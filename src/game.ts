@@ -22,6 +22,7 @@ import { Traffic, TRAFFIC_ASSETS } from './world/traffic';
 import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
+import { ViewControl } from './world/viewcam';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
@@ -129,6 +130,8 @@ export class Game {
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   paused = false;
+  /** rotazione, zoom e inclinazione della camera scelti dal giocatore */
+  view = new ViewControl();
   private outline!: OutlineRenderer;
   private sky = new Sky();
   private clouds = new Clouds(260);
@@ -442,6 +445,7 @@ export class Game {
     }
     this.dismount();
     this.scene.remove(this.player.root);
+    this.view.reset();
     this.interior = new TruckInterior(this, biz);
     this.interior.enter(this.player);
     this.moveTarget = null;
@@ -453,6 +457,7 @@ export class Game {
     const lotId = this.interior.biz.lotId;
     this.interior.exit();
     this.interior = null;
+    this.view.reset();
     const site = this.trucks.get(lotId)!;
     this.player.root.position.copy(site.inter.pos);
     this.player.root.rotation.y = DIR_ROT[site.slot.dir];
@@ -568,6 +573,7 @@ export class Game {
     this.moveTarget = null;
     this.houseDoor.copy(door);
     this.scene.remove(this.player.root);
+    this.view.reset();
     this.house = new ClientHouse(this, pid, level, {
       status: (left, total, text) => {
         run.timeLeft = left;
@@ -584,6 +590,7 @@ export class Game {
     if (!this.house) return;
     this.house.exit();
     this.house = null;
+    this.view.reset();
     this.player.root.position.copy(this.houseDoor);
     this.scene.add(this.player.root);
     this.player.play('idle');
@@ -839,6 +846,7 @@ export class Game {
 
     // il tempo del gioco scorre sempre (è un idle), anche con i pannelli aperti
     advance(s, dt * TIME.GAME_MIN_PER_SEC);
+    this.view.update(dt);
 
     if (!this.paused) {
       if (this.interior) {
@@ -946,7 +954,7 @@ export class Game {
    */
   moveVector() {
     const v = this.input.vector;
-    if (!this.firstPerson) return v;
+    if (!this.firstPerson) return this.view.toWorld(v);
     const c = Math.cos(this.fpYaw);
     const sn = Math.sin(this.fpYaw);
     // destra = (cos, sin), avanti = (sin, -cos)
@@ -1135,11 +1143,8 @@ export class Game {
   }
 
   private placeCamera() {
-    const pitch = THREE.MathUtils.degToRad(58);
-    const d = this.camDist();
     const t = this.camTarget;
-    this.camera.position.set(t.x, t.y + Math.sin(pitch) * d, t.z + Math.cos(pitch) * d);
-    this.camera.lookAt(t.x, t.y + 0.6, t.z);
+    this.view.place(this.camera, t, this.camDist(), THREE.MathUtils.degToRad(58), undefined, 0.6);
     // ombre solo attorno al giocatore
     this.sun.target.position.copy(t);
     this.sun.position.copy(t).addScaledVector(this.sunDir, 36);

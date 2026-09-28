@@ -515,3 +515,17 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .switch.on i { left: 25px; }
 .jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+
+/* ---------- comandi della camera ---------- */
+.camctl {
+  position: fixed; left: var(--sal); top: 50%; transform: translateY(-20%);
+  display: grid; grid-template-columns: 40px 40px; gap: 6px; z-index: 6;
+}
+.camctl button {
+  width: 40px; height: 40px; border-radius: 12px; border: 3px solid #fff; background: rgba(58, 47, 85, .72);
+  color: #fff; font-size: 18px; font-weight: 700; padding: 0; box-shadow: 0 3px 8px rgba(0,0,0,.2); touch-action: none;
+}
+.camctl button:active { background: var(--blue); transform: scale(.94); }
+.camctl .wide { grid-column: 1 / -1; width: auto; font-size: 12px; opacity: .55; }
+.camctl.changed .wide { opacity: 1; background: var(--blue); }
+@media (orientation: landscape) { .camctl { top: auto; bottom: calc(var(--sab) + 12px); transform: none; } }

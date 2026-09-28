@@ -79,6 +79,7 @@ export class UI {
   private minimap!: Minimap;
   private mapScreen!: MapScreen;
   private rideEl!: HTMLButtonElement;
+  private camEl!: HTMLDivElement;
   private pointers!: EdgePointers;
 
   constructor(private game: Game) {
@@ -171,6 +172,42 @@ export class UI {
     this.root.appendChild(act);
     this.actionEl = act;
 
+    // comandi della camera (terza persona)
+    const cam = document.createElement('div');
+    cam.className = 'camctl';
+    cam.innerHTML = `
+      <button data-v="spin:1" aria-label="Ruota a sinistra">⟲</button><button data-v="spin:-1" aria-label="Ruota a destra">⟳</button>
+      <button data-v="zoom:1" aria-label="Avvicina">＋</button><button data-v="zoom:-1" aria-label="Allontana">－</button>
+      <button data-v="tilt:1" aria-label="Più dall'alto">▲</button><button data-v="tilt:-1" aria-label="Più di lato">▼</button>
+      <button data-v="reset" class="wide" aria-label="Visuale standard">⌂ Visuale</button>`;
+    const view = this.game.view;
+    cam.querySelectorAll<HTMLButtonElement>('[data-v]').forEach((b) => {
+      const [k, d] = b.dataset.v!.split(':');
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (k === 'reset') view.reset();
+        else view.hold(k as 'spin' | 'zoom' | 'tilt', +d);
+      });
+      const stop = () => k !== 'reset' && view.hold(k as 'spin' | 'zoom' | 'tilt', 0);
+      b.addEventListener('pointerup', stop);
+      b.addEventListener('pointerleave', stop);
+      b.addEventListener('pointercancel', stop);
+    });
+    this.root.appendChild(cam);
+    this.camEl = cam;
+    // rotellina = zoom, Q/R = ruota (su PC)
+    window.addEventListener('wheel', (e) => {
+      if (this.panel || (e.target as HTMLElement).closest?.('.mapscreen,.modal')) return;
+      view.zoomBy(Math.exp(e.deltaY * 0.001));
+    }, { passive: true });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyQ') view.hold('spin', 1);
+      if (e.code === 'KeyR') view.hold('spin', -1);
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyQ' || e.code === 'KeyR') view.hold('spin', 0);
+    });
+
     const ride = document.createElement('button');
     ride.className = 'ride-btn';
     ride.addEventListener('click', () => this.game.toggleRide());
@@ -219,6 +256,8 @@ export class UI {
 
     this.minimap.el.style.display = settings.minimap ? '' : 'none';
     if (settings.minimap) this.minimap.update(dt);
+    this.camEl.style.display = this.game.firstPerson ? 'none' : '';
+    this.camEl.classList.toggle('changed', this.game.view.changed);
     const r = s.riding;
     const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {

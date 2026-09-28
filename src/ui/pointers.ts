@@ -85,7 +85,7 @@ export class EdgePointers {
       const wx = m.x - p.x;
       const wz = m.z - p.z;
       // in prima persona lo schermo è ruotato come lo sguardo
-      const yaw = g.firstPerson ? g.fpYaw : 0;
+      const yaw = g.firstPerson ? g.fpYaw : -g.view.yaw;
       const dx = wx * Math.cos(yaw) + wz * Math.sin(yaw);
       const dy = -(wx * Math.sin(yaw) - wz * Math.cos(yaw));
       const tx = dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity;

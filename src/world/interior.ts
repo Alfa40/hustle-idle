@@ -15,6 +15,7 @@ import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
 import { label } from './props';
 import { Particles } from './particles';
+import { updateCutWalls, type CutWall } from './viewcam';
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
@@ -101,6 +102,7 @@ export class TruckInterior {
   private queueBase: THREE.Vector3;
   private door: THREE.Vector3;
   private uiT = 0;
+  private walls: CutWall[] = [];
   private fx = new Particles();
   private smokeT = 0;
   private earned = 0;
@@ -143,10 +145,12 @@ export class TruckInterior {
     const back = new THREE.Mesh(new THREE.BoxGeometry(W, 2.4, 0.15), wallMat);
     back.position.set(this.center, 1.2, BACK - 0.1);
     s.add(back);
+    this.walls.push({ obj: back, at: back.position.clone(), out: new THREE.Vector3(0, 0, -1) });
     for (const x of [LEFT, LEFT + W]) {
       const side = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1, depth), wallMat);
       side.position.set(x, 0.5, (BACK + COUNTER_Z) / 2);
       s.add(side);
+      this.walls.push({ obj: side, at: side.position.clone(), out: new THREE.Vector3(x === LEFT ? -1 : 1, 0, 0) });
     }
     // bancone dei clienti (a sinistra resta libera la porta)
     const cx0 = LEFT + 1.5;
@@ -276,8 +280,8 @@ export class TruckInterior {
     const max = LEFT + this.width - v.half + 0.7;
     const want = min >= max ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, min, max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
-    this.camera.position.set(this.camX, Math.sin(v.pitch) * v.d, v.z + Math.cos(v.pitch) * v.d);
-    this.camera.lookAt(this.camX, 0, v.z);
+    this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
+    updateCutWalls(this.walls, this.camera);
   }
 
   // ---------------- ordini ----------------

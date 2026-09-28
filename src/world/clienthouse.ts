@@ -7,6 +7,7 @@ import { toast } from '../sim/bus';
 import type { Character } from './character';
 import { label } from './props';
 import { Particles } from './particles';
+import { updateCutWalls, type CutWall } from './viewcam';
 
 export const HOUSE_ASSETS = [
   'furniture/loungeSofa.glb', 'furniture/bedDouble.glb', 'furniture/tableCoffee.glb', 'furniture/lampRoundFloor.glb',
@@ -99,6 +100,7 @@ export class ClientHouse {
   private camX = 0;
   private view = { half: 4, d: 10, pitch: 1, z: 0.3 };
   private cleaning: boolean;
+  private walls: CutWall[] = [];
   private fx = new Particles();
 
   constructor(private game: Game, private pid: ProductId, level: number, private hooks: HouseRunHooks) {
@@ -147,6 +149,7 @@ export class ClientHouse {
       const back = new THREE.Mesh(new THREE.BoxGeometry(ROOM_W, 2.4, 0.15), new THREE.MeshLambertMaterial({ color: walls[r % 3] }));
       back.position.set(x0 + ROOM_W / 2, 1.2, BACK - 0.08);
       s.add(back);
+      this.walls.push({ obj: back, at: back.position.clone(), out: new THREE.Vector3(0, 0, -1) });
       // parete interna con passaggio
       if (r > 0) {
         const wallMat = new THREE.MeshLambertMaterial({ color: 0xbfae98 });
@@ -161,11 +164,13 @@ export class ClientHouse {
       const side = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, D), sideMat);
       side.position.set(x, 0.6, (BACK + FRONT) / 2);
       s.add(side);
+      this.walls.push({ obj: side, at: side.position.clone(), out: new THREE.Vector3(x === LEFT ? -1 : 1, 0, 0) });
     }
     // parete davanti bassa (si vede dentro) con la porta d'ingresso a sinistra
     const front = new THREE.Mesh(new THREE.BoxGeometry(W - 1.6, 0.5, 0.15), sideMat);
     front.position.set(LEFT + 1.6 + (W - 1.6) / 2, 0.25, FRONT);
     s.add(front);
+    this.walls.push({ obj: front, at: front.position.clone(), out: new THREE.Vector3(0, 0, 1) });
     const mat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.9), new THREE.MeshLambertMaterial({ color: 0x4cd07d }));
     mat.position.set(this.door.x, 0.06, this.door.z);
     s.add(mat);
@@ -370,8 +375,8 @@ export class ClientHouse {
     const max = LEFT + this.width - v.half + 0.7;
     const want = min >= max ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, min, max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
-    this.camera.position.set(this.camX, Math.sin(v.pitch) * v.d, v.z + Math.cos(v.pitch) * v.d);
-    this.camera.lookAt(this.camX, 0, v.z);
+    this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
+    updateCutWalls(this.walls, this.camera);
   }
 
   // ---------------- aggiornamento ----------------
