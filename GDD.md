@@ -111,7 +111,10 @@ clienti/ora = base_prodotto
 ```
 
 - **Casuale ma guidata:** ogni prodotto ha una domanda che oscilla da un giorno all'altro.
-- **Calendario di gioco con eventi:** stagioni, festività, meteo (ondata di caldo → gelati +50%), fiere, eventi cittadini. Gli eventi vengono annunciati in anticipo, così il player può prepararsi (per esempio riempiendo il magazzino).
+- **Calendario di gioco** (si apre toccando la data in alto):
+  - **Eventi sicuri:** feste fisse a date precise (Concertone del 1° Maggio, Festa della Repubblica, Notte bianca, Ferragosto, Halloween, Mercatini di Natale, Capodanno…), appuntamenti settimanali (mercato del sabato, domenica al parco) ed eventi casuali annunciati 2–5 giorni prima (festa del quartiere, fiera dello street food, concerto, sagra).
+  - **Meteo con previsioni a 7 giorni** in percentuale: sole, nuvoloso, pioggia, temporale, ondata di caldo, gelata, neve, con probabilità diverse per stagione. Più il giorno è lontano, meno la previsione è affidabile. Il tempo tende a durare più giorni.
+  - Ogni evento e ogni tempo mostra il suo effetto sulla domanda (es. "🍦 ×2").
 - **Concorrenti:** per ora no.
 
 ## 9. Esperienza e fama
@@ -206,6 +209,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Bacheca con 3 missioni giornaliere
 - Casa: teletrasporto e "dormi fino alle 7"
 - Salvataggio automatico e guadagno offline a fasce
+
+### Versione 0.2 (28/09/2026), fatto
+- Freccette ai bordi dello schermo verso i 3 lavoretti più vicini (o verso l'obiettivo del lavoro in corso), con distanza
+- Minimappa centrata sul giocatore + mappa a tutto schermo con legenda, lavori vicini (direzione, distanza, paga) e food truck
+- Interfaccia allegra: font Fredoka, pannelli chiari con intestazione colorata, pulsanti con etichetta, schede con icone
+- Calendario con eventi sicuri e previsioni meteo
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

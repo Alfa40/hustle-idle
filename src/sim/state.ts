@@ -2,6 +2,7 @@ import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
 import type { JobType } from '../config/jobs';
 import type { ProductId } from '../config/products';
+import { EVENT_BY_ID, type WeatherId } from '../config/events';
 import { SKILL_IDS, type SkillId } from '../config/skills';
 
 export interface Employee {
@@ -85,6 +86,8 @@ export interface GameState {
   missionsDay: number;
   missions: Mission[];
   events: CalEvent[];
+  /** meteo reale per giorno (solo i prossimi giorni) */
+  weather: Record<number, WeatherId>;
   eventSeq: number;
   demandDay: number;
   demandRand: Record<ProductId, number>;
@@ -117,6 +120,7 @@ export function newState(): GameState {
     missionsDay: -1,
     missions: [],
     events: [],
+    weather: {},
     eventSeq: 1,
     demandDay: -1,
     demandRand: { panini: 1, hotdog: 1, tacos: 1, gelati: 1 },
@@ -136,7 +140,10 @@ export function loadState(): GameState | null {
     if (!raw) return null;
     const s = JSON.parse(raw) as GameState;
     if (s.version !== 1) return null;
-    return { ...newState(), ...s };
+    const st = { ...newState(), ...s };
+    // eventi di versioni vecchie che non esistono più
+    st.events = st.events.filter((e) => EVENT_BY_ID[e.defId]);
+    return st;
   } catch {
     return null;
   }

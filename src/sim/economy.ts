@@ -3,10 +3,10 @@ import {
   BUSINESS_TYPES, FIRST_NAMES, LAST_NAMES, ROLES, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
-import { EVENT_BY_ID } from '../config/events';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
+import { activeToday, effectMultiplier } from './effects';
 import { addFame, addMoney } from './progress';
 import {
   day, emptyLedger, euro, hourOf, monthIndex, pick, rand, randInt,
@@ -29,16 +29,7 @@ export const bizAtLot = (s: GameState, lotId: string) => s.businesses.find((b) =
 // ---------------- domanda ----------------
 
 export function eventMultiplier(s: GameState, pid: ProductId, zone: ZoneId) {
-  const d = day(s);
-  let m = 1;
-  for (const e of s.events) {
-    if (d < e.startDay || d > e.endDay) continue;
-    const def = EVENT_BY_ID[e.defId];
-    if (def.all) m *= def.all;
-    m *= def.product?.[pid] ?? 1;
-    m *= def.zone?.[zone] ?? 1;
-  }
-  return m;
+  return effectMultiplier(activeToday(s), pid, zone);
 }
 
 /** Domanda "di mercato" di un prodotto in una zona (senza bonus dell'attività). */

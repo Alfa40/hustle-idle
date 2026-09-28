@@ -22,7 +22,7 @@ export function exclamation() {
     g.fill();
     g.stroke();
     g.fillStyle = '#3a2800';
-    g.font = 'bold 84px system-ui, sans-serif';
+    g.font = '700 84px Fredoka, system-ui, sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText('!', 64, 70);
@@ -38,17 +38,17 @@ export function label(text: string, opts: { bg?: string; fg?: string; scale?: nu
   const fontPx = 44;
   const pad = 18;
   const tmp = document.createElement('canvas').getContext('2d')!;
-  tmp.font = `bold ${fontPx}px system-ui, sans-serif`;
+  tmp.font = `600 ${fontPx}px Fredoka, system-ui, sans-serif`;
   const w = Math.ceil(tmp.measureText(text).width) + pad * 2;
   const h = fontPx + pad * 1.4;
   const tex = canvasTexture(w, h, (g) => {
-    g.fillStyle = opts.bg ?? 'rgba(20,24,36,0.85)';
+    g.fillStyle = opts.bg ?? '#ffffff';
     const r = h / 2;
     g.beginPath();
     g.roundRect(0, 0, w, h, r);
     g.fill();
-    g.fillStyle = opts.fg ?? '#fff';
-    g.font = `bold ${fontPx}px system-ui, sans-serif`;
+    g.fillStyle = opts.fg ?? (opts.bg ? '#fff' : '#3a2f55');
+    g.font = `600 ${fontPx}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, w / 2, h / 2 + 2);
@@ -139,7 +139,7 @@ export function board() {
   panel.position.y = 1.55;
   panel.castShadow = true;
   g.add(panel);
-  const top = label('📋 BACHECA', { bg: '#1d2433', scale: 0.55 });
+  const top = label('📋 BACHECA', { bg: '#8e5bd6', scale: 0.55 });
   top.position.y = 2.65;
   g.add(top);
   return g;
@@ -155,10 +155,10 @@ export function saleSign(text: string) {
     c.fillStyle = '#e53935';
     c.fillRect(0, 0, 256, 128);
     c.fillStyle = '#fff';
-    c.font = 'bold 40px system-ui, sans-serif';
+    c.font = '700 40px Fredoka, system-ui, sans-serif';
     c.textAlign = 'center';
     c.fillText('IN VENDITA', 128, 52);
-    c.font = 'bold 34px system-ui, sans-serif';
+    c.font = '600 34px Fredoka, system-ui, sans-serif';
     c.fillText(text, 128, 100);
   });
   const panel = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.65, 0.06), new THREE.MeshLambertMaterial({ map: tex }));

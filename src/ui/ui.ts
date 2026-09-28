@@ -1,11 +1,15 @@
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
 import { BUSINESS_TYPES, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
-import { EVENT_BY_ID, MONTH_NAMES } from '../config/events';
+import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
+import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
 import { JOBS } from '../config/jobs';
 import { LOTS, ZONES } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game } from '../game';
+import { drawMap, Minimap } from './map';
+import { EdgePointers } from './pointers';
+import { CITY_MAP, TILE } from '../config/map';
 import { bus, toast } from '../sim/bus';
 import type { OfflineReport } from '../sim/calendar';
 import {
@@ -19,7 +23,6 @@ import {
   type Business, type Employee, type JobOffer,
 } from '../sim/state';
 
-const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 
 type Actions = Record<string, (arg: string) => void>;
 
@@ -28,7 +31,12 @@ interface Panel {
   actions: Actions;
   live?: boolean;
   small?: boolean;
+  wide?: boolean;
+  /** colore dell'intestazione */
+  color?: string;
   title: string;
+  /** dopo ogni render (es. per disegnare un canvas) */
+  after?: (body: HTMLElement) => void;
   onClose?: () => void;
 }
 
@@ -64,6 +72,8 @@ export class UI {
   private liveTimer = 0;
   private lastAction = '';
   private queue: Panel[] = [];
+  private minimap!: Minimap;
+  private pointers!: EdgePointers;
 
   constructor(private game: Game) {
     this.buildHud();
@@ -83,24 +93,32 @@ export class UI {
     top.innerHTML = `
       <div class="pills">
         <div class="pill money" id="h-money">€0</div>
-        <div class="pill" id="h-date"></div>
+        <button class="pill date" id="h-date" style="border:none"></button>
         <div class="pill event" id="h-event" style="display:none"></div>
-        <div class="pill" id="h-info" style="display:none"></div>
-      </div>
-      <div class="hud-btns">
-        <button class="hbtn" data-h="biz" title="Attività">🏢</button>
-        <button class="hbtn" data-h="missions" title="Missioni">📋<span class="dot" id="h-dot" style="display:none"></span></button>
-        <button class="hbtn" data-h="profile" title="Profilo">👤</button>
-        <button class="hbtn" data-h="home" title="Vai a casa">🏠</button>
-        <button class="hbtn" data-h="settings" title="Impostazioni">⚙️</button>
+        <div class="pill info" id="h-info" style="display:none"></div>
       </div>`;
     this.root.appendChild(top);
+    const right = document.createElement('div');
+    right.className = 'hud-right';
+    right.innerHTML = `
+      <div class="hud-btns">
+        <button class="hbtn c-orange" data-h="biz"><span class="i">🏢</span><span class="l">Attività</span></button>
+        <button class="hbtn c-purple" data-h="missions"><span class="i">📋</span><span class="l">Missioni</span><span class="dot" id="h-dot" style="display:none">!</span></button>
+        <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span></button>
+        <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
+        <button class="hbtn c-gray" data-h="settings"><span class="i">⚙️</span><span class="l">Opzioni</span></button>
+      </div>`;
+    this.root.appendChild(right);
+    this.minimap = new Minimap(this.game, () => this.openMap());
+    right.prepend(this.minimap.el);
+    this.pointers = new EdgePointers(this.game, document.body);
     this.moneyEl = top.querySelector('#h-money')!;
     this.dateEl = top.querySelector('#h-date')!;
     this.eventEl = top.querySelector('#h-event')!;
     this.infoEl = top.querySelector('#h-info')!;
-    this.missionDot = top.querySelector('#h-dot')!;
-    top.querySelectorAll<HTMLButtonElement>('[data-h]').forEach((b) =>
+    this.dateEl.addEventListener('click', () => this.openCalendar());
+    this.missionDot = right.querySelector('#h-dot')!;
+    right.querySelectorAll<HTMLButtonElement>('[data-h]').forEach((b) =>
       b.addEventListener('click', () => {
         const k = b.dataset.h;
         if (k === 'biz') this.openBusinessList();
@@ -154,11 +172,10 @@ export class UI {
       this.moneyEl.textContent = m;
       this.moneyEl.classList.toggle('neg', s.money < 0);
     }
-    const d = formatDate(s.minutes);
-    if (this.dateEl.textContent !== d) this.dateEl.textContent = d;
     const today = day(s);
-    const ev = s.events.filter((e) => today >= e.startDay && today <= e.endDay).map((e) => EVENT_BY_ID[e.defId]);
-    const evText = ev.map((e) => `${e.icon} ${e.name}`).join(' · ');
+    const d = `${WEATHER[weatherOf(s, today)].icon} ${formatDate(s.minutes)} 📅`;
+    if (this.dateEl.textContent !== d) this.dateEl.textContent = d;
+    const evText = activeToday(s).filter((x) => x.kind !== 'weather').map(({ h }) => `${h.icon} ${h.name}`).join(' · ');
     if (this.eventEl.textContent !== evText) {
       this.eventEl.textContent = evText;
       this.eventEl.style.display = evText ? '' : 'none';
@@ -182,6 +199,9 @@ export class UI {
       fill.style.width = `${f * 100}%`;
       fill.className = 'fill' + (f < 0.2 ? ' danger' : f < 0.45 ? ' warn' : '');
     }
+
+    this.minimap.update(dt);
+    this.pointers.update();
 
     if (this.panel?.live) {
       this.liveTimer += dt;
@@ -239,7 +259,7 @@ export class UI {
     this.game.input.cancel();
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''}"><div class="sheet-head"><h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
+    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head"><h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
     modal.addEventListener('pointerdown', (e) => {
@@ -276,6 +296,7 @@ export class UI {
     body.innerHTML = content;
     body.scrollTop = scroll;
     (this.modal.querySelector('h2') as HTMLElement).textContent = this.panel.title;
+    this.panel.after?.(body);
   }
 
   close() {
@@ -300,14 +321,16 @@ export class UI {
     this.open({
       title: `${def.icon} ${def.name}`,
       small: true,
+      color: 'var(--orange)',
       render: () => `
-        <div class="card"><p style="margin:0">${def.intro}</p></div>
+        <div class="card tint row"><div class="icon-bubble" style="background:#fff">${def.icon}</div><p style="margin:0">${def.intro}</p></div>
         <div class="grid2">
-          <div class="stat"><b>${euro(offer.pay)}</b><span>paga base (2★)</span></div>
-          <div class="stat"><b>Liv. ${offer.level}</b><span>difficoltà</span></div>
-          <div class="stat"><b>${euro(offer.pay * 1.35)}</b><span>con 3★</span></div>
-          <div class="stat"><b>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</b><span>esperienza</span></div>
+          <div class="stat s-green"><b class="money-t">${euro(offer.pay)}</b><span>💰 paga (⭐⭐)</span></div>
+          <div class="stat s-yellow"><b class="money-t">${euro(offer.pay * 1.35)}</b><span>🤩 paga con ⭐⭐⭐</span></div>
+          <div class="stat s-purple"><b>Liv. ${offer.level}</b><span>📈 difficoltà</span></div>
+          <div class="stat"><b>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</b><span>esperienza che guadagni</span></div>
         </div>
+        <p class="muted small center" style="margin:10px 0 0">Più sei veloce, più stelle prendi ⭐</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
         yes: () => {
@@ -323,15 +346,16 @@ export class UI {
     const def = JOBS[offer.type];
     const st = [1, 2, 3].map((i) => `<span class="${i <= stars ? '' : 'off'}">⭐</span>`).join('');
     this.open({
-      title: stars ? 'Lavoro completato!' : 'Lavoro fallito',
+      title: stars ? (stars === 3 ? '🎉 Perfetto!' : '👍 Lavoro completato!') : '😓 Lavoro fallito',
       small: true,
+      color: stars ? 'var(--green)' : 'var(--red)',
       render: () => `
         <div class="stars">${st}</div>
-        <p class="center muted">${def.icon} ${def.name}</p>
+        <p class="center muted" style="margin-top:0">${def.icon} ${def.name}</p>
         ${stars ? `<div class="grid2">
-          <div class="stat"><b class="money-t">+${euro(pay)}</b><span>guadagno</span></div>
-          <div class="stat"><b>+${xp} XP</b><span>${SKILLS[def.skill].name}</span></div>
-          <div class="stat"><b>+${fame.toFixed(1)}</b><span>fama ${SKILLS[def.skill].name}</span></div>
+          <div class="stat s-green"><b class="money-t">+${euro(pay)}</b><span>💰 guadagno</span></div>
+          <div class="stat s-purple"><b>+${xp} XP</b><span>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</span></div>
+          <div class="stat s-yellow"><b>+${fame.toFixed(1)}</b><span>⭐ fama ${SKILLS[def.skill].name}</span></div>
           <div class="stat"><b>Liv. ${skillLevel(this.s, def.skill)}</b><span>${SKILLS[def.skill].name}</span></div>
         </div>` : `<p class="center">Tempo scaduto o lavoro abbandonato.<br><span class="bad">-1 fama ${SKILLS[def.skill].name}</span></p>`}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
@@ -348,6 +372,7 @@ export class UI {
     this.open({
       title: `🏷️ ${lot.name}`,
       small: true,
+      color: 'var(--red)',
       render: () => {
         const s = this.s;
         const prods = BUSINESS_TYPES[type].products
@@ -358,14 +383,14 @@ export class UI {
           .join('');
         return `
           <div class="grid2">
-            <div class="stat"><b>${ZONES[zone].name}</b><span>zona (domanda ×${ZONES[zone].demand})</span></div>
-            <div class="stat"><b>${euro(lot.rent)}/mese</b><span>posteggio</span></div>
+            <div class="stat s-purple"><b>📍 ${ZONES[zone].name}</b><span>zona · clienti ×${ZONES[zone].demand}</span></div>
+            <div class="stat s-orange"><b>${euro(lot.rent)}</b><span>🅿️ posteggio al mese</span></div>
           </div>
           <div class="card" style="margin-top:10px"><h3>🚚 Food truck</h3>
             <p class="muted small" style="margin-top:0">Clienti all'ora previsti oggi in questa zona:</p>${prods}
             <p class="muted small">Costi fissi: posteggio ${euro(lot.rent)} + bollette ${euro(BUSINESS.UTILITIES_MONTH)} al mese, più gli stipendi.</p>
           </div>
-          <button class="btn full" data-a="buy" ${s.money < lot.price ? 'disabled' : ''}>Compra per ${euro(lot.price)}</button>
+          <button class="btn good full" data-a="buy" ${s.money < lot.price ? 'disabled' : ''}>🛒 Compra per ${euro(lot.price)}</button>
           ${s.money < lot.price ? `<p class="center muted small">Ti mancano ${euro(lot.price - s.money)}</p>` : ''}`;
       },
       actions: {
@@ -389,6 +414,7 @@ export class UI {
     this.open({
       title: '🏢 Le tue attività',
       live: true,
+      color: 'var(--orange)',
       render: () => {
         if (!s.businesses.length) {
           const cheapest = Math.min(...LOTS.map((l) => l.price));
@@ -428,6 +454,7 @@ export class UI {
     this.open({
       title: `${BUSINESS_TYPES[b().type].icon} ${lotDef(b().lotId).name}`,
       live: true,
+      color: 'var(--orange)',
       render: () => {
         const head = `<div class="tabs">${tabs.map(([k, n]) => `<button class="tab ${cur === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
         return head + this.bizTab(b(), cur);
@@ -476,19 +503,19 @@ export class UI {
       const dem = totalDemand(s, b);
       const cap = autoCapacity(b);
       return `
-        <div class="card"><div class="row between"><h3>Stato</h3>${this.autoTag(b)}</div>
+        <div class="card ${isAutonomous(b) ? '' : 'hl'}"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
           ${missing.length ? `<p class="muted small" style="margin:0">Per farla lavorare da sola serve: <b>${missing.join(', ')}</b>. Fino ad allora vende solo quando ci sei tu dentro.</p>`
             : '<p class="muted small" style="margin:0">Lavora da sola anche quando sei altrove o offline.</p>'}
         </div>
         <div class="grid2">
-          <div class="stat"><b>${dem.toFixed(1)}/h</b><span>clienti richiesti ora</span></div>
-          <div class="stat"><b>${isAutonomous(b) ? cap.toFixed(1) + '/h' : '—'}</b><span>capacità dipendenti</span></div>
-          <div class="stat"><b class="money-t">${euro(b.today.revenue)}</b><span>incasso oggi · ${b.today.served} clienti</span></div>
-          <div class="stat"><b>${b.today.lost}</b><span>clienti persi oggi</span></div>
-          <div class="stat"><b>${euro(b.yesterday.revenue)}</b><span>incasso ieri</span></div>
-          <div class="stat"><b>${euro(b.month.revenue)}</b><span>incasso del mese</span></div>
+          <div class="stat s-purple"><b>${dem.toFixed(1)}/h</b><span>🙋 clienti richiesti ora</span></div>
+          <div class="stat"><b>${isAutonomous(b) ? cap.toFixed(1) + '/h' : '—'}</b><span>👥 capacità dipendenti</span></div>
+          <div class="stat s-green"><b class="money-t">${euro(b.today.revenue)}</b><span>💰 oggi · ${b.today.served} clienti</span></div>
+          <div class="stat s-red"><b>${b.today.lost}</b><span>😠 clienti persi oggi</span></div>
+          <div class="stat s-yellow"><b>${euro(b.yesterday.revenue)}</b><span>📅 incasso ieri</span></div>
+          <div class="stat s-orange"><b>${euro(b.month.revenue)}</b><span>🗓️ incasso del mese</span></div>
         </div>
-        <div class="card" style="margin-top:10px"><h3>Costi mensili</h3>
+        <div class="card" style="margin-top:10px"><h3>🧾 Costi mensili</h3>
           <div class="row between small"><span>Posteggio</span><span>${euro(c.rent)}</span></div>
           <div class="row between small"><span>Bollette</span><span>${euro(c.utilities)}</span></div>
           <div class="row between small"><span>Stipendi (${b.staff.length})</span><span>${euro(fullSal)}</span></div>
@@ -538,7 +565,7 @@ export class UI {
         .map((e) => this.empCard(e, `<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button>`))
         .join('');
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => ROLES[r].name.toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più clienti serviti.</p>
-        <h3>Il tuo staff</h3>${staff}<h3>Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Nuovi candidati ogni giorno.</p>${cands}`;
+        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}<h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Nuovi candidati ogni giorno.</p>${cands}`;
     }
     // migliorie
     return UPGRADE_IDS.map((id) => {
@@ -546,9 +573,9 @@ export class UI {
       const lvl = upg(b, id);
       const maxed = lvl >= u.max;
       const cost = u.cost(lvl);
-      return `<div class="card"><div class="row between"><h3>${u.icon} ${u.name}</h3><span class="tag">Liv. ${lvl}/${u.max}</span></div>
+      return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
         <p class="muted small" style="margin:0 0 8px">${u.desc}</p>
-        <button class="btn sm full" data-a="upgrade:${id}" ${maxed || s.money < cost ? 'disabled' : ''}>${maxed ? 'Massimo' : 'Migliora · ' + euro(cost)}</button></div>`;
+        <button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || s.money < cost ? 'disabled' : ''}>${maxed ? 'Massimo' : 'Migliora · ' + euro(cost)}</button></div>`;
     }).join('');
   }
 
@@ -564,13 +591,14 @@ export class UI {
   openMissions() {
     const s = this.s;
     this.open({
-      title: '📋 Bacheca',
+      title: '📋 Bacheca missioni',
       live: true,
+      color: 'var(--purple)',
       render: () => {
         const ms = s.missions
           .map((m) => {
             const done = m.progress >= m.target;
-            return `<div class="card"><div class="row between"><b style="flex:1">${m.text}</b>${
+            return `<div class="card ${done && !m.claimed ? 'hl' : ''}"><div class="row between"><b style="flex:1">${m.text}</b>${
               m.claimed ? '<span class="tag g">Riscossa</span>' : done ? `<button class="btn sm good" data-a="claim:${m.id}">Riscuoti</button>` : ''
             }</div>
             <div class="bar green"><i style="width:${(m.progress / m.target) * 100}%"></i></div>
@@ -578,26 +606,23 @@ export class UI {
           })
           .join('');
         const today = day(s);
-        const evs = [...s.events].sort((a, b) => a.startDay - b.startDay)
-          .map((e) => {
-            const def = EVENT_BY_ID[e.defId];
-            const active = today >= e.startDay;
-            const when = active ? '<span class="tag y">In corso</span>' : `<span class="tag">tra ${e.startDay - today} g</span>`;
-            return `<div class="card"><div class="row between"><b>${def.icon} ${def.name}</b>${when}</div><div class="muted small">${def.desc} (${e.endDay - e.startDay + 1} giorni)</div></div>`;
-          })
-          .join('') || '<p class="muted small">Nessun evento in programma.</p>';
-        const mi = monthIndex(today);
+        const evs = [0, 1, 2].map((k) => this.dayCard(today + k, false)).join('');
         const prods = (Object.keys(PRODUCTS) as ProductId[])
           .map((p) => {
             const d = marketDemand(s, p, 'periferia');
             return `<div class="row between small"><span>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>${demandBars(d, 2.4)}</div>`;
           })
           .join('');
-        return `<h3>Missioni di oggi</h3><p class="muted small" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama.</p>${ms}
-          <h3>📅 Calendario — ${MONTH_NAMES[mi]}, anno ${yearOf(today)}</h3>${evs}
-          <div class="card"><h3>Domanda del giorno</h3>${prods}</div>`;
+        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama.</p>${ms}
+          <h3 class="sec-title">📅 Prossimi giorni</h3>${evs}
+          <button class="btn blue full" data-a="cal" style="margin-bottom:10px">📅 Apri il calendario completo</button>
+          <div class="card"><h3>📊 Domanda del giorno</h3>${prods}</div>`;
       },
       actions: {
+        cal: () => {
+          this.close();
+          this.openCalendar();
+        },
         claim: (id) => {
           const m = s.missions.find((x) => x.id === id);
           if (!m || m.claimed || m.progress < m.target) return;
@@ -610,6 +635,152 @@ export class UI {
     });
   }
 
+  // ---------------- calendario ----------------
+
+  private dayName(d: number) {
+    const k = d - day(this.s);
+    const date = `${WEEKDAYS[weekday(d)]} ${dayOfMonth(d)} ${MONTH_NAMES[monthIndex(d)]}`;
+    return k === 0 ? `Oggi · ${date}` : k === 1 ? `Domani · ${date}` : date;
+  }
+
+  private happeningRow({ h, kind }: DayHappening) {
+    const tag = kind === 'weekly' ? '<span class="tag b">ogni settimana</span>' : '<span class="tag g">sicuro</span>';
+    const fx = effectText(h);
+    return `<div class="row" style="margin-top:6px;align-items:flex-start"><div class="icon-bubble" style="width:36px;height:36px;font-size:19px">${h.icon}</div>
+      <div style="flex:1"><div class="row between"><b>${h.name}</b>${tag}</div><div class="muted small">${h.desc}${fx ? ` <b style="color:var(--ink)">${fx}</b>` : ''}</div></div></div>`;
+  }
+
+  /** Scheda di un giorno: meteo (certo o previsto) + eventi sicuri. */
+  private dayCard(d: number, full = true) {
+    const s = this.s;
+    const k = d - day(s);
+    const events = sureEvents(s, d);
+    let weather = '';
+    if (k >= 0 && k <= FORECAST_DAYS) {
+      const fc = forecast(s, d);
+      const top = WEATHER[fc[0].w];
+      if (k === 0) {
+        weather = `<div class="row"><div class="icon-bubble" style="width:36px;height:36px;font-size:19px;background:#dff1ff">${top.icon}</div>
+          <div style="flex:1"><b>${top.name}</b> <span class="tag b">meteo di oggi</span><div class="muted small">${top.desc} ${effectText(top) ? `<b style="color:var(--ink)">${effectText(top)}</b>` : ''}</div></div></div>`;
+      } else {
+        const probs = fc.slice(0, full ? 3 : 2).map((x) => `${WEATHER[x.w].icon} ${WEATHER[x.w].name} <b>${Math.round(x.p * 100)}%</b>`).join(' · ');
+        weather = `<div class="row"><div class="icon-bubble" style="width:36px;height:36px;font-size:19px;background:#dff1ff">${top.icon}</div>
+          <div style="flex:1"><b>Previsioni</b> <span class="tag">possono cambiare</span><div class="small" style="margin-top:2px">${probs}</div></div></div>`;
+      }
+    }
+    const evs = events.map((e) => this.happeningRow(e)).join('');
+    const empty = !weather && !evs ? '<div class="muted small">Nessun evento previsto.</div>' : '';
+    return `<div class="card ${k === 0 ? 'hl' : ''}"><h3>${this.dayName(d)}</h3>${weather}${evs}${empty}</div>`;
+  }
+
+  openCalendar() {
+    const s = this.s;
+    let monthOff = 0;
+    let sel = day(s);
+    this.open({
+      title: '📅 Calendario',
+      color: 'var(--purple)',
+      live: true,
+      actions: {
+        month: (v) => (monthOff = Math.max(0, Math.min(2, monthOff + +v))),
+        sel: (v) => (sel = +v),
+      },
+      render: () => {
+        const today = day(s);
+        const curMonthStart = today - (today % 30);
+        const start = curMonthStart + monthOff * 30;
+        const lead = weekday(start);
+        const cells: string[] = WEEKDAYS.map((w) => `<div class="cal-h">${w}</div>`);
+        for (let i = 0; i < lead; i++) cells.push('<div></div>');
+        for (let d = start; d < start + 30; d++) {
+          const k = d - today;
+          const icons = sureEvents(s, d).filter((e) => e.kind !== 'weekly').map((e) => e.h.icon).slice(0, 2).join('');
+          let wx = '';
+          if (k >= 0 && k <= FORECAST_DAYS) {
+            const f = forecast(s, d)[0];
+            wx = `<span class="cal-wx" style="opacity:${k === 0 ? 1 : 0.45 + f.p * 0.55}">${WEATHER[f.w].icon}</span>`;
+          }
+          cells.push(`<button class="cal-cell ${k === 0 ? 'today' : ''} ${k < 0 ? 'past' : ''} ${d === sel ? 'sel' : ''}" data-a="sel:${d}">
+            <span class="cal-n">${dayOfMonth(d)}</span>${wx}<span class="cal-ev">${icons}</span></button>`);
+        }
+        const upcoming: string[] = [];
+        for (let d = today + 1; d < today + 60 && upcoming.length < 5; d++) {
+          for (const e of sureEvents(s, d)) {
+            if (e.kind === 'weekly') continue;
+            if (sureEvents(s, d - 1).some((x) => x.h.id === e.h.id)) continue;
+            upcoming.push(`<div class="row between small" style="margin-top:4px"><span>${e.h.icon} <b>${e.h.name}</b></span><span class="tag ${d - today <= 3 ? 'y' : ''}">tra ${d - today} g</span></div>`);
+          }
+        }
+        return `
+          <div class="card">
+            <div class="row between" style="margin-bottom:8px">
+              <button class="btn sm sec" data-a="month:-1" ${monthOff === 0 ? 'disabled' : ''}>◀</button>
+              <h3 style="margin:0">${MONTH_NAMES[monthIndex(start)]} · anno ${yearOf(start)}</h3>
+              <button class="btn sm sec" data-a="month:1" ${monthOff === 2 ? 'disabled' : ''}>▶</button>
+            </div>
+            <div class="cal-grid">${cells.join('')}</div>
+            <div class="legend" style="margin-top:8px"><span>🟨 Oggi</span><span>☀️ Meteo previsto (più chiaro = meno sicuro)</span><span>🎉 Evento sicuro</span></div>
+          </div>
+          <h3 class="sec-title">🔎 Giorno scelto</h3>${this.dayCard(sel)}
+          <div class="card"><h3>🗓️ Prossimi eventi sicuri</h3>${upcoming.join('') || '<div class="muted small">Nessuno nei prossimi due mesi.</div>'}
+            <p class="muted small" style="margin-bottom:0">Ogni sabato c'è il 🛒 mercato e ogni domenica 🌳 la gente va al parco. Il meteo si può prevedere al massimo ${FORECAST_DAYS} giorni prima.</p></div>`;
+      },
+    });
+  }
+
+  // ---------------- mappa ----------------
+
+  openMap() {
+    const game = this.game;
+    const dirName = (dx: number, dz: number) => {
+      const a = (Math.atan2(dx, -dz) * 180) / Math.PI;
+      return ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'][Math.round(((a + 360) % 360) / 45) % 8];
+    };
+    this.open({
+      title: '🗺️ Mappa della città',
+      actions: {},
+      wide: true,
+      live: true,
+      color: 'var(--blue)',
+      render: () => {
+        const p = game.player.root.position;
+        const markers = game.mapMarkers();
+        const jobs = markers.filter((m) => m.kind === 'job' || m.kind === 'target').sort((a, b) => a.dist - b.dist);
+        const list = jobs.length
+          ? jobs.map((m) => `<div class="card row" style="padding:8px 12px;margin-bottom:6px"><div class="icon-bubble" style="background:${m.color}">${m.icon}</div>
+              <div style="flex:1"><b>${m.label}</b><div class="muted small">${dirName(m.x - p.x, m.z - p.z)} ${Math.round(m.dist)} m da te</div></div></div>`).join('')
+          : '<p class="muted small">Nessun lavoretto al momento: ne arriveranno altri a breve.</p>';
+        const others = markers.filter((m) => m.kind === 'lot' || m.kind === 'biz')
+          .map((m) => `<div class="card row" style="padding:8px 12px;margin-bottom:6px"><div class="icon-bubble" style="background:${m.color}">${m.icon}</div>
+            <div style="flex:1"><b>${m.label}</b><div class="muted small">${dirName(m.x - p.x, m.z - p.z)} ${Math.round(m.dist)} m</div></div></div>`).join('');
+        return `<div class="bigmap-layout"><div class="bigmap-wrap"><canvas class="bigmap"></canvas></div>
+          <div class="bigmap-side">
+            <div class="legend">
+              <span>🔵 Tu</span><span>🟡 Lavoretti</span><span>🎯 Obiettivo</span><span>🏷️ In vendita</span>
+              <span>🚚 Tuo food truck</span><span>📋 Bacheca</span><span>🏠 Casa</span>
+              <span><i style="background:#ffd66b"></i>Case</span><span><i style="background:#b3bde0"></i>Negozi</span>
+              <span><i style="background:#ff9f6e"></i>Ristoranti</span><span><i style="background:#5cc46a"></i>Parchi</span>
+            </div>
+            <h3 class="sec-title">🔨 Lavori vicini</h3>${list}
+            <h3 class="sec-title">🚚 Food truck</h3>${others}
+          </div></div>`;
+      },
+      after: (body) => {
+        const cv = body.querySelector<HTMLCanvasElement>('.bigmap')!;
+        const landscape = window.innerWidth > window.innerHeight;
+        const avail = landscape ? Math.min(window.innerHeight - 110, window.innerWidth * 0.5) : Math.min(body.clientWidth - 40, window.innerHeight * 0.55);
+        const size = Math.max(220, Math.floor(avail));
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        cv.width = cv.height = size * dpr;
+        cv.style.width = cv.style.height = size + 'px';
+        const g = cv.getContext('2d')!;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const span = Math.max(CITY_MAP.length, CITY_MAP[0].length) * TILE + 4;
+        drawMap(g, size, size, game, { cx: 0, cz: 0, span, full: true });
+      },
+    });
+  }
+
   // ---------------- profilo ----------------
 
   openProfile() {
@@ -617,6 +788,7 @@ export class UI {
     this.open({
       title: '👤 Profilo',
       live: true,
+      color: 'var(--blue)',
       render: () => {
         const skills = SKILL_IDS.map((k) => {
           const lvl = skillLevel(s, k);
@@ -624,12 +796,13 @@ export class UI {
           const b = LEVEL.xpForLevel(lvl + 1);
           const f = s.fame[k];
           const bonus = Math.round((f / (f + 150)) * 100);
-          return `<div class="card"><div class="row between"><h3>${SKILLS[k].icon} ${SKILLS[k].name}</h3><span class="tag y">Liv. ${lvl}</span></div>
-            <div class="bar"><i style="width:${((s.xp[k] - a) / (b - a)) * 100}%"></i></div>
+          return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${SKILLS[k].icon}</div><h3 style="margin:0">${SKILLS[k].name}</h3></div><span class="tag y">Liv. ${lvl}</span></div>
+            <div class="bar purple"><i style="width:${((s.xp[k] - a) / (b - a)) * 100}%"></i></div>
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(s.xp[k] - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div></div>`;
         }).join('');
-        return `<div class="card center"><div class="muted small">Rango</div><div class="big">${rank(s)}</div>
-          <div class="muted small">Guadagnato in totale: <b class="money-t">${euro(s.totalEarned)}</b> · Attività: ${s.businesses.length}</div></div>
+        return `<div class="card hero tint"><div class="emoji">🧑‍💼</div><div class="muted small">Il tuo rango</div><div class="big">${rank(s)}</div></div>
+          <div class="grid2" style="margin-bottom:10px"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
+          <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div></div>
           <p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>
           ${skills}`;
       },
@@ -644,12 +817,14 @@ export class UI {
     this.open({
       title: '🏠 Casa tua',
       small: true,
+      color: 'var(--green)',
       live: true,
       render: () => {
         const h = hourOf(s);
         const canSleep = h >= 19 || h < 6;
-        return `<p class="muted">La casa è il tuo punto di teletrasporto: con il pulsante 🏠 in alto ci torni all'istante da qualsiasi punto della città.</p>
-          <button class="btn full" data-a="sleep" ${canSleep ? '' : 'disabled'}>😴 Dormi fino alle 7:00</button>
+        return `<div class="hero"><div class="emoji">🏡</div></div>
+          <p class="muted center">La casa è il tuo punto di teletrasporto: con il pulsante verde <b>🏠 Casa</b> ci torni all'istante da qualsiasi punto della città.</p>
+          <button class="btn blue full" data-a="sleep" ${canSleep ? '' : 'disabled'}>😴 Dormi fino alle 7:00</button>
           <p class="center muted small">${canSleep ? 'Le attività sono chiuse di notte: dormire fa passare il tempo.' : 'Puoi dormire dalle 19:00 in poi.'}</p>`;
       },
       actions: {
@@ -666,8 +841,9 @@ export class UI {
   openSettings() {
     let confirm = false;
     this.open({
-      title: '⚙️ Impostazioni',
+      title: '⚙️ Opzioni',
       small: true,
+      color: 'var(--gray)',
       render: () => `
         <div class="card"><h3>Come si gioca</h3><p class="muted small" style="margin:0">
           Trascina il dito per muoverti (compare un joystick) oppure tocca un punto per andarci.
@@ -697,12 +873,13 @@ export class UI {
     this.open({
       title: '🌙 Bentornato!',
       small: true,
+      color: 'var(--purple)',
       render: () => `
         <p class="muted">Sei stato via ${r.realHours < 1 ? Math.round(r.realHours * 60) + ' minuti' : r.realHours.toFixed(1).replace('.', ',') + ' ore'}.
         Nel gioco sono passati ${days < 1 ? Math.round(r.gameMinutes / 60) + ' ore' : days.toFixed(1).replace('.', ',') + ' giorni'}.</p>
         <div class="grid2">
-          <div class="stat"><b class="money-t">${euro(r.revenue)}</b><span>incassi delle attività</span></div>
-          <div class="stat"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>saldo netto (dopo i costi)</span></div>
+          <div class="stat s-green"><b class="money-t">${euro(r.revenue)}</b><span>💰 incassi delle attività</span></div>
+          <div class="stat ${r.net >= 0 ? 's-green' : 's-red'}"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>🧾 saldo dopo i costi</span></div>
         </div>
         ${r.revenue === 0 ? '<p class="muted small">Solo le attività con un dipendente per reparto e un manager lavorano mentre sei via.</p>' : ''}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
@@ -712,16 +889,20 @@ export class UI {
 
   openWelcome() {
     this.open({
-      title: '👋 Benvenuto in Hustle Idle',
+      title: '👋 Benvenuto!',
       small: true,
+      color: 'var(--orange)',
       render: () => `
-        <p>Hai <b class="money-t">${euro(this.s.money)}</b> in tasca e tanta voglia di fare.</p>
-        <p class="muted">1. Cerca le persone con il <b>!</b> giallo: offrono lavoretti. Più sei veloce, più stelle e soldi ottieni.<br>
-        2. Controlla la <b>📋 bacheca</b> in piazza per le missioni del giorno.<br>
-        3. Quando hai abbastanza soldi compra un lotto <b>IN VENDITA</b> e apri il tuo food truck.<br>
-        4. Assumi dipendenti e un manager per farlo andare da solo, poi punta più in alto!</p>
-        <p class="muted small">Muoviti trascinando il dito oppure tocca dove vuoi andare. Il pulsante giallo in basso a destra serve per le azioni.</p>
-        <button class="btn full" data-a="ok">Iniziamo!</button>`,
+        <div class="hero"><div class="emoji">💼</div><p style="margin:4px 0 12px">Hai <b class="money-t">${euro(this.s.money)}</b> in tasca e tanta voglia di fare!</p></div>
+        <ul class="steps">
+          <li><div class="icon-bubble">❗</div><span>Cerca le persone con il <b>!</b> giallo: offrono <b>lavoretti</b>. Le freccette ai bordi ti portano da loro.</span></li>
+          <li><div class="icon-bubble">📋</div><span>Nella <b>bacheca</b> in piazza trovi le <b>missioni</b> del giorno.</span></li>
+          <li><div class="icon-bubble">🚚</div><span>Con i risparmi compra un lotto <b>IN VENDITA</b> e apri il tuo <b>food truck</b>.</span></li>
+          <li><div class="icon-bubble">👥</div><span>Assumi <b>dipendenti</b> e un <b>manager</b> per farlo lavorare da solo.</span></li>
+          <li><div class="icon-bubble">🗺️</div><span>Tocca la <b>mappa</b> in alto per vedere tutta la città.</span></li>
+        </ul>
+        <p class="muted small center">Trascina il dito per muoverti oppure tocca dove vuoi andare. Il pulsante giallo fa le azioni.</p>
+        <button class="btn full" data-a="ok">Iniziamo! 🚀</button>`,
       actions: {
         ok: () => {
           this.s.tutorialDone = true;

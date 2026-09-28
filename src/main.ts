@@ -1,3 +1,6 @@
+import '@fontsource/fredoka/500.css';
+import '@fontsource/fredoka/600.css';
+import '@fontsource/fredoka/700.css';
 import './ui/style.css';
 import { Game } from './game';
 import { UI } from './ui/ui';
@@ -5,6 +8,8 @@ import { UI } from './ui/ui';
 async function boot() {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const bar = document.getElementById('loadbar')!;
+  // il font serve già per le scritte 3D disegnate su canvas
+  await Promise.race([document.fonts.load('600 20px Fredoka'), new Promise((r) => setTimeout(r, 1500))]);
   const game = new Game(canvas);
   await game.init((f) => (bar.style.width = `${Math.round(f * 100)}%`));
   game.ui = new UI(game);

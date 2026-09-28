@@ -12,6 +12,8 @@ export interface JobRun {
   status: string;
   timeLeft: number;
   timeTotal: number;
+  /** dove andare adesso (per freccette e mappa) */
+  target?: THREE.Vector3;
   update(dt: number): void;
   onAction?(): void;
   dispose(): void;
@@ -29,6 +31,7 @@ abstract class BaseRun implements JobRun {
   status = '';
   timeLeft = 0;
   timeTotal = 0;
+  target?: THREE.Vector3;
   protected objs: THREE.Object3D[] = [];
   constructor(protected game: Game, protected offer: JobOffer) {}
 
@@ -106,6 +109,7 @@ export class GardenRun extends BaseRun {
       }
     }
     const left = this.bushes.filter((b) => !b.done).length;
+    this.target = this.bushes.find((b) => !b.done)?.pos;
     this.status = `Cespugli: ${this.bushes.length - left}/${this.bushes.length}`;
     if (!near) {
       this.game.prompt = null;
@@ -171,19 +175,20 @@ export class DeliveryRun extends BaseRun {
     this.placeMarker();
   }
 
-  private get target() {
+  private get dest() {
     return this.targets[this.idx];
   }
 
   private placeMarker() {
-    const t = this.target;
+    const t = this.dest;
+    this.target = t.pos;
     this.ringObj.position.set(t.pos.x, 0.05, t.pos.z);
     this.marker.position.set(t.pos.x, 3, t.pos.z);
   }
 
   update(dt: number) {
     if (!this.tick(dt)) return;
-    const t = this.target;
+    const t = this.dest;
     const p = this.game.player.root.position;
     this.marker.position.y = 3 + Math.sin(performance.now() / 250) * 0.3;
     this.marker.rotation.y += dt * 2;
@@ -200,7 +205,7 @@ export class DeliveryRun extends BaseRun {
   }
 
   onAction() {
-    const t = this.target;
+    const t = this.dest;
     const p = this.game.player.root.position;
     if (Math.hypot(t.pos.x - p.x, t.pos.z - p.z) > 1.8) return;
     this.idx++;

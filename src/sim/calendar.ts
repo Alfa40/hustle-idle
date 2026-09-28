@@ -1,5 +1,6 @@
 import { TIME } from '../config/balance';
-import { EVENTS, EVENT_BY_ID } from '../config/events';
+import { EVENTS, WEATHER } from '../config/events';
+import { ensureWeather, sureEvents, weatherOf } from './effects';
 import { JOBS, JOB_TYPES } from '../config/jobs';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
@@ -55,8 +56,11 @@ export function newDay(s: GameState, online = true) {
 export function updateEvents(s: GameState, announce = true) {
   const d = day(s);
   s.events = s.events.filter((e) => e.endDay >= d);
-  for (const e of s.events) {
-    if (e.startDay === d && announce) toast(`${EVENT_BY_ID[e.defId].icon} Oggi: ${EVENT_BY_ID[e.defId].name}`, 'info');
+  ensureWeather(s);
+  if (announce) {
+    for (const { h, kind } of sureEvents(s, d)) if (kind !== 'weekly') toast(`${h.icon} Oggi: ${h.name}`, 'info');
+    const w = weatherOf(s, d);
+    if (w !== 'sole' && w !== 'nuvoloso') toast(`${WEATHER[w].icon} Oggi: ${WEATHER[w].name}. ${WEATHER[w].desc}`, 'info');
   }
   const upcoming = s.events.filter((e) => e.startDay > d).length;
   if (upcoming < 2 && Math.random() < 0.5) {

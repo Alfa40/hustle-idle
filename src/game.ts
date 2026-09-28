@@ -5,6 +5,7 @@ import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS } from './config/map';
 import { PRODUCTS } from './config/products';
 import { Input } from './input';
+import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, genMissions, missionProgress, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, lotZone, refreshCandidates } from './sim/economy';
@@ -27,6 +28,17 @@ export interface Interactable {
   icon: string;
   action: () => void;
   enabled?: () => boolean;
+}
+
+export interface MapMarker {
+  x: number;
+  z: number;
+  icon: string;
+  color: string;
+  label: string;
+  kind: 'job' | 'target' | 'lot' | 'biz' | 'board' | 'home';
+  /** metri dal giocatore */
+  dist: number;
 }
 
 export interface ActionPrompt {
@@ -132,6 +144,7 @@ export class Game {
     } else {
       this.offlineReport = applyOffline(this.state, Date.now() - this.state.lastSeen);
     }
+    ensureWeather(this.state);
     if (this.state.missionsDay !== day(this.state)) genMissions(this.state);
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
@@ -149,7 +162,7 @@ export class Game {
 
     // casa del giocatore
     const home = this.city.homes[0];
-    const homeLabel = label('🏠 Casa tua', { bg: '#2e7d4f', scale: 0.5 });
+    const homeLabel = label('🏠 Casa tua', { bg: '#35c46a', scale: 0.5 });
     homeLabel.position.set(home.pos.x, 3.2, home.pos.z);
     this.scene.add(homeLabel);
     this.addInteractable({
@@ -412,6 +425,31 @@ export class Game {
     this.player.play('idle');
     this.ui.openJobResult(offer, stars, pay, xp, fame);
     this.save();
+  }
+
+  // ---------------- mappa e indicatori ----------------
+
+  mapMarkers(): MapMarker[] {
+    const p = this.player.root.position;
+    const out: MapMarker[] = [];
+    const add = (pos: THREE.Vector3, m: Omit<MapMarker, 'x' | 'z' | 'dist'>) =>
+      out.push({ ...m, x: pos.x, z: pos.z, dist: Math.hypot(pos.x - p.x, pos.z - p.z) });
+    add(this.city.board.pos, { icon: '📋', color: '#8e5bd6', label: 'Bacheca missioni', kind: 'board' });
+    add(this.city.homes[0].pos, { icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home' });
+    for (const lot of this.city.lots) {
+      const def = LOTS.find((l) => l.id === lot.id)!;
+      const biz = bizAtLot(this.state, lot.id);
+      if (biz) add(lot.center, { icon: '🚚', color: '#ff8a3d', label: def.name, kind: 'biz' });
+      else add(lot.center, { icon: '🏷️', color: '#ff5d73', label: `${def.name} · €${def.price.toLocaleString('it-IT')}`, kind: 'lot' });
+    }
+    if (this.run?.target) add(this.run.target, { icon: '🎯', color: '#ff3b5c', label: 'Obiettivo del lavoro', kind: 'target' });
+    else if (!this.run) {
+      for (const n of this.npcs.values()) {
+        const d = JOBS[n.offer.type];
+        add(n.char.root.position, { icon: d.icon, color: '#ffc21a', label: `${d.name} · €${n.offer.pay}`, kind: 'job' });
+      }
+    }
+    return out;
   }
 
   // ---------------- casa ----------------

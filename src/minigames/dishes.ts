@@ -153,7 +153,7 @@ export class DishGame {
     }
     this.bubbles = this.bubbles.filter((b) => b.life > 0);
     g.fillStyle = '#fff';
-    g.font = `bold ${Math.round(S * 0.055)}px system-ui`;
+    g.font = `600 ${Math.round(S * 0.06)}px Fredoka, system-ui`;
     g.textAlign = 'center';
     g.fillText(`Strofina! Piatto ${Math.min(this.done + 1, this.total)}/${this.total}`, S / 2, S * 0.07);
   }
