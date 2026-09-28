@@ -16,9 +16,12 @@ import {
   type GameState, type JobOffer,
 } from './sim/state';
 import { Character, charPath } from './world/character';
-import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, TREE_MODELS, type Slot } from './world/city';
+import { BUILDING_MODELS, City, CITY_ASSETS, DIR_ROT, DIR_VEC, TREE_MODELS, type Slot } from './world/city';
+import { StreetLights, WindowLights } from './world/night';
+import { Traffic, TRAFFIC_ASSETS } from './world/traffic';
 import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
+import { Particles } from './world/particles';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
@@ -129,6 +132,12 @@ export class Game {
   private outline!: OutlineRenderer;
   private sky = new Sky();
   private clouds = new Clouds(260);
+  /** particelle del mondo aperto (foglie, bolle, scintille…) */
+  fx = new Particles();
+  private windows!: WindowLights;
+  private lamps!: StreetLights;
+  private traffic!: Traffic;
+  private night = 0;
   /** direzione da cui arriva la luce del sole (cambia con l'ora) */
   private sunDir = new THREE.Vector3(-14, 30, 12).normalize();
   /** title = schermata iniziale (città sullo sfondo), play = partita */
@@ -153,7 +162,7 @@ export class Game {
 
     this.scene.background = new THREE.Color(0x9fd3f0);
     this.scene.fog = new THREE.Fog(0x9fd3f0, 90, 290);
-    this.scene.add(this.sky.mesh, this.clouds.group);
+    this.scene.add(this.sky.mesh, this.clouds.group, this.fx.group);
     this.scene.add(this.hemi);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -184,7 +193,7 @@ export class Game {
   async init(onProgress: (f: number) => void) {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
-      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS,
+      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
       'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model ? [p.model] : [])),
       'furniture/cardboardBoxClosed.glb',
     ];
@@ -193,6 +202,11 @@ export class Game {
     this.city = new City();
     this.scene.add(this.city.group);
     this.scene.add(buildLandscape(this.city.halfW, TREE_MODELS));
+    this.windows = new WindowLights(BUILDING_MODELS);
+    this.lamps = new StreetLights(this.city.lampHeads);
+    this.scene.add(this.lamps.group);
+    this.traffic = new Traffic(this.city, 28, 18, CHAR_MODELS);
+    this.scene.add(this.traffic.group);
     for (const l of this.city.lots) lotZone[l.id] = l.zone;
 
     // bacheca, casa, concessionaria e agenzia non dipendono dalla partita
@@ -600,6 +614,7 @@ export class Game {
     let xp = 0;
     let fame = 0;
     if (stars > 0) {
+      this.fx.emit('spark', this.player.root.position.clone().setY(1.2), 14);
       pay = Math.round(offer.pay * JOB.STAR_PAY[stars]);
       xp = Math.round(def.xp * (1 + 0.1 * offer.level) * (0.6 + stars * 0.25));
       fame = def.fame * (stars / 2);
@@ -810,6 +825,7 @@ export class Game {
     this.sun.position.copy(this.sunDir).multiplyScalar(36);
     this.updateLighting(11);
     this.clouds.update(dt);
+    this.traffic.update(dt, new THREE.Vector3(9999, 0, 9999), this.night);
     if (!this.renderPaused) this.draw(this.scene, this.camera);
   }
 
@@ -854,6 +870,8 @@ export class Game {
     this.ui.update(dt);
     if (this.renderPaused) return;
     this.clouds.update(dt);
+    this.fx.update(dt);
+    if (!this.interior && !this.house) this.traffic.update(dt, this.player.root.position, this.night);
     if (this.interior) this.draw(this.interior.scene, this.interior.camera);
     else if (this.house) this.draw(this.house.scene, this.house.camera);
     else this.draw(this.scene, this.camera);
@@ -987,6 +1005,7 @@ export class Game {
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
       this.city.collide(p, ride ? ride.radius : 0.38);
+      this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       // bloccato contro un muro mentre va verso un punto: rinuncia
       if (this.moveTarget && before.distanceTo(p) < speed * dt * 0.2) this.moveTarget = null;
       this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
@@ -1100,6 +1119,11 @@ export class Game {
     const sunCol = new THREE.Color(0xfff2c0).lerp(new THREE.Color(0xff9a4a), golden).multiplyScalar(0.3 + 0.7 * k);
     this.sky.set(top, horizon, this.sunDir, sunCol);
     this.clouds.setTint(k);
+    // di sera si accendono lampioni e finestre
+    const night = 1 - THREE.MathUtils.smoothstep(k, 0.15, 0.75);
+    this.night = night;
+    this.windows?.set(night);
+    this.lamps?.set(night);
     (this.scene.background as THREE.Color).copy(horizon);
     this.scene.fog!.color.copy(horizon);
   }
@@ -1107,7 +1131,8 @@ export class Game {
   /** Disegna una scena, con i contorni se attivi nelle impostazioni. */
   private draw(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
     if (scene === this.scene) this.sky.follow(camera);
-    if (settings.outlines) this.outline.render(scene, camera);
+    // con qualità Bassa niente contorni: sono il passaggio grafico più pesante
+    if (settings.outlines && settings.quality !== 'bassa') this.outline.render(scene, camera);
     else this.renderer.render(scene, camera);
   }
 

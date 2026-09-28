@@ -14,6 +14,7 @@ import { addFame, addXp } from '../sim/progress';
 import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
 import { label } from './props';
+import { Particles } from './particles';
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
@@ -100,6 +101,8 @@ export class TruckInterior {
   private queueBase: THREE.Vector3;
   private door: THREE.Vector3;
   private uiT = 0;
+  private fx = new Particles();
+  private smokeT = 0;
   private earned = 0;
   private served = 0;
 
@@ -121,6 +124,7 @@ export class TruckInterior {
     const def = bizType(this.biz.type);
     s.background = new THREE.Color(0x2a3350);
     s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.6));
+    s.add(this.fx.group);
     const sun = new THREE.DirectionalLight(0xffffff, 1.5);
     sun.position.set(this.center - 3, 9, 7);
     sun.target.position.set(this.center, 0, 0);
@@ -468,11 +472,17 @@ export class TruckInterior {
 
   private updateStations(dt: number) {
     const speed = 1 + 0.15 * upg(this.biz, 'attrezzatura');
+    this.fx.update(dt);
+    this.smokeT -= dt;
+    const puff = this.smokeT <= 0;
+    if (puff) this.smokeT = 0.35;
     for (const st of this.stations) {
       for (const sl of st.slots) {
         if (!sl.item) continue;
         sl.p += (dt * speed) / (st.def.sec ?? 3);
         const state = sl.p >= BURN ? 'burnt' : sl.p >= 1 ? 'ready' : 'cook';
+        // fumo mentre cuoce: grigio scuro se sta bruciando
+        if (puff) this.fx.emit('smoke', st.pos.clone().setY(1.2), 1, state === 'burnt' ? 0x444444 : state === 'ready' ? 0xfff3c4 : undefined);
         sl.bar.visible = sl.fill.visible = true;
         (sl.fill.material as THREE.MeshBasicMaterial).color.setHex(COLORS[state]);
         const f = Math.min(1, sl.p / BURN);
@@ -610,6 +620,7 @@ export class TruckInterior {
         }
         if (held) {
           st.hold += (dt * (1 + 0.15 * upg(this.biz, 'attrezzatura'))) / (d.sec ?? 1);
+          if (Math.random() < dt * 12) this.fx.emit('dust', st.pos.clone().setY(1.1), 1, 0xf5e6c8);
           this.player.play('interact-right', 0.1, 1.5);
           this.player.faceTowards(st.pos.x, st.pos.z - 2, dt);
           if (st.hold >= 1) {
@@ -635,6 +646,7 @@ export class TruckInterior {
             else {
               r.step++;
               this.setHeld(r);
+              this.fx.emit('spark', st.pos.clone().setY(1.3), 8);
               addXp(this.game.state, skill, 2);
             }
           }
@@ -657,6 +669,7 @@ export class TruckInterior {
         if (it && this.finished(it)) {
           if (!this.deliverable(it)) return { label: 'Nessuno lo ha ordinato', icon: '🤷' };
           if (pressed) {
+            this.fx.emit('spark', st.pos.clone().setY(1.4), 12);
             this.deliver(it, true);
             this.setHeld(null);
             this.player.once('interact-right');

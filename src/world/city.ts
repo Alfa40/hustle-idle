@@ -40,6 +40,7 @@ const TALL = ['commercial/building-l.glb', 'commercial/building-skyscraper-a.glb
 const TREES = ['suburban/tree-large.glb', 'suburban/tree-small.glb'];
 
 export const TREE_MODELS = TREES;
+export const BUILDING_MODELS = [...HOUSES, ...SHOPS, ...TALL];
 
 export const CITY_ASSETS = [
   ...ROAD_PIECES.map((p) => p.path), 'roads/tile-low.glb', 'roads/light-square.glb',
@@ -66,6 +67,8 @@ export class City {
   roadTiles: THREE.Vector3[] = [];
   /** edifici e alberi: si nascondono quando coprono una zona di lavoro */
   private tall: InstanceHandle[] = [];
+  /** posizione delle lampade dei lampioni (per le luci notturne) */
+  lampHeads: THREE.Vector3[] = [];
   private hidden: InstanceHandle[] = [];
   readonly cols = CITY_MAP[0].length;
   readonly rows = CITY_MAP.length;
@@ -231,8 +234,11 @@ export class City {
   private placeLamp(inst: Instancer, p: THREE.Vector3, k: number) {
     // strada lungo X se k pari: lampione sul marciapiede sud, braccio verso la strada
     const off = TILE * 0.43;
-    if (k % 2 === 0) inst.add('roads/light-square.glb', placeMatrix(p.x, p.z + off, 0, TILE));
-    else inst.add('roads/light-square.glb', placeMatrix(p.x + off, p.z, -Math.PI / 2, TILE));
+    const base = k % 2 === 0 ? new THREE.Vector3(p.x, 0, p.z + off) : new THREE.Vector3(p.x + off, 0, p.z);
+    inst.add('roads/light-square.glb', placeMatrix(base.x, base.z, k % 2 === 0 ? 0 : Math.PI / 2, TILE));
+    // la lampada sta in cima, sporgente verso il centro della strada
+    const toRoad = p.clone().sub(base).normalize();
+    this.lampHeads.push(base.clone().addScaledVector(toRoad, 1.15).setY(3.35));
   }
 
   /**

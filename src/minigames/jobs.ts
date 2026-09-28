@@ -3,6 +3,7 @@ import { model } from '../assets';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
+import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, foam, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
 
 export interface JobRun {
@@ -90,6 +91,9 @@ export interface Task {
   label: string;
   icon: string;
   onDone?: () => void;
+  /** particelle mentre si lavora (foglie, bolle, vernice…) */
+  fx?: ParticleKind;
+  fxColor?: number;
   /** durante il "tieni premuto" (0–1), per animare l'oggetto */
   onProgress?: (p: number) => void;
   done?: boolean;
@@ -233,6 +237,11 @@ export class PhasedRun extends BaseRun {
     if (near.kind === 'hold') {
       if (this.game.input.actionHeld) {
         near.progress = (near.progress ?? 0) + dt / (near.sec ?? 1.2);
+        this.fxT -= dt;
+        if (near.fx && this.fxT <= 0) {
+          this.fxT = 0.09;
+          this.game.fx.emit(near.fx, near.pos.clone().setY(0.7), 2, near.fxColor);
+        }
         near.onProgress?.(Math.min(1, near.progress));
         this.game.player.faceTowards(near.pos.x, near.pos.z, dt);
         this.game.player.play('interact-right', 0.1, 1.6);
@@ -252,8 +261,11 @@ export class PhasedRun extends BaseRun {
     this.complete(t);
   }
 
+  private fxT = 0;
+
   private complete(t: Task) {
     t.done = true;
+    this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.8), t.fx ? 8 : 5, t.fxColor);
     this.game.player.play('idle');
     t.onDone?.();
     const m = this.markers.get(t);
@@ -330,7 +342,7 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
     {
       name: 'Taglia i cespugli', icon: '✂️',
       tasks: () => spots.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1.1 / (1 + 0.04 * level), label: 'Taglia', icon: '✂️',
+        pos, kind: 'hold' as const, sec: 1.1 / (1 + 0.04 * level), label: 'Taglia', icon: '✂️', fx: 'leaf' as const,
         onProgress: (p: number) => {
           bushes[i].rotation.y += 0.3;
           bushes[i].scale.setScalar(1 - p * 0.35);
@@ -348,7 +360,7 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
     {
       name: 'Raccogli le foglie', icon: '🍂',
       tasks: () => piles.map((pos, i) => ({
-        pos, kind: 'tap' as const, label: 'Raccogli le foglie', icon: '🍂',
+        pos, kind: 'tap' as const, label: 'Raccogli le foglie', icon: '🍂', fx: 'leaf' as const,
         onDone: () => {
           const o = game.scene.getObjectByName('pile' + i);
           if (o) o.visible = false;
@@ -426,7 +438,7 @@ export function dishJob(game: Game, level: number, slot: Slot, title: string) {
       name: `Tavolo ${i + 1}: raccogli, lava, asciuga`, icon: '🍽️', ordered: true,
       tasks: () => [
         { pos: tpos[i], kind: 'tap', label: 'Prendi i piatti sporchi', icon: '🍽️', onDone: () => { stacks[i].visible = false; hold(game, plateStack(4, true)); } },
-        { pos: sink, kind: 'hold', sec: 1.6 / (1 + 0.04 * level), label: 'Lava i piatti', icon: '🫧', onDone: () => hold(game, plateStack(4, false)) },
+        { pos: sink, kind: 'hold', sec: 1.6 / (1 + 0.04 * level), label: 'Lava i piatti', icon: '🫧', fx: 'bubble', onDone: () => hold(game, plateStack(4, false)) },
         { pos: rack, kind: 'tap', label: 'Appoggia sullo scolapiatti', icon: '✨', onDone: () => { hold(game); clean[i].visible = true; } },
       ],
     });
@@ -475,7 +487,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
     {
       name: 'Insapona ogni lato', icon: '🧽',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1.2 / (1 + 0.04 * level), label: 'Insapona', icon: '🧽',
+        pos, kind: 'hold' as const, sec: 1.2 / (1 + 0.04 * level), label: 'Insapona', icon: '🧽', fx: 'bubble' as const,
         onDone: () => {
           const f = foam();
           const mid = pos.clone().lerp(carPos, 0.55);
@@ -487,7 +499,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
     {
       name: 'Risciacqua ogni lato', icon: '💦',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1 / (1 + 0.04 * level), label: 'Risciacqua', icon: '💦',
+        pos, kind: 'hold' as const, sec: 1 / (1 + 0.04 * level), label: 'Risciacqua', icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff,
         onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
         onDone: () => { if (foams[i]) foams[i].visible = false; },
       })),
@@ -526,7 +538,7 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
     {
       name: 'Dipingi ogni tratto del muretto', icon: '🖌️',
       tasks: () => ppos.map((pos, i) => ({
-        pos: at(pos, 0.8, 0), kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️',
+        pos: at(pos, 0.8, 0), kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️', fx: 'paint' as const, fxColor: col,
         onProgress: (p: number) => (panels[i].material as THREE.MeshLambertMaterial).color.lerpColors(new THREE.Color(0x9e9e9e), new THREE.Color(col), p),
       })),
     },

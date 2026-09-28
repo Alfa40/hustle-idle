@@ -270,6 +270,11 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Tone mapping neutro (colori vivi e naturali), ombre morbide più definite con qualità Alta/Media
 - Contorni cartoon su tutti gli oggetti (passaggio di profondità a tutto schermo), attivabili nelle impostazioni
 
+### Vita in città
+- Traffico: auto che tengono la destra, girano agli incroci, si fermano davanti al giocatore e alle altre auto (fari accesi di notte); pedoni che passeggiano attorno agli isolati
+- Notte: finestre che si illuminano, lampioni con alone e cerchio di luce a terra
+- Particelle: foglie (giardino), bolle (lavaggi, lavapiatti, pulizie), schizzi di vernice, fumo da piastra/forno (scuro se brucia), polvere, scintille a lavoro completato
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

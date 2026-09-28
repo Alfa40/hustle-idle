@@ -6,6 +6,7 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import type { Character } from './character';
 import { label } from './props';
+import { Particles } from './particles';
 
 export const HOUSE_ASSETS = [
   'furniture/loungeSofa.glb', 'furniture/bedDouble.glb', 'furniture/tableCoffee.glb', 'furniture/lampRoundFloor.glb',
@@ -98,6 +99,7 @@ export class ClientHouse {
   private camX = 0;
   private view = { half: 4, d: 10, pitch: 1, z: 0.3 };
   private cleaning: boolean;
+  private fx = new Particles();
 
   constructor(private game: Game, private pid: ProductId, level: number, private hooks: HouseRunHooks) {
     this.cleaning = !!CLEAN_MIX[pid];
@@ -128,6 +130,7 @@ export class ClientHouse {
     const s = this.scene;
     s.background = new THREE.Color(0x2a3350);
     s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.7));
+    s.add(this.fx.group);
     const sun = new THREE.DirectionalLight(0xffffff, 1.3);
     sun.position.set(this.center - 3, 9, 7);
     sun.target.position.set(this.center, 0, 0);
@@ -401,6 +404,7 @@ export class ClientHouse {
     this.hooks.status(this.timeLeft, this.timeTotal, `${what}: ${total - left}/${total} · ${hint}`);
     this.movePlayer(dt);
     this.placeCamera();
+    this.fx.update(dt);
     this.game.ui.setAction(this.cleaning ? this.cleanInteract(dt) : this.moveInteract(dt));
   }
 
@@ -488,6 +492,13 @@ export class ClientHouse {
     }
     if (input.actionHeld) {
       best.cut += dt / 1.3;
+      if (Math.random() < dt * 14) {
+        const y = best.tool === 'spugna' ? 0.2 : best.tool === 'piumino' ? 1.4 : 1.5;
+        const at = best.pos.clone().setY(y);
+        if (best.tool === 'tergivetro') at.z -= 0.9;
+        else if (best.tool === 'piumino') at.z -= 0.5;
+        this.fx.emit(best.tool === 'piumino' ? 'dust' : 'bubble', at, 1);
+      }
       this.player.faceTowards(best.pos.x, best.pos.z - (best.tool === 'spugna' ? 0 : 1), dt);
       this.player.play('interact-right', 0.1, 1.6);
       const k = Math.max(0, 1 - best.cut);
@@ -533,6 +544,7 @@ export class ClientHouse {
     if (this.near(this.packTable, 1.3) && c && !c.packed) {
       if (input.actionHeld) {
         c.lift += dt / 1.2;
+        if (Math.random() < dt * 10) this.fx.emit('dust', this.packTable.clone().setY(1), 1);
         this.player.play('interact-right', 0.1, 1.5);
         if (c.lift >= 1) {
           c.packed = true;

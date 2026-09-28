@@ -21,7 +21,7 @@ export function settingsHtml() {
   return [
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),
-    toggle('outlines', '✏️ Contorni', 'Bordi scuri attorno agli oggetti: tutto più distinguibile.'),
+    toggle('outlines', '✏️ Contorni', 'Bordi scuri attorno agli oggetti: tutto più distinguibile. Spenti con qualità Bassa.'),
     segmented('camera', '🎥 Distanza della camera', 'Quanto vedi della città attorno al personaggio.'),
     toggle('pointers', '➡️ Freccette ai bordi', 'Indicano i lavoretti vicini e il segnaposto.'),
     toggle('minimap', '🗺️ Minimappa', 'La mappa piccola in alto a destra.'),
