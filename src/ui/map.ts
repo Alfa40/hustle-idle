@@ -239,13 +239,13 @@ export class Minimap {
       this.cv.style.width = this.cv.style.height = size + 'px';
     }
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (this.game.interior) {
+    if (this.game.interior || this.game.house) {
       this.g.fillStyle = '#ffe9c7';
       this.g.fillRect(0, 0, size, size);
       this.g.font = `${size * 0.36}px system-ui`;
       this.g.textAlign = 'center';
       this.g.textBaseline = 'middle';
-      this.g.fillText(bizType(this.game.interior.biz.type).icon, size / 2, size / 2);
+      this.g.fillText(this.game.interior ? bizType(this.game.interior.biz.type).icon : '🏠', size / 2, size / 2);
       return;
     }
     const p = this.game.player.root.position;

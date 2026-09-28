@@ -245,8 +245,13 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Ordini con più prodotti e ordini da asporto (fase di imballaggio); ripiano dei pronti dove i dipendenti appoggiano i prodotti
 - Miglioria "Ampliamento del locale" (2 livelli): stanza più grande, nuove postazioni, nuovi prodotti (es. tacos e gelati nel food truck, pizza e torte nel panificio, sedie e gioielli nel laboratorio)
 
+### Versione 0.7 (tappa 2), fatto
+- Pulizie e traslochi in 3D dentro la casa del cliente (world/clienthouse.ts): si raggiunge l'indirizzo, si entra in casa (1–3 stanze arredate) e il lavoro si fa lì
+- Pulizie: carrello con 3 attrezzi (spugna per le macchie a terra, piumino per polvere e ragnatele sui mobili, tergivetro per i vetri appannati); ogni sporco si pulisce solo con l'attrezzo giusto
+- Traslochi: scatoloni da caricare, oggetti sparsi da imballare al banco prima di caricarli, mobili pesanti da sollevare tenendo premuto (si cammina più piano); tutto va portato al furgone all'ingresso
+- Tempo, stelle e progressi nella barra in alto; la paga dipende dalle stelle
+
 ### Prossime tappe
-- Tappa 2: pulizie e traslochi in 3D dentro la casa del cliente
 - Tappa 3: lavoretti in 3D in città con zona di lavoro delimitata e fasi chiare (anche lavapiatti, lavaggio auto, imbianchino)
 
 ### Prossimi passi proposti

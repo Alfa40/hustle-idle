@@ -220,7 +220,7 @@ export class UI {
     this.minimap.el.style.display = settings.minimap ? '' : 'none';
     if (settings.minimap) this.minimap.update(dt);
     const r = s.riding;
-    const rideTxt = !s.vehicles.length || this.game.interior ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
+    const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {
       this.rideEl.dataset.k = rideTxt;
       this.rideEl.innerHTML = rideTxt;

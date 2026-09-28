@@ -3,7 +3,7 @@ import { model, preload } from './assets';
 import { JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS } from './config/map';
-import { PRODUCTS } from './config/products';
+import { PRODUCTS, type ProductId } from './config/products';
 import { Input } from './input';
 import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
 import { ensureWeather } from './sim/effects';
@@ -19,7 +19,8 @@ import { Character, charPath } from './world/character';
 import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, type Slot } from './world/city';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
-import { RouteRun, ScrubRun, SpotRun, type JobRun } from './minigames/jobs';
+import { RouteRun, ScrubRun, SpotRun, VisitRun, type JobRun } from './minigames/jobs';
+import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { bizType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
@@ -101,6 +102,9 @@ export class Game {
   city!: City;
   player!: Character;
   interior: TruckInterior | null = null;
+  /** casa del cliente in cui si sta facendo un servizio (pulizie, trasloco) */
+  house: ClientHouse | null = null;
+  private houseDoor = new THREE.Vector3();
   playerMarker?: THREE.Sprite;
 
   interactables: Interactable[] = [];
@@ -167,7 +171,7 @@ export class Game {
   async init(onProgress: (f: number) => void) {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
-      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS,
+      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS,
       'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model ? [p.model] : [])),
       'furniture/cardboardBoxClosed.glb',
     ];
@@ -516,7 +520,6 @@ export class Game {
       return;
     }
     if (this.interior) this.exitTruck();
-    this.dismount();
     const houses = this.deliveryHouses;
     const slot = houses[order.house % houses.length];
     const def = bizType(biz.type);
@@ -524,15 +527,38 @@ export class Game {
     const pr = PRODUCTS[order.pid];
     const title = `${pr.icon} ${pr.name}`;
     this.runOrder = { bizId: biz.id, order };
-    if (biz.type === 'pulizie') {
-      const amount = order.pid === 'pulizia_uffici' ? 1.5 : order.pid === 'vetri' ? 0.8 : 1.1;
-      this.run = new SpotRun(this, lv, slot, { kind: 'stain', title, amount });
-    } else {
-      const boxes = order.pid === 'trasloco_grande' ? 5 : order.pid === 'sgombero' ? 3 : 3;
-      this.run = new RouteRun(this, lv, slot, { mode: 'moving', title, boxes });
-    }
+    const run = new VisitRun(this, lv, slot, title, () => this.enterHouse(order.pid, lv, slot.pos, run));
+    this.run = run;
     this.ui.jobBar(true);
     toast(`📍 Vai all'indirizzo segnato: ${pr.name}`, 'info');
+  }
+
+  /** Entra nella casa del cliente: il lavoro vero si fa lì dentro, in 3D. */
+  private enterHouse(pid: ProductId, level: number, door: THREE.Vector3, run: VisitRun) {
+    this.dismount();
+    this.moveTarget = null;
+    this.houseDoor.copy(door);
+    this.scene.remove(this.player.root);
+    this.house = new ClientHouse(this, pid, level, {
+      status: (left, total, text) => {
+        run.timeLeft = left;
+        run.timeTotal = total;
+        run.status = text;
+      },
+      done: (stars) => this.finishJob(stars),
+    });
+    this.house.enter(this.player);
+    run.target = undefined;
+  }
+
+  private exitHouse() {
+    if (!this.house) return;
+    this.house.exit();
+    this.house = null;
+    this.player.root.position.copy(this.houseDoor);
+    this.scene.add(this.player.root);
+    this.player.play('idle');
+    this.snapCamera();
   }
 
   cancelJob() {
@@ -543,6 +569,7 @@ export class Game {
   /** stelle 0 = fallito */
   finishJob(stars: number) {
     const s = this.state;
+    this.exitHouse();
     this.run?.dispose();
     this.run = null;
     this.prompt = null;
@@ -694,8 +721,8 @@ export class Game {
   }
 
   mount(id: VehicleId) {
-    if (!this.state.vehicles.includes(id) || this.interior) return;
-    if (this.run && !(this.runOffer && JOBS[this.runOffer.type].vehicleOk)) {
+    if (!this.state.vehicles.includes(id) || this.interior || this.house) return;
+    if (this.run && !this.runOrder && !(this.runOffer && JOBS[this.runOffer.type].vehicleOk)) {
       toast('Per questo lavoro devi stare a piedi', 'bad');
       return;
     }
@@ -784,6 +811,8 @@ export class Game {
     if (!this.paused) {
       if (this.interior) {
         this.interior.update(dt);
+      } else if (this.house) {
+        this.house.update(dt);
       } else {
         this.updatePlayer(dt);
         this.updateWaypoint();
@@ -807,6 +836,7 @@ export class Game {
     this.ui.update(dt);
     if (this.renderPaused) return;
     if (this.interior) this.renderer.render(this.interior.scene, this.interior.camera);
+    else if (this.house) this.renderer.render(this.house.scene, this.house.camera);
     else this.renderer.render(this.scene, this.camera);
   }
 

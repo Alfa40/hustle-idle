@@ -40,7 +40,7 @@ export class EdgePointers {
   update() {
     const g = this.game;
     let list: MapMarker[] = [];
-    if (!g.interior && !g.paused && settings.pointers) {
+    if (!g.interior && !g.house && !g.paused && settings.pointers) {
       const all = g.mapMarkers();
       const target = all.filter((m) => m.kind === 'target');
       const way = all.filter((m) => m.kind === 'waypoint');

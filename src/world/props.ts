@@ -190,21 +190,6 @@ export function playerDot() {
   return s;
 }
 
-const stainMat = new THREE.MeshBasicMaterial({ color: 0x5d4037, transparent: true, opacity: 0.75, depthWrite: false });
-/** Macchia di sporco a terra (impresa di pulizie). */
-export function stain() {
-  const g = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(0.28 + Math.random() * 0.2, 12), stainMat);
-    m.rotation.x = -Math.PI / 2;
-    m.position.set((Math.random() - 0.5) * 0.5, 0.04 + i * 0.002, (Math.random() - 0.5) * 0.5);
-    g.add(m);
-  }
-  const bubble = label('🧽', { bg: 'rgba(0,0,0,0)', scale: 0.5 });
-  bubble.position.y = 0.9;
-  g.add(bubble);
-  return g;
-}
 
 const sizeCache = new Map<string, number>();
 /**

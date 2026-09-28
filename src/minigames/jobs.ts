@@ -3,7 +3,7 @@ import { model } from '../assets';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
-import { arrow, bush, ring, stain, trimmedBush } from '../world/props';
+import { arrow, bush, ring, trimmedBush } from '../world/props';
 import { DishGame, type DishTheme } from './dishes';
 
 export interface JobRun {
@@ -72,21 +72,21 @@ interface Spot {
 }
 
 export interface SpotOpts {
-  kind: 'bush' | 'stain';
+  kind: 'bush';
   title: string;
   /** moltiplicatore sul numero di punti */
   amount?: number;
 }
 
-/** Giardinaggio (cespugli) e pulizie (macchie): avvicinati e tieni premuto su ogni punto. */
+/** Giardinaggio: avvicinati e tieni premuto su ogni cespuglio. */
 export class SpotRun extends BaseRun {
   private spots: Spot[] = [];
   private cutTime: number;
 
-  constructor(game: Game, level: number, slot: Slot, private opts: SpotOpts) {
+  constructor(game: Game, level: number, slot: Slot, opts: SpotOpts) {
     super(game, level);
     const n = Math.round(Math.min(9, 3 + Math.floor(level / 2)) * (opts.amount ?? 1));
-    this.cutTime = (opts.kind === 'stain' ? 1.4 : 1.1) / (1 + 0.04 * level);
+    this.cutTime = 1.1 / (1 + 0.04 * level);
     this.timeTotal = this.timeLeft = n * Math.max(3.6, 5.2 - level * 0.12) + 7;
     this.title = opts.title;
     const [dx, dz] = DIR_VEC[slot.dir];
@@ -99,7 +99,7 @@ export class SpotRun extends BaseRun {
       if (pts.every((s) => s.distanceTo(v) > 1.1) && v.distanceTo(slot.pos) > 0.8) pts.push(v);
     }
     for (const pos of pts) {
-      const obj = this.add(opts.kind === 'bush' ? bush() : stain());
+      const obj = this.add(bush());
       obj.position.copy(pos);
       this.spots.push({ obj, pos, cut: 0, done: false });
     }
@@ -120,8 +120,7 @@ export class SpotRun extends BaseRun {
     }
     const left = this.spots.filter((b) => !b.done).length;
     this.target = this.spots.find((b) => !b.done)?.pos;
-    const what = this.opts.kind === 'bush' ? 'Cespugli' : 'Macchie';
-    this.status = `${what}: ${this.spots.length - left}/${this.spots.length}`;
+    this.status = `Cespugli: ${this.spots.length - left}/${this.spots.length}`;
     if (!near) {
       this.game.prompt = null;
       return;
@@ -131,19 +130,13 @@ export class SpotRun extends BaseRun {
       near.cut += dt / this.cutTime;
       this.game.player.faceTowards(near.pos.x, near.pos.z, dt);
       this.game.player.play('interact-right', 0.1, 1.6);
-      if (this.opts.kind === 'bush') {
-        near.obj.rotation.y += dt * 8;
-        near.obj.scale.setScalar(1 - near.cut * 0.35);
-      } else {
-        near.obj.scale.setScalar(Math.max(0.05, 1 - near.cut));
-      }
+      near.obj.rotation.y += dt * 8;
+      near.obj.scale.setScalar(1 - near.cut * 0.35);
       if (near.cut >= 1) {
         near.done = true;
         this.game.scene.remove(near.obj);
-        if (this.opts.kind === 'bush') {
-          const t = this.add(trimmedBush());
-          t.position.copy(near.pos);
-        }
+        const t = this.add(trimmedBush());
+        t.position.copy(near.pos);
         this.game.player.play('idle');
         if (this.spots.every((b) => b.done)) {
           this.done();
@@ -153,28 +146,23 @@ export class SpotRun extends BaseRun {
     } else if (this.game.player.currentName === 'interact-right') {
       this.game.player.play('idle');
     }
-    this.game.prompt = this.opts.kind === 'bush'
-      ? { label: 'Tieni premuto', icon: '✂️', progress: near.cut }
-      : { label: 'Strofina', icon: '🧽', progress: near.cut };
+    this.game.prompt = { label: 'Tieni premuto', icon: '✂️', progress: near.cut };
   }
 }
 
 // ---------------- vai da A a B ----------------
 
 export interface RouteOpts {
-  mode: 'package' | 'flyer' | 'moving';
+  mode: 'package' | 'flyer';
   title: string;
-  /** per i traslochi: numero di scatoloni (lo decide l'ordine) */
-  boxes?: number;
 }
 
 interface Stop {
   slot: Slot;
-  /** nei traslochi: si prende (pick) o si lascia (drop) uno scatolone */
-  act: 'drop' | 'pick' | 'flyer';
+  act: 'drop' | 'flyer';
 }
 
-/** Consegne, volantinaggio e traslochi: raggiungi le tappe segnate. */
+/** Consegne e volantinaggio: raggiungi le tappe segnate. */
 export class RouteRun extends BaseRun {
   private stops: Stop[] = [];
   private idx = 0;
@@ -212,14 +200,6 @@ export class RouteRun extends BaseRun {
         from = t;
       }
       this.timeTotal = (dist / 5.2) * Math.max(1.3, 1.75 - level * 0.03) + 2 * n;
-    } else {
-      // trasloco: dalla casa del cliente (start) alla nuova casa, avanti e indietro
-      const cands = houses.filter((h) => h !== start && h.pos.distanceTo(start.pos) > 14 && h.pos.distanceTo(start.pos) < 40);
-      const to = cands[Math.floor(Math.random() * cands.length)] ?? houses[0];
-      const boxes = opts.boxes ?? 3;
-      for (let i = 0; i < boxes; i++) this.stops.push({ slot: start, act: 'pick' }, { slot: to, act: 'drop' });
-      dist = dist2(start, to) * (boxes * 2 - 1) + 10;
-      this.timeTotal = (dist / 5.2) * 1.5 + 4 * boxes;
     }
     this.timeLeft = this.timeTotal;
     this.title = opts.title;
@@ -255,8 +235,7 @@ export class RouteRun extends BaseRun {
   private label() {
     const a = this.stop.act;
     if (a === 'flyer') return { label: 'Volantino', icon: '📰' };
-    if (a === 'pick') return { label: 'Prendi scatolone', icon: '📦' };
-    return { label: this.opts.mode === 'moving' ? 'Lascia scatolone' : 'Consegna', icon: '📦' };
+    return { label: 'Consegna', icon: '📦' };
   }
 
   update(dt: number) {
@@ -274,10 +253,7 @@ export class RouteRun extends BaseRun {
     const d = Math.hypot(t.pos.x - p.x, t.pos.z - p.z);
     this.guide.visible = d > 4;
     const m = this.opts.mode;
-    const doneCount = m === 'moving' ? Math.floor(this.idx / 2) : this.idx;
-    const total = m === 'moving' ? this.stops.length / 2 : this.stops.length;
-    const what = m === 'flyer' ? 'Volantini' : m === 'moving' ? 'Scatoloni' : 'Pacchi';
-    this.status = `${what}: ${doneCount}/${total} · ${Math.round(d)} m`;
+    this.status = `${m === 'flyer' ? 'Volantini' : 'Pacchi'}: ${this.idx}/${this.stops.length} · ${Math.round(d)} m`;
     const reach = this.game.riding ? 3 : 1.8;
     this.game.prompt = d < reach ? this.label() : null;
   }
@@ -286,9 +262,6 @@ export class RouteRun extends BaseRun {
     const t = this.stop.slot;
     const p = this.game.player.root.position;
     if (Math.hypot(t.pos.x - p.x, t.pos.z - p.z) > (this.game.riding ? 3 : 1.8)) return;
-    const act = this.stop.act;
-    if (act === 'pick') this.carry(true);
-    if (act === 'drop' && this.opts.mode === 'moving') this.carry(false);
     this.idx++;
     if (!this.game.riding) this.game.player.once('interact-right');
     if (this.idx >= this.stops.length) {
@@ -337,5 +310,52 @@ export class ScrubRun extends BaseRun {
     super.dispose();
     this.dish.destroy();
     this.game.input.enabled = true;
+  }
+}
+
+// ---------------- ordini delle imprese di servizi ----------------
+
+/**
+ * Ordine di pulizie o traslochi: si raggiunge la casa del cliente (anche col
+ * veicolo), poi il lavoro si fa in 3D dentro la casa (world/clienthouse.ts).
+ */
+export class VisitRun extends BaseRun {
+  private marker: THREE.Object3D;
+  private ringObj: THREE.Object3D;
+  inside = false;
+
+  constructor(game: Game, level: number, private dest: Slot, title: string, private onEnter: () => void) {
+    super(game, level);
+    const p = game.player.root.position;
+    const dist = Math.abs(dest.pos.x - p.x) + Math.abs(dest.pos.z - p.z);
+    this.timeTotal = this.timeLeft = (dist / 5.2) * 2 + 25;
+    this.title = title;
+    this.target = dest.pos;
+    this.marker = this.add(arrow(0x2d9cdb));
+    this.marker.position.set(dest.pos.x, 3, dest.pos.z);
+    this.ringObj = this.add(ring(0x2d9cdb, 1.6));
+    this.ringObj.position.set(dest.pos.x, 0.05, dest.pos.z);
+  }
+
+  private reach() {
+    return this.game.riding ? 3 : 2;
+  }
+
+  update(dt: number) {
+    if (this.inside || !this.tick(dt)) return;
+    const p = this.game.player.root.position;
+    const d = Math.hypot(this.dest.pos.x - p.x, this.dest.pos.z - p.z);
+    this.marker.position.y = 3 + Math.sin(performance.now() / 250) * 0.3;
+    this.marker.rotation.y += dt * 2;
+    this.status = `Vai dal cliente · ${Math.round(d)} m`;
+    this.game.prompt = d < this.reach() ? { label: 'Entra in casa', icon: '🚪' } : null;
+  }
+
+  onAction() {
+    const p = this.game.player.root.position;
+    if (this.inside || Math.hypot(this.dest.pos.x - p.x, this.dest.pos.z - p.z) > this.reach()) return;
+    this.inside = true;
+    this.game.prompt = null;
+    this.onEnter();
   }
 }
