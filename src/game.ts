@@ -19,7 +19,7 @@ import { Character, charPath } from './world/character';
 import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, type Slot } from './world/city';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
-import { RouteRun, ScrubRun, SpotRun, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { bizType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
@@ -490,8 +490,9 @@ export class Game {
 
   startJob(offer: JobOffer) {
     if (this.run) return;
+    // il cliente si fa da parte: la zona di lavoro resta libera
     const npc = this.npcs.get(offer.id);
-    if (npc) npc.marker.visible = false;
+    if (npc) npc.char.root.visible = false;
     this.runOffer = offer;
     const slot = this.slotsFor(offer.type)[offer.slot];
     const def = JOBS[offer.type];
@@ -499,12 +500,12 @@ export class Game {
     const title = `${def.icon} ${def.name}`;
     const lv = offer.level;
     switch (offer.type) {
-      case 'giardino': this.run = new SpotRun(this, lv, slot, { kind: 'bush', title }); break;
-      case 'consegna': this.run = new RouteRun(this, lv, slot, { mode: 'package', title }); break;
-      case 'volantini': this.run = new RouteRun(this, lv, slot, { mode: 'flyer', title }); break;
-      case 'piatti': this.run = new ScrubRun(this, lv, 'plate', title); break;
-      case 'lavaggio': this.run = new ScrubRun(this, lv, 'car', title); break;
-      case 'imbianchino': this.run = new ScrubRun(this, lv, 'wall', title); break;
+      case 'giardino': this.run = gardenJob(this, lv, slot, title); break;
+      case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
+      case 'volantini': this.run = routeJob(this, lv, slot, title, 'flyer'); break;
+      case 'piatti': this.run = dishJob(this, lv, slot, title); break;
+      case 'lavaggio': this.run = carWashJob(this, lv, slot, title); break;
+      case 'imbianchino': this.run = paintJob(this, lv, slot, title); break;
     }
     this.ui.jobBar(true);
   }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { gltf, Instancer, placeMatrix } from '../assets';
+import { gltf, Instancer, placeMatrix, setInstanceVisible, type InstanceHandle } from '../assets';
 import { CITY_MAP, LOTS, TILE, zoneAt, type ZoneId } from '../config/map';
 
 export type Dir = 'N' | 'E' | 'S' | 'W';
@@ -62,6 +62,9 @@ export class City {
   dealer!: Slot;
   agency!: Slot;
   roadTiles: THREE.Vector3[] = [];
+  /** edifici e alberi: si nascondono quando coprono una zona di lavoro */
+  private tall: InstanceHandle[] = [];
+  private hidden: InstanceHandle[] = [];
   readonly cols = CITY_MAP[0].length;
   readonly rows = CITY_MAP.length;
   readonly halfW = (this.cols * TILE) / 2;
@@ -152,7 +155,7 @@ export class City {
               const x = p.x + (rnd() - 0.5) * TILE * 0.75;
               const z = p.z + (rnd() - 0.5) * TILE * 0.75;
               const s = 5 + rnd() * 2.5;
-              shadowInst.add(rpick(TREES), placeMatrix(x, z, rnd() * 6.28, s));
+              this.tall.push(shadowInst.add(rpick(TREES), placeMatrix(x, z, rnd() * 6.28, s)));
               this.colliders.push({ minX: x - 0.35, maxX: x + 0.35, minZ: z - 0.35, maxZ: z + 0.35 });
             }
             break;
@@ -199,7 +202,7 @@ export class City {
   }
 
   private placeBuilding(inst: Instancer, path: string, pos: THREE.Vector3, rot: number, scale: number) {
-    inst.add(path, placeMatrix(pos.x, pos.z, rot, scale));
+    this.tall.push(inst.add(path, placeMatrix(pos.x, pos.z, rot, scale)));
     const box = new THREE.Box3().setFromObject(gltf(path).scene);
     const m = placeMatrix(pos.x, pos.z, rot, scale);
     box.applyMatrix4(m);
@@ -235,6 +238,28 @@ export class City {
     const off = TILE * 0.43;
     if (k % 2 === 0) inst.add('roads/light-square.glb', placeMatrix(p.x, p.z + off, 0, TILE));
     else inst.add('roads/light-square.glb', placeMatrix(p.x + off, p.z, -Math.PI / 2, TILE));
+  }
+
+  /**
+   * Nasconde edifici e alberi fra la zona di lavoro e la camera (che guarda
+   * verso nord): tutto ciò che sta a sud della zona e abbastanza vicino.
+   * `keep` è il centro della tessera del lavoro, che resta visibile.
+   */
+  clearView(center: THREE.Vector3, halfW: number, keep?: THREE.Vector3) {
+    this.restoreView();
+    for (const h of this.tall) {
+      if (keep && Math.hypot(h.x - keep.x, h.z - keep.z) < 2.5) continue;
+      if (Math.abs(h.x - center.x) > halfW + 3) continue;
+      const dz = h.z - center.z;
+      if (dz < 0.5 || dz > 16) continue;
+      setInstanceVisible(h, false);
+      this.hidden.push(h);
+    }
+  }
+
+  restoreView() {
+    for (const h of this.hidden) setInstanceVisible(h, true);
+    this.hidden = [];
   }
 
   /** Spinge un cerchio fuori dagli ostacoli. */

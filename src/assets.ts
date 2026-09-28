@@ -86,8 +86,27 @@ const CHUNK = 36;
  * per ogni coppia geometria/materiale, fondamentale per strade e alberi.
  * Le copie sono divise in riquadri così la camera disegna solo quelli vicini.
  */
+/** Riferimento a una copia già costruita: si può nascondere e rimostrare. */
+export interface InstanceHandle {
+  x: number;
+  z: number;
+  key: string;
+  index: number;
+  meshes: { im: THREE.InstancedMesh; matrix: THREE.Matrix4 }[];
+}
+
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+
+export function setInstanceVisible(h: InstanceHandle, visible: boolean) {
+  for (const { im, matrix } of h.meshes) {
+    im.setMatrixAt(h.index, visible ? matrix : HIDDEN);
+    im.instanceMatrix.needsUpdate = true;
+  }
+}
+
 export class Instancer {
   private items = new Map<string, THREE.Matrix4[]>();
+  private handles: InstanceHandle[] = [];
   add(path: string, matrix: THREE.Matrix4) {
     const cx = Math.floor(matrix.elements[12] / CHUNK);
     const cz = Math.floor(matrix.elements[14] / CHUNK);
@@ -95,6 +114,9 @@ export class Instancer {
     let arr = this.items.get(key);
     if (!arr) this.items.set(key, (arr = []));
     arr.push(matrix.clone());
+    const h: InstanceHandle = { x: matrix.elements[12], z: matrix.elements[14], key, index: arr.length - 1, meshes: [] };
+    this.handles.push(h);
+    return h;
   }
   build(parent: THREE.Object3D, opts: { castShadow?: boolean } = {}) {
     for (const [key, mats] of this.items) {
@@ -104,8 +126,9 @@ export class Instancer {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
         const im = new THREE.InstancedMesh(mesh.geometry, mesh.material, mats.length);
-        const tmp = new THREE.Matrix4();
-        mats.forEach((m, i) => im.setMatrixAt(i, tmp.multiplyMatrices(m, mesh.matrixWorld)));
+        const full = mats.map((m) => new THREE.Matrix4().multiplyMatrices(m, mesh.matrixWorld));
+        full.forEach((m, i) => im.setMatrixAt(i, m));
+        for (const h of this.handles) if (h.key === key) h.meshes.push({ im, matrix: full[h.index] });
         im.castShadow = !!opts.castShadow;
         im.receiveShadow = true;
         im.computeBoundingSphere();
@@ -113,6 +136,7 @@ export class Instancer {
       });
     }
     this.items.clear();
+    this.handles = [];
   }
 }
 

@@ -3,8 +3,7 @@ import { model } from '../assets';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
-import { arrow, bush, ring, trimmedBush } from '../world/props';
-import { DishGame, type DishTheme } from './dishes';
+import { arrow, boxProp, bush, cone, cylProp, foam, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
 
 export interface JobRun {
   title: string;
@@ -62,255 +61,501 @@ abstract class BaseRun implements JobRun {
   }
 }
 
-// ---------------- taglia / strofina sul posto ----------------
+// ---------------- lavoretti a fasi in una zona di lavoro ----------------
 
-interface Spot {
-  obj: THREE.Object3D;
+/** Rettangolo orientato: `dir` verso la strada, `side` di lato. */
+export interface Zone {
+  center: THREE.Vector3;
+  dir: THREE.Vector3;
+  side: THREE.Vector3;
+  halfF: number;
+  halfR: number;
+}
+
+function zonePoint(z: Zone, f: number, r: number) {
+  return z.center.clone().addScaledVector(z.dir, f).addScaledVector(z.side, r);
+}
+
+function inZone(z: Zone, p: THREE.Vector3, pad = 0) {
+  const v = p.clone().sub(z.center);
+  return Math.abs(v.dot(z.dir)) <= z.halfF + pad && Math.abs(v.dot(z.side)) <= z.halfR + pad;
+}
+
+/** Un'azione da fare in un punto: tocco singolo o tieni premuto. */
+export interface Task {
   pos: THREE.Vector3;
-  cut: number;
-  done: boolean;
+  kind: 'tap' | 'hold';
+  /** secondi da tenere premuto */
+  sec?: number;
+  label: string;
+  icon: string;
+  onDone?: () => void;
+  /** durante il "tieni premuto" (0–1), per animare l'oggetto */
+  onProgress?: (p: number) => void;
+  done?: boolean;
+  progress?: number;
 }
 
-export interface SpotOpts {
-  kind: 'bush';
-  title: string;
-  /** moltiplicatore sul numero di punti */
-  amount?: number;
+export interface Phase {
+  name: string;
+  icon: string;
+  /** crea le attività quando la fase inizia (così possono dipendere da quelle prima) */
+  tasks: () => Task[];
+  /** true = le attività vanno fatte nell'ordine dato (es. prendi → lava → appoggia) */
+  ordered?: boolean;
 }
 
-/** Giardinaggio: avvicinati e tieni premuto su ogni cespuglio. */
-export class SpotRun extends BaseRun {
-  private spots: Spot[] = [];
-  private cutTime: number;
+/**
+ * Lavoretto strutturato: una zona di lavoro delimitata (se serve) e una
+ * sequenza di fasi; ogni fase ha punti da toccare o da tenere premuti.
+ */
+export class PhasedRun extends BaseRun {
+  private phases: Phase[];
+  private idx = -1;
+  private tasks: Task[] = [];
+  private markers = new Map<Task, THREE.Sprite>();
+  private zone: Zone | null;
+  private outTimer = 0;
 
-  constructor(game: Game, level: number, slot: Slot, opts: SpotOpts) {
+  constructor(game: Game, level: number, title: string, phases: Phase[], opts: { zone?: Zone; time: number; keep?: THREE.Vector3 }) {
     super(game, level);
-    const n = Math.round(Math.min(9, 3 + Math.floor(level / 2)) * (opts.amount ?? 1));
-    this.cutTime = 1.1 / (1 + 0.04 * level);
-    this.timeTotal = this.timeLeft = n * Math.max(3.6, 5.2 - level * 0.12) + 7;
-    this.title = opts.title;
-    const [dx, dz] = DIR_VEC[slot.dir];
-    // punti nel cortile davanti e ai lati della casa
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i < 60 && pts.length < n; i++) {
-      const across = (Math.random() - 0.5) * 5;
-      const depth = 0.9 + Math.random() * 1.7;
-      const v = new THREE.Vector3(slot.center.x + dx * depth + dz * across, 0, slot.center.z + dz * depth + dx * across);
-      if (pts.every((s) => s.distanceTo(v) > 1.1) && v.distanceTo(slot.pos) > 0.8) pts.push(v);
+    this.title = title;
+    this.phases = phases;
+    this.zone = opts.zone ?? null;
+    this.timeTotal = this.timeLeft = opts.time * Math.max(0.75, 1 - level * 0.02);
+    if (this.zone) {
+      this.drawZone(this.zone);
+      // niente palazzi o alberi davanti alla zona di lavoro
+      const z = this.zone;
+      const halfW = Math.abs(z.side.x) * z.halfR + Math.abs(z.dir.x) * z.halfF;
+      game.city.clearView(z.center, halfW, opts.keep);
     }
-    for (const pos of pts) {
-      const obj = this.add(bush());
-      obj.position.copy(pos);
-      this.spots.push({ obj, pos, cut: 0, done: false });
-    }
+    this.nextPhase();
   }
 
-  update(dt: number) {
-    if (!this.tick(dt)) return;
-    const p = this.game.player.root.position;
-    let near: Spot | null = null;
-    let nd = 1.6;
-    for (const b of this.spots) {
-      if (b.done) continue;
-      const d = Math.hypot(b.pos.x - p.x, b.pos.z - p.z);
-      if (d < nd) {
-        nd = d;
-        near = b;
-      }
-    }
-    const left = this.spots.filter((b) => !b.done).length;
-    this.target = this.spots.find((b) => !b.done)?.pos;
-    this.status = `Cespugli: ${this.spots.length - left}/${this.spots.length}`;
-    if (!near) {
-      this.game.prompt = null;
-      return;
-    }
-    const input = this.game.input;
-    if (input.actionHeld) {
-      near.cut += dt / this.cutTime;
-      this.game.player.faceTowards(near.pos.x, near.pos.z, dt);
-      this.game.player.play('interact-right', 0.1, 1.6);
-      near.obj.rotation.y += dt * 8;
-      near.obj.scale.setScalar(1 - near.cut * 0.35);
-      if (near.cut >= 1) {
-        near.done = true;
-        this.game.scene.remove(near.obj);
-        const t = this.add(trimmedBush());
-        t.position.copy(near.pos);
-        this.game.player.play('idle');
-        if (this.spots.every((b) => b.done)) {
-          this.done();
-          return;
-        }
-      }
-    } else if (this.game.player.currentName === 'interact-right') {
-      this.game.player.play('idle');
-    }
-    this.game.prompt = { label: 'Tieni premuto', icon: '✂️', progress: near.cut };
-  }
-}
-
-// ---------------- vai da A a B ----------------
-
-export interface RouteOpts {
-  mode: 'package' | 'flyer';
-  title: string;
-}
-
-interface Stop {
-  slot: Slot;
-  act: 'drop' | 'flyer';
-}
-
-/** Consegne e volantinaggio: raggiungi le tappe segnate. */
-export class RouteRun extends BaseRun {
-  private stops: Stop[] = [];
-  private idx = 0;
-  private marker: THREE.Object3D;
-  private ringObj: THREE.Object3D;
-  private guide: THREE.Object3D;
-
-  constructor(game: Game, level: number, start: Slot, private opts: RouteOpts) {
-    super(game, level);
-    const houses = [...game.deliveryHouses];
-    const dist2 = (a: Slot, b: Slot) => Math.abs(a.pos.x - b.pos.x) + Math.abs(a.pos.z - b.pos.z);
-    let dist = 0;
-    if (opts.mode === 'package') {
-      const n = Math.min(3, 1 + Math.floor(level / 3));
-      let from = start;
-      for (let i = 0; i < n; i++) {
-        const cands = houses.filter((h) => h.pos.distanceTo(from.pos) > 22 && h.pos.distanceTo(from.pos) < 60 && !this.stops.some((s) => s.slot === h));
-        const t = cands[Math.floor(Math.random() * cands.length)] ?? houses[0];
-        dist += dist2(from, t);
-        this.stops.push({ slot: t, act: 'drop' });
-        from = t;
-      }
-      this.timeTotal = (dist / 5.2) * Math.max(1.35, 1.9 - level * 0.04) + 5 * n;
-    } else if (opts.mode === 'flyer') {
-      // tante case vicine, una dopo l'altra
-      const n = Math.min(9, 4 + Math.floor(level / 2));
-      let from = start;
-      for (let i = 0; i < n; i++) {
-        const cands = houses.filter((h) => !this.stops.some((s) => s.slot === h) && h !== from)
-          .sort((a, b) => a.pos.distanceTo(from.pos) - b.pos.distanceTo(from.pos));
-        const t = cands[Math.floor(Math.random() * Math.min(3, cands.length))];
-        if (!t) break;
-        dist += dist2(from, t);
-        this.stops.push({ slot: t, act: 'flyer' });
-        from = t;
-      }
-      this.timeTotal = (dist / 5.2) * Math.max(1.3, 1.75 - level * 0.03) + 2 * n;
-    }
-    this.timeLeft = this.timeTotal;
-    this.title = opts.title;
-    if (opts.mode === 'package') this.carry(true);
-    this.marker = this.add(arrow());
-    this.ringObj = this.add(ring(0xffcc1a, 1.4));
-    this.guide = this.add(arrow(0xffffff));
-    this.guide.scale.set(0.6, 0.6, 0.6);
-    this.placeMarker();
+  /** Rettangolo a terra con i coni agli angoli e lungo i lati: la zona dove si lavora. */
+  private drawZone(z: Zone) {
+    const c = zonePoint(z, 0, 0);
+    const rot = Math.atan2(z.side.x, z.side.z);
+    const w = z.halfR * 2;
+    const d = z.halfF * 2;
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshBasicMaterial({ color: 0xffc21a, transparent: true, opacity: 0.12, depthWrite: false }),
+    );
+    fill.rotation.set(-Math.PI / 2, 0, rot - Math.PI / 2);
+    fill.position.set(c.x, 0.035, c.z);
+    this.add(fill);
+    const edge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)),
+      new THREE.LineBasicMaterial({ color: 0xff8a3d }),
+    );
+    edge.rotation.copy(fill.rotation);
+    edge.position.set(c.x, 0.05, c.z);
+    this.add(edge);
+    const pts: [number, number][] = [];
+    for (const f of [-1, 1]) for (const r of [-1, 0, 1]) pts.push([f * z.halfF, r * z.halfR]);
+    pts.push([0, -z.halfR], [0, z.halfR]);
+    for (const [f, r] of pts) this.add(cone()).position.copy(zonePoint(z, f, r));
+    const sign = label('🚧 Zona di lavoro', { bg: '#ff8a3d', scale: 0.45 });
+    sign.position.set(c.x, 3.2, c.z);
+    this.add(sign);
   }
 
-  private carry(on: boolean) {
-    if (!on) {
-      this.game.player.hold();
-      return;
-    }
-    const box = model('furniture/cardboardBoxClosed.glb', 2.2);
-    box.position.x = -0.23;
-    this.game.player.hold(box);
+  /** Aggiunge un oggetto di scena che sparisce a fine lavoro. */
+  prop(o: THREE.Object3D, pos: THREE.Vector3, rotY = 0) {
+    o.position.copy(pos);
+    o.rotation.y = rotY;
+    return this.add(o);
   }
 
-  private get stop() {
-    return this.stops[this.idx];
-  }
-
-  private placeMarker() {
-    const t = this.stop.slot;
-    this.target = t.pos;
-    this.ringObj.position.set(t.pos.x, 0.05, t.pos.z);
-    this.marker.position.set(t.pos.x, 3, t.pos.z);
-  }
-
-  private label() {
-    const a = this.stop.act;
-    if (a === 'flyer') return { label: 'Volantino', icon: '📰' };
-    return { label: 'Consegna', icon: '📦' };
-  }
-
-  update(dt: number) {
-    if (!this.tick(dt)) return;
-    const t = this.stop.slot;
-    const p = this.game.player.root.position;
-    this.marker.position.y = 3 + Math.sin(performance.now() / 250) * 0.3;
-    this.marker.rotation.y += dt * 2;
-    // freccia guida attorno al giocatore
-    const ang = Math.atan2(t.pos.x - p.x, t.pos.z - p.z);
-    this.guide.position.set(p.x + Math.sin(ang) * 1.6, 0.4, p.z + Math.cos(ang) * 1.6);
-    // il cono punta verso -Y: con ordine YXZ, -90° su X lo porta verso +Z, poi Y lo gira
-    this.guide.rotation.order = 'YXZ';
-    this.guide.rotation.set(-Math.PI / 2, ang, 0);
-    const d = Math.hypot(t.pos.x - p.x, t.pos.z - p.z);
-    this.guide.visible = d > 4;
-    const m = this.opts.mode;
-    this.status = `${m === 'flyer' ? 'Volantini' : 'Pacchi'}: ${this.idx}/${this.stops.length} · ${Math.round(d)} m`;
-    const reach = this.game.riding ? 3 : 1.8;
-    this.game.prompt = d < reach ? this.label() : null;
-  }
-
-  onAction() {
-    const t = this.stop.slot;
-    const p = this.game.player.root.position;
-    if (Math.hypot(t.pos.x - p.x, t.pos.z - p.z) > (this.game.riding ? 3 : 1.8)) return;
+  private nextPhase() {
+    for (const m of this.markers.values()) this.game.scene.remove(m);
+    this.markers.clear();
     this.idx++;
-    if (!this.game.riding) this.game.player.once('interact-right');
-    if (this.idx >= this.stops.length) {
+    if (this.idx >= this.phases.length) {
       this.done();
       return;
     }
-    this.placeMarker();
+    this.tasks = this.phases[this.idx].tasks();
+    for (const t of this.tasks) {
+      const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
+      m.position.set(t.pos.x, 2.3, t.pos.z);
+      this.game.scene.add(m);
+      this.markers.set(t, m);
+    }
+  }
+
+  private pending() {
+    const p = this.tasks.filter((t) => !t.done);
+    return this.phases[this.idx]?.ordered ? p.slice(0, 1) : p;
+  }
+
+  private reach() {
+    return this.game.riding ? 3 : 1.6;
+  }
+
+  update(dt: number) {
+    if (!this.tick(dt)) return;
+    const ph = this.phases[this.idx];
+    if (!ph) return;
+    const p = this.game.player.root.position;
+    const pend = this.pending();
+    // freccette sopra i punti ancora da fare (solo quelli attivi)
+    const t0 = performance.now() / 250;
+    for (const [t, m] of this.markers) {
+      m.visible = !t.done && pend.includes(t);
+      m.position.y = 2.3 + Math.sin(t0 + t.pos.x) * 0.12;
+    }
+    let near: Task | null = null;
+    let nd = Infinity;
+    for (const t of pend) {
+      const d = Math.hypot(t.pos.x - p.x, t.pos.z - p.z);
+      if (d < nd) {
+        nd = d;
+        near = t;
+      }
+    }
+    this.target = near?.pos;
+    const done = this.tasks.filter((t) => t.done).length;
+    let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${this.tasks.length > 1 ? ` ${done}/${this.tasks.length}` : ''}`;
+    if (this.zone && !inZone(this.zone, p, 1.2)) {
+      this.outTimer += dt;
+      status = '⚠️ Torna nella zona di lavoro!';
+      if (this.outTimer > 0 && this.outTimer - dt <= 0) this.game.player.play('idle');
+    } else this.outTimer = 0;
+    this.status = status;
+    if (!near || nd > this.reach()) {
+      this.game.prompt = null;
+      if (this.game.player.currentName === 'interact-right' && !this.game.input.actionHeld) this.game.player.play('idle');
+      return;
+    }
+    if (near.kind === 'hold') {
+      if (this.game.input.actionHeld) {
+        near.progress = (near.progress ?? 0) + dt / (near.sec ?? 1.2);
+        near.onProgress?.(Math.min(1, near.progress));
+        this.game.player.faceTowards(near.pos.x, near.pos.z, dt);
+        this.game.player.play('interact-right', 0.1, 1.6);
+        if (near.progress >= 1) this.complete(near);
+      } else if (this.game.player.currentName === 'interact-right') this.game.player.play('idle');
+      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0 };
+    } else {
+      this.game.prompt = { label: near.label, icon: near.icon };
+    }
+  }
+
+  onAction() {
+    const p = this.game.player.root.position;
+    const t = this.pending().find((x) => x.kind === 'tap' && Math.hypot(x.pos.x - p.x, x.pos.z - p.z) < this.reach());
+    if (!t) return;
+    if (!this.game.riding) this.game.player.once('interact-right');
+    this.complete(t);
+  }
+
+  private complete(t: Task) {
+    t.done = true;
+    this.game.player.play('idle');
+    t.onDone?.();
+    const m = this.markers.get(t);
+    if (m) m.visible = false;
+    if (this.tasks.every((x) => x.done)) this.nextPhase();
   }
 
   dispose() {
+    for (const m of this.markers.values()) this.game.scene.remove(m);
+    if (this.zone) this.game.city.restoreView();
     super.dispose();
     this.game.player.hold();
   }
 }
 
-// ---------------- strofina sullo schermo ----------------
+// ---------------- i lavoretti ----------------
 
-const THEME_INFO: Record<DishTheme, { what: string }> = {
-  plate: { what: 'Piatti' },
-  car: { what: 'Parti dell\'auto' },
-  wall: { what: 'Pareti' },
-};
+/** Sistema di riferimento davanti a un edificio: `f` verso la strada, `r` di lato. */
+function frame(slot: Slot) {
+  const [dx, dz] = DIR_VEC[slot.dir];
+  return (base: THREE.Vector3, f: number, r: number) => new THREE.Vector3(base.x + dx * f + dz * r, 0, base.z + dz * f - dx * r);
+}
 
-/** Lavapiatti, lavaggio auto, imbianchino: minigioco a tutto schermo. */
-export class ScrubRun extends BaseRun {
-  private dish: DishGame;
-
-  constructor(game: Game, level: number, private theme: DishTheme, title: string) {
-    super(game, level);
-    const rounds = Math.min(8, (theme === 'plate' ? 3 : 2) + Math.floor(level / 2));
-    const spots = Math.min(9, 4 + Math.floor(level / 3));
-    const per = theme === 'plate' ? 4.8 : 6;
-    this.timeTotal = this.timeLeft = rounds * Math.max(3.4, per - level * 0.1) + 3;
-    this.title = title;
-    this.dish = new DishGame(rounds, spots, theme, () => this.done());
-    game.input.enabled = false;
+/**
+ * Distanza (verso la strada) del fronte dell'edificio di questa tessera:
+ * il cortile di lavoro inizia lì, così nessun punto finisce sotto al tetto.
+ */
+function frontEdge(game: Game, slot: Slot) {
+  const [dx, dz] = DIR_VEC[slot.dir];
+  let best = 0.6;
+  for (const b of game.city.colliders) {
+    const inside = slot.center.x > b.minX - 0.5 && slot.center.x < b.maxX + 0.5 && slot.center.z > b.minZ - 0.5 && slot.center.z < b.maxZ + 0.5;
+    if (!inside) continue;
+    for (const x of [b.minX, b.maxX]) for (const z of [b.minZ, b.maxZ]) best = Math.max(best, (x - slot.center.x) * dx + (z - slot.center.z) * dz);
   }
+  return Math.min(best, 2.2);
+}
 
-  update(dt: number) {
-    if (!this.tick(dt)) return;
-    this.status = `${THEME_INFO[this.theme].what}: ${this.dish.done}/${this.dish.total}`;
-    this.game.prompt = null;
-  }
+/** Zona rettangolare davanti a un edificio: da `f0` a `f1` verso la strada, da -`r` a +`r` di lato. */
+function zoneFor(slot: Slot, base: THREE.Vector3, f0: number, f1: number, r: number): Zone {
+  const [dx, dz] = DIR_VEC[slot.dir];
+  const fm = (f0 + f1) / 2;
+  return {
+    center: new THREE.Vector3(base.x + dx * fm, 0, base.z + dz * fm),
+    dir: new THREE.Vector3(dx, 0, dz),
+    side: new THREE.Vector3(dz, 0, -dx),
+    halfF: (f1 - f0) / 2,
+    halfR: r,
+  };
+}
 
-  dispose() {
-    super.dispose();
-    this.dish.destroy();
-    this.game.input.enabled = true;
+const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
+
+/** Giardinaggio: attrezzi → taglia i cespugli → raccogli le foglie → svuota nel bidone. */
+export function gardenJob(game: Game, level: number, slot: Slot, title: string) {
+  const at = frame(slot);
+  const f0 = frontEdge(game, slot) + 0.3;
+  const n = Math.min(8, 3 + Math.floor(level / 2));
+  const spots: THREE.Vector3[] = [];
+  for (let i = 0; i < 60 && spots.length < n; i++) {
+    const v = at(slot.center, f0 + 0.3 + Math.random() * Math.max(0.2, 2.8 - f0 - 0.3), (Math.random() - 0.5) * 3.8);
+    if (spots.every((s) => s.distanceTo(v) > 1.15) && v.distanceTo(slot.pos) > 1) spots.push(v);
   }
+  let run: PhasedRun;
+  const bushes: THREE.Object3D[] = [];
+  const piles: THREE.Vector3[] = [];
+  const box = at(slot.center, 2.7, 2.6);
+  const bin = at(slot.center, 2.7, -2.6);
+  const phases: Phase[] = [
+    {
+      name: 'Prendi il tosasiepi', icon: '🧰',
+      tasks: () => [{ pos: box, kind: 'tap', label: 'Prendi il tosasiepi', icon: '🧰', onDone: () => hold(game, boxProp(0.5, 0.15, 0.15, 0xff5d73)) }],
+    },
+    {
+      name: 'Taglia i cespugli', icon: '✂️',
+      tasks: () => spots.map((pos, i) => ({
+        pos, kind: 'hold' as const, sec: 1.1 / (1 + 0.04 * level), label: 'Taglia', icon: '✂️',
+        onProgress: (p: number) => {
+          bushes[i].rotation.y += 0.3;
+          bushes[i].scale.setScalar(1 - p * 0.35);
+        },
+        onDone: () => {
+          bushes[i].visible = false;
+          run.prop(trimmedBush(), pos);
+          // le foglie tagliate cadono accanto
+          const lp = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8));
+          piles.push(lp);
+          run.prop(leafPile(), lp).name = 'pile' + (piles.length - 1);
+        },
+      })),
+    },
+    {
+      name: 'Raccogli le foglie', icon: '🍂',
+      tasks: () => piles.map((pos, i) => ({
+        pos, kind: 'tap' as const, label: 'Raccogli le foglie', icon: '🍂',
+        onDone: () => {
+          const o = game.scene.getObjectByName('pile' + i);
+          if (o) o.visible = false;
+          hold(game, cylProp(0.25, 0.45, 0x2e7d32));
+        },
+      })),
+    },
+    {
+      name: 'Svuota il sacco nel bidone', icon: '🗑️',
+      tasks: () => [{ pos: bin, kind: 'tap', label: 'Svuota nel bidone', icon: '🗑️', onDone: () => hold(game) }],
+    },
+  ];
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, 3.1, 2.95), time: n * 5 + 16, keep: slot.center });
+  run.prop(boxProp(0.7, 0.45, 0.45, 0xd32f2f), box);
+  run.prop(cylProp(0.35, 1, 0x2e7d32), bin);
+  for (const pos of spots) bushes.push(run.prop(bush(), pos));
+  return run;
+}
+
+/** Consegne e volantini: ritira in negozio → consegna agli indirizzi (in qualsiasi ordine) → torna per la ricevuta. */
+export function routeJob(game: Game, level: number, start: Slot, title: string, mode: 'package' | 'flyer') {
+  const houses = [...game.deliveryHouses];
+  const n = mode === 'package' ? Math.min(4, 2 + Math.floor(level / 3)) : Math.min(8, 4 + Math.floor(level / 2));
+  const sorted = houses.filter((h) => h.pos.distanceTo(start.pos) > (mode === 'package' ? 18 : 6)).sort((a, b) => a.pos.distanceTo(start.pos) - b.pos.distanceTo(start.pos));
+  const pool = mode === 'package' ? sorted.slice(0, 14) : sorted.slice(0, n + 3);
+  const stops: Slot[] = [];
+  while (stops.length < n && pool.length) stops.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  let dist = 0;
+  let from = start.pos;
+  for (const s of stops) {
+    dist += Math.abs(s.pos.x - from.x) + Math.abs(s.pos.z - from.z);
+    from = s.pos;
+  }
+  dist += Math.abs(start.pos.x - from.x) + Math.abs(start.pos.z - from.z);
+  const flyer = mode === 'flyer';
+  const box = () => {
+    const b = model('furniture/cardboardBoxClosed.glb', 2.2);
+    b.position.x = -0.23;
+    return b;
+  };
+  const phases: Phase[] = [
+    {
+      name: flyer ? 'Prendi i volantini' : 'Carica i pacchi', icon: flyer ? '📰' : '📦',
+      tasks: () => [{ pos: start.pos, kind: 'tap', label: flyer ? 'Prendi i volantini' : 'Carica i pacchi', icon: flyer ? '📰' : '📦', onDone: () => hold(game, flyer ? boxProp(0.3, 0.1, 0.4, 0xffffff) : box()) }],
+    },
+    {
+      name: flyer ? 'Imbuca in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
+      tasks: () => stops.map((s) => ({ pos: s.pos, kind: 'tap' as const, label: flyer ? 'Imbuca il volantino' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
+    },
+    {
+      name: 'Torna in negozio per la ricevuta', icon: '🧾',
+      tasks: () => [{ pos: start.pos, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', onDone: () => hold(game) }],
+    },
+  ];
+  const run = new PhasedRun(game, level, title, phases, { time: (dist / 5.2) * (flyer ? 1.35 : 1.45) + 6 + n * 2 });
+  // cassette o portoni segnati durante il giro
+  for (const s of stops) run.prop(boxProp(0.3, 1, 0.3, flyer ? 0x2d9cdb : 0xffc21a), s.pos.clone().add(new THREE.Vector3(0.7, 0, 0)));
+  return run;
+}
+
+/** Lavapiatti: per ogni tavolo prendi i piatti sporchi → lava al lavello → appoggia sullo scolapiatti. */
+export function dishJob(game: Game, level: number, slot: Slot, title: string) {
+  const at = frame(slot);
+  const tables = Math.min(4, 2 + Math.floor(level / 3));
+  const sink = at(slot.pos, 0.3, -3.1);
+  const rack = at(slot.pos, 0.3, 3.1);
+  let run: PhasedRun;
+  const tpos: THREE.Vector3[] = [];
+  const stacks: THREE.Object3D[] = [];
+  const clean: THREE.Object3D[] = [];
+  for (let i = 0; i < tables; i++) tpos.push(at(slot.pos, 0.6, (i - (tables - 1) / 2) * 1.45));
+  const phases: Phase[] = [];
+  for (let i = 0; i < tables; i++) {
+    phases.push({
+      name: `Tavolo ${i + 1}: raccogli, lava, asciuga`, icon: '🍽️', ordered: true,
+      tasks: () => [
+        { pos: tpos[i], kind: 'tap', label: 'Prendi i piatti sporchi', icon: '🍽️', onDone: () => { stacks[i].visible = false; hold(game, plateStack(4, true)); } },
+        { pos: sink, kind: 'hold', sec: 1.6 / (1 + 0.04 * level), label: 'Lava i piatti', icon: '🫧', onDone: () => hold(game, plateStack(4, false)) },
+        { pos: rack, kind: 'tap', label: 'Appoggia sullo scolapiatti', icon: '✨', onDone: () => { hold(game); clean[i].visible = true; } },
+      ],
+    });
+  }
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.pos, -0.4, 1.4, 3.7), time: tables * 11 + 6, keep: slot.center });
+  for (let i = 0; i < tables; i++) {
+    run.prop(boxProp(0.7, 0.75, 0.7, 0xffffff), tpos[i]);
+    const st = plateStack(4, true);
+    st.position.y = 0.76;
+    const g = new THREE.Group();
+    g.add(st);
+    stacks.push(run.prop(g, tpos[i]));
+  }
+  run.prop(boxProp(1.1, 0.9, 0.7, 0x90a4ae), sink);
+  const water = boxProp(0.8, 0.02, 0.45, 0x5fa8d3);
+  water.position.y = 0.9;
+  run.prop(water, sink).position.y = 0.9;
+  run.prop(boxProp(1.1, 1.1, 0.4, 0xbcaaa4), rack);
+  for (let i = 0; i < tables; i++) {
+    const c = plateStack(4, false);
+    const g = new THREE.Group();
+    c.position.set(-0.4 + i * 0.25, 1.1, 0);
+    c.rotation.z = Math.PI / 2.4;
+    g.add(c);
+    g.visible = false;
+    clean.push(run.prop(g, rack));
+  }
+  const tag = label('🍽️ Dehors del ristorante', { bg: '#ff9f6e', scale: 0.4 });
+  run.prop(tag, at(slot.pos, 0.3, 0)).position.y = 2.6;
+  return run;
+}
+
+/** Lavaggio auto: secchio → insapona i 4 lati → canna dell'acqua → risciacqua i 4 lati. */
+export function carWashJob(game: Game, level: number, slot: Slot, title: string) {
+  const at = frame(slot);
+  const f0 = frontEdge(game, slot) + 0.3;
+  const cf = Math.max(2.05, f0 + 0.85);
+  const carPos = at(slot.center, cf, 0);
+  const sides = [at(slot.center, cf, 2), at(slot.center, cf, -2), at(slot.center, cf + 1.05, 0.7), at(slot.center, cf + 1.05, -0.7)];
+  const bucket = at(slot.center, 3.3, 2.7);
+  const hose = at(slot.center, 3.3, -2.7);
+  let run: PhasedRun;
+  const foams: THREE.Object3D[] = [];
+  const phases: Phase[] = [
+    { name: 'Prendi secchio e spugna', icon: '🪣', tasks: () => [{ pos: bucket, kind: 'tap', label: 'Prendi il secchio', icon: '🪣', onDone: () => hold(game, cylProp(0.2, 0.3, 0x2d9cdb)) }] },
+    {
+      name: 'Insapona ogni lato', icon: '🧽',
+      tasks: () => sides.map((pos, i) => ({
+        pos, kind: 'hold' as const, sec: 1.2 / (1 + 0.04 * level), label: 'Insapona', icon: '🧽',
+        onDone: () => {
+          const f = foam();
+          const mid = pos.clone().lerp(carPos, 0.55);
+          foams[i] = run.prop(f, mid);
+        },
+      })),
+    },
+    { name: 'Prendi la canna dell\'acqua', icon: '🚿', tasks: () => [{ pos: hose, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.06, 0.6, 0x35c46a)) }] },
+    {
+      name: 'Risciacqua ogni lato', icon: '💦',
+      tasks: () => sides.map((pos, i) => ({
+        pos, kind: 'hold' as const, sec: 1 / (1 + 0.04 * level), label: 'Risciacqua', icon: '💦',
+        onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
+        onDone: () => { if (foams[i]) foams[i].visible = false; },
+      })),
+    },
+  ];
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, Math.max(3.6, cf + 1.6), 3.1), time: 30, keep: slot.center });
+  const car = model('cars/sedan.glb', 1);
+  const [dx, dz] = DIR_VEC[slot.dir];
+  // l'auto è parcheggiata di traverso, parallela alla casa
+  run.prop(car, carPos, Math.atan2(dz, -dx));
+  run.prop(cylProp(0.28, 0.4, 0x607d8b), bucket);
+  run.prop(new THREE.Group().add(cylProp(0.35, 0.12, 0x35c46a)), hose);
+  return run;
+}
+
+/** Imbianchino: copri le piante coi teli → prendi la vernice → dipingi ogni pannello → togli i teli. */
+export function paintJob(game: Game, level: number, slot: Slot, title: string) {
+  const at = frame(slot);
+  const f0 = frontEdge(game, slot) + 0.3;
+  const n = Math.min(5, 3 + Math.floor(level / 3));
+  const panels: THREE.Mesh[] = [];
+  const ppos: THREE.Vector3[] = [];
+  const plants = [at(slot.center, Math.max(2.5, f0 + 0.9), 2.6), at(slot.center, Math.max(2.5, f0 + 0.9), -2.6)];
+  const cans = at(slot.center, Math.max(2.9, f0 + 1.3), 1.2);
+  const colors = [0xff8a3d, 0x2d9cdb, 0x35c46a, 0x8e5bd6, 0xffc21a];
+  const col = colors[Math.floor(Math.random() * colors.length)];
+  let run: PhasedRun;
+  const tarps: THREE.Object3D[] = [];
+  for (let i = 0; i < n; i++) ppos.push(at(slot.center, f0 + 0.1, (i - (n - 1) / 2) * 1.02));
+  const phases: Phase[] = [
+    {
+      name: 'Copri le piante con i teli', icon: '🪴',
+      tasks: () => plants.map((pos, i) => ({ pos, kind: 'tap' as const, label: 'Copri con il telo', icon: '🪴', onDone: () => { tarps[i].visible = true; } })),
+    },
+    { name: 'Prendi la vernice', icon: '🪣', tasks: () => [{ pos: cans, kind: 'tap', label: 'Prendi la vernice', icon: '🪣', onDone: () => hold(game, cylProp(0.16, 0.25, col)) }] },
+    {
+      name: 'Dipingi ogni tratto del muretto', icon: '🖌️',
+      tasks: () => ppos.map((pos, i) => ({
+        pos: at(pos, 0.8, 0), kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️',
+        onProgress: (p: number) => (panels[i].material as THREE.MeshLambertMaterial).color.lerpColors(new THREE.Color(0x9e9e9e), new THREE.Color(col), p),
+      })),
+    },
+    {
+      name: 'Togli i teli e metti in ordine', icon: '🧹',
+      tasks: () => plants.map((pos, i) => ({ pos, kind: 'tap' as const, label: 'Togli il telo', icon: '🧹', onDone: () => { tarps[i].visible = false; hold(game); } })),
+    },
+  ];
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.3, Math.max(3.3, f0 + 1.8), 3.2), time: n * 4.5 + 22, keep: slot.center });
+  const [dx, dz] = DIR_VEC[slot.dir];
+  for (const pos of ppos) {
+    // segmento di muretto: spesso abbastanza da vedere il colore anche dall'alto
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.9, 0.5), new THREE.MeshLambertMaterial({ color: 0x9e9e9e }));
+    m.position.y = 0.45;
+    m.castShadow = true;
+    const g = new THREE.Group();
+    g.add(m);
+    panels.push(m);
+    run.prop(g, pos, Math.atan2(dx, dz));
+  }
+  for (const pos of plants) {
+    run.prop(bush(), pos);
+    const t = boxProp(1, 0.9, 1, 0xe0e0e0);
+    t.visible = false;
+    tarps.push(run.prop(t, pos));
+  }
+  run.prop(cylProp(0.18, 0.3, col), cans);
+  run.prop(cylProp(0.18, 0.3, 0xffffff), cans.clone().add(new THREE.Vector3(0.4, 0, 0)));
+  return run;
 }
 
 // ---------------- ordini delle imprese di servizi ----------------

@@ -251,8 +251,14 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Traslochi: scatoloni da caricare, oggetti sparsi da imballare al banco prima di caricarli, mobili pesanti da sollevare tenendo premuto (si cammina più piano); tutto va portato al furgone all'ingresso
 - Tempo, stelle e progressi nella barra in alto; la paga dipende dalle stelle
 
-### Prossime tappe
-- Tappa 3: lavoretti in 3D in città con zona di lavoro delimitata e fasi chiare (anche lavapiatti, lavaggio auto, imbianchino)
+### Versione 0.8 (tappa 3), fatto
+- Lavoretti a fasi (PhasedRun): zona di lavoro rettangolare con coni e cartello, avviso se ne esci, fasi numerate nella barra in alto, icone sopra i punti da fare
+- Giardinaggio: tosasiepi → taglia i cespugli → raccogli le foglie → svuota nel bidone
+- Consegne/volantini: carica in negozio → consegna agli indirizzi in qualsiasi ordine → ricevuta
+- Lavapiatti (dehors del ristorante): per ogni tavolo prendi → lava al lavello → scolapiatti
+- Lavaggio auto: secchio → insapona 4 lati → canna → risciacqua 4 lati
+- Imbianchino (muretto): copri le piante → vernice → dipingi ogni tratto → togli i teli
+- Durante un lavoro spariscono palazzi e alberi che coprono la zona; il cliente si fa da parte
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

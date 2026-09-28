@@ -216,3 +216,80 @@ export function productObject(modelPath: string | undefined, size: number): THRE
   }
   return model(modelPath, size / max);
 }
+
+// ---------------- oggetti di scena per i lavoretti ----------------
+
+const lamb = (color: number) => new THREE.MeshLambertMaterial({ color });
+
+export function boxProp(w: number, h: number, d: number, color: number) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lamb(color));
+  m.position.y = h / 2;
+  m.castShadow = true;
+  const g = new THREE.Group();
+  g.add(m);
+  return g;
+}
+
+export function cylProp(r: number, h: number, color: number) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, h, 14), lamb(color));
+  m.position.y = h / 2;
+  m.castShadow = true;
+  const g = new THREE.Group();
+  g.add(m);
+  return g;
+}
+
+/** Cono stradale arancione per delimitare la zona di lavoro. */
+export function cone() {
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 10), lamb(0xff7a1a));
+  c.position.y = 0.3;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.13, 0.08, 10), lamb(0xffffff));
+  band.position.y = 0.33;
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.05, 0.4), lamb(0x333333));
+  base.position.y = 0.025;
+  g.add(c, band, base);
+  g.traverse((o) => (o.castShadow = true));
+  return g;
+}
+
+/** Mucchio di foglie tagliate. */
+export function leafPile() {
+  const g = new THREE.Group();
+  const mats = [lamb(0x8bc34a), lamb(0x6d8b3a), lamb(0xa1887f)];
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.15, 0), mats[i % 3]);
+    m.position.set((Math.random() - 0.5) * 0.5, 0.1 + Math.random() * 0.1, (Math.random() - 0.5) * 0.5);
+    g.add(m);
+  }
+  return g;
+}
+
+/** Pila di piatti (sporchi o puliti). */
+export function plateStack(n: number, dirty: boolean) {
+  const g = new THREE.Group();
+  for (let i = 0; i < n; i++) {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.04, 16), lamb(0xf7f7f2));
+    p.position.y = 0.02 + i * 0.05;
+    g.add(p);
+    if (dirty && i === n - 1) {
+      const d = new THREE.Mesh(new THREE.CircleGeometry(0.1, 10), lamb(0x8d6e3f));
+      d.rotation.x = -Math.PI / 2;
+      d.position.y = p.position.y + 0.025;
+      g.add(d);
+    }
+  }
+  return g;
+}
+
+/** Schiuma di sapone (lavaggio auto). */
+export function foam() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.12 + Math.random() * 0.08, 8, 6), mat);
+    m.position.set((Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3);
+    g.add(m);
+  }
+  return g;
+}
