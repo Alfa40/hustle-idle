@@ -517,15 +517,34 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 
 
 /* ---------- comandi della camera ---------- */
-.camctl {
-  position: fixed; left: var(--sal); top: 50%; transform: translateY(-20%);
-  display: grid; grid-template-columns: 40px 40px; gap: 6px; z-index: 6;
+.camctl { position: relative; }
+.cam-grid {
+  display: none; position: absolute; right: 64px; top: 0; grid-template-columns: 40px 40px; gap: 6px;
+  background: rgba(255,255,255,.9); padding: 6px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,.2);
 }
-.camctl button {
-  width: 40px; height: 40px; border-radius: 12px; border: 3px solid #fff; background: rgba(58, 47, 85, .72);
-  color: #fff; font-size: 18px; font-weight: 700; padding: 0; box-shadow: 0 3px 8px rgba(0,0,0,.2); touch-action: none;
+.camctl.open .cam-grid { display: grid; }
+.cam-grid button {
+  width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--purple);
+  color: #fff; font-size: 18px; font-weight: 700; padding: 0; touch-action: none;
 }
-.camctl button:active { background: var(--blue); transform: scale(.94); }
-.camctl .wide { grid-column: 1 / -1; width: auto; font-size: 12px; opacity: .55; }
-.camctl.changed .wide { opacity: 1; background: var(--blue); }
-@media (orientation: landscape) { .camctl { top: auto; bottom: calc(var(--sab) + 12px); transform: none; } }
+.cam-grid button:active { background: var(--blue); transform: scale(.94); }
+.cam-grid .wide { grid-column: 1 / -1; width: auto; font-size: 12px; background: var(--gray); }
+.camctl.changed .cam-grid .wide { background: var(--blue); }
+.camctl.changed .cam-toggle { box-shadow: 0 0 0 3px var(--blue), 0 4px 0 var(--gray-d); }
+@media (orientation: landscape) { .cam-grid { right: 0; top: 64px; } }
+
+/* ---------- guida nelle attività ---------- */
+.guide {
+  position: fixed; left: var(--sal); right: calc(var(--sar) + 124px); bottom: calc(var(--sab) + 14px); z-index: 6;
+  background: rgba(255,255,255,.95); border-radius: 18px; padding: 8px 10px; border: 3px solid var(--green);
+  box-shadow: 0 4px 14px rgba(0,0,0,.2); pointer-events: none; max-width: 520px;
+}
+.gd-title { font-weight: 700; font-size: 14px; }
+.gd-steps { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 5px; font-size: 12px; }
+.gd-steps i { font-style: normal; background: #f1ead9; border-radius: 8px; padding: 2px 6px; color: var(--ink-2); font-weight: 600; }
+.gd-steps i.ok { background: #dff5e6; color: var(--green-d); }
+.gd-steps i.now { background: var(--green); color: #fff; }
+.gd-steps b { color: var(--ink-2); }
+.gd-caps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.gd-caps span { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
+@media (orientation: landscape) { .guide { left: 50%; right: auto; transform: translateX(-50%); width: min(520px, 55vw); } }

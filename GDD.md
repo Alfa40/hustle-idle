@@ -275,6 +275,11 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Notte: finestre che si illuminano, lampioni con alone e cerchio di luce a terra
 - Particelle: foglie (giardino), bolle (lavaggi, lavapiatti, pulizie), schizzi di vernice, fumo da piastra/forno (scuro se brucia), polvere, scintille a lavoro completato
 
+### Chiarezza (0.9.1)
+- Comandi camera (🎥 nella colonna a destra): ruota, zoom, inclina, visuale standard; pareti tra camera e stanza nascoste
+- Guida nelle attività: riquadro in basso con il percorso del prodotto (✅ fatte, fase attuale evidenziata) e le capienze sempre scritte (in mano 0/1, piastra/forno x/y, pronti x/4); la prossima postazione ha anello verde, freccia e nome
+- Scritte 3D più piccole: le postazioni mostrano solo l'icona (e i posti occupati), il nome completo solo sulla prossima
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

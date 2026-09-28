@@ -176,10 +176,12 @@ export class UI {
     const cam = document.createElement('div');
     cam.className = 'camctl';
     cam.innerHTML = `
+      <button class="cam-toggle hbtn c-gray" aria-label="Camera"><span class="i">🎥</span><span class="l">Camera</span></button>
+      <div class="cam-grid">
       <button data-v="spin:1" aria-label="Ruota a sinistra">⟲</button><button data-v="spin:-1" aria-label="Ruota a destra">⟳</button>
       <button data-v="zoom:1" aria-label="Avvicina">＋</button><button data-v="zoom:-1" aria-label="Allontana">－</button>
       <button data-v="tilt:1" aria-label="Più dall'alto">▲</button><button data-v="tilt:-1" aria-label="Più di lato">▼</button>
-      <button data-v="reset" class="wide" aria-label="Visuale standard">⌂ Visuale</button>`;
+      <button data-v="reset" class="wide" aria-label="Visuale standard">⌂ Visuale</button></div>`;
     const view = this.game.view;
     cam.querySelectorAll<HTMLButtonElement>('[data-v]').forEach((b) => {
       const [k, d] = b.dataset.v!.split(':');
@@ -193,7 +195,8 @@ export class UI {
       b.addEventListener('pointerleave', stop);
       b.addEventListener('pointercancel', stop);
     });
-    this.root.appendChild(cam);
+    cam.querySelector('.cam-toggle')!.addEventListener('click', () => cam.classList.toggle('open'));
+    this.root.querySelector('.hud-right .hud-btns')!.appendChild(cam);
     this.camEl = cam;
     // rotellina = zoom, Q/R = ruota (su PC)
     window.addEventListener('wheel', (e) => {

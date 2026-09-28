@@ -13,7 +13,7 @@ import {
 import { addFame, addXp } from '../sim/progress';
 import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
-import { label } from './props';
+import { arrow, label, ring } from './props';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
 
@@ -65,6 +65,10 @@ interface Station {
   pos: THREE.Vector3;
   slots: Slot[];
   hold: number;
+  /** etichetta sopra la postazione (si aggiorna con i posti occupati) */
+  tag?: THREE.Sprite;
+  tagKey?: string;
+  tagY: number;
 }
 
 interface Worker {
@@ -178,8 +182,7 @@ export class TruckInterior {
         s.add(o);
       }
       const tall = d.model.includes('Fridge') || d.model.includes('bookcase');
-      this.tag(`${d.icon} ${d.name}`, pos, d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7);
-      const st: Station = { def: d, pos, slots: [], hold: 0 };
+      const st: Station = { def: d, pos, slots: [], hold: 0, tagY: d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7 };
       const nSlots = d.kind === 'timed' ? (d.slots ?? 2) + Math.floor(upg(this.biz, 'attrezzatura') / 3) : 0;
       for (let i = 0; i < nSlots; i++) {
         const bar = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x333333, depthTest: false }));
@@ -197,13 +200,18 @@ export class TruckInterior {
     }
     this.passGroup.position.set(this.stationOf('pass')!.pos.x, 1.08, COUNTER_Z);
     s.add(this.passGroup);
+    // evidenzia la prossima postazione: anello verde a terra e freccia che rimbalza
+    this.nextRing = ring(0x35c46a, 0.75);
+    this.nextArrow = arrow(0x35c46a);
+    this.nextArrow.scale.setScalar(0.6);
+    s.add(this.nextRing, this.nextArrow);
 
     // dipendenti: i cuochi alle postazioni, i cassieri al bancone
     const work = this.stations.filter((x) => x.def.kind === 'hold' || x.def.kind === 'timed');
     let wi = 0;
     for (const e of this.biz.staff) {
       const char = new Character(e.model || CHAR_MODELS[e.id % CHAR_MODELS.length]);
-      const tag = label(e.name.split(' ')[0], { scale: 0.24 });
+      const tag = label(e.name.split(' ')[0], { scale: 0.2 });
       tag.position.y = 1.75;
       char.root.add(tag);
       if (e.role === 'cassa') {
@@ -221,10 +229,101 @@ export class TruckInterior {
     }
   }
 
-  private tag(t: string, v: THREE.Vector3, y: number) {
-    const l = label(t, { scale: 0.28 });
+  private tag(t: string, v: THREE.Vector3, y: number, bg?: string) {
+    const l = label(t, { scale: 0.3, bg, fg: bg ? '#fff' : undefined });
     l.position.set(v.x, y, v.z);
     this.scene.add(l);
+    return l;
+  }
+
+  // ---------------- guida ----------------
+
+  /** Capienza: in mano si porta un prodotto alla volta. */
+  static readonly HAND_MAX = 1;
+  static readonly PASS_MAX = 4;
+  private guideEl: HTMLDivElement | null = null;
+  private guideKey = '';
+  private nextRing!: THREE.Mesh;
+  private nextArrow!: THREE.Object3D;
+
+  /** Postazione dove andare adesso. */
+  private nextStation(): Station | null {
+    const it = this.held;
+    if (it) {
+      if (this.finished(it)) return this.stationOf('counter') ?? null;
+      return this.stations.find((s) => s.def.id === this.recipe(it)[it.step]) ?? null;
+    }
+    // qualcosa è pronto sul fuoco? prima si ritira
+    const ready = this.stations.find((s) => s.slots.some((sl) => sl.item && sl.p >= 1));
+    if (ready) return ready;
+    if (this.pass.some((p) => this.deliverable(p))) return this.stationOf('pass') ?? null;
+    const need = this.needed()[0];
+    if (need) return this.stations.find((s) => s.def.id === this.layout.recipes[need.pid]?.steps[0]) ?? null;
+    return null;
+  }
+
+  /** Solo l'icona (e i posti occupati); il nome completo solo sulla prossima postazione. */
+  private stationLabel(st: Station, hot: boolean) {
+    const d = st.def;
+    const count = d.kind === 'timed' ? ` ${st.slots.filter((x) => x.item).length}/${st.slots.length}`
+      : d.kind === 'pass' ? ` ${this.pass.length}/${TruckInterior.PASS_MAX}` : '';
+    return hot ? `👉 ${d.icon} ${d.name}${count}` : `${d.icon}${count}`;
+  }
+
+  private updateTags() {
+    const next = this.nextStation();
+    for (const st of this.stations) {
+      const hot = st === next;
+      const key = this.stationLabel(st, hot);
+      if (key === st.tagKey) continue;
+      st.tagKey = key;
+      if (st.tag) this.scene.remove(st.tag);
+      st.tag = this.tag(key, st.pos, st.tagY, hot ? '#35c46a' : undefined);
+    }
+    this.nextRing.visible = this.nextArrow.visible = !!next;
+    if (next) {
+      const z = next.def.z > 1 ? FRONT - 0.1 : next.pos.z + 0.95;
+      this.nextRing.position.set(next.pos.x, 0.08, z);
+      this.nextArrow.position.set(next.pos.x, 2.35 + Math.sin(performance.now() / 220) * 0.12, next.pos.z);
+    }
+  }
+
+  /** Riquadro con il percorso del prodotto e le capienze, sempre visibile. */
+  private updateGuide() {
+    if (!this.guideEl) return;
+    const it = this.held;
+    const onFire = this.stations.filter((s) => s.def.kind === 'timed');
+    const caps = [
+      `✋ In mano ${it ? 1 : 0}/${TruckInterior.HAND_MAX}`,
+      ...onFire.map((s) => `${s.def.icon} ${s.def.name} ${s.slots.filter((x) => x.item).length}/${s.slots.length}`),
+      `${this.stationOf('pass')!.def.icon} Pronti ${this.pass.length}/${TruckInterior.PASS_MAX}`,
+    ].map((c) => `<span>${c}</span>`).join('');
+    let title: string;
+    let steps = '';
+    const stepChips = (pid: ProductId, takeaway: boolean, at: number) => {
+      const ids = [...(this.layout.recipes[pid]?.steps ?? []), ...(takeaway && this.hasStation('imballo') ? ['imballo'] : [])];
+      const counter = this.stationOf('counter')!.def;
+      return [...ids.map((id) => this.stationDef(id)!), counter]
+        .map((d, i) => `<i class="${i < at ? 'ok' : i === at ? 'now' : ''}">${i < at ? '✅' : d.icon} ${d.name}</i>`)
+        .join('<b>›</b>');
+    };
+    const next = this.nextStation();
+    if (it) {
+      title = `${PRODUCTS[it.pid].icon} ${PRODUCTS[it.pid].name}${it.takeaway ? ' 🥡 da asporto' : ''}`;
+      steps = stepChips(it.pid, it.takeaway, it.step);
+    } else if (next?.slots.some((sl) => sl.item && sl.p >= 1)) {
+      title = `✅ Pronto! Ritira da ${next.def.icon} ${next.def.name}`;
+    } else if (next?.def.kind === 'pass') {
+      title = '🍽️ C\'è un prodotto pronto: prendilo e servilo';
+    } else {
+      const need = this.needed()[0];
+      title = need ? `Prossimo ordine: ${PRODUCTS[need.pid].icon} ${PRODUCTS[need.pid].name}${need.takeaway ? ' 🥡' : ''}` : this.customers.length ? '⏳ Aspetta che la cottura finisca' : '😴 Nessun cliente: aspetta';
+      if (need) steps = stepChips(need.pid, need.takeaway, 0);
+    }
+    const key = title + steps + caps;
+    if (key === this.guideKey) return;
+    this.guideKey = key;
+    this.guideEl.innerHTML = `<div class="gd-title">${title}</div>${steps ? `<div class="gd-steps">${steps}</div>` : ''}<div class="gd-caps">${caps}</div>`;
   }
 
   private stationOf(kind: StationDef['kind']) {
@@ -241,12 +340,17 @@ export class TruckInterior {
     player.root.rotation.y = Math.PI;
     this.scene.add(player.root);
     this.biz.__playerInside = true;
+    this.guideEl = document.createElement('div');
+    this.guideEl.className = 'guide';
+    document.body.appendChild(this.guideEl);
     this.resize();
     window.addEventListener('resize', this.resize);
   }
 
   exit() {
     this.biz.__playerInside = false;
+    this.guideEl?.remove();
+    this.guideEl = null;
     window.removeEventListener('resize', this.resize);
     this.setHeld(null);
     this.scene.remove(this.player.root);
@@ -336,7 +440,7 @@ export class TruckInterior {
     if (key === c.bubbleKey) return;
     c.bubbleKey = key;
     c.char.root.remove(c.bubble);
-    c.bubble = label(key, { bg: '#ffffff', fg: '#000', scale: 0.5 });
+    c.bubble = label(key, { bg: '#ffffff', fg: '#000', scale: 0.42 });
     c.bubble.position.y = 1.95;
     c.char.root.add(c.bubble);
   }
@@ -420,7 +524,7 @@ export class TruckInterior {
     const txt = this.finished(it)
       ? `${PRODUCTS[it.pid].icon}${it.takeaway ? '🥡' : ''} pronto!`
       : `${PRODUCTS[it.pid].icon} ${it.step}/${steps.length} → ${this.stationDef(steps[it.step])?.icon ?? ''}`;
-    this.heldSprite = label(txt, { bg: this.finished(it) ? '#35c46a' : '#ffffff', fg: this.finished(it) ? '#fff' : '#3a2f55', scale: 0.55 });
+    this.heldSprite = label(txt, { bg: this.finished(it) ? '#35c46a' : '#ffffff', fg: this.finished(it) ? '#fff' : '#3a2f55', scale: 0.45 });
     this.heldSprite.position.y = 2.3;
     this.player.root.add(this.heldSprite);
   }
@@ -444,10 +548,12 @@ export class TruckInterior {
     this.placeCamera();
     if (this.biz.autoRestock) restock(s, this.biz);
     this.uiT += dt;
-    if (this.uiT > 0.25) {
+    if (this.uiT > 0.2) {
       this.uiT = 0;
       this.renderPass();
+      this.updateGuide();
     }
+    this.updateTags();
   }
 
   private updateCustomers(dt: number, gm: number) {
@@ -503,7 +609,7 @@ export class TruckInterior {
     const cashiers = this.workers.filter((w) => w.emp.role === 'cassa');
     if (cooks.length) {
       const need = this.needed();
-      if (need.length && this.pass.length < 4) {
+      if (need.length && this.pass.length < TruckInterior.PASS_MAX) {
         const rate = cooks.reduce((a, w) => a + employeeRate(w.emp, this.biz), 0);
         this.cookAcc += (rate * gm) / 60;
         for (const w of cooks) w.char.play('interact-right', 0.15, 1.2);
@@ -604,7 +710,7 @@ export class TruckInterior {
     const skill = bizType(this.biz.type).skills[0];
     switch (d.kind) {
       case 'source': {
-        if (it) return { label: 'Hai già le mani piene', icon: '✋' };
+        if (it) return { label: `Mani piene (${TruckInterior.HAND_MAX}/${TruckInterior.HAND_MAX})`, icon: '✋' };
         const need = this.needed().find((n) => this.layout.recipes[n.pid]?.steps[0] === d.id);
         if (!need) {
           const anyHere = this.makeable().some((pid) => this.layout.recipes[pid]?.steps[0] === d.id);
@@ -658,7 +764,7 @@ export class TruckInterior {
         }
         if (it && next === d.id) {
           const free = st.slots.find((sl) => !sl.item);
-          if (!free) return { label: 'Tutto occupato: aspetta', icon: d.icon };
+          if (!free) return { label: `Pieno (${st.slots.length}/${st.slots.length}): aspetta`, icon: d.icon };
           if (pressed) {
             free.item = it;
             free.p = 0;

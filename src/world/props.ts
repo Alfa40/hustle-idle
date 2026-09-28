@@ -29,7 +29,7 @@ export function exclamation() {
     g.fillText('!', 64, 70);
   });
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: exclTex, depthTest: false }));
-  s.scale.setScalar(0.9);
+  s.scale.setScalar(0.62);
   s.renderOrder = 10;
   return s;
 }
@@ -55,7 +55,7 @@ export function label(text: string, opts: { bg?: string; fg?: string; scale?: nu
     g.fillText(text, w / 2, h / 2 + 2);
   });
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-  const sc = opts.scale ?? 0.5;
+  const sc = (opts.scale ?? 0.5) * 0.72;
   s.scale.set((w / h) * sc, sc, 1);
   s.renderOrder = 11;
   return s;
