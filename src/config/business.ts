@@ -9,7 +9,7 @@ export const ROLES: Record<Role, { name: string; icon: string; baseSalary: numbe
   manager: { name: 'Manager', icon: '👔', baseSalary: 700 },
 };
 
-export type UpgradeId = 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
+export type UpgradeId = 'ampliamento' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
 
 export interface UpgradeDef {
   name: string;
@@ -20,6 +20,10 @@ export interface UpgradeDef {
 }
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
+  ampliamento: {
+    name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio, nuove postazioni di lavoro e nuovi prodotti da vendere.', max: 2,
+    cost: (l) => [3500, 12000][l] ?? Infinity,
+  },
   attrezzatura: {
     name: 'Attrezzatura', icon: '🔥', desc: 'Si lavora più in fretta (+15% per livello).', max: 8,
     cost: (l) => Math.round(400 * 1.8 ** l),

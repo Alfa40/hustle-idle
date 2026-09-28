@@ -238,6 +238,17 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Impostazioni (anche in partita, pulsante Opzioni): qualità grafica, ombre, distanza camera, freccette, minimappa
 - In partita: "Salva e torna al menu principale" e "Ricomincia questa partita"
 
+### Versione 0.6 (tappa 1), fatto
+- Barra del lavoretto in alto, al posto di data ed eventi
+- Corretto: le freccette ai bordi puntavano nella direzione opposta per i posti molto lontani (dietro la camera)
+- Attività al bancone in 3D con lavorazione a più fasi (config/recipes.ts): ogni prodotto passa da più postazioni (prendi, lavora tenendo premuto, cottura a tempo con rischio di bruciare, consegna)
+- Ordini con più prodotti e ordini da asporto (fase di imballaggio); ripiano dei pronti dove i dipendenti appoggiano i prodotti
+- Miglioria "Ampliamento del locale" (2 livelli): stanza più grande, nuove postazioni, nuovi prodotti (es. tacos e gelati nel food truck, pizza e torte nel panificio, sedie e gioielli nel laboratorio)
+
+### Prossime tappe
+- Tappa 2: pulizie e traslochi in 3D dentro la casa del cliente
+- Tappa 3: lavoretti in 3D in città con zona di lavoro delimitata e fasi chiare (anche lavapiatti, lavaggio auto, imbianchino)
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

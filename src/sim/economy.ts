@@ -5,6 +5,7 @@ import {
 } from '../config/business';
 import { ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
+import { productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
@@ -384,6 +385,7 @@ export function estimateLot(s: GameState, lotId: string, type: BusinessType) {
   const def = bizType(type);
   const fm = fameMultiplier(s, type);
   const best = def.products
+    .filter((p) => productLevel(type, p) === 0)
     .map((p) => ({ p, d: marketDemand(s, p, zone) * fm }))
     .sort((a, b) => b.d * (PRODUCTS[b.p].price - PRODUCTS[b.p].cost) - a.d * (PRODUCTS[a.p].price - PRODUCTS[a.p].cost))[0];
   const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;

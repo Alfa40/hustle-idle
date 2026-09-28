@@ -4,6 +4,8 @@ import type { JobType } from '../config/jobs';
 import { PRODUCT_IDS, type ProductId } from '../config/products';
 import type { VehicleId } from '../config/vehicles';
 import { EVENT_BY_ID, type WeatherId } from '../config/events';
+import { productLevel } from '../config/recipes';
+import { BUSINESS_TYPES } from '../config/business';
 import { SKILL_IDS, type SkillId } from '../config/skills';
 
 export interface Employee {
@@ -193,7 +195,13 @@ function parse(raw: string | null): GameState | null {
       st.fame[k] ??= 0;
     }
     for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
-    for (const b of st.businesses) b.orders ??= [];
+    for (const b of st.businesses) {
+      b.orders ??= [];
+      // prodotti che ora richiedono un ampliamento: tolti dalla vendita
+      const lvl = b.upgrades.ampliamento ?? 0;
+      const ok = b.products.filter((p) => productLevel(b.type, p) <= lvl);
+      b.products = ok.length ? ok : [BUSINESS_TYPES[b.type].products[0]];
+    }
     return st;
   } catch {
     return null;

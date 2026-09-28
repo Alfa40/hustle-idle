@@ -2,6 +2,7 @@ import { BUSINESS, LEVEL, TIME } from '../config/balance';
 import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
+import { hasInterior, LAYOUTS, productLevel } from '../config/recipes';
 import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
 import { JOBS } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
@@ -591,6 +592,8 @@ export class UI {
           if (biz.products.includes(pid)) {
             if (biz.products.length > 1) biz.products = biz.products.filter((x) => x !== pid);
             else toast('Serve almeno un prodotto in vendita', 'bad');
+          } else if (productLevel(biz.type, pid) > upg(biz, 'ampliamento')) {
+            toast(`🔒 Serve l'ampliamento del locale (livello ${productLevel(biz.type, pid)})`, 'bad');
           } else if (biz.products.length < menuSlots(biz)) {
             biz.products.push(pid);
           } else {
@@ -687,8 +690,13 @@ export class UI {
             const next = pr.season[(monthIndex(day(s)) + 1) % 12];
             const trend = next > season * 1.05 ? '📈' : next < season * 0.95 ? '📉' : '➡️';
             const f2 = (n: number) => n.toFixed(2).replace('.', ',');
-            return `<div class="card"><div class="row between"><h3>${pr.icon} ${pr.name}</h3>
-              <label class="toggle"><input type="checkbox" ${on ? 'checked' : ''} data-c="toggleProduct:${p}"> in vendita</label></div>
+            const need = productLevel(b.type, p);
+            const locked = need > upg(b, 'ampliamento');
+            const steps = hasInterior(b.type) ? (LAYOUTS[b.type].recipes[p]?.steps ?? []) : [];
+            const path = steps.map((id) => LAYOUTS[b.type as keyof typeof LAYOUTS].stations.find((x) => x.id === id)?.icon).join(' → ');
+            return `<div class="card" ${locked ? 'style="opacity:.6"' : ''}><div class="row between"><h3>${pr.icon} ${pr.name}</h3>
+              ${locked ? `<span class="tag">🔒 Ampliamento ${need}</span>` : `<label class="toggle"><input type="checkbox" ${on ? 'checked' : ''} data-c="toggleProduct:${p}"> in vendita</label>`}</div>
+              ${path ? `<div class="small muted">Lavorazione: ${path} → ${LAYOUTS[b.type as keyof typeof LAYOUTS].stations.find((x) => x.kind === 'counter')?.icon}</div>` : ''}
               <div class="row between small"><span>Domanda oggi ${demandBars(d, service ? 1 : 4)} ${f2(d)}/h</span><span class="muted">stagione ${trend}</span></div>
               <div class="row between small muted"><span>Prezzo ${euro(pr.price)} · costo ${f2(pr.cost)}€</span><span>margine <b class="good">${f2(pr.price - pr.cost)}€</b></span></div></div>`;
           })
@@ -722,16 +730,25 @@ export class UI {
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
         <h3 class="sec-title">👥 Il tuo staff</h3>${staff}<h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Nuovi candidati ogni giorno.</p>${cands}`;
     }
-    // migliorie
-    return UPGRADE_IDS.map((id) => {
+    // migliorie (l'ampliamento c'è solo per le attività con un interno)
+    return UPGRADE_IDS.filter((id) => id !== 'ampliamento' || hasInterior(b.type)).map((id) => {
       const u = UPGRADES[id];
       const lvl = upg(b, id);
       const maxed = lvl >= u.max;
       const cost = u.cost(lvl);
       return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
-        <p class="muted small" style="margin:0 0 8px">${u.desc}</p>
+        <p class="muted small" style="margin:0 0 8px">${u.desc}${id === 'ampliamento' && !maxed ? `<br><b style="color:var(--ink)">Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b>` : ''}</p>
         <button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || s.money < cost ? 'disabled' : ''}>${maxed ? 'Massimo' : 'Migliora · ' + euro(cost)}</button></div>`;
     }).join('');
+  }
+
+  /** Cosa aggiunge un livello di ampliamento: postazioni e prodotti. */
+  private expansionUnlocks(b: Business, level: number) {
+    if (!hasInterior(b.type)) return '';
+    const lay = LAYOUTS[b.type];
+    const st = lay.stations.filter((x) => x.level === level).map((x) => `${x.icon} ${x.name}`);
+    const pr = (Object.keys(lay.recipes) as ProductId[]).filter((p) => lay.recipes[p]!.level === level).map((p) => `${PRODUCTS[p].icon} ${PRODUCTS[p].name}`);
+    return [...st, ...pr, 'stanza più grande', 'ordini più ricchi'].join(', ');
   }
 
   private empCard(e: Employee, type: BusinessType, btn: string) {
