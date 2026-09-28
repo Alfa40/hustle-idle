@@ -248,6 +248,7 @@ export class UI {
 
   jobBar(on: boolean) {
     this.jobEl.classList.toggle('on', on);
+    document.body.classList.toggle('job-on', on);
   }
 
   refresh() {

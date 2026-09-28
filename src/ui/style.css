@@ -158,23 +158,24 @@ b, h2, h3 { font-weight: 600; }
 .edge-ico { font-size: 18px; line-height: 1; }
 .edge-dist { font-size: 10px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); line-height: 1.1; }
 
-/* ---------- barra lavoro ---------- */
+/* ---------- barra lavoro (in alto, al posto di data ed eventi) ---------- */
 .jobbar {
-  position: fixed; left: var(--sal); bottom: calc(var(--sab) + 18px);
-  width: min(380px, calc(100vw - var(--sal) - var(--sar) - 128px));
+  position: fixed; left: var(--sal); top: var(--sat);
+  width: calc(100vw - var(--sal) - var(--sar) - 122px); max-width: 420px;
   background: #fff; border-radius: 18px; padding: 8px 12px 10px; display: none; pointer-events: auto;
   border: 3px solid var(--yellow); box-shadow: 0 4px 0 rgba(58,47,85,.2), 0 6px 14px rgba(0,0,0,.18);
 }
-@media (orientation: landscape) { .jobbar { left: 50%; transform: translateX(-50%); width: min(380px, 44vw); } }
-.jobbar.on { display: block; }
+@media (orientation: landscape) { .jobbar { width: min(400px, 42vw); } }
+.jobbar.on { display: block; animation: tin .25s cubic-bezier(.2,1.6,.4,1); }
+body.job-on .hud-top { display: none; }
 .jobbar .row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 600; gap: 8px; align-items: center; }
-.jobbar #j-time { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 14px; }
+.jobbar #j-time { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 14px; flex: none; }
 .jobbar #j-status { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
 .jobbar .track { height: 12px; border-radius: 8px; background: #f1ead9; margin-top: 6px; overflow: hidden; }
 .jobbar .fill { height: 100%; background: var(--green); transition: width .1s linear; border-radius: 8px; }
 .jobbar .fill.warn { background: var(--yellow); }
 .jobbar .fill.danger { background: var(--red); }
-.jobbar .quit { background: #f1ead9; border: none; border-radius: 10px; padding: 3px 9px; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.jobbar .quit { background: #f1ead9; border: none; border-radius: 10px; padding: 3px 9px; font-size: 12px; color: var(--ink-2); font-weight: 600; flex: none; }
 
 /* ---------- pulsante azione ---------- */
 .action {
@@ -381,7 +382,6 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .ride-btn .l { font-size: 10px; font-weight: 700; }
 .ride-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--blue-d); }
 @media (orientation: landscape) { .ride-btn { right: calc(var(--sar) + 124px); bottom: calc(var(--sab) + 30px); } }
-.jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------- mappa interattiva ---------- */
 .mapscreen {
@@ -513,3 +513,4 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .switch i { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 2px 4px rgba(0,0,0,.2); }
 .switch.on { background: var(--green); }
 .switch.on i { left: 25px; }
+.jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
