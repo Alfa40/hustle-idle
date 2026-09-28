@@ -64,6 +64,9 @@ abstract class BaseRun implements JobRun {
 
 // ---------------- lavoretti a fasi in una zona di lavoro ----------------
 
+/** Scala degli oggetti di scena dei lavoretti (più piccoli = vista più pulita). */
+const PROP_SCALE = 0.65;
+
 /** Rettangolo orientato: `dir` verso la strada, `side` di lato. */
 export interface Zone {
   center: THREE.Vector3;
@@ -160,16 +163,24 @@ export class PhasedRun extends BaseRun {
     const pts: [number, number][] = [];
     for (const f of [-1, 1]) for (const r of [-1, 0, 1]) pts.push([f * z.halfF, r * z.halfR]);
     pts.push([0, -z.halfR], [0, z.halfR]);
-    for (const [f, r] of pts) this.add(cone()).position.copy(zonePoint(z, f, r));
+    for (const [f, r] of pts) {
+      const k = this.add(cone());
+      k.position.copy(zonePoint(z, f, r));
+      k.scale.setScalar(0.6);
+    }
     const sign = label('🚧 Zona di lavoro', { bg: '#ff8a3d', scale: 0.45 });
     sign.position.set(c.x, 3.2, c.z);
     this.add(sign);
   }
 
-  /** Aggiunge un oggetto di scena che sparisce a fine lavoro. */
-  prop(o: THREE.Object3D, pos: THREE.Vector3, rotY = 0) {
+  /**
+   * Aggiunge un oggetto di scena che sparisce a fine lavoro.
+   * Gli oggetti dei lavoretti sono rimpiccioliti (`scale`) per non riempire la vista.
+   */
+  prop(o: THREE.Object3D, pos: THREE.Vector3, rotY = 0, scale = PROP_SCALE) {
     o.position.copy(pos);
     o.rotation.y = rotY;
+    o.scale.multiplyScalar(scale);
     return this.add(o);
   }
 
@@ -457,8 +468,7 @@ export function dishJob(game: Game, level: number, slot: Slot, title: string) {
   }
   run.prop(boxProp(1.1, 0.9, 0.7, 0x90a4ae), sink);
   const water = boxProp(0.8, 0.02, 0.45, 0x5fa8d3);
-  water.position.y = 0.9;
-  run.prop(water, sink).position.y = 0.9;
+  run.prop(water, sink).position.y = 0.9 * PROP_SCALE;
   run.prop(boxProp(1.1, 1.1, 0.4, 0xbcaaa4), rack);
   for (let i = 0; i < tables; i++) {
     const c = plateStack(4, false);
@@ -470,7 +480,7 @@ export function dishJob(game: Game, level: number, slot: Slot, title: string) {
     clean.push(run.prop(g, rack));
   }
   const tag = label('🍽️ Dehors del ristorante', { bg: '#ff9f6e', scale: 0.4 });
-  run.prop(tag, at(slot.pos, 0.3, 0)).position.y = 2.6;
+  run.prop(tag, at(slot.pos, 0.3, 0), 0, 1).position.y = 2.6;
   return run;
 }
 
@@ -512,7 +522,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
   const car = model('cars/sedan.glb', 1);
   const [dx, dz] = DIR_VEC[slot.dir];
   // l'auto è parcheggiata di traverso, parallela alla casa
-  run.prop(car, carPos, Math.atan2(dz, -dx));
+  run.prop(car, carPos, Math.atan2(dz, -dx), 1);
   run.prop(cylProp(0.28, 0.4, 0x607d8b), bucket);
   run.prop(new THREE.Group().add(cylProp(0.35, 0.12, 0x35c46a)), hose);
   return run;

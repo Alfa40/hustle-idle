@@ -941,8 +941,8 @@ export class Game {
     if (this.rideObj) this.rideObj.visible = !on;
     if (this.playerMarker) this.playerMarker.visible = !on;
     // in prima persona non si disegna ciò che è attaccato agli occhi
-    this.camera.near = on ? 0.7 : 0.5;
-    this.camera.fov = on ? 84 : 35;
+    this.camera.near = on ? 0.3 : 0.5;
+    this.camera.fov = on ? 72 : 35;
     this.camera.updateProjectionMatrix();
     if (!on) {
       for (const sp of this.fpSprites) {
@@ -983,7 +983,7 @@ export class Game {
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       const k = Math.min(1, dt * 2.2);
       if (d > 0.6) this.fpYaw += dy * k;
-      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(1.9, Math.max(d, 0.5) + 1.25), -0.95, -0.2);
+      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(1.4, Math.max(d, 0.5) + 0.35), -0.95, -0.15);
       this.fpPitch += (wantPitch - this.fpPitch) * k;
     }
     // leggero ondeggiare camminando
@@ -993,13 +993,13 @@ export class Game {
     const cam = this.camera;
     // occhi sopra la testa e un po' indietro: più spazio tra la vista e gli oggetti vicini
     // se dietro la testa c'è un muro la camera si avvicina (mai dentro gli edifici)
-    let back = 1.25;
+    let back = 0.35;
     const inWall = (x: number, z: number) => this.city.colliders.some((c) => x > c.minX - 0.15 && x < c.maxX + 0.15 && z > c.minZ - 0.15 && z < c.maxZ + 0.15);
     while (back > 0 && inWall(p.x - Math.sin(this.fpYaw) * back, p.z + Math.cos(this.fpYaw) * back)) back -= 0.1;
     back = Math.max(0, back);
     // se il muro impedisce di arretrare, la camera sale: la distanza dagli oggetti resta ampia
-    const rise = (1.25 - back) * 1.1;
-    cam.position.set(p.x - Math.sin(this.fpYaw) * back, p.y + 2.2 + rise + bob, p.z + Math.cos(this.fpYaw) * back);
+    const rise = (0.35 - back) * 1.1;
+    cam.position.set(p.x - Math.sin(this.fpYaw) * back, p.y + 1.65 + rise + bob, p.z + Math.cos(this.fpYaw) * back);
     cam.rotation.set(this.fpPitch, -this.fpYaw, 0, 'YXZ');
     this.player.root.rotation.y = Math.PI - this.fpYaw;
     this.player.body.visible = false;
@@ -1017,7 +1017,7 @@ export class Game {
       sp.scale.copy(sp.userData.baseScale).multiplyScalar(0.55);
       sp.getWorldPosition(wp);
       sp.material.transparent = true;
-      sp.material.opacity = wp.distanceTo(cam.position) < 2 ? 0 : 1;
+      sp.material.opacity = wp.distanceTo(cam.position) < 1.4 ? 0 : 1;
     }
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);
