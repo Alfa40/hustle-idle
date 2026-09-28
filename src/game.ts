@@ -24,6 +24,7 @@ import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
 import { ViewControl } from './world/viewcam';
 import { GuideLine } from './world/guideline';
+import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
@@ -140,6 +141,9 @@ export class Game {
   fx = new Particles();
   /** linea tratteggiata verso l'obiettivo (lavoretti, ordini, segnaposto) */
   private guide = new GuideLine();
+  /** oggetti fra camera e giocatore/obiettivo → trasparenti */
+  private occluder = new Occluder();
+  private occT = 0;
   private windows!: WindowLights;
   private lamps!: StreetLights;
   private traffic!: Traffic;
@@ -887,6 +891,7 @@ export class Game {
     if (this.renderPaused) return;
     this.clouds.update(dt);
     this.fx.update(dt);
+    this.updateOcclusion(dt);
     if (!this.interior && !this.house) this.traffic.update(dt, this.player.root.position, this.night);
     if (this.interior) this.draw(this.interior.scene, this.interior.camera);
     else if (this.house) this.draw(this.house.scene, this.house.camera);
@@ -1184,6 +1189,25 @@ export class Game {
     this.lamps?.set(night);
     (this.scene.background as THREE.Color).copy(horizon);
     this.scene.fog!.color.copy(horizon);
+  }
+
+  /** Ogni 0,12 s: rende trasparente ciò che copre il personaggio (o l'obiettivo in prima persona). */
+  private updateOcclusion(dt: number) {
+    this.occT += dt;
+    if (this.occT < 0.12) return;
+    this.occT = 0;
+    const scene = this.interior?.scene ?? this.house?.scene ?? this.scene;
+    const cam = this.activeCamera;
+    cam.updateMatrixWorld();
+    const p = this.player.root.position;
+    const targets: THREE.Vector3[] = [];
+    if (this.firstPerson) {
+      const t = this.run?.target;
+      if (t) targets.push(new THREE.Vector3(t.x, 0.5, t.z));
+    } else {
+      targets.push(new THREE.Vector3(p.x, 1, p.z), new THREE.Vector3(p.x, 0.3, p.z));
+    }
+    this.occluder.update(scene, cam, targets, [this.player.root, this.guide.mesh, this.sky.mesh]);
   }
 
   /** Disegna una scena, con i contorni se attivi nelle impostazioni. */

@@ -18,7 +18,9 @@ export class OutlineRenderer {
     this.target = new THREE.WebGLRenderTarget(1, 1, {
       depthTexture: new THREE.DepthTexture(1, 1, THREE.UnsignedIntType),
       samples: 0,
-      type: THREE.HalfFloatType,
+      // la trasparenza su immagini "float" richiede EXT_float_blend: senza, meglio 8 bit
+      // 8 bit: con i buffer "float" alcuni browser non miscelano bene i materiali trasparenti
+      type: THREE.UnsignedByteType,
     });
     this.mat = new THREE.ShaderMaterial({
       uniforms: {
