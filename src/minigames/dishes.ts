@@ -6,7 +6,24 @@ interface Spot {
   color: string;
 }
 
-/** Minigioco lavapiatti: strofina col dito le macchie finché il piatto è pulito. */
+export type DishTheme = 'plate' | 'car' | 'wall';
+
+/** Area dove compaiono le macchie per ogni tema (frazioni del lato). */
+const AREA: Record<DishTheme, { x0: number; x1: number; y0: number; y1: number }> = {
+  plate: { x0: 0.22, x1: 0.78, y0: 0.22, y1: 0.78 },
+  car: { x0: 0.14, x1: 0.86, y0: 0.4, y1: 0.66 },
+  wall: { x0: 0.14, x1: 0.86, y0: 0.18, y1: 0.8 },
+};
+
+const COLORS: Record<DishTheme, string[]> = {
+  plate: ['#8d6e3f', '#a0522d', '#c0392b', '#7a8c2e', '#6d4c41'],
+  car: ['#6d4c41', '#8d6e3f', '#5d4037', '#7b6a58'],
+  wall: ['#9e9e9e', '#b0a89a', '#8d8d8d', '#a8a29a'],
+};
+
+const HINT: Record<DishTheme, string> = { plate: 'Strofina! Piatto', car: 'Lava! Pezzo', wall: 'Imbianca! Parete' };
+
+/** Minigioco strofina: piatti, auto o pareti da pulire/dipingere col dito. */
 export class DishGame {
   done = 0;
   private el: HTMLDivElement;
@@ -20,7 +37,9 @@ export class DishGame {
   private dead = false;
   private bubbles: { x: number; y: number; r: number; life: number }[] = [];
 
-  constructor(public total: number, private spotsPerPlate: number, private onDone: () => void) {
+  private wallColor = '#fff3c4';
+
+  constructor(public total: number, private spotsPerPlate: number, private theme: DishTheme, private onDone: () => void) {
     this.el = document.createElement('div');
     this.el.className = 'overlay-game';
     this.cv = document.createElement('canvas');
@@ -66,15 +85,68 @@ export class DishGame {
   }
 
   private newPlate() {
-    const colors = ['#8d6e3f', '#a0522d', '#c0392b', '#7a8c2e', '#6d4c41'];
+    const colors = COLORS[this.theme];
+    const a = AREA[this.theme];
     this.spots = [];
+    this.wallColor = ['#fff3c4', '#d7f0ff', '#ffe0ec', '#e3f7d4'][Math.floor(Math.random() * 4)];
     for (let i = 0; i < this.spotsPerPlate; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const d = Math.random() * 0.3;
-      this.spots.push({
-        x: 0.5 + Math.cos(a) * d, y: 0.5 + Math.sin(a) * d, r: 0.05 + Math.random() * 0.05, dirt: 1,
-        color: colors[Math.floor(Math.random() * colors.length)],
-      });
+      let x: number;
+      let y: number;
+      if (this.theme === 'plate') {
+        const ang = Math.random() * Math.PI * 2;
+        const d = Math.random() * 0.3;
+        x = 0.5 + Math.cos(ang) * d;
+        y = 0.5 + Math.sin(ang) * d;
+      } else {
+        x = a.x0 + Math.random() * (a.x1 - a.x0);
+        y = a.y0 + Math.random() * (a.y1 - a.y0);
+      }
+      const big = this.theme === 'wall' ? 0.03 : 0;
+      this.spots.push({ x, y, r: 0.05 + big + Math.random() * 0.05, dirt: 1, color: colors[Math.floor(Math.random() * colors.length)] });
+    }
+  }
+
+  /** Sfondo e oggetto da pulire per ogni tema. */
+  private drawBase(g: CanvasRenderingContext2D, S: number) {
+    if (this.theme === 'plate') {
+      g.fillStyle = '#f7f7f2';
+      g.beginPath();
+      g.arc(S / 2, S / 2, S * 0.42, 0, 7);
+      g.fill();
+      g.strokeStyle = '#d9d9cf';
+      g.lineWidth = S * 0.02;
+      g.beginPath();
+      g.arc(S / 2, S / 2, S * 0.3, 0, 7);
+      g.stroke();
+    } else if (this.theme === 'car') {
+      // carrozzeria
+      g.fillStyle = '#ff5d73';
+      g.beginPath();
+      g.roundRect(S * 0.08, S * 0.4, S * 0.84, S * 0.26, S * 0.06);
+      g.fill();
+      g.beginPath();
+      g.roundRect(S * 0.24, S * 0.24, S * 0.5, S * 0.2, S * 0.06);
+      g.fill();
+      g.fillStyle = '#bfe6ff';
+      g.fillRect(S * 0.29, S * 0.28, S * 0.19, S * 0.13);
+      g.fillRect(S * 0.51, S * 0.28, S * 0.19, S * 0.13);
+      g.fillStyle = '#3a2f55';
+      for (const x of [0.26, 0.74]) {
+        g.beginPath();
+        g.arc(S * x, S * 0.68, S * 0.08, 0, 7);
+        g.fill();
+      }
+      g.fillStyle = '#c9c9c9';
+      for (const x of [0.26, 0.74]) {
+        g.beginPath();
+        g.arc(S * x, S * 0.68, S * 0.035, 0, 7);
+        g.fill();
+      }
+    } else {
+      g.fillStyle = this.wallColor;
+      g.fillRect(S * 0.1, S * 0.12, S * 0.8, S * 0.74);
+      g.fillStyle = '#a1887f';
+      g.fillRect(S * 0.1, S * 0.84, S * 0.8, S * 0.04);
     }
   }
 
@@ -99,7 +171,7 @@ export class DishGame {
     const g = this.g;
     const S = this.size;
     g.clearRect(0, 0, S, S);
-    g.fillStyle = '#5fa8d3';
+    g.fillStyle = this.theme === 'wall' ? '#c8b6a6' : this.theme === 'car' ? '#9fd3f0' : '#5fa8d3';
     g.fillRect(0, 0, S, S);
     // acqua
     g.fillStyle = 'rgba(255,255,255,0.12)';
@@ -123,15 +195,7 @@ export class DishGame {
     }
     g.save();
     g.translate(ox, 0);
-    g.fillStyle = '#f7f7f2';
-    g.beginPath();
-    g.arc(S / 2, S / 2, S * 0.42, 0, 7);
-    g.fill();
-    g.strokeStyle = '#d9d9cf';
-    g.lineWidth = S * 0.02;
-    g.beginPath();
-    g.arc(S / 2, S / 2, S * 0.3, 0, 7);
-    g.stroke();
+    this.drawBase(g, S);
     for (const s of this.spots) {
       if (s.dirt <= 0) continue;
       g.globalAlpha = Math.min(1, s.dirt);
@@ -155,7 +219,7 @@ export class DishGame {
     g.fillStyle = '#fff';
     g.font = `600 ${Math.round(S * 0.06)}px Fredoka, system-ui`;
     g.textAlign = 'center';
-    g.fillText(`Strofina! Piatto ${Math.min(this.done + 1, this.total)}/${this.total}`, S / 2, S * 0.07);
+    g.fillText(`${HINT[this.theme]} ${Math.min(this.done + 1, this.total)}/${this.total}`, S / 2, S * 0.07);
   }
 
   destroy() {

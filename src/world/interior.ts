@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { model } from '../assets';
-import { BUSINESS } from '../config/balance';
+import { BUSINESS, TIME } from '../config/balance';
 import { PRODUCTS, type ProductId } from '../config/products';
 import type { Game } from '../game';
 import { toast } from '../sim/bus';
@@ -11,12 +11,14 @@ import {
 import { addFame, addXp } from '../sim/progress';
 import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
-import { label } from './props';
+import { label, productObject } from './props';
+import { bizType } from '../config/business';
 import { CHAR_MODELS } from '../sim/economy';
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
   'furniture/kitchenCabinetDrawer.glb', 'furniture/kitchenSink.glb', 'food/frying-pan.glb',
+  'furniture/desk.glb', 'furniture/bookcaseOpen.glb',
 ];
 
 type Stage = 'wait' | 'cooking' | 'ready';
@@ -95,7 +97,9 @@ export class TruckInterior {
     floor.receiveShadow = true;
     s.add(floor);
     // pareti: dietro e ai lati (basse per vedere dentro)
-    const wallMat = new THREE.MeshLambertMaterial({ color: 0xe8590c });
+    const def = bizType(this.biz.type);
+    const st = def.stations!;
+    const wallMat = new THREE.MeshLambertMaterial({ color: def.wall ?? 0xe8590c });
     const back = new THREE.Mesh(new THREE.BoxGeometry(W, 2.4, 0.15), wallMat);
     back.position.set(0, 1.2, -2.4);
     s.add(back);
@@ -125,14 +129,17 @@ export class TruckInterior {
       s.add(o);
       return o;
     };
-    put('furniture/kitchenFridge.glb', this.stations.fridge.x, -2.0);
+    const crafts = this.biz.type === 'artigianato';
+    put(crafts ? 'furniture/bookcaseOpen.glb' : 'furniture/kitchenFridge.glb', this.stations.fridge.x, -2.0);
     put('furniture/kitchenCabinetDrawer.glb', -1.1, -2.0);
-    put('furniture/kitchenStove.glb', this.stations.stove.x, -2.0);
+    put(crafts ? 'furniture/desk.glb' : 'furniture/kitchenStove.glb', this.stations.stove.x, -2.0);
     put('furniture/kitchenCabinet.glb', 1.2, -2.0);
     put('furniture/kitchenSink.glb', 2.2, -2.0);
-    const pan = model('food/frying-pan.glb', 0.7);
-    pan.position.set(this.stations.stove.x + 0.1, 1.08, -1.6);
-    s.add(pan);
+    if (this.biz.type === 'foodtruck') {
+      const pan = model('food/frying-pan.glb', 0.7);
+      pan.position.set(this.stations.stove.x + 0.1, 1.08, -1.6);
+      s.add(pan);
+    }
 
     // etichette delle postazioni
     const tag = (t: string, v: THREE.Vector3, y: number) => {
@@ -140,9 +147,9 @@ export class TruckInterior {
       l.position.set(v.x, y, v.z);
       s.add(l);
     };
-    tag('🧊 Frigo', new THREE.Vector3(this.stations.fridge.x, 0, -1.9), 2.55);
-    tag('🔥 Piastra', new THREE.Vector3(this.stations.stove.x, 0, -1.9), 1.75);
-    tag('🪟 Servi qui', new THREE.Vector3(this.stations.window.x, 0, 1.75), 1.6);
+    tag(st.stock, new THREE.Vector3(this.stations.fridge.x, 0, -1.9), 2.55);
+    tag(st.work, new THREE.Vector3(this.stations.stove.x, 0, -1.9), 1.75);
+    tag(st.counter, new THREE.Vector3(this.stations.window.x, 0, 1.75), 1.6);
     tag('🚪 Esci', this.stations.door, 1.4);
     const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.9), new THREE.MeshLambertMaterial({ color: 0x4cd07d }));
     door.position.set(this.stations.door.x, 0.06, this.stations.door.z);
@@ -264,7 +271,7 @@ export class TruckInterior {
 
   update(dt: number) {
     const s = this.game.state;
-    const gm = dt * (30 * 24 * 60) / 3600; // minuti di gioco in questo frame
+    const gm = dt * TIME.GAME_MIN_PER_SEC; // minuti di gioco in questo frame
     const open = isOpenHour(s);
 
     if (open) {
@@ -387,7 +394,7 @@ export class TruckInterior {
         act = () => {
           firstWaiting.by = 'player';
           firstWaiting.stage = 'cooking';
-          const obj = model(PRODUCTS[firstWaiting.pid].model, 1.1);
+          const obj = productObject(PRODUCTS[firstWaiting.pid].model, 0.45);
           this.player.hold(obj);
           this.held = { pid: firstWaiting.pid, cooked: false, obj, order: firstWaiting };
         };
@@ -405,11 +412,11 @@ export class TruckInterior {
           this.cookHold = 0;
           this.held.cooked = true;
           this.held.order.stage = 'ready';
-          addXp(g.state, 'cucina', 2);
+          addXp(g.state, bizType(this.biz.type).skills[0], 2);
           this.player.play('idle');
         }
       }
-      prompt = { label: 'Tieni premuto: cucina', icon: '🔥', progress: this.cookHold };
+      prompt = { label: 'Tieni premuto: prepara', icon: bizType(this.biz.type).stations!.work.split(' ')[0], progress: this.cookHold };
     } else if (this.near(this.stations.window, 1.5)) {
       if (this.held?.cooked) {
         const o = this.held.order;
@@ -441,7 +448,7 @@ export class TruckInterior {
     if (this.readyShelf.children.length === ready.length) return;
     this.readyShelf.clear();
     ready.forEach((o, i) => {
-      const obj = model(PRODUCTS[o.pid].model, 0.9);
+      const obj = productObject(PRODUCTS[o.pid].model, 0.38);
       obj.position.x = i * 0.45;
       this.readyShelf.add(obj);
     });

@@ -1,5 +1,6 @@
 import { CITY_MAP, LOTS, TILE } from '../config/map';
 import type { Game, MapMarker } from '../game';
+import { bizType } from '../config/business';
 
 /** Colori della mappa per ogni tipo di tessera. */
 const TILE_COLORS: Record<string, string> = {
@@ -194,7 +195,7 @@ export class Minimap {
       this.g.font = `${size * 0.36}px system-ui`;
       this.g.textAlign = 'center';
       this.g.textBaseline = 'middle';
-      this.g.fillText('🚚', size / 2, size / 2);
+      this.g.fillText(bizType(this.game.interior.biz.type).icon, size / 2, size / 2);
       return;
     }
     const p = this.game.player.root.position;

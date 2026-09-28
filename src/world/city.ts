@@ -21,6 +21,7 @@ export interface Slot {
 
 export interface LotSlot extends Slot {
   id: string;
+  kind: 'truck' | 'shop';
 }
 
 const ROAD_PIECES: { path: string; conn: Dir[] }[] = [
@@ -58,6 +59,8 @@ export class City {
   homes: Slot[] = [];
   lots: LotSlot[] = [];
   board!: Slot;
+  dealer!: Slot;
+  agency!: Slot;
   roadTiles: THREE.Vector3[] = [];
   readonly cols = CITY_MAP[0].length;
   readonly rows = CITY_MAP.length;
@@ -111,7 +114,7 @@ export class City {
         const dir = this.roadDir(c, r);
         const [dx, dz] = DIR_VEC[dir];
         const rot = DIR_ROT[dir];
-        const paved = 'pMbBR123'.includes(ch) || (ch === '.' && zone === 'centro');
+        const paved = 'pMbBRVA1234567890'.includes(ch) || (ch === '.' && zone === 'centro');
         if (paved) inst.add('roads/tile-low.glb', placeMatrix(p.x, p.z, 0, TILE, 0.001));
 
         const front = (d: number) => new THREE.Vector3(p.x + dx * d, 0, p.z + dz * d);
@@ -154,6 +157,14 @@ export class City {
             }
             break;
           }
+          case 'V':
+          case 'A': {
+            this.placeBuilding(shadowInst, ch === 'V' ? 'commercial/building-c.glb' : 'commercial/building-l.glb', front(-0.35), rot, ch === 'V' ? 5.2 : 4.1);
+            const slot = { pos: front(2.6), dir, center: p.clone(), zone };
+            if (ch === 'V') this.dealer = slot;
+            else this.agency = slot;
+            break;
+          }
           case 'M': {
             this.board = { pos: p.clone(), dir, center: p.clone(), zone };
             break;
@@ -164,7 +175,11 @@ export class City {
           }
           default: {
             const lot = LOTS.find((l) => l.char === ch);
-            if (lot) this.lots.push({ id: lot.id, pos: front(1.2), dir, center: p.clone(), zone });
+            if (!lot) break;
+            if (lot.kind === 'shop') {
+              this.placeBuilding(shadowInst, rpick(SHOPS), front(-0.35), rot, 5.2);
+              this.lots.push({ id: lot.id, kind: 'shop', pos: front(2.6), dir, center: p.clone(), zone });
+            } else this.lots.push({ id: lot.id, kind: 'truck', pos: front(1.2), dir, center: p.clone(), zone });
           }
         }
       }

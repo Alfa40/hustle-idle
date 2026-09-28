@@ -6,7 +6,7 @@ export type Role = 'cucina' | 'cassa' | 'manager';
 export const ROLES: Record<Role, { name: string; icon: string; baseSalary: number }> = {
   cucina: { name: 'Cuoco', icon: '👨‍🍳', baseSalary: 380 },
   cassa: { name: 'Cassiere', icon: '💁', baseSalary: 330 },
-  manager: { name: 'Manager', icon: '👔', baseSalary: 1100 },
+  manager: { name: 'Manager', icon: '👔', baseSalary: 700 },
 };
 
 export type UpgradeId = 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
@@ -21,7 +21,7 @@ export interface UpgradeDef {
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   attrezzatura: {
-    name: 'Attrezzatura', icon: '🔥', desc: 'Si cucina più in fretta (+15% per livello).', max: 8,
+    name: 'Attrezzatura', icon: '🔥', desc: 'Si lavora più in fretta (+15% per livello).', max: 8,
     cost: (l) => Math.round(400 * 1.8 ** l),
   },
   look: {
@@ -29,11 +29,11 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     cost: (l) => Math.round(500 * 1.9 ** l),
   },
   menu: {
-    name: 'Menù più grande', icon: '📋', desc: 'Un prodotto in più in vendita.', max: 2,
+    name: 'Più prodotti', icon: '📋', desc: 'Un prodotto (o servizio) in più in vendita.', max: 2,
     cost: (l) => [800, 2400][l] ?? Infinity,
   },
   frigo: {
-    name: 'Frigo e magazzino', icon: '🧊', desc: '+40 porzioni di magazzino.', max: 6,
+    name: 'Magazzino più grande', icon: '🧊', desc: '+40 posti in magazzino.', max: 6,
     cost: (l) => Math.round(300 * 1.7 ** l),
   },
   marketing: {
@@ -47,20 +47,68 @@ export const UPGRADE_IDS = Object.keys(UPGRADES) as UpgradeId[];
 export interface BusinessTypeDef {
   name: string;
   icon: string;
+  desc: string;
+  /** truck/shop: clienti al bancone · service: ordini da eseguire in giro per la città */
+  kind: 'truck' | 'shop' | 'service';
+  /** su che tipo di lotto si può aprire */
+  lot: 'truck' | 'shop';
+  /** attrezzatura iniziale, da aggiungere al prezzo del lotto */
+  setupCost: number;
   products: ProductId[];
-  roles: Role[];
-  /** esperienze che fanno salire la domanda */
+  roles: Exclude<Role, 'manager'>[];
+  /** nome dei ruoli per questa attività */
+  roleNames: Partial<Record<Role, string>>;
+  /** esperienze che fanno salire la domanda e che guadagni lavorando di persona */
   skills: SkillId[];
+  /** clienti/ora gestiti da un dipendente rispetto al food truck */
+  rateMul: number;
+  /** interni: colore delle pareti e nomi delle postazioni */
+  wall?: number;
+  stations?: { stock: string; work: string; counter: string };
+  /** colore dell'insegna */
+  color: string;
 }
 
 export const BUSINESS_TYPES = {
   foodtruck: {
-    name: 'Food truck', icon: '🚚', products: ['panini', 'hotdog', 'tacos', 'gelati'],
-    roles: ['cucina', 'cassa'], skills: ['cucina', 'clientela'],
+    name: 'Food truck', icon: '🚚', desc: 'Cibo di strada: economico da aprire, si lavora al bancone.',
+    kind: 'truck', lot: 'truck', setupCost: 0, products: ['panini', 'hotdog', 'tacos', 'gelati'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Cuoco', cassa: 'Cassiere' }, skills: ['cucina', 'clientela'],
+    rateMul: 1, wall: 0xe8590c, color: '#e8590c',
+    stations: { stock: '🧊 Frigo', work: '🔥 Piastra', counter: '🪟 Servi qui' },
+  },
+  panificio: {
+    name: 'Panificio', icon: '🥖', desc: 'Pane e dolci: tanti clienti, prodotti economici.',
+    kind: 'shop', lot: 'shop', setupCost: 2500, products: ['pane', 'cornetti', 'pizza', 'torte'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Fornaio', cassa: 'Commesso' }, skills: ['cucina', 'clientela'],
+    rateMul: 1.1, wall: 0xd4a373, color: '#b5793d',
+    stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
+  },
+  artigianato: {
+    name: 'Laboratorio artigiano', icon: '🎨', desc: 'Pochi clienti ma pezzi di valore.',
+    kind: 'shop', lot: 'shop', setupCost: 3500, products: ['vasi', 'sedie', 'gioielli'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Artigiano', cassa: 'Commesso' }, skills: ['artigianato', 'clientela'],
+    rateMul: 0.3, wall: 0x6d9dc5, color: '#3d7ab8',
+    stations: { stock: '🪵 Materiali', work: '🔨 Banco da lavoro', counter: '🛍️ Vetrina' },
+  },
+  pulizie: {
+    name: 'Impresa di pulizie', icon: '🧽', desc: 'Servizi a domicilio: esegui gli ordini nelle case.',
+    kind: 'service', lot: 'shop', setupCost: 2000, products: ['pulizia_casa', 'pulizia_uffici', 'vetri'],
+    roles: ['cucina'], roleNames: { cucina: 'Addetto pulizie' }, skills: ['manualita', 'clientela'],
+    rateMul: 0.12, color: '#2d9cdb',
+  },
+  traslochi: {
+    name: 'Ditta traslochi', icon: '🚛', desc: 'Lavori grossi e ben pagati, serve un furgone.',
+    kind: 'service', lot: 'shop', setupCost: 7000, products: ['trasloco_piccolo', 'trasloco_grande', 'sgombero'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Facchino', cassa: 'Autista' }, skills: ['logistica', 'manualita'],
+    rateMul: 0.08, color: '#6a3cb0',
   },
 } satisfies Record<string, BusinessTypeDef>;
 
 export type BusinessType = keyof typeof BUSINESS_TYPES;
+export const BUSINESS_TYPE_IDS = Object.keys(BUSINESS_TYPES) as BusinessType[];
+export const bizType = (t: BusinessType): BusinessTypeDef => BUSINESS_TYPES[t];
+export const roleName = (t: BusinessType, r: Role) => bizType(t).roleNames[r] ?? ROLES[r].name;
 
 export const FIRST_NAMES = [
   'Luca', 'Giulia', 'Marco', 'Sara', 'Paolo', 'Chiara', 'Andrea', 'Elena', 'Davide', 'Marta',

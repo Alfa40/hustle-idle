@@ -1,8 +1,8 @@
 // Tutti i numeri "tarabili" del gioco in un unico posto (vedi GDD).
 
 export const TIME = {
-  /** minuti di gioco per secondo reale mentre si gioca: 1 mese (30 gg) = 1 ora reale */
-  GAME_MIN_PER_SEC: (30 * 24 * 60) / 3600,
+  /** minuti di gioco per secondo reale mentre si gioca: 1 mese (30 gg) = 2 ore reali */
+  GAME_MIN_PER_SEC: (30 * 24 * 60) / 7200,
   /** offline il tempo scorre 100 volte più lento */
   OFFLINE_SLOWDOWN: 100,
   DAYS_PER_MONTH: 30,
@@ -39,12 +39,9 @@ export const JOB = {
 export const BUSINESS = {
   OPEN_HOUR: 8,
   CLOSE_HOUR: 22,
-  /** pazienza cliente in minuti di gioco (≈ secondi reali × 12) */
-  CUSTOMER_PATIENCE_MIN: 12 * 25,
+  /** pazienza cliente in minuti di gioco (25 secondi reali) */
+  CUSTOMER_PATIENCE_MIN: ((30 * 24 * 60) / 7200) * 25,
   MAX_QUEUE: 5,
-  /** minuti di gioco per cucinare/servire con velocità 5 */
-  COOK_MIN: 12 * 3,
-  SERVE_MIN: 12 * 1.5,
   PLAYER_COOK_SEC: 1.4,
   UTILITIES_MONTH: 90,
   BASE_STOCK_CAP: 40,

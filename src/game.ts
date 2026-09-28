@@ -18,7 +18,12 @@ import { Character, charPath } from './world/character';
 import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, type Slot } from './world/city';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
-import { DeliveryRun, DishRun, GardenRun, type JobRun } from './minigames/jobs';
+import { RouteRun, ScrubRun, SpotRun, type JobRun } from './minigames/jobs';
+import { bizType } from './config/business';
+import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
+import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
+import { completeOrder } from './sim/economy';
+import type { Business, ServiceOrder } from './sim/state';
 import type { UI } from './ui/ui';
 
 export interface Interactable {
@@ -36,7 +41,7 @@ export interface MapMarker {
   icon: string;
   color: string;
   label: string;
-  kind: 'job' | 'target' | 'lot' | 'biz' | 'board' | 'home';
+  kind: 'job' | 'target' | 'lot' | 'biz' | 'board' | 'home' | 'dealer' | 'agency';
   /** metri dal giocatore */
   dist: number;
 }
@@ -63,7 +68,6 @@ interface TruckSite {
 }
 
 const PLAYER_MODEL = 'character-male-a';
-const PLAYER_SPEED = 5.2;
 
 export class Game {
   renderer: THREE.WebGLRenderer;
@@ -84,6 +88,9 @@ export class Game {
   trucks = new Map<string, TruckSite>();
   run: JobRun | null = null;
   runOffer: JobOffer | null = null;
+  /** ordine di un'attività di servizio che il giocatore sta eseguendo */
+  runOrder: { bizId: string; order: ServiceOrder } | null = null;
+  private rideObj: THREE.Object3D | null = null;
   moveTarget: THREE.Vector3 | null = null;
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
@@ -124,8 +131,8 @@ export class Game {
   async init(onProgress: (f: number) => void) {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
-      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...chars, 'cars/van.glb',
-      'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).map((p) => p.model),
+      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS,
+      'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model ? [p.model] : [])),
       'furniture/cardboardBoxClosed.glb',
     ];
     await preload([...new Set(assets)], onProgress);
@@ -172,6 +179,32 @@ export class Game {
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
 
+    // concessionaria e agenzia affari
+    const dealer = this.city.dealer;
+    const dl = label('🛵 Concessionaria', { bg: '#2d9cdb', scale: 0.6 });
+    dl.position.set(dealer.center.x, 7.8, dealer.center.z);
+    this.scene.add(dl);
+    // due auto in esposizione davanti
+    ['utilitaria', 'berlina'].forEach((v, i) => {
+      const car = vehicleModel(v as VehicleId);
+      const [dx, dz] = DIR_VEC[dealer.dir];
+      car.position.set(dealer.pos.x + dz * (i ? 2.4 : -2.4) + dx * 0.4, 0, dealer.pos.z + dx * (i ? 2.4 : -2.4) + dz * 0.4);
+      car.rotation.y = DIR_ROT[dealer.dir] + (i ? 0.5 : -0.5);
+      car.scale.multiplyScalar(0.85);
+      this.scene.add(car);
+      this.city.colliders.push({ minX: car.position.x - 1, maxX: car.position.x + 1, minZ: car.position.z - 1, maxZ: car.position.z + 1 });
+    });
+    this.addInteractable({
+      pos: dealer.pos, radius: 2, label: 'Concessionaria', icon: '🛵', action: () => this.ui.openDealer(),
+    });
+    const ag = this.city.agency;
+    const al = label('🏢 Agenzia affari', { bg: '#8e5bd6', scale: 0.6 });
+    al.position.set(ag.center.x, 11, ag.center.z);
+    this.scene.add(al);
+    this.addInteractable({
+      pos: ag.pos, radius: 2, label: 'Agenzia affari', icon: '🏢', action: () => this.ui.openAgency('compra', true),
+    });
+
     // giocatore
     this.player = new Character(PLAYER_MODEL);
     const p = this.state.player;
@@ -183,6 +216,7 @@ export class Game {
     pm.position.y = 2.05;
     this.player.root.add(pm);
     this.playerMarker = pm;
+    this.applyRide();
 
     // NPC dei lavori già offerti
     this.state.jobs = this.state.jobs.filter((j) => this.slotsFor(j.type)[j.slot]);
@@ -218,7 +252,8 @@ export class Game {
   slotsFor(type: JobType): Slot[] {
     let list = this.slotCache.get(type);
     if (!list) {
-      const all = type === 'giardino' ? this.city.gardens : type === 'consegna' ? this.city.shops : this.city.restaurants;
+      const where = JOBS[type].where;
+      const all = where === 'house' ? this.city.gardens : where === 'shop' ? this.city.shops : this.city.restaurants;
       list = all.filter((sl) => sl.dir !== 'N');
       if (!list.length) list = all;
       this.slotCache.set(type, list);
@@ -254,24 +289,27 @@ export class Game {
     g.position.copy(slot.center);
     this.scene.add(g);
     let inter: Interactable;
+    const [dx, , dz] = this.dirVec(slot, 1);
     if (!biz) {
+      const d = slot.kind === 'truck' ? 1.8 : 2.9;
       const sign = saleSign('€' + lot.price.toLocaleString('it-IT'));
-      sign.position.set(...this.dirVec(slot, 1.8));
+      sign.position.set(dx * d + dz * 1.2, 0, dz * d + dx * 1.2);
       sign.rotation.y = DIR_ROT[slot.dir];
       g.add(sign);
-      const r = ring(0xff5d5d, 2.2);
+      const r = ring(0xff5d5d, slot.kind === 'truck' ? 2.2 : 1.4);
+      r.position.set(dx * (d - 0.4), 0.05, dz * (d - 0.4));
       g.add(r);
       inter = this.addInteractable({
-        pos: slot.center.clone().add(new THREE.Vector3(...this.dirVec(slot, 1.8))), radius: 2.4,
-        label: 'Lotto in vendita', icon: '🏷️', action: () => this.ui.openLot(lotId),
+        pos: slot.center.clone().add(new THREE.Vector3(dx * d, 0, dz * d)), radius: 2.4,
+        label: slot.kind === 'truck' ? 'Posteggio in vendita' : 'Locale in vendita', icon: '🏷️',
+        action: () => this.ui.openLot(lotId),
       });
-    } else {
+    } else if (slot.kind === 'truck') {
       // furgone con il lato di servizio (+X locale) verso la strada
       const van = model('cars/van.glb', 1.55);
       van.rotation.y = DIR_ROT[slot.dir] - Math.PI / 2;
       g.add(van);
       const awn = model('commercial/detail-awning-wide.glb', 4.2);
-      awn.position.set(0, 0.55, 0);
       const side = new THREE.Group();
       side.rotation.y = DIR_ROT[slot.dir];
       side.add(awn);
@@ -282,7 +320,6 @@ export class Game {
       const sign = label(`🚚 ${icons}`, { bg: '#e8590c', scale: 0.55 });
       sign.position.y = 2.9;
       g.add(sign);
-      const [dx, , dz] = this.dirVec(slot, 1);
       // collisione del furgone (lungo il lato perpendicolare alla strada)
       const hw = dx !== 0 ? 1.3 : 2.3;
       const hd = dz !== 0 ? 1.3 : 2.3;
@@ -290,18 +327,35 @@ export class Game {
       this.city.colliders.push(Object.assign({ minX: slot.center.x - hw, maxX: slot.center.x + hw, minZ: slot.center.z - hd, maxZ: slot.center.z + hd }, { lot: lotId }));
       inter = this.addInteractable({
         pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2,
-        label: 'Entra nel food truck', icon: '🚪', action: () => this.enterTruck(lotId),
+        label: 'Entra nel food truck', icon: '🚪', action: () => this.enterBusiness(lotId),
+      });
+    } else {
+      // negozio in un edificio: insegna colorata sopra l'ingresso
+      const def = bizType(biz.type);
+      const icons = biz.products.map((p) => PRODUCTS[p].icon).join('');
+      const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.6 });
+      sign.position.set(dx * 2.2, 4.2, dz * 2.2);
+      g.add(sign);
+      const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
+      mat.position.set(dx * 2.8, 0.05, dz * 2.8);
+      g.add(mat);
+      const service = def.kind === 'service';
+      inter = this.addInteractable({
+        pos: slot.pos, radius: 2.2,
+        label: service ? `Ufficio ${def.name.toLowerCase()}` : `Entra: ${def.name}`, icon: service ? '📋' : '🚪',
+        action: () => (service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
       });
     }
     this.trucks.set(lotId, { lotId, slot, group: g, inter, built: !!biz });
   }
 
-  enterTruck(lotId: string) {
+  enterBusiness(lotId: string) {
     const biz = bizAtLot(this.state, lotId);
     if (!biz || this.run) {
       if (this.run) toast('Finisci prima il lavoro in corso', 'bad');
       return;
     }
+    this.dismount();
     this.scene.remove(this.player.root);
     this.interior = new TruckInterior(this, biz);
     this.interior.enter(this.player);
@@ -317,6 +371,7 @@ export class Game {
     const site = this.trucks.get(lotId)!;
     this.player.root.position.copy(site.inter.pos);
     this.player.root.rotation.y = DIR_ROT[site.slot.dir];
+    this.city.collide(this.player.root.position, 0.4);
     this.scene.add(this.player.root);
     this.player.play('idle');
     this.ui.refresh();
@@ -332,11 +387,12 @@ export class Game {
 
   private spawnOffer() {
     const s = this.state;
-    const inUse = new Set(s.jobs.map((j) => j.type + j.slot));
+    const key = (sl: Slot) => `${sl.pos.x},${sl.pos.z}`;
+    const inUse = new Set(s.jobs.map((j) => key(this.slotsFor(j.type)[j.slot])));
     const types = JOB_TYPES.filter((t) => !s.jobs.some((j) => j.type === t) || s.jobs.length >= JOB_TYPES.length);
     const type = pick(types.length ? types : JOB_TYPES);
     const slots = this.slotsFor(type);
-    const free = slots.map((_, i) => i).filter((i) => !inUse.has(type + i));
+    const free = slots.map((_, i) => i).filter((i) => !inUse.has(key(slots[i])));
     if (!free.length) return;
     // preferisci posti non troppo lontani dal giocatore
     const pp = this.player.root.position;
@@ -381,26 +437,69 @@ export class Game {
     if (npc) npc.marker.visible = false;
     this.runOffer = offer;
     const slot = this.slotsFor(offer.type)[offer.slot];
-    if (offer.type === 'giardino') this.run = new GardenRun(this, offer, slot);
-    else if (offer.type === 'consegna') this.run = new DeliveryRun(this, offer, slot);
-    else this.run = new DishRun(this, offer);
+    const def = JOBS[offer.type];
+    if (!def.vehicleOk) this.dismount();
+    const title = `${def.icon} ${def.name}`;
+    const lv = offer.level;
+    switch (offer.type) {
+      case 'giardino': this.run = new SpotRun(this, lv, slot, { kind: 'bush', title }); break;
+      case 'consegna': this.run = new RouteRun(this, lv, slot, { mode: 'package', title }); break;
+      case 'volantini': this.run = new RouteRun(this, lv, slot, { mode: 'flyer', title }); break;
+      case 'piatti': this.run = new ScrubRun(this, lv, 'plate', title); break;
+      case 'lavaggio': this.run = new ScrubRun(this, lv, 'car', title); break;
+      case 'imbianchino': this.run = new ScrubRun(this, lv, 'wall', title); break;
+    }
     this.ui.jobBar(true);
   }
 
+  /** Il titolare esegue di persona un ordine della sua impresa di servizi. */
+  startOrder(biz: Business, order: ServiceOrder) {
+    if (this.run) {
+      toast('Finisci prima il lavoro in corso', 'bad');
+      return;
+    }
+    if ((biz.stock[order.pid] ?? 0) <= 0) {
+      toast('Magazzino vuoto: compra i materiali per questo servizio', 'bad');
+      return;
+    }
+    if (this.interior) this.exitTruck();
+    this.dismount();
+    const houses = this.deliveryHouses;
+    const slot = houses[order.house % houses.length];
+    const def = bizType(biz.type);
+    const lv = skillLevel(this.state, def.skills[0]);
+    const pr = PRODUCTS[order.pid];
+    const title = `${pr.icon} ${pr.name}`;
+    this.runOrder = { bizId: biz.id, order };
+    if (biz.type === 'pulizie') {
+      const amount = order.pid === 'pulizia_uffici' ? 1.5 : order.pid === 'vetri' ? 0.8 : 1.1;
+      this.run = new SpotRun(this, lv, slot, { kind: 'stain', title, amount });
+    } else {
+      const boxes = order.pid === 'trasloco_grande' ? 5 : order.pid === 'sgombero' ? 3 : 3;
+      this.run = new RouteRun(this, lv, slot, { mode: 'moving', title, boxes });
+    }
+    this.ui.jobBar(true);
+    toast(`📍 Vai all'indirizzo segnato: ${pr.name}`, 'info');
+  }
+
   cancelJob() {
-    if (!this.run || !this.runOffer) return;
+    if (!this.run) return;
     this.finishJob(0);
   }
 
   /** stelle 0 = fallito */
   finishJob(stars: number) {
     const s = this.state;
-    const offer = this.runOffer!;
     this.run?.dispose();
     this.run = null;
-    this.runOffer = null;
     this.prompt = null;
     this.ui.jobBar(false);
+    if (this.runOrder) {
+      this.finishOrder(stars);
+      return;
+    }
+    const offer = this.runOffer!;
+    this.runOffer = null;
     const def = JOBS[offer.type];
     let pay = 0;
     let xp = 0;
@@ -427,6 +526,25 @@ export class Game {
     this.save();
   }
 
+  private finishOrder(stars: number) {
+    const s = this.state;
+    const { bizId, order } = this.runOrder!;
+    this.runOrder = null;
+    const biz = s.businesses.find((b) => b.id === bizId);
+    this.player.hold();
+    this.player.play('idle');
+    if (!biz) return;
+    const earned = completeOrder(s, biz, order.id, stars);
+    const def = bizType(biz.type);
+    const xp = stars ? Math.round(PRODUCTS[order.pid].price / 6 + 8) : 0;
+    if (stars) {
+      for (const k of def.skills) addXp(s, k, Math.round(xp / def.skills.length));
+      missionProgress(s, 'served');
+    } else addFame(s, def.skills[0], -1);
+    this.ui.openOrderResult(biz, order, stars, earned, xp);
+    this.save();
+  }
+
   // ---------------- mappa e indicatori ----------------
 
   mapMarkers(): MapMarker[] {
@@ -436,11 +554,14 @@ export class Game {
       out.push({ ...m, x: pos.x, z: pos.z, dist: Math.hypot(pos.x - p.x, pos.z - p.z) });
     add(this.city.board.pos, { icon: '📋', color: '#8e5bd6', label: 'Bacheca missioni', kind: 'board' });
     add(this.city.homes[0].pos, { icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home' });
+    add(this.city.dealer.pos, { icon: '🛵', color: '#2d9cdb', label: 'Concessionaria', kind: 'dealer' });
+    add(this.city.agency.pos, { icon: '🏢', color: '#8e5bd6', label: 'Agenzia affari', kind: 'agency' });
     for (const lot of this.city.lots) {
       const def = LOTS.find((l) => l.id === lot.id)!;
       const biz = bizAtLot(this.state, lot.id);
-      if (biz) add(lot.center, { icon: '🚚', color: '#ff8a3d', label: def.name, kind: 'biz' });
-      else add(lot.center, { icon: '🏷️', color: '#ff5d73', label: `${def.name} · €${def.price.toLocaleString('it-IT')}`, kind: 'lot' });
+      const bt = biz && bizType(biz.type);
+      if (bt) add(lot.center, { icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, kind: 'biz' });
+      else add(lot.center, { icon: '🏷️', color: '#ff5d73', label: `${def.kind === 'truck' ? 'Posteggio' : 'Locale'} in vendita · ${def.name}`, kind: 'lot' });
     }
     if (this.run?.target) add(this.run.target, { icon: '🎯', color: '#ff3b5c', label: 'Obiettivo del lavoro', kind: 'target' });
     else if (!this.run) {
@@ -450,6 +571,65 @@ export class Game {
       }
     }
     return out;
+  }
+
+  // ---------------- veicoli ----------------
+
+  get riding(): VehicleId | null {
+    return this.state.riding;
+  }
+
+  /** Aggancia al personaggio il modello del veicolo in uso (o lo toglie). */
+  private applyRide() {
+    if (this.rideObj) this.player.root.remove(this.rideObj);
+    this.rideObj = null;
+    const id = this.state.riding;
+    this.player.body.visible = true;
+    this.player.body.position.y = 0;
+    if (this.playerMarker) this.playerMarker.position.y = 2.05;
+    if (!id) {
+      this.player.play('idle');
+      return;
+    }
+    this.rideObj = vehicleModel(id);
+    this.player.root.add(this.rideObj);
+    const pose = riderPose(id);
+    this.player.body.position.y = pose.y;
+    this.player.body.visible = !pose.hidden;
+    this.player.play(pose.anim);
+    if (this.playerMarker && pose.hidden) this.playerMarker.position.y = 2.6;
+  }
+
+  mount(id: VehicleId) {
+    if (!this.state.vehicles.includes(id) || this.interior) return;
+    if (this.run && !(this.runOffer && JOBS[this.runOffer.type].vehicleOk)) {
+      toast('Per questo lavoro devi stare a piedi', 'bad');
+      return;
+    }
+    this.state.riding = id;
+    this.applyRide();
+    toast(`${VEHICLES[id].icon} In sella: ${VEHICLES[id].name}`, 'info');
+  }
+
+  dismount() {
+    if (!this.state.riding) return;
+    this.state.riding = null;
+    this.applyRide();
+  }
+
+  /** Pulsante veicolo: sali sull'ultimo mezzo o scendi. */
+  toggleRide() {
+    const s = this.state;
+    if (s.riding) {
+      this.dismount();
+      return;
+    }
+    if (!s.vehicles.length) {
+      toast('Non hai veicoli: passa dalla 🛵 concessionaria', 'info');
+      return;
+    }
+    if (s.vehicles.length === 1) this.mount(s.vehicles[0]);
+    else this.ui.openGarage();
   }
 
   // ---------------- casa ----------------
@@ -540,15 +720,17 @@ export class Game {
     }
     const len = Math.hypot(mx, mz);
     if (len > 0.05) {
-      const speed = PLAYER_SPEED * Math.min(1, len);
+      const ride = this.state.riding ? VEHICLES[this.state.riding] : null;
+      const speed = (ride ? ride.speed : WALK_SPEED) * Math.min(1, len);
       const before = p.clone();
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
-      this.city.collide(p, 0.38);
+      this.city.collide(p, ride ? ride.radius : 0.38);
       // bloccato contro un muro mentre va verso un punto: rinuncia
       if (this.moveTarget && before.distanceTo(p) < speed * dt * 0.2) this.moveTarget = null;
-      this.player.faceTowards(p.x + mx, p.z + mz, dt);
-      if (!this.prompt?.progress) this.player.play(len > 0.6 ? 'sprint' : 'walk', 0.15, len > 0.6 ? 0.85 : 1);
+      this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
+      if (ride) this.player.play(riderPose(this.state.riding!).anim);
+      else if (!this.prompt?.progress) this.player.play(len > 0.6 ? 'sprint' : 'walk', 0.15, len > 0.6 ? 0.85 : 1);
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'sprint') {
       this.player.play('idle');
     }

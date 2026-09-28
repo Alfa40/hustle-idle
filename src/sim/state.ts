@@ -1,7 +1,8 @@
 import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
 import type { JobType } from '../config/jobs';
-import type { ProductId } from '../config/products';
+import { PRODUCT_IDS, type ProductId } from '../config/products';
+import type { VehicleId } from '../config/vehicles';
 import { EVENT_BY_ID, type WeatherId } from '../config/events';
 import { SKILL_IDS, type SkillId } from '../config/skills';
 
@@ -41,6 +42,17 @@ export interface Business {
   month: Ledger;
   totalRevenue: number;
   boughtFor: number;
+  /** solo per le attività di servizio: ordini in attesa */
+  orders: ServiceOrder[];
+}
+
+export interface ServiceOrder {
+  id: number;
+  pid: ProductId;
+  /** minuto di gioco in cui scade */
+  expires: number;
+  /** indirizzo (indice delle case) */
+  house: number;
 }
 
 export interface JobOffer {
@@ -98,6 +110,10 @@ export interface GameState {
   player: { x: number; z: number };
   totalEarned: number;
   tutorialDone: boolean;
+  vehicles: VehicleId[];
+  /** veicolo su cui si è ora (null = a piedi) */
+  riding: VehicleId | null;
+  orderSeq: number;
 }
 
 const SAVE_KEY = 'hustleidle.save.v1';
@@ -123,7 +139,7 @@ export function newState(): GameState {
     weather: {},
     eventSeq: 1,
     demandDay: -1,
-    demandRand: { panini: 1, hotdog: 1, tacos: 1, gelati: 1 },
+    demandRand: Object.fromEntries(PRODUCT_IDS.map((p) => [p, 1])) as Record<ProductId, number>,
     candidatesDay: -1,
     candidates: [],
     empSeq: 1,
@@ -131,6 +147,9 @@ export function newState(): GameState {
     player: { x: NaN, z: NaN },
     totalEarned: 0,
     tutorialDone: false,
+    vehicles: [],
+    riding: null,
+    orderSeq: 1,
   };
 }
 
@@ -143,6 +162,13 @@ export function loadState(): GameState | null {
     const st = { ...newState(), ...s };
     // eventi di versioni vecchie che non esistono più
     st.events = st.events.filter((e) => EVENT_BY_ID[e.defId]);
+    // nuove esperienze, prodotti e campi aggiunti dopo
+    for (const k of SKILL_IDS) {
+      st.xp[k] ??= 0;
+      st.fame[k] ??= 0;
+    }
+    for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
+    for (const b of st.businesses) b.orders ??= [];
     return st;
   } catch {
     return null;

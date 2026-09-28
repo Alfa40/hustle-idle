@@ -1,8 +1,11 @@
 import { BUSINESS, FAME } from '../config/balance';
 import {
-  BUSINESS_TYPES, FIRST_NAMES, LAST_NAMES, ROLES, UPGRADES,
+  bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
+import { ROLES } from '../config/business';
+import { VEHICLES } from '../config/vehicles';
+import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
@@ -39,7 +42,7 @@ export function marketDemand(s: GameState, pid: ProductId, zone: ZoneId) {
 }
 
 export function fameMultiplier(s: GameState, type: BusinessType) {
-  const skills = BUSINESS_TYPES[type].skills;
+  const skills = bizType(type).skills;
   const f = skills.reduce((a, k) => a + s.fame[k], 0) / skills.length;
   return 1 + f / (f + FAME.K);
 }
@@ -69,7 +72,7 @@ export function isOpenHour(s: GameState) {
 export const hasManager = (b: Business) => b.staff.some((e) => e.role === 'manager');
 
 export function isAutonomous(b: Business) {
-  return hasManager(b) && BUSINESS_TYPES[b.type].roles.every((r) => b.staff.some((e) => e.role === r));
+  return hasManager(b) && bizType(b.type).roles.every((r) => b.staff.some((e) => e.role === r));
 }
 
 /** Clienti/ora che un dipendente riesce a gestire. */
@@ -77,7 +80,7 @@ export function employeeRate(e: Employee, b: Business) {
   let r = (2 + e.speed * 0.6) * (1 + 0.1 * (e.level - 1));
   if (e.role === 'cucina') r *= 1 + 0.15 * upg(b, 'attrezzatura');
   if (hasManager(b)) r *= 1.1;
-  return r;
+  return r * bizType(b.type).rateMul;
 }
 
 export function roleCapacity(b: Business, role: Role) {
@@ -85,7 +88,7 @@ export function roleCapacity(b: Business, role: Role) {
 }
 
 export function autoCapacity(b: Business) {
-  return Math.min(...BUSINESS_TYPES[b.type].roles.map((r) => roleCapacity(b, r)));
+  return Math.min(...bizType(b.type).roles.map((r) => roleCapacity(b, r)));
 }
 
 export function makeCandidate(s: GameState, role: Role): Employee {
@@ -126,7 +129,7 @@ export function hire(s: GameState, b: Business, candId: number) {
   }
   e.hiredDay = day(s);
   b.staff.push(e);
-  toast(`${e.name} assunto come ${ROLES[e.role].name.toLowerCase()}`, 'good');
+  toast(`${e.name} assunto come ${roleName(b.type, e.role).toLowerCase()}`, 'good');
 }
 
 export function fire(s: GameState, b: Business, empId: number) {
@@ -168,13 +171,21 @@ export function menuSlots(b: Business) {
   return 1 + upg(b, 'menu');
 }
 
+/** Prezzo totale: lotto + attrezzatura iniziale dell'attività. */
+export const lotPrice = (lotId: string, type: BusinessType) => lotDef(lotId).price + bizType(type).setupCost;
+
+/** Tipi di attività che si possono aprire in un lotto. */
+export const typesForLot = (lotId: string) =>
+  (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => bizType(t).lot === lotDef(lotId).kind);
+
 export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   const lot = lotDef(lotId);
-  if (bizAtLot(s, lotId) || s.money < lot.price) return null;
+  const price = lotPrice(lotId, type);
+  if (bizAtLot(s, lotId) || s.money < price || bizType(type).lot !== lot.kind) return null;
   const b: Business = {
     id: 'biz' + lotId,
     type, lotId,
-    products: [BUSINESS_TYPES[type].products[0]],
+    products: [bizType(type).products[0]],
     stock: {},
     upgrades: {},
     staff: [],
@@ -183,13 +194,14 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
     yesterday: emptyLedger(),
     month: emptyLedger(),
     totalRevenue: 0,
-    boughtFor: lot.price,
+    boughtFor: price,
+    orders: [],
   };
-  addMoney(s, -lot.price);
+  addMoney(s, -price);
   s.businesses.push(b);
   // una scorta iniziale per partire subito
   buyStock(s, b, b.products[0], 20, true);
-  toast(`Hai comprato un ${BUSINESS_TYPES[type].name} in ${lot.name}!`, 'good');
+  toast(`Hai aperto: ${bizType(type).icon} ${bizType(type).name} in ${lot.name}!`, 'good');
   return b;
 }
 
@@ -230,7 +242,7 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
   b.month.served++;
   b.totalRevenue += amount;
   addMoney(s, amount);
-  for (const k of BUSINESS_TYPES[b.type].skills) addFame(s, k, manual ? FAME.PER_MANUAL_SALE : FAME.PER_AUTO_SALE);
+  for (const k of bizType(b.type).skills) addFame(s, k, manual ? FAME.PER_MANUAL_SALE : FAME.PER_AUTO_SALE);
   return amount;
 }
 
@@ -256,6 +268,10 @@ const acc = new Map<string, number>();
  * `efficiency` < 1 per il guadagno offline.
  */
 export function autoSim(s: GameState, b: Business, minutes: number, efficiency = 1) {
+  if (bizType(b.type).kind === 'service' && !isAutonomous(b)) {
+    serviceOrders(s, b, minutes);
+    return;
+  }
   if (!isAutonomous(b) || !isOpenHour(s)) return;
   const rate = Math.min(totalDemand(s, b), autoCapacity(b));
   const lostRate = Math.max(0, totalDemand(s, b) - rate);
@@ -285,6 +301,40 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
   if (b.autoRestock) restock(s, b, 0.25);
 }
 
+export const MAX_ORDERS = 4;
+
+/** Attività di servizio senza staff completo: arrivano ordini che esegue il titolare. */
+function serviceOrders(s: GameState, b: Business, minutes: number) {
+  b.orders ??= [];
+  for (const o of b.orders.filter((x) => x.expires < s.minutes)) {
+    lostCustomer(b);
+    b.orders = b.orders.filter((x) => x !== o);
+  }
+  if (!isOpenHour(s)) return;
+  let a = (acc.get(b.id) ?? 0) + (totalDemand(s, b) * minutes) / 60;
+  while (a >= 1) {
+    a -= 1;
+    if (b.orders.length >= MAX_ORDERS) {
+      lostCustomer(b);
+      continue;
+    }
+    b.orders.push({ id: s.orderSeq++, pid: pickProduct(s, b), expires: s.minutes + 20 * 60, house: randInt(0, 999) });
+  }
+  acc.set(b.id, a);
+}
+
+/** Il titolare ha eseguito un ordine di persona. */
+export function completeOrder(s: GameState, b: Business, orderId: number, stars: number) {
+  const o = b.orders.find((x) => x.id === orderId);
+  if (!o) return 0;
+  b.orders = b.orders.filter((x) => x !== o);
+  if (stars <= 0) {
+    lostCustomer(b);
+    return 0;
+  }
+  return recordSale(s, b, o.pid, true, 0.75 + stars * 0.15);
+}
+
 /** Il manager riordina quando un prodotto scende sotto la soglia. */
 export function restock(s: GameState, b: Business, threshold = 0) {
   if (!hasManager(b)) return;
@@ -302,8 +352,10 @@ export function monthlyCosts(s: GameState, b: Business) {
   return { rent: lot.rent, utilities: BUSINESS.UTILITIES_MONTH, salaries };
 }
 
+export const vehiclesMonthly = (s: GameState) => s.vehicles.reduce((a, v) => a + VEHICLES[v].monthly, 0);
+
 export function payMonth(s: GameState) {
-  let total = 0;
+  let total = vehiclesMonthly(s);
   for (const b of s.businesses) {
     const c = monthlyCosts(s, b);
     const sum = c.rent + c.utilities + c.salaries;
@@ -313,7 +365,7 @@ export function payMonth(s: GameState) {
   }
   if (total > 0) {
     addMoney(s, -total);
-    toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette e stipendi`, s.money < 0 ? 'bad' : 'info');
+    toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi e assicurazioni`, s.money < 0 ? 'bad' : 'info');
   }
 }
 
@@ -324,6 +376,28 @@ export function estimateMonthlyProfit(s: GameState, b: Business) {
   const c = monthlyCosts(s, b);
   const fullSalaries = b.staff.reduce((a, e) => a + e.salary, 0);
   return perHour * hours * avgMargin - c.rent - c.utilities - fullSalaries;
+}
+
+/** Stima per l'agenzia: clienti/ora del prodotto migliore e incasso al mese con lo staff base. */
+export function estimateLot(s: GameState, lotId: string, type: BusinessType) {
+  const zone = lotZone[lotId];
+  const def = bizType(type);
+  const fm = fameMultiplier(s, type);
+  const best = def.products
+    .map((p) => ({ p, d: marketDemand(s, p, zone) * fm }))
+    .sort((a, b) => b.d * (PRODUCTS[b.p].price - PRODUCTS[b.p].cost) - a.d * (PRODUCTS[a.p].price - PRODUCTS[a.p].cost))[0];
+  const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;
+  const margin = PRODUCTS[best.p].price - PRODUCTS[best.p].cost;
+  // staff base: un dipendente per reparto a velocità media
+  const cap = (2 + 4 * 0.6) * 1.1 * def.rateMul;
+  const perHour = Math.min(best.d, cap);
+  const staff = def.roles.reduce((a, r) => a + ROLES[r].baseSalary, 0) + ROLES.manager.baseSalary;
+  return {
+    best: best.p,
+    demand: best.d,
+    revenue: perHour * hours * PRODUCTS[best.p].price,
+    profit: perHour * hours * margin - lotDef(lotId).rent - BUSINESS.UTILITIES_MONTH - staff,
+  };
 }
 
 export const randDemand = () => rand(0.7, 1.3);

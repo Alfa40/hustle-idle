@@ -369,3 +369,16 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .cal-wx { font-size: 15px; line-height: 1; }
 .cal-ev { font-size: 13px; line-height: 1; }
 @media (orientation: landscape) { .cal-cell { min-height: 40px; } }
+
+/* ---------- pulsante veicolo ---------- */
+.ride-btn {
+  position: fixed; right: calc(var(--sar) + 30px); bottom: calc(var(--sab) + 136px);
+  width: 62px; height: 62px; border-radius: 50%; border: 4px solid #fff; background: var(--blue);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0;
+  box-shadow: 0 4px 0 var(--blue-d), 0 6px 12px rgba(0,0,0,.22); color: #fff;
+}
+.ride-btn .i { font-size: 24px; line-height: 1; }
+.ride-btn .l { font-size: 10px; font-weight: 700; }
+.ride-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--blue-d); }
+@media (orientation: landscape) { .ride-btn { right: calc(var(--sar) + 124px); bottom: calc(var(--sab) + 30px); } }
+.jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

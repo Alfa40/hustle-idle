@@ -1,3 +1,4 @@
+import { gltf, model } from '../assets';
 import * as THREE from 'three';
 
 function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
@@ -187,4 +188,46 @@ export function playerDot() {
   s.scale.setScalar(0.45);
   s.renderOrder = 12;
   return s;
+}
+
+const stainMat = new THREE.MeshBasicMaterial({ color: 0x5d4037, transparent: true, opacity: 0.75, depthWrite: false });
+/** Macchia di sporco a terra (impresa di pulizie). */
+export function stain() {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(0.28 + Math.random() * 0.2, 12), stainMat);
+    m.rotation.x = -Math.PI / 2;
+    m.position.set((Math.random() - 0.5) * 0.5, 0.04 + i * 0.002, (Math.random() - 0.5) * 0.5);
+    g.add(m);
+  }
+  const bubble = label('🧽', { bg: 'rgba(0,0,0,0)', scale: 0.5 });
+  bubble.position.y = 0.9;
+  g.add(bubble);
+  return g;
+}
+
+const sizeCache = new Map<string, number>();
+/**
+ * Oggetto 3D di un prodotto (in mano o sul bancone), normalizzato a `size` metri.
+ * I prodotti senza modello (es. gioielli) sono costruiti con forme semplici.
+ */
+export function productObject(modelPath: string | undefined, size: number): THREE.Object3D {
+  if (!modelPath) {
+    const g = new THREE.Group();
+    const gold = new THREE.MeshLambertMaterial({ color: 0xffc21a, emissive: 0x553300 });
+    const r = new THREE.Mesh(new THREE.TorusGeometry(size * 0.3, size * 0.07, 8, 20), gold);
+    r.rotation.x = Math.PI / 2.5;
+    r.position.y = size * 0.3;
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(size * 0.12), new THREE.MeshLambertMaterial({ color: 0x5ad1ff, emissive: 0x114466 }));
+    gem.position.set(0, size * 0.62, 0);
+    g.add(r, gem);
+    return g;
+  }
+  let max = sizeCache.get(modelPath);
+  if (!max) {
+    const s = new THREE.Box3().setFromObject(gltf(modelPath).scene).getSize(new THREE.Vector3());
+    max = Math.max(s.x, s.y, s.z) || 1;
+    sizeCache.set(modelPath, max);
+  }
+  return model(modelPath, size / max);
 }

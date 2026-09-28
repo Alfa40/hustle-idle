@@ -143,7 +143,7 @@ Nuove categorie arriveranno insieme alle nuove attività.
 
 ## 10. Tempo di gioco
 
-- **1 mese di gioco = 1 ora reale** (circa 2 minuti reali per giorno di gioco) *(tarabile)*.
+- **1 mese di gioco = 2 ore reali** (4 minuti reali per giorno di gioco) *(tarabile)*.
 - Gli stipendi e i costi fissi si pagano a fine mese di gioco.
 
 ### 10.1 Guadagno offline
@@ -215,6 +215,15 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Minimappa centrata sul giocatore + mappa a tutto schermo con legenda, lavori vicini (direzione, distanza, paga) e food truck
 - Interfaccia allegra: font Fredoka, pannelli chiari con intestazione colorata, pulsanti con etichetta, schede con icone
 - Calendario con eventi sicuri e previsioni meteo
+
+### Versione 0.3 (28/09/2026), fatto
+- Tempo più lento: 1 mese di gioco = 2 ore reali
+- 10 lotti in vendita: 5 posteggi per food truck e 5 locali per negozi e imprese
+- Nuove attività: **Panificio** e **Laboratorio artigiano** (bancone come il food truck), **Impresa di pulizie** e **Ditta traslochi** (attività di servizio: arrivano ordini che il titolare esegue a domicilio, oppure li fanno i dipendenti)
+- **Agenzia affari:** le tue attività, lotti in vendita con stime di incasso e utile, resoconti e confronti, mercato per zona
+- **Concessionaria:** monopattino, scooter, utilitaria, berlina, SUV, sportiva (velocità diverse, assicurazione mensile per le auto), pulsante per salire e scendere
+- Nuovi lavoretti: volantinaggio, lavaggio auto, imbianchino. Nuova esperienza **Artigianato**
+- Corretto lo scorrimento della mappa che tornava in cima
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
