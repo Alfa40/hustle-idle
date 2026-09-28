@@ -260,9 +260,9 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Imbianchino (muretto): copri le piante → vernice → dipingi ogni tratto → togli i teli
 - Durante un lavoro spariscono palazzi e alberi che coprono la zona; il cliente si fa da parte
 
-### Visuale in prima persona
-- Pulsante 👁️/🎥 per passare dalla terza alla prima persona, ovunque (città, lavoretti, attività, case dei clienti)
-- In prima persona: metà sinistra dello schermo = joystick (avanti = dove guardi), metà destra = trascina per guardarti intorno; le etichette si rimpiccioliscono e le freccette ai bordi ruotano con lo sguardo
+### Visuale
+- Terza persona in giro per la città, nelle attività e nelle case dei clienti
+- Prima persona automatica solo durante i lavoretti: occhi sopra e un po' dietro la testa (non entrano nei muri), campo visivo ampio, oggetti in mano nascosti (indicati nella barra), sguardo che si gira da solo verso il prossimo punto quando non si trascina il dito, leggero ondeggiare camminando, passaggio morbido tra le visuali
 
 ### Grafica 0.9
 - Cielo a gradiente con sole che segue l'ora (alba, giorno, tramonto dorato, notte) e nuvole low-poly in movimento

@@ -228,7 +228,7 @@ export class PhasedRun extends BaseRun {
       status = '⚠️ Torna nella zona di lavoro!';
       if (this.outTimer > 0 && this.outTimer - dt <= 0) this.game.player.play('idle');
     } else this.outTimer = 0;
-    this.status = status;
+    this.status = status + (this.heldIcon && this.game.player.held ? ` · in mano ${this.heldIcon}` : '');
     if (!near || nd > this.reach()) {
       this.game.prompt = null;
       if (this.game.player.currentName === 'interact-right' && !this.game.input.actionHeld) this.game.player.play('idle');
@@ -262,12 +262,15 @@ export class PhasedRun extends BaseRun {
   }
 
   private fxT = 0;
+  /** icona di ciò che si tiene in mano (in prima persona l'oggetto non si vede) */
+  private heldIcon = '';
 
   private complete(t: Task) {
     t.done = true;
     this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.8), t.fx ? 8 : 5, t.fxColor);
     this.game.player.play('idle');
     t.onDone?.();
+    this.heldIcon = this.game.player.held ? t.icon : '';
     const m = this.markers.get(t);
     if (m) m.visible = false;
     if (this.tasks.every((x) => x.done)) this.nextPhase();

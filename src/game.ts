@@ -850,9 +850,12 @@ export class Game {
         this.updateWaypoint();
         this.updateJobs(dt);
         this.updateInteract();
-        this.updateCamera(dt);
+        const fp = this.wantFirstPerson();
+        if (fp !== this.firstPerson) this.setFirstPerson(fp);
+        if (this.firstPerson) this.updateFirstPerson(dt);
+        else this.updateCamera(dt);
+        this.applyCamBlend(dt);
       }
-      if (this.firstPerson) this.updateFirstPerson();
     } else {
       this.input.consumeTap();
       this.input.consumeLook();
@@ -879,49 +882,61 @@ export class Game {
 
   // ---------------- prima persona ----------------
 
-  /** visuale in prima persona (pulsante 👁️) */
+  /**
+   * Prima persona automatica: solo durante i lavoretti in città.
+   * In giro per la città, nelle attività e nelle case dei clienti si resta in terza persona.
+   */
   firstPerson = false;
   /** direzione dello sguardo: 0 = nord, positivo verso est */
   fpYaw = 0;
-  private fpPitch = -0.15;
-  private fpScene: THREE.Scene | null = null;
+  private fpPitch = -0.35;
   private fpSprites: THREE.Sprite[] = [];
   private fpScan = 0;
+  /** secondi dall'ultima volta che il giocatore ha girato lo sguardo col dito */
+  private fpIdle = 99;
+  private fpBob = 0;
+  /** passaggio morbido tra terza e prima persona */
+  private camBlend: { pos: THREE.Vector3; quat: THREE.Quaternion; t: number } | null = null;
 
   /** Camera della scena attiva (città, attività o casa del cliente). */
   get activeCamera() {
     return this.interior?.camera ?? this.house?.camera ?? this.camera;
   }
 
+  private wantFirstPerson() {
+    return !!(this.run && this.runOffer) && !this.interior && !this.house;
+  }
+
   setFirstPerson(on: boolean) {
+    if (this.firstPerson === on) return;
+    // si parte dalla posizione attuale della camera e ci si sposta con dolcezza
+    this.camBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), t: 0 };
     this.firstPerson = on;
     this.input.lookMode = on;
     this.input.cancel();
     this.moveTarget = null;
-    // si parte guardando nella direzione in cui guarda il personaggio
     if (on) {
-      this.fpYaw = Math.PI - this.player.root.rotation.y;
-      this.fpPitch = -0.15;
+      // sguardo verso il primo punto da fare (o dove guarda il personaggio)
+      const t = this.run?.target;
+      const p = this.player.root.position;
+      this.fpYaw = t ? Math.atan2(t.x - p.x, -(t.z - p.z)) : Math.PI - this.player.root.rotation.y;
+      this.fpPitch = -0.35;
+      this.fpIdle = 99;
     }
     this.player.body.visible = !on && !(this.state.riding && riderPose(this.state.riding).hidden);
+    if (this.player.held) this.player.held.visible = !on;
     if (this.rideObj) this.rideObj.visible = !on;
     if (this.playerMarker) this.playerMarker.visible = !on;
-    for (const cam of [this.camera, this.interior?.camera, this.house?.camera]) {
-      if (!cam) continue;
-      cam.near = on ? 0.05 : 0.3;
-      cam.fov = on ? 72 : cam === this.camera ? 35 : 50;
-      cam.updateProjectionMatrix();
-    }
+    this.camera.near = on ? 0.1 : 0.5;
+    this.camera.fov = on ? 78 : 35;
+    this.camera.updateProjectionMatrix();
     if (!on) {
       for (const sp of this.fpSprites) {
         sp.material.opacity = 1;
         if (sp.userData.baseScale) sp.scale.copy(sp.userData.baseScale);
       }
       this.fpSprites = [];
-      this.fpScene = null;
-      this.snapCamera();
-      // le stanze ricalcolano la loro inquadratura
-      window.dispatchEvent(new Event('resize'));
+      this.camTarget.copy(this.player.root.position);
     }
   }
 
@@ -938,44 +953,74 @@ export class Game {
     return { x: c * v.x - sn * v.y, y: sn * v.x + c * v.y };
   }
 
-  private updateFirstPerson() {
+  private updateFirstPerson(dt: number) {
     const l = this.input.consumeLook();
-    this.fpYaw += l.x * 0.006;
-    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * 0.005, -1.1, 0.6);
-    const cam = this.activeCamera;
-    if (cam.fov !== 72) {
-      // entrati in una stanza nuova: anche la sua camera passa in prima persona
-      cam.fov = 72;
-      cam.near = 0.05;
-      cam.updateProjectionMatrix();
-    }
+    if (l.x || l.y) this.fpIdle = 0;
+    else this.fpIdle += dt;
+    this.fpYaw += l.x * 0.005;
+    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * 0.004, -1.0, 0.35);
     const p = this.player.root.position;
-    const eye = this.state.riding && VEHICLES[this.state.riding].kind === 'car' ? 1.25 : 1.35;
-    cam.position.set(p.x + Math.sin(this.fpYaw) * 0.15, p.y + eye, p.z - Math.cos(this.fpYaw) * 0.15);
+    // se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto da fare
+    const t = this.run?.target;
+    if (t && this.fpIdle > 1.2) {
+      const d = Math.hypot(t.x - p.x, t.z - p.z);
+      const wantYaw = Math.atan2(t.x - p.x, -(t.z - p.z));
+      let dy = wantYaw - this.fpYaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      const k = Math.min(1, dt * 2.2);
+      if (d > 0.6) this.fpYaw += dy * k;
+      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(1.2, Math.max(d, 0.5)), -0.9, -0.12);
+      this.fpPitch += (wantPitch - this.fpPitch) * k;
+    }
+    // leggero ondeggiare camminando
+    const moving = Math.hypot(this.input.vector.x, this.input.vector.y) > 0.1;
+    this.fpBob += moving ? dt * 9 : 0;
+    const bob = moving ? Math.sin(this.fpBob) * 0.035 : 0;
+    const cam = this.camera;
+    // occhi sopra la testa e un po' indietro: più spazio tra la vista e gli oggetti vicini
+    // se dietro la testa c'è un muro la camera si avvicina (mai dentro gli edifici)
+    let back = 0.55;
+    const inWall = (x: number, z: number) => this.city.colliders.some((c) => x > c.minX - 0.15 && x < c.maxX + 0.15 && z > c.minZ - 0.15 && z < c.maxZ + 0.15);
+    while (back > 0 && inWall(p.x - Math.sin(this.fpYaw) * back, p.z + Math.cos(this.fpYaw) * back)) back -= 0.1;
+    back = Math.max(0, back);
+    cam.position.set(p.x - Math.sin(this.fpYaw) * back, p.y + 1.75 + bob, p.z + Math.cos(this.fpYaw) * back);
     cam.rotation.set(this.fpPitch, -this.fpYaw, 0, 'YXZ');
     this.player.root.rotation.y = Math.PI - this.fpYaw;
     this.player.body.visible = false;
-    // etichette troppo vicine agli occhi: coprirebbero tutta la vista
-    const scene = this.interior?.scene ?? this.house?.scene ?? this.scene;
-    if (scene !== this.fpScene || ++this.fpScan % 60 === 0) {
-      this.fpScene = scene;
+    if (this.player.held) this.player.held.visible = false;
+    // etichette: più piccole e nascoste se troppo vicine agli occhi
+    if (++this.fpScan % 45 === 1) {
       this.fpSprites = [];
-      scene.traverse((o) => {
+      this.scene.traverse((o) => {
         if ((o as THREE.Sprite).isSprite) this.fpSprites.push(o as THREE.Sprite);
       });
     }
     const wp = new THREE.Vector3();
     for (const sp of this.fpSprites) {
-      // da vicino le etichette sono enormi: in prima persona si rimpiccioliscono
       sp.userData.baseScale ??= sp.scale.clone();
-      sp.scale.copy(sp.userData.baseScale).multiplyScalar(0.4);
+      sp.scale.copy(sp.userData.baseScale).multiplyScalar(0.55);
       sp.getWorldPosition(wp);
       sp.material.transparent = true;
-      sp.material.opacity = wp.distanceTo(cam.position) < 1.2 ? 0 : 1;
+      sp.material.opacity = wp.distanceTo(cam.position) < 1.6 ? 0 : 1;
     }
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);
     this.sun.position.copy(p).addScaledVector(this.sunDir, 36);
+  }
+
+  /** Passaggio morbido della camera dopo un cambio di visuale. */
+  private applyCamBlend(dt: number) {
+    const b = this.camBlend;
+    if (!b) return;
+    b.t += dt / 0.6;
+    if (b.t >= 1) {
+      this.camBlend = null;
+      return;
+    }
+    const e = 1 - Math.pow(1 - b.t, 3);
+    const cam = this.camera;
+    cam.position.lerpVectors(b.pos, cam.position, e);
+    cam.quaternion.slerpQuaternions(b.quat, cam.quaternion.clone(), e);
   }
 
   private updatePlayer(dt: number) {

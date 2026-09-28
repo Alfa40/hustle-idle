@@ -79,7 +79,6 @@ export class UI {
   private minimap!: Minimap;
   private mapScreen!: MapScreen;
   private rideEl!: HTMLButtonElement;
-  private viewEl!: HTMLButtonElement;
   private pointers!: EdgePointers;
 
   constructor(private game: Game) {
@@ -172,12 +171,6 @@ export class UI {
     this.root.appendChild(act);
     this.actionEl = act;
 
-    const view = document.createElement('button');
-    view.className = 'view-btn';
-    view.addEventListener('click', () => this.game.setFirstPerson(!this.game.firstPerson));
-    this.root.appendChild(view);
-    this.viewEl = view;
-
     const ride = document.createElement('button');
     ride.className = 'ride-btn';
     ride.addEventListener('click', () => this.game.toggleRide());
@@ -226,11 +219,6 @@ export class UI {
 
     this.minimap.el.style.display = settings.minimap ? '' : 'none';
     if (settings.minimap) this.minimap.update(dt);
-    const vk = this.game.firstPerson ? '3' : '1';
-    if (this.viewEl.dataset.k !== vk) {
-      this.viewEl.dataset.k = vk;
-      this.viewEl.innerHTML = this.game.firstPerson ? '<span class="i">🎥</span><span class="l">3ª pers.</span>' : '<span class="i">👁️</span><span class="l">1ª pers.</span>';
-    }
     const r = s.riding;
     const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {
