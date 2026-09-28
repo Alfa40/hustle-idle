@@ -225,6 +225,13 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Nuovi lavoretti: volantinaggio, lavaggio auto, imbianchino. Nuova esperienza **Artigianato**
 - Corretto lo scorrimento della mappa che tornava in cima
 
+### Versione 0.4 (28/09/2026), fatto
+- Città 5 volte più grande (37×37 tessere, 9×9 isolati): centro commerciale in mezzo, anello residenziale, periferia con parchi. 17 lotti in vendita (7 posteggi, 10 locali)
+- La città è divisa in riquadri di disegno: sul telefono si disegna solo la parte vicina alla camera
+- Mappa interattiva a tutto schermo: trascina, zoom con due dita/rotellina/pulsanti, centra su di me, tutta la città
+- Filtri attivabili (lavoretti, le mie attività, in vendita, luoghi) e barra di ricerca su nomi, tipi di attività, prodotti e vie
+- Scheda del posto toccato con distanza e direzione, "Dettagli" e "📍 Segna percorso": il segnaposto ha la sua freccetta e sparisce quando arrivi
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

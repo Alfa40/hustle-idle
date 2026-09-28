@@ -382,3 +382,59 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .ride-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--blue-d); }
 @media (orientation: landscape) { .ride-btn { right: calc(var(--sar) + 124px); bottom: calc(var(--sab) + 30px); } }
 .jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- mappa interattiva ---------- */
+.mapscreen {
+  position: fixed; inset: 0; z-index: 25; background: var(--paper); display: flex; flex-direction: column;
+  padding: var(--sat) var(--sar) 0 var(--sal); animation: sheetin .22s ease-out;
+}
+@media (orientation: landscape) { .mapscreen { padding-top: calc(var(--sat) + 4px); } }
+.ms-head { display: flex; gap: 8px; align-items: center; padding: 6px 4px; }
+.ms-search {
+  flex: 1; display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 16px; padding: 0 6px 0 12px;
+  border: 3px solid var(--blue); box-shadow: 0 3px 0 var(--line); min-width: 0;
+}
+.ms-search input {
+  flex: 1; min-width: 0; border: none; outline: none; font: inherit; font-size: 16px; padding: 10px 0; background: none; color: var(--ink);
+  -webkit-user-select: text; user-select: text;
+}
+.ms-search input::-webkit-search-cancel-button { display: none; }
+.ms-clear, .ms-close, .ms-x {
+  border: none; border-radius: 50%; width: 34px; height: 34px; background: #f1ead9; color: var(--ink-2); font-weight: 700; flex: none;
+}
+.ms-close { width: 44px; height: 44px; background: var(--blue); color: #fff; border: 3px solid #fff; box-shadow: 0 3px 0 var(--blue-d); }
+.ms-chips { display: flex; gap: 6px; padding: 2px 4px 8px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+.ms-chip {
+  border: 2px solid var(--line); background: #fff; color: var(--ink-2); border-radius: 999px; padding: 6px 11px;
+  font-size: 13px; font-weight: 600; white-space: nowrap; opacity: .6;
+}
+.ms-chip b { background: #f1ead9; border-radius: 999px; padding: 0 6px; margin-left: 2px; }
+.ms-chip.on { opacity: 1; border-color: var(--blue); color: var(--ink); box-shadow: 0 2px 0 var(--line); }
+.ms-stage { position: relative; flex: 1; min-height: 0; border-radius: 22px 22px 0 0; overflow: hidden; border: 4px solid #fff; border-bottom: none; }
+.ms-stage canvas { display: block; touch-action: none; }
+.ms-results {
+  position: absolute; left: 8px; right: 8px; top: 8px; max-height: 55%; overflow-y: auto; background: #fff; border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.2); display: none; padding: 6px; touch-action: pan-y;
+}
+.ms-results.on { display: block; }
+.ms-results button {
+  display: flex; gap: 10px; align-items: center; width: 100%; border: none; background: none; padding: 7px; border-radius: 12px; text-align: left;
+}
+.ms-results button:active { background: #fff3d6; }
+.ms-ico { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; flex: none; }
+.ms-rt { display: flex; flex-direction: column; min-width: 0; }
+.ms-rt b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-rt small { color: var(--ink-2); font-size: 12px; }
+.ms-none { padding: 12px; color: var(--ink-2); text-align: center; }
+.ms-zoom { position: absolute; right: 10px; bottom: calc(var(--sab) + 12px); display: flex; flex-direction: column; gap: 8px; }
+.ms-zoom button {
+  width: 46px; height: 46px; border-radius: 14px; border: 3px solid #fff; background: var(--blue); color: #fff; font-size: 22px; font-weight: 700;
+  box-shadow: 0 3px 0 var(--blue-d), 0 4px 10px rgba(0,0,0,.2);
+}
+.ms-card {
+  position: absolute; left: 10px; right: 68px; bottom: calc(var(--sab) + 12px); background: #fff; border-radius: 18px; padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.22); display: none; border: 3px solid var(--yellow);
+}
+.ms-card.on { display: block; animation: tin .25s cubic-bezier(.2,1.6,.4,1); }
+.ms-card b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (orientation: landscape) { .ms-card { right: auto; width: min(380px, 60vw); } }

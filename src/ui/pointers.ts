@@ -42,7 +42,10 @@ export class EdgePointers {
     if (!g.interior && !g.paused) {
       const all = g.mapMarkers();
       const target = all.filter((m) => m.kind === 'target');
-      list = target.length ? target : all.filter((m) => m.kind === 'job').sort((a, b) => a.dist - b.dist).slice(0, MAX_POINTERS);
+      const way = all.filter((m) => m.kind === 'waypoint');
+      const jobs = all.filter((m) => m.kind === 'job').sort((a, b) => a.dist - b.dist);
+      // obiettivo del lavoro > segnaposto (+ lavori vicini) > lavori vicini
+      list = target.length ? target : [...way, ...jobs].slice(0, MAX_POINTERS);
     }
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -88,7 +91,7 @@ export class EdgePointers {
       placed.push({ x: px, y: py });
       el.style.display = 'block';
       el.style.transform = `translate(${px}px, ${py}px)`;
-      el.classList.toggle('target', m.kind === 'target');
+      el.classList.toggle('target', m.kind === 'target' || m.kind === 'waypoint');
       el.style.setProperty('--c', m.color);
       (el.querySelector('.edge-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
       (el.querySelector('.edge-ico') as HTMLElement).textContent = m.icon;

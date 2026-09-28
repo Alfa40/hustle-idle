@@ -49,7 +49,11 @@ export class DishGame {
     this.resize();
     this.newPlate();
     this.cv.addEventListener('pointerdown', (e) => {
-      this.cv.setPointerCapture(e.pointerId);
+      try {
+        this.cv.setPointerCapture(e.pointerId);
+      } catch {
+        /* puntatore già rilasciato */
+      }
       this.last = this.local(e);
     });
     this.cv.addEventListener('pointermove', (e) => {

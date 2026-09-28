@@ -7,10 +7,10 @@ import { JOBS } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
-import type { ActionPrompt, Game } from '../game';
-import { drawMap, Minimap } from './map';
+import type { ActionPrompt, Game, MapMarker } from '../game';
+import { Minimap } from './map';
+import { MapScreen } from './mapscreen';
 import { EdgePointers } from './pointers';
-import { CITY_MAP, TILE } from '../config/map';
 import { bus, toast } from '../sim/bus';
 import type { OfflineReport } from '../sim/calendar';
 import {
@@ -74,6 +74,7 @@ export class UI {
   private lastAction = '';
   private queue: Panel[] = [];
   private minimap!: Minimap;
+  private mapScreen!: MapScreen;
   private rideEl!: HTMLButtonElement;
   private pointers!: EdgePointers;
 
@@ -112,6 +113,7 @@ export class UI {
       </div>`;
     this.root.appendChild(right);
     this.minimap = new Minimap(this.game, () => this.openMap());
+    this.mapScreen = new MapScreen(this.game, { openDetails: (m) => this.openFromMap(m) });
     right.prepend(this.minimap.el);
     this.pointers = new EdgePointers(this.game, document.body);
     this.moneyEl = top.querySelector('#h-money')!;
@@ -148,7 +150,11 @@ export class UI {
     const inp = this.game.input;
     act.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      act.setPointerCapture(e.pointerId);
+      try {
+        act.setPointerCapture(e.pointerId);
+      } catch {
+        /* puntatore già rilasciato */
+      }
       inp.actionHeld = true;
       inp.actionPressed = true;
       act.classList.add('pressed');
@@ -748,12 +754,12 @@ export class UI {
 
   // ---------------- veicoli ----------------
 
-  openDealer() {
+  openDealer(canBuy = true) {
     const s = this.s;
     this.open({
       title: '🛵 Concessionaria',
       color: 'var(--blue)',
-      render: () => `<p class="muted small">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +
+      render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}<p class="muted small">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +
         VEHICLE_IDS.map((id) => {
           const v = VEHICLES[id];
           const owned = s.vehicles.includes(id);
@@ -761,7 +767,7 @@ export class UI {
           const pct = Math.round((v.speed / WALK_SPEED) * 100 - 100);
           const btn = owned
             ? `<button class="btn sm ${using ? 'sec' : 'blue'}" data-a="use:${id}" ${using ? 'disabled' : ''}>${using ? 'In uso' : 'Usa'}</button>`
-            : `<button class="btn sm good" data-a="buyv:${id}" ${s.money < v.price ? 'disabled' : ''}>Compra ${euro(v.price)}</button>`;
+            : `<button class="btn sm good" data-a="buyv:${id}" ${s.money < v.price || !canBuy ? 'disabled' : ''}>Compra ${euro(v.price)}</button>`;
           return `<div class="card ${owned ? 'hl' : ''}"><div class="row"><div class="icon-bubble" style="font-size:30px;width:54px;height:54px">${v.icon}</div>
             <div style="flex:1"><h3 style="margin:0">${v.name} ${owned ? '<span class="tag g">tuo</span>' : ''}</h3><div class="muted small">${v.desc}</div></div></div>
             <div class="grid3" style="margin-top:8px">
@@ -951,55 +957,28 @@ export class UI {
 
   // ---------------- mappa ----------------
 
-  openMap() {
-    const game = this.game;
-    const dirName = (dx: number, dz: number) => {
-      const a = (Math.atan2(dx, -dz) * 180) / Math.PI;
-      return ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'][Math.round(((a + 360) % 360) / 45) % 8];
-    };
+  openMap(focusId?: string) {
+    this.mapScreen.open(focusId);
+  }
+
+  /** "Dettagli" dalla mappa: apre la scheda giusta senza poter comprare a distanza. */
+  private openFromMap(m: MapMarker) {
+    if (m.kind === 'lot' || m.kind === 'biz') {
+      const lotId = m.id.slice(4);
+      const biz = bizAtLot(this.s, lotId);
+      if (biz) this.openBusiness(biz.id);
+      else this.openLotInfo(lotId);
+    } else if (m.kind === 'dealer') this.openDealer(false);
+    else if (m.kind === 'agency') this.openAgency('compra', false);
+    else if (m.kind === 'board') this.openMissions();
+  }
+
+  openLotInfo(lotId: string) {
     this.open({
-      title: '🗺️ Mappa della città',
+      title: `🏷️ ${lotDef(lotId).name}`,
+      color: 'var(--red)',
+      render: () => this.lotCard(lotId, false),
       actions: {},
-      wide: true,
-      live: true,
-      color: 'var(--blue)',
-      render: () => {
-        const p = game.player.root.position;
-        const markers = game.mapMarkers();
-        const jobs = markers.filter((m) => m.kind === 'job' || m.kind === 'target').sort((a, b) => a.dist - b.dist);
-        const list = jobs.length
-          ? jobs.map((m) => `<div class="card row" style="padding:8px 12px;margin-bottom:6px"><div class="icon-bubble" style="background:${m.color}">${m.icon}</div>
-              <div style="flex:1"><b>${m.label}</b><div class="muted small">${dirName(m.x - p.x, m.z - p.z)} ${Math.round(m.dist)} m da te</div></div></div>`).join('')
-          : '<p class="muted small">Nessun lavoretto al momento: ne arriveranno altri a breve.</p>';
-        const others = markers.filter((m) => m.kind === 'lot' || m.kind === 'biz' || m.kind === 'dealer' || m.kind === 'agency')
-          .sort((a, b) => a.dist - b.dist)
-          .map((m) => `<div class="card row" style="padding:8px 12px;margin-bottom:6px"><div class="icon-bubble" style="background:${m.color}">${m.icon}</div>
-            <div style="flex:1"><b>${m.label}</b><div class="muted small">${dirName(m.x - p.x, m.z - p.z)} ${Math.round(m.dist)} m</div></div></div>`).join('');
-        return `<div class="bigmap-layout"><div class="bigmap-wrap"><canvas class="bigmap"></canvas></div>
-          <div class="bigmap-side">
-            <div class="legend">
-              <span>🔵 Tu</span><span>🟡 Lavoretti</span><span>🎯 Obiettivo</span><span>🏷️ In vendita</span>
-              <span>🚚🥖 Le tue attività</span><span>📋 Bacheca</span><span>🏠 Casa</span><span>🛵 Concessionaria</span><span>🏢 Agenzia affari</span>
-              <span><i style="background:#ffd66b"></i>Case</span><span><i style="background:#b3bde0"></i>Negozi</span>
-              <span><i style="background:#ff9f6e"></i>Ristoranti</span><span><i style="background:#5cc46a"></i>Parchi</span>
-            </div>
-            <h3 class="sec-title">🔨 Lavori vicini</h3>${list}
-            <h3 class="sec-title">🏪 Attività, lotti e negozi (dal più vicino)</h3>${others}
-          </div></div>`;
-      },
-      after: (body) => {
-        const cv = body.querySelector<HTMLCanvasElement>('.bigmap')!;
-        const landscape = window.innerWidth > window.innerHeight;
-        const avail = landscape ? Math.min(window.innerHeight - 110, window.innerWidth * 0.5) : Math.min(body.clientWidth - 40, window.innerHeight * 0.55);
-        const size = Math.max(220, Math.floor(avail));
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        cv.width = cv.height = size * dpr;
-        cv.style.width = cv.style.height = size + 'px';
-        const g = cv.getContext('2d')!;
-        g.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const span = Math.max(CITY_MAP.length, CITY_MAP[0].length) * TILE + 4;
-        drawMap(g, size, size, game, { cx: 0, cz: 0, span, full: true });
-      },
     });
   }
 

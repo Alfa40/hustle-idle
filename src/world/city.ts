@@ -114,7 +114,7 @@ export class City {
         const dir = this.roadDir(c, r);
         const [dx, dz] = DIR_VEC[dir];
         const rot = DIR_ROT[dir];
-        const paved = 'pMbBRVA1234567890'.includes(ch) || (ch === '.' && zone === 'centro');
+        const paved = 'pMbBRVA'.includes(ch) || LOTS.some((l) => l.char === ch) || (ch === '.' && zone === 'centro');
         if (paved) inst.add('roads/tile-low.glb', placeMatrix(p.x, p.z, 0, TILE, 0.001));
 
         const front = (d: number) => new THREE.Vector3(p.x + dx * d, 0, p.z + dz * d);

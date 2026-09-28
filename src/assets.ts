@@ -78,20 +78,27 @@ export function skinned(path: string): { root: THREE.Object3D; clips: THREE.Anim
   return { root: SkeletonUtils.clone(g.scene), clips: g.animations };
 }
 
+/** Lato (in metri) dei riquadri in cui si divide la città per il disegno. */
+const CHUNK = 36;
+
 /**
  * Raggruppa tante copie dello stesso modello in InstancedMesh: una draw call
  * per ogni coppia geometria/materiale, fondamentale per strade e alberi.
+ * Le copie sono divise in riquadri così la camera disegna solo quelli vicini.
  */
 export class Instancer {
   private items = new Map<string, THREE.Matrix4[]>();
   add(path: string, matrix: THREE.Matrix4) {
-    let arr = this.items.get(path);
-    if (!arr) this.items.set(path, (arr = []));
+    const cx = Math.floor(matrix.elements[12] / CHUNK);
+    const cz = Math.floor(matrix.elements[14] / CHUNK);
+    const key = `${path}|${cx},${cz}`;
+    let arr = this.items.get(key);
+    if (!arr) this.items.set(key, (arr = []));
     arr.push(matrix.clone());
   }
   build(parent: THREE.Object3D, opts: { castShadow?: boolean } = {}) {
-    for (const [path, mats] of this.items) {
-      const scene = gltf(path).scene;
+    for (const [key, mats] of this.items) {
+      const scene = gltf(key.split('|')[0]).scene;
       scene.updateMatrixWorld(true);
       scene.traverse((o) => {
         const mesh = o as THREE.Mesh;

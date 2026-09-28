@@ -22,7 +22,9 @@ import { RouteRun, ScrubRun, SpotRun, type JobRun } from './minigames/jobs';
 import { bizType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
-import { completeOrder } from './sim/economy';
+import { completeOrder, lotPrice, typesForLot } from './sim/economy';
+import { ZONES } from './config/map';
+import { SKILLS } from './config/skills';
 import type { Business, ServiceOrder } from './sim/state';
 import type { UI } from './ui/ui';
 
@@ -35,15 +37,32 @@ export interface Interactable {
   enabled?: () => boolean;
 }
 
+export type MarkerCat = 'jobs' | 'mine' | 'forsale' | 'places' | 'target';
+
 export interface MapMarker {
+  /** identificativo stabile (per selezione e segnaposto) */
+  id: string;
   x: number;
   z: number;
   icon: string;
   color: string;
   label: string;
-  kind: 'job' | 'target' | 'lot' | 'biz' | 'board' | 'home' | 'dealer' | 'agency';
+  /** sottotitolo nella scheda */
+  sub?: string;
+  kind: 'job' | 'target' | 'waypoint' | 'lot' | 'biz' | 'board' | 'home' | 'dealer' | 'agency';
+  cat: MarkerCat;
+  /** parole in più per la ricerca */
+  keywords?: string;
   /** metri dal giocatore */
   dist: number;
+}
+
+export interface Waypoint {
+  id: string;
+  x: number;
+  z: number;
+  icon: string;
+  label: string;
 }
 
 export interface ActionPrompt {
@@ -100,6 +119,8 @@ export class Game {
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   paused = false;
+  /** la mappa a tutto schermo copre il mondo: niente rendering 3D */
+  renderPaused = false;
   offlineReport: OfflineReport | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -547,30 +568,70 @@ export class Game {
 
   // ---------------- mappa e indicatori ----------------
 
+  /** segnaposto scelto dalla mappa: le freccette guidano fin lì */
+  waypoint: Waypoint | null = null;
+
+  setWaypoint(m: MapMarker | null) {
+    this.waypoint = m ? { id: m.id, x: m.x, z: m.z, icon: m.icon, label: m.label } : null;
+  }
+
   mapMarkers(): MapMarker[] {
     const p = this.player.root.position;
     const out: MapMarker[] = [];
-    const add = (pos: THREE.Vector3, m: Omit<MapMarker, 'x' | 'z' | 'dist'>) =>
+    const add = (pos: { x: number; z: number }, m: Omit<MapMarker, 'x' | 'z' | 'dist'>) =>
       out.push({ ...m, x: pos.x, z: pos.z, dist: Math.hypot(pos.x - p.x, pos.z - p.z) });
-    add(this.city.board.pos, { icon: '📋', color: '#8e5bd6', label: 'Bacheca missioni', kind: 'board' });
-    add(this.city.homes[0].pos, { icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home' });
-    add(this.city.dealer.pos, { icon: '🛵', color: '#2d9cdb', label: 'Concessionaria', kind: 'dealer' });
-    add(this.city.agency.pos, { icon: '🏢', color: '#8e5bd6', label: 'Agenzia affari', kind: 'agency' });
+    add(this.city.board.pos, { id: 'board', icon: '📋', color: '#8e5bd6', label: 'Bacheca missioni', kind: 'board', cat: 'places', keywords: 'missioni piazza' });
+    add(this.city.homes[0].pos, { id: 'home', icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home', cat: 'places', keywords: 'dormire teletrasporto' });
+    add(this.city.dealer.pos, { id: 'dealer', icon: '🛵', color: '#2d9cdb', label: 'Concessionaria', kind: 'dealer', cat: 'places', keywords: 'veicoli auto scooter monopattino macchina' });
+    add(this.city.agency.pos, { id: 'agency', icon: '🏢', color: '#8e5bd6', label: 'Agenzia affari', kind: 'agency', cat: 'places', keywords: 'comprare attività lotti resoconti' });
     for (const lot of this.city.lots) {
       const def = LOTS.find((l) => l.id === lot.id)!;
       const biz = bizAtLot(this.state, lot.id);
-      const bt = biz && bizType(biz.type);
-      if (bt) add(lot.center, { icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, kind: 'biz' });
-      else add(lot.center, { icon: '🏷️', color: '#ff5d73', label: `${def.kind === 'truck' ? 'Posteggio' : 'Locale'} in vendita · ${def.name}`, kind: 'lot' });
+      const zone = ZONES[lot.zone].name;
+      if (biz) {
+        const bt = bizType(biz.type);
+        const prods = biz.products.map((x) => PRODUCTS[x].name).join(' ');
+        add(lot.center, {
+          id: 'lot:' + lot.id, icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, sub: `La tua attività · ${zone}`,
+          kind: 'biz', cat: 'mine', keywords: `${prods} mia mie`,
+        });
+      } else {
+        const types = typesForLot(lot.id).map((t) => bizType(t).name).join(' ');
+        add(lot.center, {
+          id: 'lot:' + lot.id, icon: '🏷️', color: '#ff5d73', label: `${def.kind === 'truck' ? 'Posteggio' : 'Locale'} in vendita · ${def.name}`,
+          sub: `${zone} · da €${Math.min(...typesForLot(lot.id).map((t) => lotPrice(lot.id, t))).toLocaleString('it-IT')}`,
+          kind: 'lot', cat: 'forsale', keywords: `${types} vendita comprare lotto`,
+        });
+      }
     }
-    if (this.run?.target) add(this.run.target, { icon: '🎯', color: '#ff3b5c', label: 'Obiettivo del lavoro', kind: 'target' });
+    if (this.run?.target) add(this.run.target, { id: 'target', icon: '🎯', color: '#ff3b5c', label: 'Obiettivo del lavoro', kind: 'target', cat: 'target' });
     else if (!this.run) {
       for (const n of this.npcs.values()) {
         const d = JOBS[n.offer.type];
-        add(n.char.root.position, { icon: d.icon, color: '#ffc21a', label: `${d.name} · €${n.offer.pay}`, kind: 'job' });
+        add(n.char.root.position, {
+          id: 'job:' + n.offer.id, icon: d.icon, color: '#ffc21a', label: d.name, sub: `Lavoretto · €${n.offer.pay} · liv. ${n.offer.level}`,
+          kind: 'job', cat: 'jobs', keywords: `lavoro lavoretto ${SKILLS[d.skill].name}`,
+        });
       }
     }
+    const w = this.waypoint;
+    if (w) add(w, { id: 'waypoint', icon: '📍', color: '#ff3b5c', label: `Segnaposto: ${w.label}`, kind: 'waypoint', cat: 'target' });
     return out;
+  }
+
+  /** Il segnaposto sparisce quando lo raggiungi (o se il lavoro non c'è più). */
+  private updateWaypoint() {
+    const w = this.waypoint;
+    if (!w) return;
+    if (w.id.startsWith('job:') && !this.npcs.has(+w.id.slice(4))) {
+      this.waypoint = null;
+      return;
+    }
+    const p = this.player.root.position;
+    if (Math.hypot(w.x - p.x, w.z - p.z) < 4) {
+      this.waypoint = null;
+      toast(`📍 Sei arrivato: ${w.label}`, 'good');
+    }
   }
 
   // ---------------- veicoli ----------------
@@ -677,6 +738,7 @@ export class Game {
         this.interior.update(dt);
       } else {
         this.updatePlayer(dt);
+        this.updateWaypoint();
         this.updateJobs(dt);
         this.updateInteract();
         this.updateCamera(dt);
@@ -695,6 +757,7 @@ export class Game {
     if (this.saveTimer > 10) this.save();
 
     this.ui.update(dt);
+    if (this.renderPaused) return;
     if (this.interior) this.renderer.render(this.interior.scene, this.interior.camera);
     else this.renderer.render(this.scene, this.camera);
   }
