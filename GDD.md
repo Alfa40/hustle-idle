@@ -232,6 +232,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Filtri attivabili (lavoretti, le mie attività, in vendita, luoghi) e barra di ricerca su nomi, tipi di attività, prodotti e vie
 - Scheda del posto toccato con distanza e direzione, "Dettagli" e "📍 Segna percorso": il segnaposto ha la sua freccetta e sparisce quando arrivi
 
+### Versione 0.5 (28/09/2026), fatto
+- Schermata iniziale con la città 3D che gira sullo sfondo: Continua, Nuova partita, Carica partita, Impostazioni, Crediti
+- 3 slot di salvataggio con nome della partita, rango, soldi, attività, data di gioco e "giocata X fa"; eliminazione con conferma. Il vecchio salvataggio finisce nello slot 1
+- Impostazioni (anche in partita, pulsante Opzioni): qualità grafica, ombre, distanza camera, freccette, minimappa
+- In partita: "Salva e torna al menu principale" e "Ricomincia questa partita"
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

@@ -9,6 +9,8 @@ import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
+import { settingsAction, settingsHtml } from './settingsview';
+import { settings } from '../settings';
 import { MapScreen } from './mapscreen';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
@@ -20,7 +22,7 @@ import {
 } from '../sim/economy';
 import { addFame, addMoney, rank, skillLevel } from '../sim/progress';
 import {
-  day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
+  currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type ServiceOrder,
 } from '../sim/state';
 
@@ -214,7 +216,8 @@ export class UI {
       fill.className = 'fill' + (f < 0.2 ? ' danger' : f < 0.45 ? ' warn' : '');
     }
 
-    this.minimap.update(dt);
+    this.minimap.el.style.display = settings.minimap ? '' : 'none';
+    if (settings.minimap) this.minimap.update(dt);
     const r = s.riding;
     const rideTxt = !s.vehicles.length || this.game.interior ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {
@@ -1041,19 +1044,38 @@ export class UI {
 
   openSettings() {
     let confirm = false;
+    let tab = 'impostazioni';
     this.open({
       title: '⚙️ Opzioni',
-      small: true,
       color: 'var(--gray)',
-      render: () => `
-        <div class="card"><h3>Come si gioca</h3><p class="muted small" style="margin:0">
-          Trascina il dito per muoverti (compare un joystick) oppure tocca un punto per andarci.
-          Avvicinati alle persone con il <b>!</b> per un lavoretto e usa il pulsante giallo in basso a destra.
-          Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
-        <div class="card"><h3>Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>
-        <button class="btn danger full" data-a="reset">${confirm ? 'Sicuro? Tocca di nuovo per cancellare tutto' : 'Ricomincia da capo'}</button>
-        <p class="muted small center">Grafica: Kenney.nl (CC0)</p>`,
+      render: () => {
+        const tabs = `<div class="tabs">${[['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
+          .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        if (tab === 'impostazioni') return tabs + settingsHtml();
+        if (tab === 'partita') {
+          return tabs + `
+            <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot} · la partita si salva da sola ogni pochi secondi.</p></div>
+            <button class="btn blue full" data-a="menu">🏠 Salva e torna al menu principale</button>
+            <p class="muted small center">Dal menu puoi cambiare partita o iniziarne una nuova.</p>
+            <hr>
+            <button class="btn danger full" data-a="reset">${confirm ? '⚠️ Sicuro? Tocca di nuovo per cancellare questa partita' : '🗑️ Ricomincia questa partita da capo'}</button>`;
+        }
+        return tabs + `
+          <div class="card"><h3>🕹️ Comandi</h3><p class="muted small" style="margin:0">
+            Trascina il dito per muoverti (compare un joystick) oppure tocca un punto per andarci.
+            Avvicinati alle persone con il <b>!</b> per un lavoretto e usa il pulsante giallo in basso a destra.
+            Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
+          <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
+      },
       actions: {
+        tab: (k) => (tab = k),
+        set: (v) => settingsAction('set:' + v),
+        tog: (v) => settingsAction('tog:' + v),
+        menu: () => {
+          this.game.save();
+          this.game.resetting = true;
+          location.reload();
+        },
         reset: () => {
           if (!confirm) {
             confirm = true;

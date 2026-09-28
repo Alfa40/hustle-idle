@@ -114,9 +114,20 @@ export interface GameState {
   /** veicolo su cui si è ora (null = a piedi) */
   riding: VehicleId | null;
   orderSeq: number;
+  /** nome della partita scelto dal giocatore */
+  saveName: string;
 }
 
-const SAVE_KEY = 'hustleidle.save.v1';
+// ---- salvataggi a slot ----
+
+export const SLOT_COUNT = 3;
+const OLD_KEY = 'hustleidle.save.v1';
+const slotKey = (n: number) => `hustleidle.slot.${n}`;
+const LAST_KEY = 'hustleidle.lastSlot';
+
+/** Slot della partita in corso (1–3). */
+export let currentSlot = 1;
+export const setCurrentSlot = (n: number) => (currentSlot = n);
 
 /** Si parte il 1° maggio, anno 1, alle 8:00 */
 export const START_DAY = 4 * TIME.DAYS_PER_MONTH;
@@ -150,13 +161,27 @@ export function newState(): GameState {
     vehicles: [],
     riding: null,
     orderSeq: 1,
+    saveName: 'La mia partita',
   };
 }
 
-export function loadState(): GameState | null {
+/** Le partite della prima versione (un solo salvataggio) finiscono nello slot 1. */
+function migrateOldSave() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
+    const old = localStorage.getItem(OLD_KEY);
+    if (old && !localStorage.getItem(slotKey(1))) {
+      localStorage.setItem(slotKey(1), old);
+      localStorage.setItem(LAST_KEY, '1');
+    }
+    if (old) localStorage.removeItem(OLD_KEY);
+  } catch {
+    /* niente */
+  }
+}
+
+function parse(raw: string | null): GameState | null {
+  if (!raw) return null;
+  try {
     const s = JSON.parse(raw) as GameState;
     if (s.version !== 1) return null;
     const st = { ...newState(), ...s };
@@ -175,21 +200,48 @@ export function loadState(): GameState | null {
   }
 }
 
-export function saveState(s: GameState) {
+export function loadState(slot = currentSlot): GameState | null {
+  migrateOldSave();
+  try {
+    return parse(localStorage.getItem(slotKey(slot)));
+  } catch {
+    return null;
+  }
+}
+
+export function saveState(s: GameState, slot = currentSlot) {
   s.lastSeen = Date.now();
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+    localStorage.setItem(slotKey(slot), JSON.stringify(s));
+    localStorage.setItem(LAST_KEY, String(slot));
   } catch {
     /* spazio pieno o modalità privata: si continua senza salvare */
   }
 }
 
-export function wipeSave() {
+export function wipeSave(slot = currentSlot) {
   try {
-    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(slotKey(slot));
+    if (localStorage.getItem(LAST_KEY) === String(slot)) localStorage.removeItem(LAST_KEY);
   } catch {
     /* niente */
   }
+}
+
+export function lastSlot(): number | null {
+  migrateOldSave();
+  try {
+    const n = Number(localStorage.getItem(LAST_KEY));
+    return n >= 1 && n <= SLOT_COUNT && localStorage.getItem(slotKey(n)) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Tutti gli slot (null = vuoto), per la schermata iniziale. */
+export function listSlots(): (GameState | null)[] {
+  migrateOldSave();
+  return Array.from({ length: SLOT_COUNT }, (_, i) => loadState(i + 1));
 }
 
 export function emptyLedger(): Ledger {

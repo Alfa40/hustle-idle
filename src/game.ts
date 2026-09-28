@@ -5,13 +5,14 @@ import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS } from './config/map';
 import { PRODUCTS } from './config/products';
 import { Input } from './input';
+import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, genMissions, missionProgress, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
 import {
-  day, hourOf, loadState, newState, pick, rand, saveState,
+  day, hourOf, loadState, newState, pick, rand, saveState, setCurrentSlot,
   type GameState, type JobOffer,
 } from './sim/state';
 import { Character, charPath } from './world/character';
@@ -119,6 +120,8 @@ export class Game {
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   paused = false;
+  /** title = schermata iniziale (città sullo sfondo), play = partita */
+  mode: 'title' | 'play' = 'title';
   /** la mappa a tutto schermo copre il mondo: niente rendering 3D */
   renderPaused = false;
   offlineReport: OfflineReport | null = null;
@@ -126,7 +129,8 @@ export class Game {
   constructor(canvas: HTMLCanvasElement) {
     const dpr = window.devicePixelRatio || 1;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: dpr < 2, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(dpr, 1.6));
+    this.applySettings();
+    onSettings(() => this.applySettings());
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -149,6 +153,17 @@ export class Game {
     this.resize();
   }
 
+  /** Qualità grafica e ombre dalle impostazioni. */
+  applySettings() {
+    const dpr = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(Math.min(dpr, QUALITY_PIXEL_RATIO[settings.quality]));
+    this.sun.castShadow = settings.shadows;
+    this.sun.shadow.mapSize.setScalar(settings.quality === 'alta' ? 1024 : 512);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
+    this.resize();
+  }
+
   async init(onProgress: (f: number) => void) {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
@@ -162,9 +177,16 @@ export class Game {
     this.scene.add(this.city.group);
     for (const l of this.city.lots) lotZone[l.id] = l.zone;
 
-    // stato + tempo offline
-    const saved = loadState();
+    // bacheca, casa, concessionaria e agenzia non dipendono dalla partita
+    this.setupPlaces();
+  }
+
+  /** Avvia la partita di uno slot: nuova (con nome) oppure caricata. */
+  begin(slot: number, newName?: string) {
+    setCurrentSlot(slot);
+    const saved = newName === undefined ? loadState(slot) : null;
     this.state = saved ?? newState();
+    if (newName !== undefined) this.state.saveName = newName.trim() || `Partita ${slot}`;
     if (!saved) {
       updateEvents(this.state, false);
       genMissions(this.state);
@@ -176,6 +198,17 @@ export class Game {
     if (this.state.missionsDay !== day(this.state)) genMissions(this.state);
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
+    for (const lot of this.city.lots) this.setupLot(lot.id);
+    this.spawnPlayer();
+    this.mode = 'play';
+    this.snapCamera();
+    bus.on('newday', () => this.ui?.refresh());
+    document.addEventListener('visibilitychange', () => this.onVisibility());
+    window.addEventListener('pagehide', () => this.save());
+    this.save();
+  }
+
+  private setupPlaces() {
     // bacheca
     const b = this.city.board;
     const bg = board();
@@ -197,8 +230,6 @@ export class Game {
       pos: home.pos, radius: 1.8, label: 'Casa', icon: '🏠',
       action: () => this.ui.openHome(),
     });
-
-    for (const lot of this.city.lots) this.setupLot(lot.id);
 
     // concessionaria e agenzia affari
     const dealer = this.city.dealer;
@@ -225,6 +256,10 @@ export class Game {
     this.addInteractable({
       pos: ag.pos, radius: 2, label: 'Agenzia affari', icon: '🏢', action: () => this.ui.openAgency('compra', true),
     });
+  }
+
+  private spawnPlayer() {
+    const home = this.city.homes[0];
 
     // giocatore
     this.player = new Character(PLAYER_MODEL);
@@ -243,9 +278,6 @@ export class Game {
     this.state.jobs = this.state.jobs.filter((j) => this.slotsFor(j.type)[j.slot]);
     for (const j of this.state.jobs) this.spawnNpc(j);
 
-    bus.on('newday', () => this.ui?.refresh());
-    document.addEventListener('visibilitychange', () => this.onVisibility());
-    window.addEventListener('pagehide', () => this.save());
   }
 
   // ---------------- utilità ----------------
@@ -722,12 +754,28 @@ export class Game {
 
   start() {
     this.clock.start();
-    this.snapCamera();
     this.renderer.setAnimationLoop(() => this.frame());
+  }
+
+  private titleAngle = 0.6;
+  /** Schermata iniziale: la camera gira lentamente sopra il centro città. */
+  private titleFrame(dt: number) {
+    this.titleAngle += dt * 0.06;
+    const r = 70;
+    this.camera.position.set(Math.sin(this.titleAngle) * r, 48, Math.cos(this.titleAngle) * r);
+    this.camera.lookAt(0, 0, 0);
+    this.sun.target.position.set(0, 0, 0);
+    this.sun.position.set(-14, 30, 12);
+    this.updateLighting(11);
+    if (!this.renderPaused) this.renderer.render(this.scene, this.camera);
   }
 
   private frame() {
     const dt = Math.min(0.05, this.clock.getDelta());
+    if (this.mode === 'title') {
+      this.titleFrame(dt);
+      return;
+    }
     const s = this.state;
 
     // il tempo del gioco scorre sempre (è un idle), anche con i pannelli aperti
@@ -857,7 +905,7 @@ export class Game {
   }
 
   private camDist() {
-    return this.camera.aspect < 1 ? 33 : 25;
+    return (this.camera.aspect < 1 ? 33 : 25) * CAMERA_MULT[settings.camera];
   }
 
   private camTarget = new THREE.Vector3();
@@ -883,8 +931,8 @@ export class Game {
     this.sun.position.copy(t).add(new THREE.Vector3(-14, 30, 12));
   }
 
-  private updateLighting() {
-    const h = hourOf(this.state);
+  private updateLighting(fixedHour?: number) {
+    const h = fixedHour ?? hourOf(this.state);
     // luce del giorno: piena 8-18, tramonto, notte blu
     const dayF = THREE.MathUtils.clamp(1 - Math.abs(h - 13) / 8.5, 0, 1);
     const k = THREE.MathUtils.smoothstep(dayF, 0, 0.35);
@@ -899,12 +947,13 @@ export class Game {
   resetting = false;
   save() {
     this.saveTimer = 0;
-    if (this.resetting) return;
+    if (this.resetting || this.mode !== 'play') return;
     saveState(this.state);
   }
 
   private hiddenAt = 0;
   private onVisibility() {
+    if (this.mode !== 'play') return;
     if (document.hidden) {
       this.save();
       this.hiddenAt = Date.now();

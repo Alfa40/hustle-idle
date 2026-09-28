@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Game, MapMarker } from '../game';
+import { settings } from '../settings';
 
 const MAX_POINTERS = 3;
 
@@ -39,7 +40,7 @@ export class EdgePointers {
   update() {
     const g = this.game;
     let list: MapMarker[] = [];
-    if (!g.interior && !g.paused) {
+    if (!g.interior && !g.paused && settings.pointers) {
       const all = g.mapMarkers();
       const target = all.filter((m) => m.kind === 'target');
       const way = all.filter((m) => m.kind === 'waypoint');
