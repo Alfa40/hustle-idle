@@ -69,9 +69,9 @@ export class EdgePointers {
       }
       // un punto dietro la camera (molto a sud) proiettato risulterebbe capovolto:
       // lo si considera visibile solo se è davanti alla camera
-      this.v.set(m.x, 1, m.z).applyMatrix4(g.camera.matrixWorldInverse);
+      this.v.set(m.x, 1, m.z).applyMatrix4(g.activeCamera.matrixWorldInverse);
       const inFront = this.v.z < 0;
-      this.v.set(m.x, 1, m.z).project(g.camera);
+      this.v.set(m.x, 1, m.z).project(g.activeCamera);
       const x = (this.v.x * 0.5 + 0.5) * w;
       const y = (-this.v.y * 0.5 + 0.5) * h;
       // già visibile sullo schermo: niente freccia
@@ -82,8 +82,12 @@ export class EdgePointers {
       // direzione presa dal mondo (la camera guarda sempre verso nord):
       // est = destra, sud = giù, così non si inverte mai
       const p = g.player.root.position;
-      const dx = m.x - p.x;
-      const dy = m.z - p.z;
+      const wx = m.x - p.x;
+      const wz = m.z - p.z;
+      // in prima persona lo schermo è ruotato come lo sguardo
+      const yaw = g.firstPerson ? g.fpYaw : 0;
+      const dx = wx * Math.cos(yaw) + wz * Math.sin(yaw);
+      const dy = -(wx * Math.sin(yaw) - wz * Math.cos(yaw));
       const tx = dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity;
       const ty = dy > 0 ? (bottom - cy) / dy : dy < 0 ? (top - cy) / dy : Infinity;
       const t = Math.min(tx, ty);

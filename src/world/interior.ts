@@ -547,7 +547,7 @@ export class TruckInterior {
   private updatePlayer(dt: number) {
     const g = this.game;
     const input = g.input;
-    const v = input.vector;
+    const v = g.moveVector();
     input.consumeTap();
     const p = this.player.root.position;
     const len = Math.hypot(v.x, v.y);

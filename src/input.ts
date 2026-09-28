@@ -8,6 +8,12 @@ export class Input {
   /** ultimo tocco breve (coordinate schermo), da consumare */
   tap: { x: number; y: number } | null = null;
   actionHeld = false;
+  /** prima persona: la metà destra dello schermo serve a guardarsi intorno */
+  lookMode = false;
+  /** spostamento del dito per guardarsi intorno (pixel), da consumare */
+  look = { x: 0, y: 0 };
+  private lookId: number | null = null;
+  private lookLast = { x: 0, y: 0 };
   actionPressed = false;
   enabled = true;
 
@@ -50,13 +56,26 @@ export class Input {
   }
 
   private down(e: PointerEvent) {
-    if (!this.enabled || this.pointerId !== null) return;
+    if (!this.enabled) return;
+    if (this.lookMode && e.clientX > window.innerWidth / 2) {
+      if (this.lookId !== null) return;
+      this.lookId = e.pointerId;
+      this.lookLast = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    if (this.pointerId !== null) return;
     this.pointerId = e.pointerId;
     this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
     this.dragging = false;
   }
 
   private moveEv(e: PointerEvent) {
+    if (e.pointerId === this.lookId) {
+      this.look.x += e.clientX - this.lookLast.x;
+      this.look.y += e.clientY - this.lookLast.y;
+      this.lookLast = { x: e.clientX, y: e.clientY };
+      return;
+    }
     if (e.pointerId !== this.pointerId) return;
     const dx = e.clientX - this.start.x;
     const dy = e.clientY - this.start.y;
@@ -75,9 +94,13 @@ export class Input {
   }
 
   private up(e: PointerEvent) {
+    if (e.pointerId === this.lookId) {
+      this.lookId = null;
+      return;
+    }
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
-    if (!this.dragging && performance.now() - this.start.t < 350 && this.enabled) {
+    if (!this.dragging && !this.lookMode && performance.now() - this.start.t < 350 && this.enabled) {
       this.tap = { x: e.clientX, y: e.clientY };
     }
     this.dragging = false;
@@ -100,6 +123,12 @@ export class Input {
     return l > 1 ? { x: x / l, y: y / l } : { x, y };
   }
 
+  consumeLook() {
+    const l = this.look;
+    this.look = { x: 0, y: 0 };
+    return l;
+  }
+
   consumeTap() {
     const t = this.tap;
     this.tap = null;
@@ -114,6 +143,7 @@ export class Input {
 
   cancel() {
     this.pointerId = null;
+    this.lookId = null;
     this.dragging = false;
     this.move.x = this.move.y = 0;
     this.stick.classList.remove('on');

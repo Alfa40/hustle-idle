@@ -260,6 +260,10 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Imbianchino (muretto): copri le piante → vernice → dipingi ogni tratto → togli i teli
 - Durante un lavoro spariscono palazzi e alberi che coprono la zona; il cliente si fa da parte
 
+### Visuale in prima persona
+- Pulsante 👁️/🎥 per passare dalla terza alla prima persona, ovunque (città, lavoretti, attività, case dei clienti)
+- In prima persona: metà sinistra dello schermo = joystick (avanti = dove guardi), metà destra = trascina per guardarti intorno; le etichette si rimpiccioliscono e le freccette ai bordi ruotano con lo sguardo
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

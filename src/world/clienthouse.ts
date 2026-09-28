@@ -418,7 +418,7 @@ export class ClientHouse {
 
   private movePlayer(dt: number) {
     const input = this.game.input;
-    const v = input.vector;
+    const v = this.game.moveVector();
     input.consumeTap();
     const p = this.player.root.position;
     const len = Math.hypot(v.x, v.y);

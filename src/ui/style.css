@@ -514,3 +514,15 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .switch.on { background: var(--green); }
 .switch.on i { left: 25px; }
 .jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- pulsante prima/terza persona ---------- */
+.view-btn {
+  position: fixed; right: calc(var(--sar) + 30px); bottom: calc(var(--sab) + 210px);
+  width: 62px; height: 62px; border-radius: 50%; border: 4px solid #fff; background: var(--purple);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0;
+  box-shadow: 0 4px 0 var(--purple-d), 0 6px 12px rgba(0,0,0,.22); color: #fff;
+}
+.view-btn .i { font-size: 22px; line-height: 1; }
+.view-btn .l { font-size: 10px; font-weight: 700; }
+.view-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--purple-d); }
+@media (orientation: landscape) { .view-btn { right: calc(var(--sar) + 196px); bottom: calc(var(--sab) + 30px); } }
