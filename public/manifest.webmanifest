@@ -1,0 +1,9 @@
+{
+  "name": "Hustle Idle",
+  "short_name": "Hustle Idle",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1d2433",
+  "theme_color": "#1d2433"
+}
