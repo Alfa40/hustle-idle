@@ -933,15 +933,16 @@ export class Game {
       const t = this.run?.target;
       const p = this.player.root.position;
       this.fpYaw = t ? Math.atan2(t.x - p.x, -(t.z - p.z)) : Math.PI - this.player.root.rotation.y;
-      this.fpPitch = -0.35;
+      this.fpPitch = -0.45;
       this.fpIdle = 99;
     }
     this.player.body.visible = !on && !(this.state.riding && riderPose(this.state.riding).hidden);
     if (this.player.held) this.player.held.visible = !on;
     if (this.rideObj) this.rideObj.visible = !on;
     if (this.playerMarker) this.playerMarker.visible = !on;
-    this.camera.near = on ? 0.1 : 0.5;
-    this.camera.fov = on ? 78 : 35;
+    // in prima persona non si disegna ciò che è attaccato agli occhi
+    this.camera.near = on ? 0.7 : 0.5;
+    this.camera.fov = on ? 84 : 35;
     this.camera.updateProjectionMatrix();
     if (!on) {
       for (const sp of this.fpSprites) {
@@ -982,7 +983,7 @@ export class Game {
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       const k = Math.min(1, dt * 2.2);
       if (d > 0.6) this.fpYaw += dy * k;
-      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(1.2, Math.max(d, 0.5)), -0.9, -0.12);
+      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(1.9, Math.max(d, 0.5) + 1.25), -0.95, -0.2);
       this.fpPitch += (wantPitch - this.fpPitch) * k;
     }
     // leggero ondeggiare camminando
@@ -992,11 +993,13 @@ export class Game {
     const cam = this.camera;
     // occhi sopra la testa e un po' indietro: più spazio tra la vista e gli oggetti vicini
     // se dietro la testa c'è un muro la camera si avvicina (mai dentro gli edifici)
-    let back = 0.55;
+    let back = 1.25;
     const inWall = (x: number, z: number) => this.city.colliders.some((c) => x > c.minX - 0.15 && x < c.maxX + 0.15 && z > c.minZ - 0.15 && z < c.maxZ + 0.15);
     while (back > 0 && inWall(p.x - Math.sin(this.fpYaw) * back, p.z + Math.cos(this.fpYaw) * back)) back -= 0.1;
     back = Math.max(0, back);
-    cam.position.set(p.x - Math.sin(this.fpYaw) * back, p.y + 1.75 + bob, p.z + Math.cos(this.fpYaw) * back);
+    // se il muro impedisce di arretrare, la camera sale: la distanza dagli oggetti resta ampia
+    const rise = (1.25 - back) * 1.1;
+    cam.position.set(p.x - Math.sin(this.fpYaw) * back, p.y + 2.2 + rise + bob, p.z + Math.cos(this.fpYaw) * back);
     cam.rotation.set(this.fpPitch, -this.fpYaw, 0, 'YXZ');
     this.player.root.rotation.y = Math.PI - this.fpYaw;
     this.player.body.visible = false;
@@ -1014,7 +1017,7 @@ export class Game {
       sp.scale.copy(sp.userData.baseScale).multiplyScalar(0.55);
       sp.getWorldPosition(wp);
       sp.material.transparent = true;
-      sp.material.opacity = wp.distanceTo(cam.position) < 1.6 ? 0 : 1;
+      sp.material.opacity = wp.distanceTo(cam.position) < 2 ? 0 : 1;
     }
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);

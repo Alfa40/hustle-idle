@@ -386,7 +386,7 @@ export class TruckInterior {
     const max = LEFT + this.width - v.half + 0.7;
     const want = min >= max ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, min, max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
-    this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
+    this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d * 1.18, v.pitch, this.player?.root.position);
     updateCutWalls(this.walls, this.camera);
   }
 
