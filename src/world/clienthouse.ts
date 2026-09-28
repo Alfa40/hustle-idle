@@ -7,6 +7,7 @@ import { toast } from '../sim/bus';
 import type { Character } from './character';
 import { label } from './props';
 import { Particles } from './particles';
+import { GuideLine } from './guideline';
 import { updateCutWalls, type CutWall } from './viewcam';
 
 export const HOUSE_ASSETS = [
@@ -102,6 +103,7 @@ export class ClientHouse {
   private cleaning: boolean;
   private walls: CutWall[] = [];
   private fx = new Particles();
+  private guide = new GuideLine(0xffffff, 0.24);
 
   constructor(private game: Game, private pid: ProductId, level: number, private hooks: HouseRunHooks) {
     this.cleaning = !!CLEAN_MIX[pid];
@@ -132,7 +134,7 @@ export class ClientHouse {
     const s = this.scene;
     s.background = new THREE.Color(0x2a3350);
     s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.7));
-    s.add(this.fx.group);
+    s.add(this.fx.group, this.guide.mesh);
     const sun = new THREE.DirectionalLight(0xffffff, 1.3);
     sun.position.set(this.center - 3, 9, 7);
     sun.target.position.set(this.center, 0, 0);
@@ -408,6 +410,7 @@ export class ClientHouse {
       : this.carrying ? `in mano: ${this.carrying.icon}` : 'porta tutto al 🚚';
     this.hooks.status(this.timeLeft, this.timeTotal, `${what}: ${total - left}/${total} · ${hint}`);
     this.movePlayer(dt);
+    this.guide.update(dt, this.player.root.position, this.goal(), 0.6);
     this.placeCamera();
     this.fx.update(dt);
     this.game.ui.setAction(this.cleaning ? this.cleanInteract(dt) : this.moveInteract(dt));
@@ -454,6 +457,24 @@ export class ClientHouse {
     this.toolSprite = label(text, { bg: '#ffffff', fg: '#3a2f55', scale: 0.5 });
     this.toolSprite.position.y = 2.3;
     this.player.root.add(this.toolSprite);
+  }
+
+  /** Dove andare adesso: attrezzo giusto, sporco da pulire, banco, furgone… */
+  private goal(): THREE.Vector3 | null {
+    const p = this.player.root.position;
+    const nearest = <T extends { pos: THREE.Vector3 }>(list: T[]) =>
+      list.sort((a, b) => a.pos.distanceTo(p) - b.pos.distanceTo(p))[0];
+    if (this.cleaning) {
+      const left = this.dirts.filter((d) => !d.done);
+      if (!left.length) return this.door;
+      const withTool = left.filter((d) => d.tool === this.tool);
+      if (withTool.length) return nearest(withTool).pos;
+      return new THREE.Vector3(this.cart.x + 0.8, 0, this.cart.z);
+    }
+    const c = this.carrying;
+    if (c) return c.packed ? this.van : this.packTable;
+    const left = this.things.filter((t) => !t.done);
+    return left.length ? nearest(left).pos : null;
   }
 
   // ---- pulizie ----

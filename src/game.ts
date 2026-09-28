@@ -23,6 +23,7 @@ import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
 import { ViewControl } from './world/viewcam';
+import { GuideLine } from './world/guideline';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
@@ -137,6 +138,8 @@ export class Game {
   private clouds = new Clouds(260);
   /** particelle del mondo aperto (foglie, bolle, scintille…) */
   fx = new Particles();
+  /** linea tratteggiata verso l'obiettivo (lavoretti, ordini, segnaposto) */
+  private guide = new GuideLine();
   private windows!: WindowLights;
   private lamps!: StreetLights;
   private traffic!: Traffic;
@@ -165,7 +168,7 @@ export class Game {
 
     this.scene.background = new THREE.Color(0x9fd3f0);
     this.scene.fog = new THREE.Fog(0x9fd3f0, 90, 290);
-    this.scene.add(this.sky.mesh, this.clouds.group, this.fx.group);
+    this.scene.add(this.sky.mesh, this.clouds.group, this.fx.group, this.guide.mesh);
     this.scene.add(this.hemi);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -857,6 +860,8 @@ export class Game {
         this.updatePlayer(dt);
         this.updateWaypoint();
         this.updateJobs(dt);
+        const goal = this.run?.target ?? (this.waypoint ? new THREE.Vector3(this.waypoint.x, 0, this.waypoint.z) : null);
+        this.guide.update(dt, this.player.root.position, goal, this.run ? 1 : 3, this.firstPerson ? 1.6 : 0.45);
         this.updateInteract();
         const fp = this.wantFirstPerson();
         if (fp !== this.firstPerson) this.setFirstPerson(fp);

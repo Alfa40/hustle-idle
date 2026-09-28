@@ -14,6 +14,7 @@ import { addFame, addXp } from '../sim/progress';
 import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
 import { arrow, label, ring } from './props';
+import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
 
@@ -204,7 +205,7 @@ export class TruckInterior {
     this.nextRing = ring(0x35c46a, 0.75);
     this.nextArrow = arrow(0x35c46a);
     this.nextArrow.scale.setScalar(0.6);
-    s.add(this.nextRing, this.nextArrow);
+    s.add(this.nextRing, this.nextArrow, this.guide.mesh);
 
     // dipendenti: i cuochi alle postazioni, i cassieri al bancone
     const work = this.stations.filter((x) => x.def.kind === 'hold' || x.def.kind === 'timed');
@@ -245,6 +246,7 @@ export class TruckInterior {
   private guideKey = '';
   private nextRing!: THREE.Mesh;
   private nextArrow!: THREE.Object3D;
+  private guide = new GuideLine(0xffffff, 0.24);
 
   /** Postazione dove andare adesso. */
   private nextStation(): Station | null {
@@ -554,6 +556,9 @@ export class TruckInterior {
       this.updateGuide();
     }
     this.updateTags();
+    // linea verso la prossima postazione (davanti al mobile, dove ci si ferma)
+    const next = this.nextStation();
+    this.guide.update(dt, this.player.root.position, next ? this.nextRing.position : null, 0.4);
   }
 
   private updateCustomers(dt: number, gm: number) {
