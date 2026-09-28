@@ -5,11 +5,12 @@ export interface Settings {
   camera: 'vicina' | 'normale' | 'lontana';
   pointers: boolean;
   minimap: boolean;
+  outlines: boolean;
 }
 
 const KEY = 'hustleidle.settings';
 
-const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true };
+const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true };
 
 export const settings: Settings = { ...DEFAULTS };
 

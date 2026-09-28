@@ -39,6 +39,8 @@ const SHOPS = ['a', 'b', 'c', 'd', 'f', 'g', 'h'].map((k) => `commercial/buildin
 const TALL = ['commercial/building-l.glb', 'commercial/building-skyscraper-a.glb', 'commercial/building-skyscraper-b.glb'];
 const TREES = ['suburban/tree-large.glb', 'suburban/tree-small.glb'];
 
+export const TREE_MODELS = TREES;
+
 export const CITY_ASSETS = [
   ...ROAD_PIECES.map((p) => p.path), 'roads/tile-low.glb', 'roads/light-square.glb',
   ...HOUSES, ...SHOPS, ...TALL, ...TREES,
@@ -96,14 +98,7 @@ export class City {
     const shadowInst = new Instancer();
 
     // prato sotto tutto
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(this.cols * TILE + 80, this.rows * TILE + 80),
-      new THREE.MeshLambertMaterial({ color: 0x86c06c }),
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.02;
-    ground.receiveShadow = true;
-    this.group.add(ground);
+    // il prato e il paesaggio attorno sono in world/scenery.ts
 
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {

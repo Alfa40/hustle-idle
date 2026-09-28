@@ -16,7 +16,9 @@ import {
   type GameState, type JobOffer,
 } from './sim/state';
 import { Character, charPath } from './world/character';
-import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, type Slot } from './world/city';
+import { City, CITY_ASSETS, DIR_ROT, DIR_VEC, TREE_MODELS, type Slot } from './world/city';
+import { buildLandscape, Clouds, Sky } from './world/scenery';
+import { OutlineRenderer } from './render/outline';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
@@ -124,6 +126,11 @@ export class Game {
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   paused = false;
+  private outline!: OutlineRenderer;
+  private sky = new Sky();
+  private clouds = new Clouds(260);
+  /** direzione da cui arriva la luce del sole (cambia con l'ora) */
+  private sunDir = new THREE.Vector3(-14, 30, 12).normalize();
   /** title = schermata iniziale (città sullo sfondo), play = partita */
   mode: 'title' | 'play' = 'title';
   /** la mappa a tutto schermo copre il mondo: niente rendering 3D */
@@ -138,10 +145,15 @@ export class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // colori più naturali: luci forti che non "bruciano" e ombre più ricche
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.outline = new OutlineRenderer(this.renderer);
     this.input = new Input(canvas);
 
     this.scene.background = new THREE.Color(0x9fd3f0);
-    this.scene.fog = new THREE.Fog(0x9fd3f0, 60, 150);
+    this.scene.fog = new THREE.Fog(0x9fd3f0, 90, 290);
+    this.scene.add(this.sky.mesh, this.clouds.group);
     this.scene.add(this.hemi);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -162,7 +174,8 @@ export class Game {
     const dpr = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(Math.min(dpr, QUALITY_PIXEL_RATIO[settings.quality]));
     this.sun.castShadow = settings.shadows;
-    this.sun.shadow.mapSize.setScalar(settings.quality === 'alta' ? 1024 : 512);
+    this.sun.shadow.mapSize.setScalar(settings.quality === 'alta' ? 2048 : settings.quality === 'media' ? 1024 : 512);
+    this.renderer.shadowMap.type = settings.quality === 'bassa' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     this.sun.shadow.map?.dispose();
     this.sun.shadow.map = null;
     this.resize();
@@ -179,6 +192,7 @@ export class Game {
 
     this.city = new City();
     this.scene.add(this.city.group);
+    this.scene.add(buildLandscape(this.city.halfW, TREE_MODELS));
     for (const l of this.city.lots) lotZone[l.id] = l.zone;
 
     // bacheca, casa, concessionaria e agenzia non dipendono dalla partita
@@ -793,9 +807,10 @@ export class Game {
     this.camera.position.set(Math.sin(this.titleAngle) * r, 48, Math.cos(this.titleAngle) * r);
     this.camera.lookAt(0, 0, 0);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.position.set(-14, 30, 12);
+    this.sun.position.copy(this.sunDir).multiplyScalar(36);
     this.updateLighting(11);
-    if (!this.renderPaused) this.renderer.render(this.scene, this.camera);
+    this.clouds.update(dt);
+    if (!this.renderPaused) this.draw(this.scene, this.camera);
   }
 
   private frame() {
@@ -838,9 +853,10 @@ export class Game {
 
     this.ui.update(dt);
     if (this.renderPaused) return;
-    if (this.interior) this.renderer.render(this.interior.scene, this.interior.camera);
-    else if (this.house) this.renderer.render(this.house.scene, this.house.camera);
-    else this.renderer.render(this.scene, this.camera);
+    this.clouds.update(dt);
+    if (this.interior) this.draw(this.interior.scene, this.interior.camera);
+    else if (this.house) this.draw(this.house.scene, this.house.camera);
+    else this.draw(this.scene, this.camera);
   }
 
   // ---------------- prima persona ----------------
@@ -941,7 +957,7 @@ export class Game {
     }
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);
-    this.sun.position.copy(p).add(new THREE.Vector3(-14, 30, 12));
+    this.sun.position.copy(p).addScaledVector(this.sunDir, 36);
   }
 
   private updatePlayer(dt: number) {
@@ -1062,7 +1078,7 @@ export class Game {
     this.camera.lookAt(t.x, t.y + 0.6, t.z);
     // ombre solo attorno al giocatore
     this.sun.target.position.copy(t);
-    this.sun.position.copy(t).add(new THREE.Vector3(-14, 30, 12));
+    this.sun.position.copy(t).addScaledVector(this.sunDir, 36);
   }
 
   private updateLighting(fixedHour?: number) {
@@ -1070,12 +1086,29 @@ export class Game {
     // luce del giorno: piena 8-18, tramonto, notte blu
     const dayF = THREE.MathUtils.clamp(1 - Math.abs(h - 13) / 8.5, 0, 1);
     const k = THREE.MathUtils.smoothstep(dayF, 0, 0.35);
-    this.sun.intensity = 0.35 + 1.9 * k;
-    this.hemi.intensity = 0.6 + 0.7 * k;
-    const sky = new THREE.Color(0x1b2745).lerp(new THREE.Color(0x9fd3f0), k);
-    if (h > 17 && h < 20.5) sky.lerp(new THREE.Color(0xf29a5c), 0.35 * (1 - Math.abs(h - 18.7) / 1.8));
-    (this.scene.background as THREE.Color).copy(sky);
-    this.scene.fog!.color.copy(sky);
+    // il sole sorge a est, è alto a mezzogiorno e tramonta a ovest
+    const ang = ((h - 6) / 12) * Math.PI;
+    const elev = Math.max(0.25, Math.sin(ang));
+    this.sunDir.set(Math.cos(ang) * 0.9, elev * 1.6, 0.45).normalize();
+    this.sun.intensity = 0.35 + 2.1 * k;
+    this.hemi.intensity = 0.55 + 0.75 * k;
+    // tramonto/alba: luce più calda
+    const golden = THREE.MathUtils.clamp(1 - Math.min(Math.abs(h - 18.6), Math.abs(h - 6.8)) / 1.6, 0, 1);
+    this.sun.color.setRGB(1, 0.96 - 0.2 * golden, 0.9 - 0.35 * golden);
+    const top = new THREE.Color(0x0f1a33).lerp(new THREE.Color(0x3d8fd6), k);
+    const horizon = new THREE.Color(0x24345a).lerp(new THREE.Color(0xcfeaf7), k).lerp(new THREE.Color(0xf6a25e), 0.55 * golden);
+    const sunCol = new THREE.Color(0xfff2c0).lerp(new THREE.Color(0xff9a4a), golden).multiplyScalar(0.3 + 0.7 * k);
+    this.sky.set(top, horizon, this.sunDir, sunCol);
+    this.clouds.setTint(k);
+    (this.scene.background as THREE.Color).copy(horizon);
+    this.scene.fog!.color.copy(horizon);
+  }
+
+  /** Disegna una scena, con i contorni se attivi nelle impostazioni. */
+  private draw(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    if (scene === this.scene) this.sky.follow(camera);
+    if (settings.outlines) this.outline.render(scene, camera);
+    else this.renderer.render(scene, camera);
   }
 
   resetting = false;

@@ -264,6 +264,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Pulsante 👁️/🎥 per passare dalla terza alla prima persona, ovunque (città, lavoretti, attività, case dei clienti)
 - In prima persona: metà sinistra dello schermo = joystick (avanti = dove guardi), metà destra = trascina per guardarti intorno; le etichette si rimpiccioliscono e le freccette ai bordi ruotano con lo sguardo
 
+### Grafica 0.9
+- Cielo a gradiente con sole che segue l'ora (alba, giorno, tramonto dorato, notte) e nuvole low-poly in movimento
+- Paesaggio attorno alla città: prato con sfumature, fascia di boschi, colline e lago
+- Tone mapping neutro (colori vivi e naturali), ombre morbide più definite con qualità Alta/Media
+- Contorni cartoon su tutti gli oggetti (passaggio di profondità a tutto schermo), attivabili nelle impostazioni
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie
