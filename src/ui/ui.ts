@@ -16,7 +16,7 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
-import type { OfflineReport } from '../sim/calendar';
+import { canRent, RENT_MAX_HOURS, type OfflineReport } from '../sim/calendar';
 import {
   autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
@@ -919,20 +919,22 @@ export class UI {
           const price = g.housePrice(i);
           const rent = g.houseRent(i);
           const zone = ZONES[h.zone].name;
+          const rentable = canRent(s);
           const home = s.homeIdx === i;
           const state = !own ? '' : home ? '<span class="tag g">🏠 ci vivi</span>' : own.rent ? '<span class="tag y">🔑 in affitto</span>' : '<span class="tag b">tua, libera</span>';
           const btns = !own
             ? `<button class="btn sm good" data-a="buy:${i}" ${s.money < price ? 'disabled' : ''}>Compra ${euro(price)}</button>`
             : `${home ? '' : `<button class="btn sm" data-a="live:${i}">🏠 Vivi qui</button>`}
-               ${home ? '' : `<button class="btn sm ${own.rent ? 'sec' : 'blue'}" data-a="rent:${i}">${own.rent ? 'Togli dall\'affitto' : `🔑 Affitta +${euro(rent)}/g`}</button>`}
+               ${home || !rentable ? '' : `<button class="btn sm ${own.rent ? 'sec' : 'blue'}" data-a="rent:${i}">${own.rent ? 'Togli dall\'affitto' : `🔑 Affitta +${euro(rent)}/ora`}</button>`}
                <button class="btn sm danger" data-a="sell:${i}">Vendi ${euro(Math.round(price * 0.85))}</button>`;
-          return `<div class="card ${own ? 'hl' : ''}"><div class="row between"><div><h3 style="margin:0">🏡 Casa ${i + 1} ${state}</h3><div class="muted small">${zone} · affitto ${euro(rent)} al giorno</div></div>
+          return `<div class="card ${own ? 'hl' : ''}"><div class="row between"><div><h3 style="margin:0">🏡 Casa ${i + 1} ${state}</h3><div class="muted small">${zone} · affitto ${euro(rent)} all'ora mentre sei offline</div></div>
             <button class="btn sm sec" data-a="map:${i}" aria-label="Mostra sulla mappa">📍</button></div>
             <div class="row" style="justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap">${btns}</div></div>`;
         }).join('');
-        const tot = s.houses.filter((x) => x.rent).reduce((a, x) => a + g.houseRent(x.i), 0);
-        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi) oppure <b>affittala</b>: l'affitto arriva ogni giorno. Rivendendola recuperi l'85% del prezzo.</div>
-          ${tot ? `<div class="stat s-green" style="margin-bottom:10px"><b class="money-t">+${euro(tot)}</b><span>🔑 affitti al giorno</span></div>` : ''}
+        const tot = canRent(s) ? s.houses.filter((x) => x.rent).reduce((a, x) => a + g.houseRent(x.i), 0) : 0;
+        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi). Con <b>almeno 2 case</b> puoi <b>affittare</b> quelle dove non vivi: l'affitto si guadagna <b>solo mentre il gioco è chiuso</b> (fino a ${RENT_MAX_HOURS} ore). Rivendendola recuperi l'85% del prezzo.</div>
+          ${tot ? `<div class="stat s-green" style="margin-bottom:10px"><b class="money-t">+${euro(tot)}/ora</b><span>🔑 affitti mentre sei offline</span></div>` : ''}
+          ${s.houses.length === 1 ? '<p class="muted small center">🔑 Compra un\'altra casa per poter affittare quella dove non vivi.</p>' : ''}
           ${s.homeIdx >= 0 ? '<button class="btn sm sec" data-a="live:-1" style="margin-bottom:10px">🏠 Torna a vivere nella casa di partenza</button>' : ''}${rows}`;
       },
       actions: {
@@ -941,7 +943,7 @@ export class UI {
           const price = g.housePrice(i);
           if (s.houses.some((x) => x.i === i) || s.money < price) return;
           addMoney(s, -price);
-          s.houses.push({ i, rent: false });
+          s.houses.push({ i, rent: false, price });
           toast(`🏡 Hai comprato la casa ${i + 1}!`, 'good');
           g.refreshHomes();
           g.save();
@@ -957,7 +959,7 @@ export class UI {
         },
         rent: (a) => {
           const own = s.houses.find((x) => x.i === +a);
-          if (!own || s.homeIdx === own.i) return;
+          if (!own || s.homeIdx === own.i || !canRent(s)) return;
           own.rent = !own.rent;
           g.refreshHomes();
           g.save();
@@ -967,6 +969,8 @@ export class UI {
           if (!s.houses.some((x) => x.i === i)) return;
           s.houses = s.houses.filter((x) => x.i !== i);
           if (s.homeIdx === i) s.homeIdx = -1;
+          // con una casa sola non si affitta più
+          if (!canRent(s)) for (const h of s.houses) h.rent = false;
           const back = Math.round(g.housePrice(i) * 0.85);
           addMoney(s, back);
           toast(`💰 Casa ${i + 1} venduta: +${euro(back)}`, 'money');
@@ -1703,6 +1707,7 @@ export class UI {
           <div class="stat s-green"><b class="money-t">${euro(r.revenue)}</b><span>💰 incassi delle attività</span></div>
           <div class="stat ${r.net >= 0 ? 's-green' : 's-red'}"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>🧾 saldo dopo i costi</span></div>
         </div>
+        ${r.rent ? `<div class="stat s-yellow" style="margin-top:8px"><b class="money-t">+${euro(r.rent)}</b><span>🔑 affitti delle tue case</span></div>` : ''}
         ${r.revenue === 0 ? '<p class="muted small">Solo le attività con un dipendente per reparto e un manager lavorano mentre sei via.</p>' : ''}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },

@@ -644,3 +644,21 @@ body.guide-on .hud-top { display: none; }
 .st-opt.on { border-color: var(--purple); background: #f3edff; }
 .st-opt:disabled { opacity: .5; }
 .st-ico { font-size: 26px; }
+
+/* ---------- consiglio: aggiungi alla schermata Home ---------- */
+.inst-wrap { position: fixed; inset: 0; z-index: 200; background: rgba(20,24,40,.72); display: flex; align-items: center; justify-content: center; padding: calc(var(--sat) + 12px) 14px calc(var(--sab) + 12px); animation: inst-in .25s ease-out; overflow-y: auto; }
+.inst-wrap.out { opacity: 0; transition: opacity .25s; }
+.inst { background: #fffaf0; border-radius: 26px; padding: 18px 16px 14px; max-width: 420px; width: 100%; box-shadow: 0 12px 40px rgba(0,0,0,.35); text-align: center; }
+.inst-icon { width: 76px; height: 76px; border-radius: 18px; box-shadow: 0 4px 12px rgba(0,0,0,.2); margin-top: -4px; }
+.inst h2 { margin: 8px 0 4px; font-size: 20px; color: var(--ink); }
+.inst-why { margin: 0 0 4px; color: var(--ink-2); font-weight: 700; font-size: 14px; }
+.inst-list { list-style: none; padding: 0; margin: 0 0 10px; text-align: left; font-size: 14px; color: var(--ink); }
+.inst-list li { padding: 3px 0; }
+.inst-steps { background: #fff; border-radius: 16px; padding: 8px; margin: 8px 0 10px; text-align: left; box-shadow: 0 2px 0 rgba(0,0,0,.06); }
+.inst-step { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 14px; color: var(--ink); }
+.inst-n { width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff; font-weight: 800; font-size: 13px; display: grid; place-items: center; flex: none; }
+.inst-i { font-size: 22px; width: 28px; text-align: center; flex: none; }
+.inst-arrow { font-weight: 800; color: var(--green-d); margin-bottom: 8px; animation: inst-bob 1s ease-in-out infinite alternate; }
+.inst .btn + .inst-steps { margin-top: 10px; }
+@keyframes inst-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes inst-bob { from { transform: translateY(0); } to { transform: translateY(5px); } }

@@ -10,7 +10,7 @@ import { Input } from './input';
 import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
-import { advance, applyOffline, genMissions, missionProgress, updateEvents, type OfflineReport } from './sim/calendar';
+import { advance, applyOffline, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
 import {
@@ -265,10 +265,7 @@ export class Game {
     this.spawnPlayer();
     this.mode = 'play';
     this.snapCamera();
-    bus.on('newday', () => {
-      this.payRents();
-      this.ui?.refresh();
-    });
+    bus.on('newday', () => this.ui?.refresh());
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('pagehide', () => this.save());
     this.save();
@@ -384,9 +381,9 @@ export class Game {
     return Math.round((base * (0.9 + ((i * 37) % 10) / 25)) / 100) * 100;
   }
 
-  /** Affitto al giorno di una casa data in affitto. */
+  /** Affitto all'ora (mentre il gioco è chiuso) di una casa data in affitto. */
   houseRent(i: number) {
-    return Math.round(this.housePrice(i) * 0.005);
+    return Math.round(this.housePrice(i) * RENT_PER_HOUR);
   }
 
   /** La casa dove vivi (il pulsante Casa ti porta qui, e qui dormi). */
@@ -425,15 +422,6 @@ export class Game {
       this.scene.add(t);
       this.homeObjs.push(t);
     }
-  }
-
-  /** Ogni nuovo giorno arrivano gli affitti delle case date in affitto. */
-  private payRents() {
-    const rented = this.state.houses.filter((h) => h.rent);
-    if (!rented.length) return;
-    const tot = rented.reduce((a, h) => a + this.houseRent(h.i), 0);
-    addMoney(this.state, tot);
-    toast(`🔑 Affitti incassati: +€${tot.toLocaleString('it-IT')}`, 'money');
   }
 
   // ---------------- utilità ----------------

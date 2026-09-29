@@ -158,8 +158,12 @@ Nuove categorie arriveranno insieme alle nuove attività.
 
 ### Negozio (pulsante 🛍️ sotto Casa)
 - **Concessionaria**: si comprano i veicoli da qui, senza andare in centro
-- **Agenzia immobiliare**: 10 case in vendita (prezzo per zona: periferia ~9.000 €, residenziale ~15.000 €, centro ~26.000 €). Una casa comprata si può: 🏠 viverci (il pulsante Casa ti porta lì e lì dormi; la casa di partenza resta), 🔑 affittare (0,5% del prezzo al giorno, pagato a ogni nuovo giorno di gioco), vendere all'85%. Il 📍 mette il segnaposto sulla mappa
+- **Agenzia immobiliare**: 10 case in vendita (prezzo per zona: periferia ~9.000 €, residenziale ~15.000 €, centro ~26.000 €). Una casa comprata si può: 🏠 viverci (il pulsante Casa ti porta lì e lì dormi; la casa di partenza resta), 🔑 affittare (solo con almeno 2 case comprate, e non quella dove vivi): l'affitto si guadagna **solo mentre il gioco è chiuso**, 0,15% del prezzo per ogni ora reale, fino a 48 ore, e compare nel riepilogo "Bentornato", vendere all'85%. Il 📍 mette il segnaposto sulla mappa
 - **Stile e accessori**: 9 stili (i personaggi Kenney, il primo gratis) e accessori agganciati alla testa (seguono le animazioni), uno per parte del corpo: testa (cappellino, cilindro, corona), occhi (occhiali da sole, a cuore), collo (collana d'oro, di perle, sciarpa), schiena (zaino, mantello). Si comprano una volta per partita e si indossano/tolgono quando si vuole
+
+### Installazione sulla schermata Home
+- Ogni volta che il gioco si apre dal browser (non dall'icona sulla Home) compare un consiglio: perché conviene (schermo intero, si apre con un tocco, salvataggi più al sicuro, più fluido) e i passaggi giusti per il telefono in uso (iPhone con Safari o altri browser, Android con Chrome, computer). Su Android con Chrome c'è anche il pulsante "Installa adesso". Si chiude con "Più tardi"
+- Manifest con icone 192/512 (anche maskable) e apple-touch-icon, così l'icona sulla Home è quella del gioco
 
 ### Orari delle attività
 - I locali e i furgoni si possono usare solo da aperti (8:00–22:00): fuori orario la porta è chiusa ("🔒 Chiuso · apre alle 8:00") e il gioco suggerisce di andare a dormire; a chiusura, servito l'ultimo cliente, si esce da soli. I tuoi furgoni abbassano la serranda di notte. L'ufficio delle imprese di servizi resta sempre raggiungibile

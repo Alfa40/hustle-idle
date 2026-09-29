@@ -124,7 +124,7 @@ export interface GameState {
   /** aspetto del personaggio: stile (modello), stili comprati, accessori comprati e indossati */
   style: { model: string; owned: string[]; accOwned: string[]; acc: string[] };
   /** case comprate all'agenzia immobiliare (indice nella lista delle case in vendita) */
-  houses: { i: number; rent: boolean }[];
+  houses: { i: number; rent: boolean; price: number }[];
   /** dove vivi: -1 = la casa di partenza, altrimenti l'indice di una casa comprata */
   homeIdx: number;
 }
@@ -211,6 +211,7 @@ function parse(raw: string | null): GameState | null {
     st.logo = safeLogo(s.logo) ?? randomLogo();
     st.style = { ...newState().style, ...(s.style ?? {}) };
     st.houses ??= [];
+    for (const h of st.houses) h.price ??= 12000;
     if (!st.houses.some((h) => h.i === st.homeIdx)) st.homeIdx = -1;
     for (const b of st.businesses) {
       b.orders ??= [];

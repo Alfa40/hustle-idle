@@ -143,7 +143,16 @@ export interface OfflineReport {
   gameMinutes: number;
   revenue: number;
   net: number;
+  /** affitti delle case date in affitto (solo mentre il gioco è chiuso) */
+  rent: number;
 }
+
+/** Affitto di una casa all'ora (reale) mentre il gioco è chiuso. */
+export const RENT_PER_HOUR = 0.0015;
+/** Oltre 48 ore di assenza l'affitto non cresce più. */
+export const RENT_MAX_HOURS = 48;
+/** Per affittare servono almeno 2 case comprate (una dove vivere, l'altra da affittare). */
+export const canRent = (s: GameState) => s.houses.length >= 2;
 
 /**
  * Tempo passato con il gioco chiuso: il tempo di gioco scorre 100 volte più
@@ -166,7 +175,12 @@ export function applyOffline(s: GameState, realMs: number): OfflineReport | null
     advance(s, minutes, tier.eff, false);
     gameMin += minutes;
   }
+  // affitti: guadagnano solo mentre sei offline, in base alle ore reali
+  const hours = Math.min(realMs / 3_600_000, RENT_MAX_HOURS);
+  const rent = canRent(s) ? Math.round(s.houses.filter((h) => h.rent).reduce((a, h) => a + h.price * RENT_PER_HOUR, 0) * hours) : 0;
+  if (rent > 0) s.money += rent;
   return {
+    rent,
     realHours: realMs / 3_600_000,
     gameMinutes: gameMin,
     revenue: s.businesses.reduce((a, b) => a + b.totalRevenue, 0) - revBefore,

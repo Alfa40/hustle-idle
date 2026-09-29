@@ -5,6 +5,7 @@ import './ui/style.css';
 import { Game } from './game';
 import { UI } from './ui/ui';
 import { TitleScreen } from './ui/title';
+import { showInstallTip } from './ui/install';
 
 async function boot() {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -18,6 +19,8 @@ async function boot() {
   const loading = document.getElementById('loading')!;
   loading.style.opacity = '0';
   setTimeout(() => loading.remove(), 400);
+  // aperto dal browser: consiglio di aggiungerlo alla schermata Home
+  showInstallTip();
 
   // accesso da console per i test
   (window as unknown as { game: Game }).game = game;
