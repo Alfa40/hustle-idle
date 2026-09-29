@@ -169,6 +169,10 @@ Nuove categorie arriveranno insieme alle nuove attività.
 - Il gioco non supera mai 60 immagini al secondo, anche sugli schermi a 120 Hz (meno calore, niente crash)
 - 🔋 Risparmio batteria (spento di serie): 30 immagini al secondo invece di 60, 15 dopo 5 s senza toccare lo schermo, risoluzione massima 1,1× (ombre e contorni restano). Il tempo di gioco scorre normalmente. Senza risparmio: città ~150–300 oggetti e ~160–320 mila triangoli per immagine, dentro le attività ~60–120 oggetti
 
+### Pulsanti a destra (Opzioni → Pulsanti a destra)
+- Ordine modificabile con ▲▼ per Attività, Missioni, Profilo, Casa, Negozio, Opzioni, Camera. Ognuno può essere "Visibile" o "Nel menu": quelli nel menu spariscono dalla colonna e si aprono col pulsante ☰ Menu (in fondo alla colonna, compare solo se c'è almeno un pulsante nel menu; il "!" delle missioni passa sul ☰). Tutti, alcuni o nessuno. "Disposizione iniziale" ripristina tutto
+- Il pulsante Sali/Scendi del veicolo in verticale sta a sinistra della colonna (non copre più Camera)
+
 ### Orari delle attività
 - I locali e i furgoni si possono usare solo da aperti (8:00–22:00): fuori orario la porta è chiusa ("🔒 Chiuso · apre alle 8:00") e il gioco suggerisce di andare a dormire; a chiusura, servito l'ultimo cliente, si esce da soli. I tuoi furgoni abbassano la serranda di notte. L'ufficio delle imprese di servizi resta sempre raggiungibile
 

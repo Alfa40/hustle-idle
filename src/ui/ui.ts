@@ -11,7 +11,7 @@ import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
-import { settings } from '../settings';
+import { onSettings, settings, type HudKey } from '../settings';
 import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
@@ -118,6 +118,7 @@ export class UI {
         <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
         <button class="hbtn c-pink" data-h="shop"><span class="i">🛍️</span><span class="l">Negozio</span></button>
         <button class="hbtn c-gray" data-h="settings"><span class="i">⚙️</span><span class="l">Opzioni</span></button>
+        <div class="hud-menu"><button class="hbtn c-dark hud-menu-btn" aria-label="Menu"><span class="i">☰</span><span class="l">Menu</span><span class="dot" id="h-dot2" style="display:none">!</span></button><div class="hud-drop"></div></div>
       </div>`;
     this.root.appendChild(right);
     this.minimap = new Minimap(this.game, () => this.openMap());
@@ -139,8 +140,11 @@ export class UI {
         if (k === 'home') this.game.goHome();
         if (k === 'shop') this.openShop();
         if (k === 'settings') this.openSettings();
+        this.hudMenuEl.classList.remove('open');
       }),
     );
+    this.hudMenuEl = right.querySelector('.hud-menu')!;
+    this.hudMenuEl.querySelector('.hud-menu-btn')!.addEventListener('click', () => this.hudMenuEl.classList.toggle('open'));
 
     const job = document.createElement('div');
     job.className = 'jobbar';
@@ -203,6 +207,8 @@ export class UI {
     cam.querySelector('.cam-toggle')!.addEventListener('click', () => cam.classList.toggle('open'));
     this.root.querySelector('.hud-right .hud-btns')!.appendChild(cam);
     this.camEl = cam;
+    this.layoutHud();
+    onSettings(() => this.layoutHud());
     // rotellina = zoom, Q/R = ruota (su PC)
     window.addEventListener('wheel', (e) => {
       if (this.panel || (e.target as HTMLElement).closest?.('.mapscreen,.modal')) return;
@@ -226,6 +232,24 @@ export class UI {
     this.toastsEl = document.createElement('div');
     this.toastsEl.className = 'toasts';
     document.body.appendChild(this.toastsEl);
+  }
+
+  private hudMenuEl!: HTMLElement;
+
+  /** Pulsanti a destra nell'ordine scelto; quelli "nel menu" vanno nella tendina ☰. */
+  private layoutHud() {
+    const col = this.root.querySelector('.hud-right .hud-btns') as HTMLElement;
+    const drop = this.hudMenuEl.querySelector('.hud-drop') as HTMLElement;
+    const el = (k: HudKey): HTMLElement => (k === 'camera' ? this.camEl : (col.querySelector(`[data-h="${k}"]`) ?? drop.querySelector(`[data-h="${k}"]`)) as HTMLElement);
+    for (const k of settings.hudOrder) {
+      if (settings.hudMenu.includes(k)) drop.appendChild(el(k));
+      else col.appendChild(el(k));
+    }
+    // il pulsante ☰ c'è solo se qualcosa è nel menu, sempre in fondo alla colonna
+    col.appendChild(this.hudMenuEl);
+    this.hudMenuEl.style.display = settings.hudMenu.length ? '' : 'none';
+    this.hudMenuEl.classList.remove('open');
+    this.camEl.classList.toggle('in-menu', settings.hudMenu.includes('camera'));
   }
 
   update(dt: number) {
@@ -310,6 +334,9 @@ export class UI {
   private updateDot() {
     const claimable = this.s.missions.some((m) => !m.claimed && m.progress >= m.target);
     this.missionDot.style.display = claimable ? '' : 'none';
+    // se Missioni è nel menu, il "!" compare anche sul pulsante ☰
+    const dot2 = this.root.querySelector('#h-dot2') as HTMLElement | null;
+    if (dot2) dot2.style.display = claimable && settings.hudMenu.includes('missions') ? '' : 'none';
   }
 
   toast(text: string, kind = 'info') {
@@ -1692,6 +1719,7 @@ export class UI {
         tab: (k) => (tab = k),
         set: (v) => settingsAction('set:' + v),
         tog: (v) => settingsAction('tog:' + v),
+        hud: (v) => settingsAction('hud:' + v),
         menu: () => {
           this.game.save();
           this.game.resetting = true;

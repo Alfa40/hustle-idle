@@ -8,17 +8,32 @@ export interface Settings {
   outlines: boolean;
   /** risparmio batteria: 30 fotogrammi al secondo (15 da fermo) e meno pixel */
   battery: boolean;
+  /** ordine dei pulsanti a destra (dall'alto) */
+  hudOrder: HudKey[];
+  /** pulsanti spostati nel menu a tendina ☰ */
+  hudMenu: HudKey[];
 }
+
+export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'settings', 'camera'] as const;
+export type HudKey = (typeof HUD_KEYS)[number];
+export const HUD_NAMES: Record<HudKey, string> = {
+  biz: '🏢 Attività', missions: '📋 Missioni', profile: '👤 Profilo', home: '🏠 Casa', shop: '🛍️ Negozio', settings: '⚙️ Opzioni', camera: '🎥 Camera',
+};
 
 const KEY = 'hustleidle.settings';
 
-const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false };
+const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false, hudOrder: [...HUD_KEYS], hudMenu: [] };
 
 export const settings: Settings = { ...DEFAULTS };
 
 try {
   const raw = localStorage.getItem(KEY);
   if (raw) Object.assign(settings, JSON.parse(raw));
+  // pulsanti nuovi (o nomi sconosciuti) sistemati: ogni pulsante compare una volta sola
+  const known = (k: unknown): k is HudKey => (HUD_KEYS as readonly unknown[]).includes(k);
+  const order = (Array.isArray(settings.hudOrder) ? settings.hudOrder : []).filter(known);
+  settings.hudOrder = [...new Set([...order, ...HUD_KEYS])];
+  settings.hudMenu = [...new Set((Array.isArray(settings.hudMenu) ? settings.hudMenu : []).filter(known))];
 } catch {
   /* si usano i valori predefiniti */
 }

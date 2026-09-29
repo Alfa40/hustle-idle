@@ -374,7 +374,8 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 
 /* ---------- pulsante veicolo ---------- */
 .ride-btn {
-  position: fixed; right: calc(var(--sar) + 30px); bottom: calc(var(--sab) + 136px);
+  /* in verticale a sinistra della colonna dei pulsanti (non copre Camera) */
+  position: fixed; right: calc(var(--sar) + 76px); bottom: calc(var(--sab) + 136px);
   width: 62px; height: 62px; border-radius: 50%; border: 4px solid #fff; background: var(--blue);
   display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0;
   box-shadow: 0 4px 0 var(--blue-d), 0 6px 12px rgba(0,0,0,.22); color: #fff;
@@ -662,3 +663,17 @@ body.guide-on .hud-top { display: none; }
 .inst .btn + .inst-steps { margin-top: 10px; }
 @keyframes inst-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes inst-bob { from { transform: translateY(0); } to { transform: translateY(5px); } }
+
+/* ---------- pulsanti a destra: menu a tendina ☰ ---------- */
+.hbtn.c-dark { --b: #3a2f55; --bd: #221a36; }
+.hud-menu { position: relative; }
+.hud-drop { display: none; position: absolute; right: 64px; top: 0; grid-template-columns: repeat(2, 54px); gap: 7px; padding: 8px; background: rgba(255,255,255,.9); border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.hud-menu.open .hud-drop { display: grid; }
+.hud-menu.open .hud-menu-btn { box-shadow: 0 0 0 3px var(--yellow), 0 4px 0 #221a36; }
+.hud-drop .cam-grid { right: 0; top: 64px; }
+@media (orientation: landscape) { .hud-drop { right: 0; top: 64px; grid-template-columns: repeat(4, 54px); } }
+.hud-row { display: flex; align-items: center; gap: 5px; padding: 4px 0; border-top: 1px solid #efe6d6; }
+.hud-row .hud-name { flex: 1; font-weight: 700; font-size: 14px; }
+.hud-row.in-menu .hud-name { color: var(--purple-d); }
+.hud-menu-btn .i { color: #fff; font-weight: 900; font-size: 24px; }
+.hud-row .btn:last-child { min-width: 132px; }
