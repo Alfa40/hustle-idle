@@ -597,9 +597,9 @@ body.guide-on .hud-top { display: none; }
   background: rgba(255,255,255,.97); border-radius: 16px; padding: 6px 8px; border: 3px solid #ffc21a;
   box-shadow: 0 4px 14px rgba(0,0,0,.2); display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
 }
-.hand-badge > i { font-style: normal; font-weight: 900; font-size: 14px; background: #ffc21a; color: #4a3500; border-radius: 999px; padding: 2px 9px; }
-.hand-badge > span { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; }
-.hand-badge > span b { font-weight: 800; color: var(--ink); }
-.hand-badge > span em { font-style: normal; font-weight: 800; font-size: 12px; color: #fff; border-radius: 8px; padding: 1px 6px; }
-.hand-badge > span.empty { color: var(--ink-2); font-weight: 700; }
+.hand-badge { flex-direction: column; align-items: stretch; gap: 3px; padding: 5px 6px; }
+.hb-slot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 6px; min-width: 0; min-height: 24px; padding: 1px 6px; border-radius: 10px; background: #fff8e6; font-size: 13px; }
+.hb-slot b { min-width: 0; max-width: 100%; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb-slot em { margin-left: auto; font-style: normal; font-weight: 800; font-size: 12px; color: #fff; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
+.hb-slot.empty { background: transparent; border: 2px dashed #ecd9a8; min-height: 22px; }
 @media (orientation: landscape) { .hand-badge { width: min(480px, 46vw); } }

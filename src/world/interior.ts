@@ -123,6 +123,23 @@ const PHASE: Record<StationDef['kind'], { name: string; color: number; css: stri
   pass: { name: 'Ripiano', color: 0x35c46a, css: '#2fae5e' },
   bin: { name: 'Butta', color: 0x8a8aa0, css: '#77778f' },
 };
+/** Nome al singolare e se è femminile (per "cucinata", "dipinta"…). */
+const SINGULAR: Partial<Record<ProductId, [string, boolean]>> = {
+  panini: ['Panino', false], hotdog: ['Hot dog', false], tacos: ['Taco', false], gelati: ['Gelato', false],
+  pane: ['Pane', false], cornetti: ['Cornetto', false], pizza: ['Pizza', true], torte: ['Torta', true],
+  vasi: ['Vaso', false], sedie: ['Sedia', true], gioielli: ['Gioiello', false],
+};
+/** Cosa è diventato il prodotto dopo una postazione (maschile) e cosa si fa alla prossima. */
+const DONE: Record<string, string> = {
+  piastra: 'cucinato', forno: 'sfornato', fornace: 'cotto', banco: 'assemblato', tagliere: 'tagliato', imballo: 'imballato',
+  impastatrice: 'impastato', tavolo: 'formato', farcitura: 'farcito', decorazione: 'decorato',
+  tornio: 'modellato', pittura: 'dipinto', sega: 'tagliato', orafo: 'lavorato',
+};
+const TODO: Record<string, string> = {
+  piastra: 'cucinare', forno: 'infornare', fornace: 'cuocere in fornace', banco: 'assemblare', tagliere: 'tagliare', imballo: 'imballare',
+  impastatrice: 'impastare', tavolo: 'formare', farcitura: 'farcire', decorazione: 'decorare',
+  tornio: 'modellare', pittura: 'dipingere', sega: 'tagliare', orafo: 'lavorare',
+};
 /** Esperienza nel campo → quanti prodotti si portano insieme (1 all'inizio, fino a 4). */
 export const HAND_LEVELS = [1, 3, 6, 10];
 
@@ -569,34 +586,41 @@ export class TruckInterior {
   }
 
   /**
-   * Riquadro "in mano": ogni prodotto per nome, con la prossima fase (col suo colore),
-   * pronto o freddo. Uguali raggruppati (Panini ×2).
+   * Riquadro "in mano": una riga per ogni posto in mano (quanti se ne possono portare);
+   * ogni prodotto dice com'è ("Panino cucinato") e cosa gli manca ("da assemblare").
+   * Posti vuoti = righe vuote.
    */
   private updateHandBadge() {
     if (!this.handEl) return;
-    const groups = new Map<string, { n: number; html: string }>();
-    for (const x of this.hand) {
+    const rows: string[] = [];
+    for (let i = 0; i < this.handMax; i++) {
+      const x = this.hand[i];
+      if (!x) {
+        rows.push('<div class="hb-slot empty"></div>');
+        continue;
+      }
       const p = PRODUCTS[x.pid];
+      const [one, fem] = SINGULAR[x.pid] ?? [p.name, false];
+      const g = (w: string) => (fem ? w.replace(/o$/, 'a') : w);
+      const steps = this.recipe(x);
+      const doneId = x.step > 1 ? steps[x.step - 1] : null;
+      const done = doneId ? ` ${g(DONE[doneId] ?? 'lavorato')}` : '';
       let state: string;
       let css: string;
       if (this.cold(x)) {
-        state = '❄️ freddo → 🗑️ butta';
+        state = `${g('freddo')} · da buttare`;
         css = '#2d9cdb';
       } else if (this.finished(x)) {
-        state = this.deliverable(x) ? '✅ pronto → 🍽️ servi' : '✅ pronto → ripiano';
+        state = this.deliverable(x) ? `${g('pronto')} per i clienti` : `${g('pronto')}: mettil${fem ? 'a' : 'o'} sul ripiano`;
         css = PHASE.counter.css;
       } else {
-        const d = this.stationDef(this.recipe(x)[x.step])!;
-        state = `→ ${d.icon} ${d.verb}`;
-        css = PHASE[d.kind].css;
+        const next = steps[x.step];
+        state = `da ${TODO[next] ?? 'lavorare'}`;
+        css = PHASE[this.stationDef(next)!.kind].css;
       }
-      const key = `${x.pid}|${x.takeaway}|${state}`;
-      const g = groups.get(key);
-      if (g) g.n++;
-      else groups.set(key, { n: 1, html: `<b>${p.icon} ${p.name}${x.takeaway ? ' 🥡' : ''}</b><em style="background:${css}">${state}</em>` });
+      rows.push(`<div class="hb-slot"><b>${p.icon} ${one}${done}${x.takeaway ? ' 🥡' : ''}</b><em style="background:${css}">${state}</em></div>`);
     }
-    const items = [...groups.values()].map((g) => `<span>${g.html.replace('</b>', g.n > 1 ? ` ×${g.n}</b>` : '</b>')}</span>`).join('');
-    const html = `<i>✋ ${this.hand.length}/${this.handMax}</i>${items || '<span class="empty">Mani vuote</span>'}`;
+    const html = rows.join('');
     if (html === this.handHtml) return;
     this.handHtml = html;
     this.handEl.innerHTML = html;
