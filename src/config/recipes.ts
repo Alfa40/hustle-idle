@@ -39,6 +39,8 @@ export interface Layout {
   stations: StationDef[];
   /** fasi di ogni prodotto (id delle postazioni) e livello che lo sblocca */
   recipes: Partial<Record<ProductId, { steps: string[]; level: number }>>;
+  /** postazioni che si possono duplicare con i miglioramenti */
+  extra: { fuochi: string; banco: string };
 }
 
 /** Profondità comune: fondo a z=-2.2, bancone clienti a z=1.75. */
@@ -74,6 +76,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
       tacos: { steps: ['frigo', 'piastra', 'tagliere', 'banco'], level: 1 },
       gelati: { steps: ['gelatiera', 'banco'], level: 2 },
     },
+    extra: { fuochi: 'piastra', banco: 'banco' },
   },
   panificio: {
     width: [7.5, 10, 12.5],
@@ -99,6 +102,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
       pizza: { steps: ['dispensa', 'tavolo', 'farcitura', 'forno'], level: 1 },
       torte: { steps: ['dispensa', 'impastatrice', 'forno', 'decorazione'], level: 2 },
     },
+    extra: { fuochi: 'forno', banco: 'tavolo' },
   },
   artigianato: {
     width: [7.5, 10, 12.5],
@@ -125,6 +129,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
       sedie: { steps: ['legno', 'sega', 'pittura'], level: 1 },
       gioielli: { steps: ['metalli', 'orafo', 'fornace'], level: 2 },
     },
+    extra: { fuochi: 'fornace', banco: 'pittura' },
   },
 };
 
@@ -136,3 +141,41 @@ export function productLevel(t: BusinessType, pid: ProductId) {
 }
 
 export const EXPANSION_NAMES = ['Base', 'Ampliato', 'Grande'];
+
+/** Larghezza della stanza e bordo sinistro (uguali per tutte le attività). */
+export const ROOM_LEFT = -3.75;
+
+/** Posti liberi sull'isola centrale per i mobili extra dei miglioramenti. */
+export function extraSpots(t: keyof typeof LAYOUTS, level: number) {
+  const lay = LAYOUTS[t];
+  const right = ROOM_LEFT + lay.width[level] - 1.0;
+  const used = lay.stations.filter((s) => s.level <= level && Math.abs(s.z - ISLAND_Z) < 0.5).map((s) => s.x);
+  const out: { x: number; z: number }[] = [];
+  for (let x = ROOM_LEFT + 1.4; x <= right; x += 1.55) {
+    if (used.some((u) => Math.abs(u - x) < 1.35)) continue;
+    out.push({ x, z: ISLAND_Z });
+  }
+  return out;
+}
+
+/** Mobili extra (fuochi e banchi) messi nei posti liberi: prima i fuochi, poi i banchi. */
+export function extraStations(t: keyof typeof LAYOUTS, level: number, fuochi: number, banchi: number): StationDef[] {
+  const lay = LAYOUTS[t];
+  const spots = extraSpots(t, level);
+  const out: StationDef[] = [];
+  const add = (id: string, n: number) => {
+    const base = lay.stations.find((s) => s.id === id)!;
+    for (let i = 0; i < n && spots.length; i++) {
+      const sp = spots.shift()!;
+      out.push({ ...base, x: sp.x, z: sp.z, level: 0, name: `${base.name} ${i + 2}` });
+    }
+  };
+  add(lay.extra.fuochi, fuochi);
+  add(lay.extra.banco, banchi);
+  return out;
+}
+
+/** Quanti mobili extra ci stanno ancora (per i pulsanti dei miglioramenti). */
+export function extraRoom(t: keyof typeof LAYOUTS, level: number, fuochi: number, banchi: number) {
+  return extraSpots(t, level).length - fuochi - banchi;
+}

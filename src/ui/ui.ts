@@ -2,7 +2,7 @@ import { BUSINESS, LEVEL, TIME } from '../config/balance';
 import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
-import { hasInterior, LAYOUTS, productLevel } from '../config/recipes';
+import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
 import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
 import { JOBS } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
@@ -19,7 +19,7 @@ import type { OfflineReport } from '../sim/calendar';
 import {
   autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
-  stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
+  refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, rank, skillLevel } from '../sim/progress';
 import {
@@ -667,6 +667,11 @@ export class UI {
         },
         autoRestock: () => (b().autoRestock = !b().autoRestock),
         hire: (id) => hire(s, b(), +id),
+        reroll: () => {
+          if (s.money < 40) return;
+          addMoney(s, -40);
+          refreshCandidates(s);
+        },
         fire: (id) => fire(s, b(), +id),
         upgrade: (id) => {
           buyUpgrade(s, b(), id as never);
@@ -787,17 +792,22 @@ export class UI {
         .map((e) => this.empCard(e, b.type, `<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button>`))
         .join('');
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
-        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}<h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Nuovi candidati ogni giorno.</p>${cands}`;
+        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}<h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
+        <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
-    return UPGRADE_IDS.filter((id) => id !== 'ampliamento' || hasInterior(b.type)).map((id) => {
+    const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
+    return UPGRADE_IDS.filter((id) => !kitchenOnly.includes(id) || hasInterior(b.type)).map((id) => {
       const u = UPGRADES[id];
       const lvl = upg(b, id);
-      const maxed = lvl >= u.max;
       const cost = u.cost(lvl);
+      // fuochi e banchi extra hanno bisogno di spazio libero nel locale
+      const noRoom = (id === 'fuochi' || id === 'banco') && hasInterior(b.type) &&
+        extraRoom(b.type, Math.min(2, upg(b, 'ampliamento')), upg(b, 'fuochi'), upg(b, 'banco')) <= 0;
+      const maxed = lvl >= u.max;
       return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
         <p class="muted small" style="margin:0 0 8px">${u.desc}${id === 'ampliamento' && !maxed ? `<br><b style="color:var(--ink)">Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b>` : ''}</p>
-        <button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || s.money < cost ? 'disabled' : ''}>${maxed ? 'Massimo' : 'Migliora · ' + euro(cost)}</button></div>`;
+        <button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || noRoom || s.money < cost ? 'disabled' : ''}>${maxed ? 'Massimo' : noRoom ? '📏 Non c\'è spazio: amplia il locale' : 'Migliora · ' + euro(cost)}</button></div>`;
     }).join('');
   }
 

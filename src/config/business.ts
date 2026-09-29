@@ -9,7 +9,7 @@ export const ROLES: Record<Role, { name: string; icon: string; baseSalary: numbe
   manager: { name: 'Manager', icon: '👔', baseSalary: 700 },
 };
 
-export type UpgradeId = 'ampliamento' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
+export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
 
 export interface UpgradeDef {
   name: string;
@@ -24,24 +24,36 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio, nuove postazioni di lavoro e nuovi prodotti da vendere.', max: 2,
     cost: (l) => [3500, 12000][l] ?? Infinity,
   },
+  fuochi: {
+    name: 'Fuochi e forni extra', icon: '🔥', desc: 'Un fornello/forno in più nel locale: si cuociono più cose insieme.', max: 3,
+    cost: (l) => [900, 2200, 5000][l] ?? Infinity,
+  },
+  banco: {
+    name: 'Banco di lavoro extra', icon: '🧑‍🍳', desc: 'Un banco di lavoro in più: tu e i dipendenti lavorate in parallelo.', max: 2,
+    cost: (l) => [700, 1800][l] ?? Infinity,
+  },
+  ripiano: {
+    name: 'Ripiano pronti più grande', icon: '🍽️', desc: '+2 posti per i prodotti pronti.', max: 3,
+    cost: (l) => [400, 1000, 2400][l] ?? Infinity,
+  },
   attrezzatura: {
-    name: 'Attrezzatura', icon: '🔥', desc: 'Si lavora più in fretta (+15% per livello).', max: 8,
+    name: 'Attrezzatura professionale', icon: '⚡', desc: 'Si lavora più in fretta (+15% per livello). Le postazioni diventano lucide e dorate.', max: 8,
     cost: (l) => Math.round(400 * 1.8 ** l),
   },
   look: {
-    name: 'Look e insegna', icon: '✨', desc: 'Attira più clienti (+15% di domanda per livello).', max: 8,
+    name: 'Look e insegna', icon: '✨', desc: 'Attira più clienti (+15% di domanda per livello). Piante, luci e un pavimento più bello.', max: 8,
     cost: (l) => Math.round(500 * 1.9 ** l),
   },
   menu: {
-    name: 'Più prodotti', icon: '📋', desc: 'Un prodotto (o servizio) in più in vendita.', max: 2,
+    name: 'Più prodotti', icon: '📋', desc: 'Un prodotto (o servizio) in più in vendita, scritto sulla lavagna del menù.', max: 2,
     cost: (l) => [800, 2400][l] ?? Infinity,
   },
   frigo: {
-    name: 'Magazzino più grande', icon: '🧊', desc: '+40 posti in magazzino.', max: 6,
+    name: 'Magazzino più grande', icon: '🧊', desc: '+40 posti in magazzino. Più scatoloni di scorte nel locale.', max: 6,
     cost: (l) => Math.round(300 * 1.7 ** l),
   },
   marketing: {
-    name: 'Pubblicità', icon: '📣', desc: '+10% di domanda per livello.', max: 6,
+    name: 'Pubblicità', icon: '📣', desc: '+10% di domanda per livello. Manifesti alle pareti e insegna.', max: 6,
     cost: (l) => Math.round(650 * 2 ** l),
   },
 };

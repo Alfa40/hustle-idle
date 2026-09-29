@@ -3,7 +3,7 @@ import { model } from '../assets';
 import { BUSINESS, TIME } from '../config/balance';
 import { bizType } from '../config/business';
 import { PRODUCTS, type ProductId } from '../config/products';
-import { COUNTER_Z, LAYOUTS, type Layout, type StationDef } from '../config/recipes';
+import { COUNTER_Z, extraStations, LAYOUTS, type Layout, type StationDef } from '../config/recipes';
 import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { missionProgress } from '../sim/calendar';
@@ -13,7 +13,7 @@ import {
 import { addFame, addXp } from '../sim/progress';
 import type { Business, Employee } from '../sim/state';
 import { Character } from './character';
-import { arrow, label, ring } from './props';
+import { arrow, boxProp, label, ring } from './props';
 import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
@@ -63,6 +63,8 @@ interface Customer {
 interface Slot {
   item: Item | null;
   p: number;
+  /** dipendente che sta venendo a toglierlo dal fuoco */
+  claim?: Worker;
   bar: THREE.Mesh;
   fill: THREE.Mesh;
 }
@@ -78,12 +80,22 @@ interface Station {
   tagY: number;
 }
 
+/** Cosa sta facendo un cuoco: andare a una postazione e lavorarci. */
+interface Job {
+  act: 'rescue' | 'start' | 'work' | 'cook' | 'pass' | 'bin';
+  target: Station;
+  slot?: Slot;
+  t: number;
+}
+
 interface Worker {
   emp: Employee;
   char: Character;
   home: THREE.Vector3;
-  /** prodotto che sta preparando e tappe da percorrere */
-  job?: { item: Item; stops: THREE.Vector3[]; leg: number; t: number };
+  job?: Job;
+  /** prodotto che ha in mano */
+  item?: Item;
+  sprite?: THREE.Sprite;
   pause: number;
 }
 
@@ -185,18 +197,31 @@ export class TruckInterior {
     sign.position.set(this.center, 2.75, BACK);
     s.add(sign);
 
-    for (const d of this.layout.stations) {
-      if (d.level > this.level) continue;
+    const t = this.biz.type as keyof typeof LAYOUTS;
+    const extras = extraStations(t, this.level, upg(this.biz, 'fuochi'), upg(this.biz, 'banco'));
+    const pro = upg(this.biz, 'attrezzatura');
+    for (const d of [...this.layout.stations.filter((x) => x.level <= this.level), ...extras]) {
       const pos = new THREE.Vector3(d.x, 0, d.z);
       if (d.model) {
         const o = model(d.model, FURN);
         // i mobili del furniture kit hanno l'origine in un angolo
         o.position.set(d.x - 0.43 * FURN * 0.5, 0.05, d.z - 0.2 + 0.45 * FURN * 0.5);
+        // attrezzatura professionale: postazioni di lavoro lucide e dorate
+        if (pro > 0 && (d.kind === 'hold' || d.kind === 'timed')) {
+          o.traverse((m) => {
+            const mesh = m as THREE.Mesh;
+            if (!mesh.isMesh) return;
+            const mat = (mesh.material as THREE.MeshLambertMaterial).clone();
+            mat.emissive = new THREE.Color(0xffb300);
+            mat.emissiveIntensity = 0.08 + pro * 0.05;
+            mesh.material = mat;
+          });
+        }
         s.add(o);
       }
       const tall = d.model.includes('Fridge') || d.model.includes('bookcase');
       const st: Station = { def: d, pos, slots: [], hold: 0, tagY: d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7 };
-      const nSlots = d.kind === 'timed' ? (d.slots ?? 2) + Math.floor(upg(this.biz, 'attrezzatura') / 3) : 0;
+      const nSlots = d.kind === 'timed' ? (d.slots ?? 2) : 0;
       for (let i = 0; i < nSlots; i++) {
         const bar = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x333333, depthTest: false }));
         const fill = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: COLORS.cook, depthTest: false }));
@@ -213,6 +238,11 @@ export class TruckInterior {
     }
     this.passGroup.position.set(this.stationOf('pass')!.pos.x, 1.08, COUNTER_Z);
     s.add(this.passGroup);
+    // ripiano dei pronti: più lungo con il miglioramento
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(this.passMax * 0.45 + 0.2, 0.06, 0.5), new THREE.MeshLambertMaterial({ color: 0xc8a27a }));
+    shelf.position.set(this.stationOf('pass')!.pos.x + (this.passMax * 0.45) / 2 - 0.8, 1.09, COUNTER_Z);
+    s.add(shelf);
+    this.decorate();
     // evidenzia la prossima postazione: anello verde a terra e freccia che rimbalza
     this.nextRing = ring(0x35c46a, 0.75);
     this.nextArrow = arrow(0x35c46a);
@@ -220,26 +250,69 @@ export class TruckInterior {
     s.add(this.nextRing, this.nextArrow, this.guide.mesh);
 
     // dipendenti: i cuochi alle postazioni, i cassieri al bancone
-    const work = this.stations.filter((x) => x.def.kind === 'hold' || x.def.kind === 'timed');
     let wi = 0;
+    let ci = 0;
     for (const e of this.biz.staff) {
       const char = new Character(e.model || CHAR_MODELS[e.id % CHAR_MODELS.length]);
       const tag = label(e.name.split(' ')[0], { scale: 0.2 });
       tag.position.y = 1.75;
       char.root.add(tag);
       if (e.role === 'cassa') {
-        char.root.position.set(this.stationOf('pass')!.pos.x + 0.9, 0, COUNTER_Z - 0.6);
+        char.root.position.set(this.stationOf('pass')!.pos.x + 0.9 + ci++ * 0.8, 0, COUNTER_Z - 0.6);
       } else if (e.role === 'manager') {
         char.root.position.set(LEFT + this.width - 0.8, 0, 0.6);
         char.root.rotation.y = -Math.PI / 2;
       } else {
-        const st = work[wi++ % Math.max(1, work.length)];
-        char.root.position.set(st.pos.x + 0.6, 0, st.pos.z + 0.8);
+        // i cuochi aspettano in fila nel corridoio, pronti ad aiutare
+        char.root.position.set(LEFT + 1.8 + (wi++ % 6) * 0.9, 0, 0.75);
         char.root.rotation.y = Math.PI;
       }
       s.add(char.root);
       this.workers.push({ emp: e, char, home: char.root.position.clone(), pause: 0 });
     }
+  }
+
+  /** Dettagli visibili dei miglioramenti: piante, manifesti, scorte, menù. */
+  private decorate() {
+    const s = this.scene;
+    const W = this.width;
+    // look e insegna: piante lungo le pareti e pavimento più caldo
+    const look = upg(this.biz, 'look');
+    for (let i = 0; i < Math.min(look, 8); i++) {
+      const g = new THREE.Group();
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.3, 10), new THREE.MeshLambertMaterial({ color: 0xc1693c }));
+      pot.position.y = 0.15;
+      const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), new THREE.MeshLambertMaterial({ color: 0x3fae57, flatShading: true }));
+      leaves.position.y = 0.5;
+      g.add(pot, leaves);
+      const left = i % 2 === 0;
+      g.position.set(left ? LEFT + 0.3 : LEFT + W - 0.3, 0, -1.6 + Math.floor(i / 2) * 0.75);
+      s.add(g);
+    }
+    if (look > 0) {
+      const rug = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.6, 1.2), new THREE.MeshLambertMaterial({ color: 0xd9534f }));
+      rug.rotation.x = -Math.PI / 2;
+      rug.position.set(this.center, 0.06, 0.55);
+      s.add(rug);
+    }
+    // pubblicità: manifesti sulla parete di fondo
+    const ads = ['📣 PROMO!', '⭐ I migliori!', '🔥 Novità', '💯 Top', '🎉 Offerta', '❤️ Da provare'];
+    for (let i = 0; i < Math.min(upg(this.biz, 'marketing'), ads.length); i++) {
+      const l = label(ads[i], { bg: '#ff5d73', scale: 0.32 });
+      l.position.set(LEFT + 0.9 + i * 1.3, 2.35, BACK + 0.05);
+      s.add(l);
+    }
+    // magazzino più grande: scatoloni di scorte vicino al frigo/dispensa
+    const src = this.stationOf('source')!;
+    for (let i = 0; i < upg(this.biz, 'frigo') * 2; i++) {
+      const b = boxProp(0.45, 0.35, 0.45, 0xc8a27a);
+      b.position.set(src.pos.x - 0.95, 0.05 + Math.floor(i / 2) * 0.36, src.pos.z + (i % 2) * 0.5 - 0.1);
+      s.add(b);
+    }
+    // lavagna del menù con i prodotti in vendita
+    const menu = label(`📋 Menù: ${this.biz.products.map((p) => PRODUCTS[p].icon).join(' ')}`, { bg: '#2e3b2f', scale: 0.34 });
+    menu.position.set(LEFT + W - 1.6, 2.35, BACK + 0.05);
+    s.add(menu);
   }
 
   private tag(t: string, v: THREE.Vector3, y: number, bg?: string) {
@@ -253,7 +326,10 @@ export class TruckInterior {
 
   /** Capienza: in mano si porta un prodotto alla volta. */
   static readonly HAND_MAX = 1;
-  static readonly PASS_MAX = 4;
+  /** posti sul ripiano dei pronti (+2 per livello del miglioramento) */
+  get passMax() {
+    return 4 + 2 * upg(this.biz, 'ripiano');
+  }
   private guideEl: HTMLDivElement | null = null;
   private guideKey = '';
   private nextRing!: THREE.Mesh;
@@ -266,7 +342,7 @@ export class TruckInterior {
     if (it) {
       if (this.cold(it)) return this.stationOf('bin') ?? null;
       if (this.finished(it)) return this.deliverable(it) ? this.stationOf('counter') ?? null : this.stationOf('pass') ?? null;
-      return this.stations.find((s) => s.def.id === this.recipe(it)[it.step]) ?? null;
+      return this.bestStation(this.recipe(it)[it.step], this.player.root.position);
     }
     // qualcosa è pronto sul fuoco? prima si ritira
     const ready = this.stations.find((s) => s.slots.some((sl) => sl.item && sl.p >= 1));
@@ -274,15 +350,31 @@ export class TruckInterior {
     if (this.pass.some((p) => this.deliverable(p))) return this.stationOf('counter') ?? null;
     if (this.pass.some((p) => this.cold(p))) return this.stationOf('pass') ?? null;
     const need = this.needed()[0];
-    if (need) return this.stations.find((s) => s.def.id === this.layout.recipes[need.pid]?.steps[0]) ?? null;
+    if (need) return this.bestStation(this.layout.recipes[need.pid]?.steps[0] ?? '', this.player.root.position);
     return null;
+  }
+
+  /**
+   * Tra le postazioni con lo stesso ruolo (es. due piastre) sceglie la più comoda:
+   * con un posto libero, non occupata da un dipendente, la più vicina.
+   */
+  private bestStation(id: string, from: THREE.Vector3, by?: Worker): Station | null {
+    const list = this.stations.filter((s) => s.def.id === id);
+    const busy = (st: Station) => this.workers.some((w) => w !== by && w.job?.target === st && w.job.act === 'work');
+    const score = (st: Station) => {
+      let v = st.pos.distanceTo(from);
+      if (st.def.kind === 'timed' && !st.slots.some((sl) => !sl.item)) v += 50;
+      if (busy(st)) v += 20;
+      return v;
+    };
+    return list.sort((a, b) => score(a) - score(b))[0] ?? null;
   }
 
   /** Solo l'icona (e i posti occupati); il nome completo solo sulla prossima postazione. */
   private stationLabel(st: Station, hot: boolean) {
     const d = st.def;
     const count = d.kind === 'timed' ? ` ${st.slots.filter((x) => x.item).length}/${st.slots.length}`
-      : d.kind === 'pass' ? ` ${this.pass.length}/${TruckInterior.PASS_MAX}` : '';
+      : d.kind === 'pass' ? ` ${this.pass.length}/${this.passMax}` : '';
     return hot ? `👉 ${d.icon} ${d.name}${count}` : `${d.icon}${count}`;
   }
 
@@ -314,8 +406,10 @@ export class TruckInterior {
       `💰 €${Math.round(s.money).toLocaleString('it-IT')}`,
       `${isOpenHour(s) ? '🟢 Aperto' : '🔴 Chiuso'} · coda ${this.customers.length}/${BUSINESS.MAX_QUEUE}`,
       `✋ In mano ${it ? 1 : 0}/${TruckInterior.HAND_MAX}`,
-      ...onFire.map((s) => `${s.def.icon} ${s.def.name} ${s.slots.filter((x) => x.item).length}/${s.slots.length}`),
-      `${this.stationOf('pass')!.def.icon} Pronti ${this.pass.length}/${TruckInterior.PASS_MAX}`,
+      // tutti i fuochi/forni insieme: posti occupati sul totale
+      ...(onFire.length ? [`${onFire[0].def.icon} ${onFire[0].def.name.replace(/ \d+$/, '')} ${onFire.reduce((a, x) => a + x.slots.filter((y) => y.item).length, 0)}/${onFire.reduce((a, x) => a + x.slots.length, 0)}`] : []),
+      ...(this.workers.some((w) => w.emp.role === 'cucina') ? [`👨‍🍳 Cuochi ${this.rush ? 'cucinano' : 'aiutano'}`] : []),
+      `${this.stationOf('pass')!.def.icon} Pronti ${this.pass.length}/${this.passMax}`,
     ].map((c) => `<span>${c}</span>`).join('');
     let title: string;
     let steps = '';
@@ -488,7 +582,7 @@ export class TruckInterior {
       ...(this.held && !this.cold(this.held) ? [this.held] : []),
       ...this.pass.filter((x) => !this.cold(x)),
       ...this.stations.flatMap((s) => s.slots.flatMap((sl) => (sl.item ? [sl.item] : []))),
-      ...this.workers.flatMap((w) => (w.job ? [w.job.item] : [])),
+      ...this.workers.flatMap((w) => (w.item && !this.cold(w.item) ? [w.item] : [])),
     ];
     for (const it of inWork) {
       const i = pending.findIndex((p) => p.pid === it.pid && p.takeaway === it.takeaway);
@@ -668,36 +762,18 @@ export class TruckInterior {
   }
 
   /**
-   * I dipendenti lavorano anche mentre ci sei tu:
-   * - i cuochi girano tra le postazioni e preparano ciò che manca, appoggiandolo sul ripiano;
-   * - tolgono dal fuoco ciò che è pronto (così non brucia) e buttano il cibo freddo;
-   * - i cassieri servono dal ripiano e, se ci sono, i clienti lasciano mance più alte.
+   * I dipendenti aiutano il giocatore:
+   * - tolgono dal fuoco ciò che è pronto e il giocatore non riesce a prendere,
+   *   lo finiscono (assemblano, imballano…) e lo mettono sul ripiano prima che bruci;
+   * - buttano il cibo freddo;
+   * - solo quando la coda si allunga iniziano anche a preparare da zero;
+   * - i cassieri servono dal ripiano e alzano le mance.
    */
   private updateWorkers(dt: number, gm: number) {
     for (const w of this.workers) w.char.update(dt);
     const cooks = this.workers.filter((w) => w.emp.role === 'cucina');
     const cashiers = this.workers.filter((w) => w.emp.role === 'cassa');
     for (const w of cooks) this.updateCook(w, dt);
-    // un cuoco libero toglie dal fuoco ciò che è pronto prima che bruci
-    for (const st of this.stations) {
-      for (const sl of st.slots) {
-        if (!sl.item || sl.p < 1.15 || sl.p >= BURN || !cooks.some((w) => !w.job)) continue;
-        const it = sl.item;
-        sl.item = null;
-        sl.bar.visible = sl.fill.visible = false;
-        it.step++;
-        this.markReady(it);
-        if (this.finished(it) && this.pass.length < TruckInterior.PASS_MAX) this.pass.push(it);
-        else {
-          // serve ancora una fase: la finisce il cuoco
-          const w = cooks.find((x) => !x.job)!;
-          this.startCookJob(w, it);
-        }
-        this.fx.emit('spark', st.pos.clone().setY(1.3), 6);
-      }
-    }
-    // il personale butta via i prodotti freddi
-    if (cashiers.length || cooks.length) this.pass = this.pass.filter((it) => !this.cold(it));
     if (cashiers.length && this.pass.some((it) => this.deliverable(it))) {
       const rate = cashiers.reduce((a, w) => a + employeeRate(w.emp, this.biz), 0) * 2;
       this.serveAcc += (rate * gm) / 60;
@@ -713,28 +789,68 @@ export class TruckInterior {
     } else for (const w of cashiers) if (w.char.currentName === 'interact-right') w.char.play('idle');
   }
 
-  /** Dove sta un dipendente per usare una postazione. */
-  private standAt(id: string) {
-    const st = this.stations.find((x) => x.def.id === id);
-    if (!st) return null;
-    return new THREE.Vector3(st.pos.x + 0.35, 0, st.def.z > 1 ? FRONT - 0.2 : st.pos.z + 0.85);
+  /** La coda è lunga: i cuochi iniziano a preparare anche da zero. */
+  private get rush() {
+    return this.customers.length >= 3 || this.needed().length >= 3;
   }
 
-  private startCookJob(w: Worker, item: Item) {
-    const ids = this.recipe(item).slice(item.step);
-    const stops = [...ids, 'passe'].map((id) => this.standAt(id)).filter((v): v is THREE.Vector3 => !!v);
-    w.job = { item, stops, leg: 0, t: 0 };
+  private setWorkerItem(w: Worker, it?: Item) {
+    w.item = it;
+    if (w.sprite) w.char.root.remove(w.sprite);
+    w.sprite = undefined;
+    if (!it) return;
+    w.sprite = label(PRODUCTS[it.pid].icon + (this.finished(it) ? '✅' : ''), { bg: '#ffffff', fg: '#000', scale: 0.32 });
+    w.sprite.position.y = 2.05;
+    w.char.root.add(w.sprite);
+  }
+
+  /** Prossima cosa da fare per un cuoco libero. */
+  private nextCookJob(w: Worker): Job | undefined {
+    const p = w.char.root.position;
+    // 1) qualcosa è pronto sul fuoco e nessuno lo prende: lo salva prima che bruci
+    for (const st of this.stations) {
+      for (const sl of st.slots) {
+        if (sl.item && sl.p >= 1.05 && sl.p < BURN && !sl.claim) {
+          sl.claim = w;
+          return { act: 'rescue', target: st, slot: sl, t: 0 };
+        }
+      }
+    }
+    // 2) cibo freddo sul ripiano: va buttato
+    if (this.pass.some((x) => this.cold(x))) return { act: 'bin', target: this.stationOf('pass')!, t: 0 };
+    // 3) coda lunga: prepara da zero ciò che manca
+    if (this.rush && this.pass.length < this.passMax) {
+      const need = this.needed()[0];
+      const src = need && this.bestStation(this.layout.recipes[need.pid]?.steps[0] ?? '', p, w);
+      if (need && src) {
+        this.setWorkerItem(w, { pid: need.pid, step: 0, takeaway: need.takeaway });
+        return { act: 'start', target: src, t: 0 };
+      }
+    }
+    return undefined;
+  }
+
+  /** Dopo aver preso/lavorato un prodotto: dove portarlo. */
+  private continueItem(w: Worker): Job | undefined {
+    const it = w.item!;
+    if (this.cold(it)) return { act: 'bin', target: this.stationOf('bin')!, t: 0 };
+    if (this.finished(it)) return { act: 'pass', target: this.stationOf('pass')!, t: 0 };
+    const id = this.recipe(it)[it.step];
+    const st = this.bestStation(id, w.char.root.position, w);
+    if (!st) return undefined;
+    return { act: st.def.kind === 'timed' ? 'cook' : 'work', target: st, t: 0 };
+  }
+
+  private standAt(st: Station) {
+    return new THREE.Vector3(st.pos.x + 0.35, 0, st.def.z > 1 ? FRONT - 0.2 : st.pos.z + 0.85);
   }
 
   private updateCook(w: Worker, dt: number) {
     const p = w.char.root.position;
-    if (!w.job) {
-      const need = this.needed()[0];
-      if (need && this.pass.length < TruckInterior.PASS_MAX) {
-        this.startCookJob(w, { pid: need.pid, step: 0, takeaway: need.takeaway });
-        return;
-      }
-      // niente da fare: torna al suo posto
+    if (!w.job) w.job = w.item ? this.continueItem(w) : this.nextCookJob(w);
+    const job = w.job;
+    if (!job) {
+      // niente da fare: aspetta al suo posto, pronto ad aiutare
       const d = p.distanceTo(w.home);
       if (d > 0.1) {
         p.lerp(w.home, Math.min(1, (dt * 2.5) / d));
@@ -743,31 +859,98 @@ export class TruckInterior {
       } else w.char.play('idle');
       return;
     }
-    const job = w.job;
-    const target = job.stops[job.leg];
-    const d = p.distanceTo(target);
-    // più il dipendente è bravo, più cammina e lavora in fretta
-    const speed = employeeRate(w.emp, this.biz) / 4;
-    if (d > 0.08) {
-      const step = Math.min(d, dt * 3 * Math.max(0.7, speed));
-      p.addScaledVector(target.clone().sub(p).normalize(), step);
-      w.char.faceTowards(target.x, target.z, dt);
-      w.char.play('walk');
+    // il prodotto da salvare è sparito (l'ha preso il giocatore)
+    if (job.act === 'rescue' && (!job.slot!.item || job.slot!.claim !== w)) {
+      if (job.slot!.claim === w) job.slot!.claim = undefined;
+      w.job = undefined;
       return;
     }
-    // lavora un po' alla postazione
-    w.char.faceTowards(p.x, p.z - 2, dt);
-    w.char.play('interact-right', 0.1, 1.3);
-    job.t += (dt * Math.max(0.6, speed)) / 1.4;
-    if (job.t < 1) return;
-    job.t = 0;
-    job.leg++;
-    if (job.leg >= job.stops.length) {
-      job.item.step = this.recipe(job.item).length;
-      this.markReady(job.item);
-      if (this.pass.length < TruckInterior.PASS_MAX) this.pass.push(job.item);
-      employeeGainXp(w.emp, 1);
-      w.job = undefined;
+    const target = this.standAt(job.target);
+    const d = p.distanceTo(target);
+    // più il dipendente è bravo, più cammina e lavora in fretta
+    const speed = Math.max(0.7, employeeRate(w.emp, this.biz) / 4);
+    if (d > 0.08) {
+      p.addScaledVector(target.clone().sub(p).normalize(), Math.min(d, dt * 3 * speed));
+      w.char.faceTowards(target.x, target.z, dt);
+      w.char.play(w.item ? 'holding-both' : 'walk');
+      return;
+    }
+    w.char.faceTowards(p.x, p.z + (job.target.def.z > 1 ? 2 : -2), dt);
+    const pro = 1 + 0.15 * upg(this.biz, 'attrezzatura');
+    switch (job.act) {
+      case 'rescue': {
+        job.t += dt / 0.5;
+        if (job.t < 1) return;
+        const sl = job.slot!;
+        const it = sl.item!;
+        const burnt = sl.p >= BURN;
+        sl.item = null;
+        sl.claim = undefined;
+        sl.bar.visible = sl.fill.visible = false;
+        this.fx.emit('spark', job.target.pos.clone().setY(1.3), 6);
+        if (burnt) {
+          w.job = undefined;
+          return;
+        }
+        it.step++;
+        this.markReady(it);
+        this.setWorkerItem(w, it);
+        w.job = undefined;
+        return;
+      }
+      case 'start': {
+        job.t += dt / 0.6;
+        if (job.t < 1) return;
+        w.item!.step = 1;
+        this.setWorkerItem(w, w.item);
+        w.job = undefined;
+        return;
+      }
+      case 'work': {
+        w.char.play('interact-right', 0.1, 1.3);
+        if (Math.random() < dt * 10) this.fx.emit('dust', job.target.pos.clone().setY(1.1), 1, 0xf5e6c8);
+        job.t += (dt * speed * pro) / ((job.target.def.sec ?? 1) * SLOW);
+        if (job.t < 1) return;
+        w.item!.step++;
+        this.markReady(w.item!);
+        this.setWorkerItem(w, w.item);
+        employeeGainXp(w.emp, 1);
+        w.job = undefined;
+        return;
+      }
+      case 'cook': {
+        const free = job.target.slots.find((sl) => !sl.item);
+        if (!free) {
+          // piastra piena: aspetta un attimo e riprova con un'altra
+          job.t += dt;
+          if (job.t > 1.5) w.job = undefined;
+          return;
+        }
+        free.item = w.item!;
+        free.p = 0;
+        this.setWorkerItem(w);
+        w.job = undefined;
+        return;
+      }
+      case 'pass': {
+        if (this.pass.length >= this.passMax) return;
+        this.pass.push(w.item!);
+        this.setWorkerItem(w);
+        employeeGainXp(w.emp, 1);
+        w.job = undefined;
+        return;
+      }
+      case 'bin': {
+        job.t += dt / 0.4;
+        if (job.t < 1) return;
+        if (w.item) this.setWorkerItem(w);
+        else {
+          const i = this.pass.findIndex((x) => this.cold(x));
+          if (i >= 0) this.pass.splice(i, 1);
+        }
+        w.job = undefined;
+        return;
+      }
     }
   }
 
@@ -779,6 +962,7 @@ export class TruckInterior {
     this.pass.forEach((it, i) => {
       const l = label(PRODUCTS[it.pid].icon + (it.takeaway ? '🥡' : '') + (this.cold(it) ? '❄️' : ''), { bg: this.cold(it) ? 'rgba(160,210,255,0.95)' : 'rgba(255,255,255,0.9)', fg: '#000', scale: 0.32 });
       l.position.set(i * 0.45 - 0.6, 0.25, 0);
+      l.userData.cold = this.cold(it);
       this.passGroup.add(l);
     });
   }
@@ -950,12 +1134,12 @@ export class TruckInterior {
       case 'pass': {
         // appoggia un prodotto pronto (anche preparato in anticipo)
         if (it && this.finished(it) && !this.cold(it)) {
-          if (this.pass.length >= TruckInterior.PASS_MAX) return { label: `Ripiano pieno (${TruckInterior.PASS_MAX}/${TruckInterior.PASS_MAX})`, icon: '🍽️' };
+          if (this.pass.length >= this.passMax) return { label: `Ripiano pieno (${this.passMax}/${this.passMax})`, icon: '🍽️' };
           if (pressed) {
             this.pass.push(it);
             this.setHeld(null);
           }
-          return { label: `Appoggia sul ripiano (${this.pass.length}/${TruckInterior.PASS_MAX})`, icon: PRODUCTS[it.pid].icon };
+          return { label: `Appoggia sul ripiano (${this.pass.length}/${this.passMax})`, icon: PRODUCTS[it.pid].icon };
         }
         if (!it && this.pass.length) {
           // prende prima quelli freddi (da buttare), poi i più vecchi

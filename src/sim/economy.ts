@@ -115,7 +115,7 @@ export function salaryFor(e: Employee) {
 
 export function refreshCandidates(s: GameState) {
   s.candidates = [];
-  for (const r of ['cucina', 'cucina', 'cassa', 'cassa', 'manager'] as Role[]) s.candidates.push(makeCandidate(s, r));
+  for (const r of ['cucina', 'cucina', 'cucina', 'cucina', 'cassa', 'cassa', 'cassa', 'manager'] as Role[]) s.candidates.push(makeCandidate(s, r));
   s.candidatesDay = day(s);
 }
 
