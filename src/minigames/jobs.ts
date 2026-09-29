@@ -4,7 +4,7 @@ import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
 import type { ParticleKind } from '../world/particles';
-import { arrow, boxProp, bush, cone, cylProp, foam, halo, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
+import { arrow, boxProp, bush, cone, cylProp, foam, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
 
 export interface JobRun {
   title: string;
@@ -188,7 +188,7 @@ export class PhasedRun extends BaseRun {
   }
 
   /** oggetti di scena che brillano per ogni punto da fare, con i materiali originali */
-  private glows = new Map<Task, { meshes: { m: THREE.Mesh; orig: THREE.Material | THREE.Material[] }[]; halo: THREE.Sprite }>();
+  private glows = new Map<Task, { meshes: { m: THREE.Mesh; orig: THREE.Material | THREE.Material[] }[] }>();
 
   /** Fa brillare gli oggetti vicini a un punto da fare (cassetta, cespuglio, muretto…). */
   private addGlow(t: Task) {
@@ -200,40 +200,35 @@ export class PhasedRun extends BaseRun {
         const m = c as THREE.Mesh;
         if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite) return;
         const orig = m.material;
+        // nessuna luce esterna: il colore dell'oggetto stesso si accende
         const glowMat = (mat: THREE.Material) => {
           const g = mat.clone() as THREE.MeshLambertMaterial;
-          g.emissive = new THREE.Color(0xffd54a);
-          g.emissiveIntensity = 0.5;
+          g.emissive = g.color ? g.color.clone() : new THREE.Color(0xffffff);
+          if (g.map) g.emissiveMap = g.map;
+          g.emissiveIntensity = 0;
           return g;
         };
         m.material = Array.isArray(orig) ? orig.map(glowMat) : glowMat(orig);
         meshes.push({ m, orig });
       });
     }
-    const h = halo();
-    h.position.set(t.pos.x, 0.8, t.pos.z);
-    h.renderOrder = 4;
-    this.game.scene.add(h);
-    this.glows.set(t, { meshes, halo: h });
+    this.glows.set(t, { meshes });
   }
 
   private removeGlow(t: Task) {
     const g = this.glows.get(t);
     if (!g) return;
     for (const { m, orig } of g.meshes) m.material = orig;
-    this.game.scene.remove(g.halo);
     this.glows.delete(t);
   }
 
   /** Luce che pulsa sugli oggetti ancora da usare (solo quelli attivi adesso). */
   private pulseGlows() {
     const pend = new Set(this.pending());
-    const k = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(performance.now() / 180));
+    // colore più vivo che pulsa piano (da +25% a +70%)
+    const k = 0.25 + 0.45 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
     for (const [t, g] of this.glows) {
       const on = pend.has(t) && !t.done;
-      g.halo.visible = on;
-      g.halo.material.opacity = 0.35 + k * 0.6;
-      g.halo.scale.setScalar(1.3 + k * 0.6);
       for (const { m } of g.meshes) {
         const mats = Array.isArray(m.material) ? m.material : [m.material];
         for (const mat of mats) (mat as THREE.MeshLambertMaterial).emissiveIntensity = on ? k : 0;

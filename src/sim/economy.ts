@@ -5,7 +5,7 @@ import {
 } from '../config/business';
 import { ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
-import { productLevel } from '../config/recipes';
+import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
@@ -227,6 +227,12 @@ export function buyUpgrade(s: GameState, b: Business, id: UpgradeId) {
   const def = UPGRADES[id];
   const cost = def.cost(lvl);
   if (lvl >= def.max || s.money < cost) return false;
+  // i locali hanno pareti limitate: niente postazioni nuove se non c'è posto
+  if ((id === 'fuochi' || id === 'banco') && hasInterior(b.type) &&
+    extraRoom(b.type, Math.min(2, upg(b, 'ampliamento')), upg(b, 'fuochi'), upg(b, 'banco')) <= 0) {
+    toast(`📏 Non c'è spazio sul muro: amplia prima ${b.type === 'foodtruck' ? 'il furgone' : 'il locale'}`, 'bad');
+    return false;
+  }
   addMoney(s, -cost);
   b.upgrades[id] = lvl + 1;
   toast(`${def.name} livello ${lvl + 1}`, 'good');

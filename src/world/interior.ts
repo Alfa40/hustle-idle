@@ -3,7 +3,7 @@ import { model } from '../assets';
 import { BUSINESS, TIME } from '../config/balance';
 import { bizType } from '../config/business';
 import { PRODUCTS, type ProductId } from '../config/products';
-import { COUNTER_Z, extraStations, LAYOUTS, type Layout, type StationDef } from '../config/recipes';
+import { COUNTER_Z, kitchenLayout, LAYOUTS, type Layout, type StationDef } from '../config/recipes';
 import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { missionProgress } from '../sim/calendar';
@@ -204,14 +204,17 @@ export class TruckInterior {
     s.add(sign);
 
     const t = this.biz.type as keyof typeof LAYOUTS;
-    const extras = extraStations(t, this.level, upg(this.biz, 'fuochi'), upg(this.biz, 'banco'));
     const pro = upg(this.biz, 'attrezzatura');
-    for (const d of [...this.layout.stations.filter((x) => x.level <= this.level), ...extras]) {
+    for (const d of kitchenLayout(t, this.level, upg(this.biz, 'fuochi'), upg(this.biz, 'banco'))) {
       const pos = new THREE.Vector3(d.x, 0, d.z);
       if (d.model) {
         const o = model(d.model, FURN);
-        // i mobili del furniture kit hanno l'origine in un angolo
-        o.position.set(d.x - 0.43 * FURN * 0.5, 0.05, d.z - 0.2 + 0.45 * FURN * 0.5);
+        // i mobili del furniture kit hanno l'origine in un angolo; il gruppo li ruota sulla parete
+        o.position.set(-0.43 * FURN * 0.5, 0.05, -0.2 + 0.45 * FURN * 0.5);
+        const wrap = new THREE.Group();
+        wrap.position.set(d.x, 0, d.z);
+        wrap.rotation.y = d.rot ?? 0;
+        wrap.add(o);
         // attrezzatura professionale: postazioni di lavoro lucide e dorate
         if (pro > 0 && (d.kind === 'hold' || d.kind === 'timed')) {
           o.traverse((m) => {
@@ -223,7 +226,7 @@ export class TruckInterior {
             mesh.material = mat;
           });
         }
-        s.add(o);
+        s.add(wrap);
       }
       const tall = d.model.includes('Fridge') || d.model.includes('bookcase');
       const st: Station = { def: d, pos, slots: [], hold: 0, tagY: d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7 };
@@ -454,8 +457,8 @@ export class TruckInterior {
     }
     this.nextRing.visible = this.nextArrow.visible = !!next;
     if (next) {
-      const z = next.def.z > 1 ? FRONT - 0.1 : next.pos.z + 0.95;
-      this.nextRing.position.set(next.pos.x, 0.08, z);
+      if (next.def.z > 1) this.nextRing.position.set(next.pos.x, 0.08, FRONT - 0.1);
+      else this.nextRing.position.copy(next.pos).addScaledVector(this.front(next), 0.95).setY(0.08);
       this.nextArrow.position.set(next.pos.x, 2.35 + Math.sin(performance.now() / 220) * 0.12, next.pos.z);
     }
   }
@@ -914,8 +917,15 @@ export class TruckInterior {
     return { act: st.def.kind === 'timed' ? 'cook' : 'work', target: st, t: 0 };
   }
 
+  /** Direzione verso cui guarda una postazione (dove ci si mette per usarla). */
+  private front(st: Station) {
+    return st.def.rot ? new THREE.Vector3(-1, 0, 0) : new THREE.Vector3(0, 0, 1);
+  }
+
   private standAt(st: Station) {
-    return new THREE.Vector3(st.pos.x + 0.35, 0, st.def.z > 1 ? FRONT - 0.2 : st.pos.z + 0.85);
+    if (st.def.z > 1) return new THREE.Vector3(st.pos.x + 0.35, 0, FRONT - 0.2);
+    const f = this.front(st);
+    return st.pos.clone().addScaledVector(f, 0.85).add(new THREE.Vector3(f.z * 0.3, 0, -f.x * 0.3));
   }
 
   /** Cammina verso un punto; true quando è arrivato. */
@@ -949,7 +959,7 @@ export class TruckInterior {
     }
     const st = job.target!;
     if (!this.walkTo(w, this.standAt(st), dt)) return;
-    w.char.faceTowards(w.char.root.position.x, w.char.root.position.z + (st.def.z > 1 ? 2 : -2), dt);
+    w.char.faceTowards(st.pos.x, st.pos.z, dt);
     const speed = Math.max(0.7, employeeRate(w.emp, this.biz) / 4);
     const pro = 1 + 0.15 * upg(this.biz, 'attrezzatura');
     switch (job.act) {
@@ -1230,7 +1240,7 @@ export class TruckInterior {
           st.hold += (dt * (1 + 0.15 * upg(this.biz, 'attrezzatura'))) / ((d.sec ?? 1) * SLOW);
           if (Math.random() < dt * 12) this.fx.emit('dust', st.pos.clone().setY(1.1), 1, 0xf5e6c8);
           this.player.play('interact-right', 0.1, 1.5);
-          this.player.faceTowards(st.pos.x, st.pos.z - 2, dt);
+          this.player.faceTowards(st.pos.x, st.pos.z, dt);
           if (st.hold >= 1) {
             st.hold = 0;
             it.step++;

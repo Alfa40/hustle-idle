@@ -29,6 +29,8 @@ export interface StationDef {
   sec?: number;
   /** posti per le postazioni "timed" */
   slots?: number;
+  /** rotazione del mobile (0 = guarda verso i clienti, -90° = sulla parete destra) */
+  rot?: number;
 }
 
 export interface Layout {
@@ -144,38 +146,47 @@ export const EXPANSION_NAMES = ['Base', 'Ampliato', 'Grande'];
 
 /** Larghezza della stanza e bordo sinistro (uguali per tutte le attività). */
 export const ROOM_LEFT = -3.75;
+const STEP = 1.1;
 
-/** Posti liberi sull'isola centrale per i mobili extra dei miglioramenti. */
-export function extraSpots(t: keyof typeof LAYOUTS, level: number) {
-  const lay = LAYOUTS[t];
-  const right = ROOM_LEFT + lay.width[level] - 1.0;
-  const used = lay.stations.filter((s) => s.level <= level && Math.abs(s.z - ISLAND_Z) < 0.5).map((s) => s.x);
-  const out: { x: number; z: number }[] = [];
-  for (let x = ROOM_LEFT + 1.4; x <= right; x += 1.55) {
-    if (used.some((u) => Math.abs(u - x) < 1.35)) continue;
-    out.push({ x, z: ISLAND_Z });
-  }
+/** Posti lungo le pareti: prima il fondo, poi la parete destra (cucina a L). */
+function wallSpots(t: keyof typeof LAYOUTS, level: number) {
+  const W = LAYOUTS[t].width[level];
+  const out: { x: number; z: number; rot: number }[] = [];
+  for (let x = ROOM_LEFT + 1.05; x <= ROOM_LEFT + W - 1.0; x += STEP) out.push({ x, z: BACK_Z, rot: 0 });
+  const sx = ROOM_LEFT + W - 0.55;
+  for (let z = BACK_Z + 1.3; z <= 0.35; z += STEP) out.push({ x: sx, z, rot: -Math.PI / 2 });
   return out;
 }
 
-/** Mobili extra (fuochi e banchi) messi nei posti liberi: prima i fuochi, poi i banchi. */
-export function extraStations(t: keyof typeof LAYOUTS, level: number, fuochi: number, banchi: number): StationDef[] {
+/**
+ * Tutte le postazioni di lavoro della cucina, in fila lungo le pareti:
+ * i mobili extra (fuochi, banchi) stanno subito accanto a quelli dello stesso tipo.
+ * Bancone e ripiano restano al loro posto. Se non c'è abbastanza parete, gli extra non stanno.
+ */
+export function kitchenLayout(t: keyof typeof LAYOUTS, level: number, fuochi: number, banchi: number): StationDef[] {
   const lay = LAYOUTS[t];
-  const spots = extraSpots(t, level);
-  const out: StationDef[] = [];
-  const add = (id: string, n: number) => {
-    const base = lay.stations.find((s) => s.id === id)!;
-    for (let i = 0; i < n && spots.length; i++) {
-      const sp = spots.shift()!;
-      out.push({ ...base, x: sp.x, z: sp.z, level: 0, name: `${base.name} ${i + 2}` });
-    }
-  };
-  add(lay.extra.fuochi, fuochi);
-  add(lay.extra.banco, banchi);
-  return out;
+  const fixed = lay.stations.filter((s) => s.level <= level && (s.kind === 'counter' || s.kind === 'pass'));
+  const work = lay.stations.filter((s) => s.level <= level && s.kind !== 'counter' && s.kind !== 'pass');
+  // ordine lungo il muro: come nel layout, con il cestino in fondo
+  const ordered = [...work.filter((s) => s.kind !== 'bin'), ...work.filter((s) => s.kind === 'bin')];
+  const spots = wallSpots(t, level);
+  // le postazioni base hanno sempre il loro posto: gli extra solo se avanza parete
+  let room = spots.length - ordered.length;
+  const seq: StationDef[] = [];
+  for (const st of ordered) {
+    seq.push(st);
+    const want = st.id === lay.extra.fuochi ? fuochi : st.id === lay.extra.banco ? banchi : 0;
+    const n = Math.max(0, Math.min(want, room));
+    room -= n;
+    for (let i = 0; i < n; i++) seq.push({ ...st, name: `${st.name} ${i + 2}` });
+  }
+  const placed = seq.slice(0, spots.length).map((st, i) => ({ ...st, x: spots[i].x, z: spots[i].z, rot: spots[i].rot }));
+  return [...placed, ...fixed];
 }
 
 /** Quanti mobili extra ci stanno ancora (per i pulsanti dei miglioramenti). */
 export function extraRoom(t: keyof typeof LAYOUTS, level: number, fuochi: number, banchi: number) {
-  return extraSpots(t, level).length - fuochi - banchi;
+  const lay = LAYOUTS[t];
+  const base = lay.stations.filter((s) => s.level <= level && s.kind !== 'counter' && s.kind !== 'pass').length;
+  return wallSpots(t, level).length - base - fuochi - banchi;
 }

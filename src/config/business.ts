@@ -29,7 +29,7 @@ export interface UpgradeDef {
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   ampliamento: {
-    name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio, nuove postazioni di lavoro e nuovi prodotti da vendere.', max: 2,
+    name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio sulle pareti (per fuochi e banchi extra), nuove postazioni e nuovi prodotti da vendere.', max: 2,
     cost: (l) => [3500, 12000][l] ?? Infinity,
   },
   fuochi: {

@@ -287,7 +287,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Cotture e lavorazioni +30%; pazienza clienti ×2,2
 
 ### Cucina: miglioramenti visibili e dipendenti di supporto
-- Nuovi miglioramenti (attività con interno): Fuochi e forni extra (fino a 3), Banco di lavoro extra (fino a 2), Ripiano pronti più grande (+2 posti per livello). I mobili extra compaiono sull'isola centrale; se non c'è spazio serve l'ampliamento
+- Nuovi miglioramenti (attività con interno): Fuochi e forni extra (fino a 3), Banco di lavoro extra (fino a 2), Ripiano pronti più grande (+2 posti per livello). Tutte le postazioni stanno lungo le pareti (fondo, poi parete destra a L) e gli extra accanto a quelle dello stesso tipo; il centro resta libero. Se la parete è piena il gioco avvisa: prima serve ampliare il furgone/locale
 - Ogni miglioramento si vede: attrezzatura = postazioni dorate, look = piante e tappeto, pubblicità = manifesti, magazzino = scatoloni, più prodotti = lavagna del menù
 - Cuochi: di base aiutano (tolgono dal fuoco ciò che il giocatore non prende, lo finiscono e lo mettono sul ripiano, buttano il freddo); con la coda lunga (3+ clienti) preparano anche da zero. Si possono assumere quanti dipendenti si vuole (8 candidati al giorno, pulsante per cercarne altri a €40)
 
@@ -299,7 +299,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Magazzinieri (nuovo ruolo): portano le scorte dal magazzino al frigo e riordinano anche senza manager
 
 ### Lavoretti
-- Gli oggetti da usare nella fase attuale brillano (luce che pulsa + alone): cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
+- Gli oggetti da usare nella fase attuale hanno il loro colore più acceso che pulsa (niente luce esterna): cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
