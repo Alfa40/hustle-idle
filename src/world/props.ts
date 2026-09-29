@@ -309,3 +309,45 @@ export function halo(color = 0xffe066) {
   s.scale.setScalar(1.6);
   return s;
 }
+
+/** Cassetta della posta su palo, con sportello e bandierina: si riconosce da lontano. */
+export function mailbox(color: number) {
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.95, 8), lamb(0x5b4636));
+  post.position.y = 0.475;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.26, 0.52), lamb(color));
+  body.position.y = 1.08;
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.52, 14, 1, false, 0, Math.PI), lamb(color));
+  top.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+  top.position.y = 1.21;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.03), lamb(0xffffff));
+  door.position.set(0, 1.12, 0.27);
+  const flagPole = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.34, 0.03), lamb(0xe53935));
+  flagPole.position.set(0.2, 1.3, -0.05);
+  const flag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.18), lamb(0xe53935));
+  flag.position.set(0.2, 1.41, 0.04);
+  for (const m of [post, body, top, door, flagPole, flag]) {
+    m.castShadow = true;
+    g.add(m);
+  }
+  return g;
+}
+
+/** Espositore dei volantini davanti al negozio: mobiletto giallo con pile di fogli colorati e cartello. */
+export function flyerStand() {
+  const g = new THREE.Group();
+  const add = (geo: THREE.BufferGeometry, color: number, x: number, y: number, z: number) => {
+    const m = new THREE.Mesh(geo, lamb(color));
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    g.add(m);
+    return m;
+  };
+  add(new THREE.BoxGeometry(0.8, 0.8, 0.45), 0xffc21a, 0, 0.4, 0);
+  const colors = [0xff5d73, 0x2d9cdb, 0x7ed957];
+  colors.forEach((c, i) => add(new THREE.BoxGeometry(0.22, 0.14, 0.3), c, -0.26 + i * 0.26, 0.87, 0));
+  add(new THREE.BoxGeometry(0.05, 0.7, 0.05), 0x5b4636, 0, 1.15, -0.18);
+  add(new THREE.BoxGeometry(0.6, 0.36, 0.05), 0x2d9cdb, 0, 1.55, -0.18);
+  add(new THREE.BoxGeometry(0.44, 0.22, 0.02), 0xffffff, 0, 1.55, -0.15);
+  return g;
+}

@@ -300,6 +300,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Lavoretti
 - Gli oggetti da usare nella fase attuale hanno il loro colore più acceso che pulsa (niente luce esterna): cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
+- Volantinaggio e consegne: al negozio c'è un espositore giallo dei volantini o una pila di pacchi; a ogni indirizzo una cassetta della posta su palo con bandierina, così il punto si trova subito
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

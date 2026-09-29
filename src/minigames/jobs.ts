@@ -4,7 +4,7 @@ import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
 import type { ParticleKind } from '../world/particles';
-import { arrow, boxProp, bush, cone, cylProp, foam, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
+import { arrow, boxProp, bush, cone, cylProp, flyerStand, foam, label, leafPile, mailbox, plateStack, ring, trimmedBush } from '../world/props';
 
 export interface JobRun {
   title: string;
@@ -225,8 +225,8 @@ export class PhasedRun extends BaseRun {
   /** Luce che pulsa sugli oggetti ancora da usare (solo quelli attivi adesso). */
   private pulseGlows() {
     const pend = new Set(this.pending());
-    // colore più vivo che pulsa piano (da +25% a +70%)
-    const k = 0.25 + 0.45 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
+    // colore più vivo che pulsa (da +55% a +120%)
+    const k = 0.55 + 0.65 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
     for (const [t, g] of this.glows) {
       const on = pend.has(t) && !t.done;
       for (const { m } of g.meshes) {
@@ -487,8 +487,21 @@ export function routeJob(game: Game, level: number, start: Slot, title: string, 
     },
   ];
   const run = new PhasedRun(game, level, title, phases, { time: (dist / 5.2) * (flyer ? 1.35 : 1.45) + 6 + n * 2 });
-  // cassette o portoni segnati durante il giro
-  for (const s of stops) run.prop(boxProp(0.3, 1, 0.3, flyer ? 0x2d9cdb : 0xffc21a), s.pos.clone().add(new THREE.Vector3(0.7, 0, 0)));
+  // al negozio: espositore dei volantini o pila di pacchi, accanto a chi ti dà il lavoro
+  const face = (s: Slot) => Math.atan2(DIR_VEC[s.dir][0], DIR_VEC[s.dir][1]);
+  const at = frame(start);
+  if (flyer) run.prop(flyerStand(), at(start.pos, 0.1, 0.8), face(start), 0.85);
+  else {
+    const pile = new THREE.Group();
+    [[0, 0, 0], [0.42, 0, 0.05], [0.2, 0.4, 0.02]].forEach(([x, y, z]) => {
+      const b = box();
+      b.position.set(x - 0.2, y, z);
+      pile.add(b);
+    });
+    run.prop(pile, at(start.pos, 0.1, 0.8), face(start), 0.9);
+  }
+  // a ogni indirizzo una cassetta della posta su palo accanto alla porta
+  for (const s of stops) run.prop(mailbox(flyer ? 0x2d9cdb : 0xffc21a), frame(s)(s.pos, 0.1, 0.7), face(s), 0.9);
   return run;
 }
 
