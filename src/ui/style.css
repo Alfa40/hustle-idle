@@ -551,3 +551,15 @@ body.guide-on .hud-top { display: none; }
 .gd-caps span { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
 .gd-caps span.money { background: var(--green-d); }
 @media (orientation: landscape) { .guide { width: min(480px, 46vw); } }
+
+/* ---------- classifica mondiale ---------- */
+.lb-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 6px; background: #fff; border-radius: 14px; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08); }
+.lb-row.me { background: #fff4c7; outline: 2px solid #ffc21a; }
+.lb-pos { width: 30px; text-align: center; font-size: 20px; }
+.lb-pos b { font-size: 16px; color: #6b6b85; }
+.lb-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lb-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-name small { color: #8a8aa0; font-size: 12px; }
+.lb-fame { font-weight: 800; white-space: nowrap; }
+.lb-gap { text-align: center; color: #8a8aa0; margin: 2px 0 6px; }
+.lb-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 18px; padding: 12px 14px; border-radius: 14px; border: 2px solid #d6d6e4; }

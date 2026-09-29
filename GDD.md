@@ -141,6 +141,12 @@ Nuove categorie arriveranno insieme alle nuove attività.
 - **Missioni giornaliere** (lavori brevi) e **settimanali** (lavori lunghi e strutturati, per esempio catering per un matrimonio o il trasloco di un'azienda).
 - Il tipo di missione, la ricompensa e la difficoltà cambiano in base a **fama ed esperienza** del player e si rinnovano ogni giorno o ogni settimana.
 
+### Classifica mondiale
+- Dal Profilo → **🏆 Classifica mondiale**: primi 50 giocatori per fama totale (somma della fama di tutte le categorie), con nome e rango; la propria riga è evidenziata e compare anche se si è fuori dai primi 50.
+- Al primo accesso si sceglie il nome (max 20 caratteri, modificabile). Identità anonima per dispositivo: un solo posto per dispositivo, vale la partita con più fama.
+- Il punteggio si invia in automatico col salvataggio (al massimo una volta al minuto) e all'apertura della classifica; senza rete il gioco continua normalmente.
+- Backend: lo stesso servizio Render + Upstash Redis della classifica di Magic Trip (`crazy-town.onrender.com`), con chiavi separate (`hustle:leaderboard`, `?game=hustle`).
+
 ## 10. Tempo di gioco
 
 - **1 mese di gioco = 2 ore reali** (4 minuti reali per giorno di gioco) *(tarabile)*.

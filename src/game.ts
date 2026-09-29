@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { submit as submitScore } from './sim/leaderboard';
 import { model, preload } from './assets';
 import { JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
@@ -1225,6 +1226,7 @@ export class Game {
     this.saveTimer = 0;
     if (this.resetting || this.mode !== 'play') return;
     saveState(this.state);
+    void submitScore(this.state);
   }
 
   private hiddenAt = 0;

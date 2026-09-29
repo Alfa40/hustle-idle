@@ -21,7 +21,8 @@ import {
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
-import { addFame, addMoney, rank, skillLevel } from '../sim/progress';
+import { addFame, addMoney, rank, skillLevel, totalFame } from '../sim/progress';
+import { fetchBoard, MAX_NICK, nickname as lbNickname, setNickname as setLbNickname, submit as submitScore, type LbData, type LbEntry } from '../sim/leaderboard';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type ServiceOrder,
@@ -204,6 +205,7 @@ export class UI {
       view.zoomBy(Math.exp(e.deltaY * 0.001));
     }, { passive: true });
     window.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       if (e.code === 'KeyQ') view.hold('spin', 1);
       if (e.code === 'KeyR') view.hold('spin', -1);
     });
@@ -1094,13 +1096,86 @@ export class UI {
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(s.xp[k] - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div></div>`;
         }).join('');
         return `<div class="card hero tint"><div class="emoji">🧑‍💼</div><div class="muted small">Il tuo rango</div><div class="big">${rank(s)}</div></div>
+          <button class="btn full" data-a="board" style="margin-bottom:10px">🏆 Classifica mondiale · fama ${totalFame(s).toFixed(1)}</button>
           <div class="grid2" style="margin-bottom:10px"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
           <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div></div>
           <p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>
           ${skills}`;
       },
-      actions: {},
+      actions: {
+        board: () => {
+          this.close();
+          this.openLeaderboard();
+        },
+      },
     });
+  }
+
+  // ---------------- classifica mondiale ----------------
+
+  openLeaderboard() {
+    const s = this.s;
+    let data: LbData | null = null;
+    let state: 'loading' | 'ok' | 'error' = 'loading';
+    let editing = !lbNickname();
+    let panel: Panel;
+    const load = async () => {
+      state = 'loading';
+      await submitScore(s, true);
+      data = await fetchBoard(50);
+      state = data ? 'ok' : 'error';
+      if (this.panel === panel) this.renderPanel();
+    };
+    const row = (e: LbEntry) => {
+      const medal = ['🥇', '🥈', '🥉'][e.rank - 1] ?? `<b>${e.rank}</b>`;
+      return `<div class="lb-row ${e.me ? 'me' : ''}"><span class="lb-pos">${medal}</span>
+        <span class="lb-name"><b>${esc(e.nickname)}</b><small>${esc(e.title)}</small></span>
+        <span class="lb-fame">⭐ ${e.fame.toFixed(1)}</span></div>`;
+    };
+    panel = {
+      title: '🏆 Classifica mondiale',
+      color: 'var(--orange)',
+      render: () => {
+        const fame = totalFame(s).toFixed(1);
+        if (editing) {
+          return `<div class="card hero tint"><div class="emoji">🏆</div><div class="muted small">La tua fama</div><div class="big">⭐ ${fame}</div></div>
+            <p class="muted small">Scegli il nome con cui comparire nella classifica mondiale. Conta la fama totale della tua partita migliore su questo dispositivo.</p>
+            <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
+            <button class="btn good full" data-a="save" style="margin-top:10px">✅ Salva il nome</button>`;
+        }
+        let list = '';
+        if (state === 'loading') list = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
+        else if (state === 'error' || !data) list = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p><button class="btn full" data-a="reload">🔄 Riprova</button>`;
+        else {
+          const d = data;
+          list = d.entries.length ? d.entries.map(row).join('') : `<p class="center muted">Nessuno in classifica: sii il primo!</p>`;
+          if (d.me && !d.entries.some((e) => e.me)) list += `<div class="lb-gap">…</div>` + row({ ...d.me, me: true });
+          list = `<div class="muted small" style="margin-bottom:6px">${d.total} giocatori in classifica</div>${list}
+            <button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>`;
+        }
+        return `<div class="card row between"><span><small class="muted">Tu sei</small><br><b>${esc(lbNickname())}</b> · ⭐ ${fame}</span>
+          <button class="btn sm sec" data-a="edit">✏️ Nome</button></div>${list}`;
+      },
+      actions: {
+        save: () => {
+          const v = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
+          if (!setLbNickname(v)) {
+            this.toast('✏️ Scrivi un nome');
+            return;
+          }
+          editing = false;
+          void load();
+        },
+        edit: () => {
+          editing = true;
+        },
+        reload: () => {
+          void load();
+        },
+      },
+    };
+    this.open(panel);
+    if (!editing) void load();
   }
 
   // ---------------- casa ----------------
