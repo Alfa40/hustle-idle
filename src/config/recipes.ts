@@ -61,7 +61,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
     floor: 0xe8e2d4,
     stations: [
       { id: 'frigo', kind: 'source', name: 'Frigo', icon: '🧊', verb: 'Prendi', model: 'furniture/kitchenFridge.glb', x: -2.6, z: BACK_Z, level: 0 },
-      { id: 'piastra', kind: 'timed', name: 'Piastra', icon: '🔥', verb: 'Cuoci', model: 'furniture/kitchenStove.glb', x: -1, z: BACK_Z, level: 0, sec: 3.2, slots: 2 },
+      { id: 'piastra', kind: 'timed', name: 'Piastra', icon: '🔥', verb: 'Cuoci', model: 'furniture/kitchenStove.glb', x: -1, z: BACK_Z, level: 0, sec: 4.6, slots: 2 },
       { id: 'banco', kind: 'hold', name: 'Banco assemblaggio', icon: '🥪', verb: 'Assembla', model: 'furniture/kitchenCabinetDrawer.glb', x: 0.8, z: BACK_Z, level: 0, sec: 1.1 },
       { id: 'cestino', kind: 'bin', name: 'Cestino', icon: '🗑️', verb: 'Butta', model: 'furniture/kitchenSink.glb', x: 2.6, z: BACK_Z, level: 0 },
       { id: 'finestra', kind: 'counter', name: 'Finestra clienti', icon: '🪟', verb: 'Servi', model: '', x: 0, z: COUNTER_Z, level: 0 },
@@ -87,7 +87,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
     stations: [
       { id: 'dispensa', kind: 'source', name: 'Dispensa', icon: '🌾', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: -2.6, z: BACK_Z, level: 0 },
       { id: 'impastatrice', kind: 'hold', name: 'Impastatrice', icon: '🥣', verb: 'Impasta', model: 'furniture/kitchenCabinetDrawer.glb', x: -1, z: BACK_Z, level: 0, sec: 1.4 },
-      { id: 'forno', kind: 'timed', name: 'Forno', icon: '🔥', verb: 'Inforna', model: 'furniture/kitchenStove.glb', x: 0.8, z: BACK_Z, level: 0, sec: 4, slots: 3 },
+      { id: 'forno', kind: 'timed', name: 'Forno', icon: '🔥', verb: 'Inforna', model: 'furniture/kitchenStove.glb', x: 0.8, z: BACK_Z, level: 0, sec: 5.8, slots: 3 },
       { id: 'tavolo', kind: 'hold', name: 'Tavolo da lavoro', icon: '🥐', verb: 'Forma', model: 'furniture/desk.glb', x: -1.6, z: ISLAND_Z, level: 0, sec: 1.1 },
       { id: 'cestino', kind: 'bin', name: 'Cestino', icon: '🗑️', verb: 'Butta', model: 'furniture/kitchenSink.glb', x: 2.6, z: BACK_Z, level: 0 },
       { id: 'bancone', kind: 'counter', name: 'Bancone', icon: '🧁', verb: 'Servi', model: '', x: 0, z: COUNTER_Z, level: 0 },
@@ -113,7 +113,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
     stations: [
       { id: 'argilla', kind: 'source', name: 'Argilla', icon: '🟤', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: -2.6, z: BACK_Z, level: 0 },
       { id: 'tornio', kind: 'hold', name: 'Tornio', icon: '🏺', verb: 'Modella', model: 'furniture/desk.glb', x: -1, z: BACK_Z, level: 0, sec: 1.8 },
-      { id: 'fornace', kind: 'timed', name: 'Fornace', icon: '🔥', verb: 'Cuoci', model: 'furniture/kitchenStove.glb', x: 0.8, z: BACK_Z, level: 0, sec: 5, slots: 2 },
+      { id: 'fornace', kind: 'timed', name: 'Fornace', icon: '🔥', verb: 'Cuoci', model: 'furniture/kitchenStove.glb', x: 0.8, z: BACK_Z, level: 0, sec: 7, slots: 2 },
       { id: 'pittura', kind: 'hold', name: 'Banco pittura', icon: '🎨', verb: 'Dipingi', model: 'furniture/desk.glb', x: -1.6, z: ISLAND_Z, level: 0, sec: 1.6 },
       { id: 'cestino', kind: 'bin', name: 'Cestino', icon: '🗑️', verb: 'Butta', model: 'furniture/kitchenSink.glb', x: 2.6, z: BACK_Z, level: 0 },
       { id: 'vetrina', kind: 'counter', name: 'Vetrina', icon: '🛍️', verb: 'Vendi', model: '', x: 0, z: COUNTER_Z, level: 0 },

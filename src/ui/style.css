@@ -543,9 +543,9 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 body.guide-on .hud-top { display: none; }
 .gd-title { font-weight: 700; font-size: 14px; }
 .gd-steps { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 5px; font-size: 12px; }
-.gd-steps i { font-style: normal; background: #f1ead9; border-radius: 8px; padding: 2px 6px; color: var(--ink-2); font-weight: 600; }
-.gd-steps i.ok { background: #dff5e6; color: var(--green-d); }
-.gd-steps i.now { background: var(--green); color: #fff; }
+.gd-steps i { font-style: normal; background: #f6f2e8; border: 2px solid var(--pc, #d8d0bd); border-radius: 8px; padding: 1px 6px; color: var(--pc, var(--ink-2)); font-weight: 700; }
+.gd-steps i.ok { background: #dff5e6; border-color: #bfe8cc; color: var(--green-d); }
+.gd-steps i.now { background: var(--pc, var(--green)); color: #fff; transform: scale(1.08); }
 .gd-steps b { color: var(--ink-2); }
 .gd-caps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .gd-caps span { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
