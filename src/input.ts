@@ -147,6 +147,7 @@ export class Input {
     this.dragging = false;
     this.move.x = this.move.y = 0;
     this.stick.classList.remove('on');
+    this.knob.style.transform = '';
     this.tap = null;
   }
 }

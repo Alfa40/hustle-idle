@@ -211,7 +211,8 @@ body.job-on .hud-top { display: none; }
 
 /* ---------- toast ---------- */
 .toasts {
-  position: fixed; bottom: calc(var(--sab) + 132px); left: 50%; transform: translateX(-50%);
+  /* sopra i pulsanti Sali/Scendi e azione: i messaggi non li coprono */
+  position: fixed; bottom: calc(var(--sab) + 212px); left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; z-index: 19;
   width: min(86vw, 420px);
 }
@@ -375,7 +376,7 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 /* ---------- pulsante veicolo ---------- */
 .ride-btn {
   /* in verticale a sinistra della colonna dei pulsanti (non copre Camera) */
-  position: fixed; right: calc(var(--sar) + 76px); bottom: calc(var(--sab) + 136px);
+  position: fixed; right: calc(var(--sar) + 76px); bottom: calc(var(--sab) + 136px); touch-action: none;
   width: 62px; height: 62px; border-radius: 50%; border: 4px solid #fff; background: var(--blue);
   display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0;
   box-shadow: 0 4px 0 var(--blue-d), 0 6px 12px rgba(0,0,0,.22); color: #fff;
@@ -677,3 +678,4 @@ body.guide-on .hud-top { display: none; }
 .hud-row.in-menu .hud-name { color: var(--purple-d); }
 .hud-menu-btn .i { color: #fff; font-weight: 900; font-size: 24px; }
 .hud-row .btn:last-child { min-width: 132px; }
+@media (orientation: landscape) { .toasts { bottom: calc(var(--sab) + 132px); } }

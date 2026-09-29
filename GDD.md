@@ -171,7 +171,7 @@ Nuove categorie arriveranno insieme alle nuove attività.
 
 ### Pulsanti a destra (Opzioni → Pulsanti a destra)
 - Ordine modificabile con ▲▼ per Attività, Missioni, Profilo, Casa, Negozio, Opzioni, Camera. Ognuno può essere "Visibile" o "Nel menu": quelli nel menu spariscono dalla colonna e si aprono col pulsante ☰ Menu (in fondo alla colonna, compare solo se c'è almeno un pulsante nel menu; il "!" delle missioni passa sul ☰). Tutti, alcuni o nessuno. "Disposizione iniziale" ripristina tutto
-- Il pulsante Sali/Scendi del veicolo in verticale sta a sinistra della colonna (non copre più Camera)
+- Il pulsante Sali/Scendi del veicolo in verticale sta a sinistra della colonna (non copre più Camera); si può usare anche mentre si tiene il dito sul joystick (risponde al tocco, non al "click"): si sale o si scende senza fermarsi e il joystick continua a funzionare. I messaggi a comparsa stanno più in alto, così non coprono Sali/Scendi
 
 ### Orari delle attività
 - I locali e i furgoni si possono usare solo da aperti (8:00–22:00): fuori orario la porta è chiusa ("🔒 Chiuso · apre alle 8:00") e il gioco suggerisce di andare a dormire; a chiusura, servito l'ultimo cliente, si esce da soli. I tuoi furgoni abbassano la serranda di notte. L'ufficio delle imprese di servizi resta sempre raggiungibile

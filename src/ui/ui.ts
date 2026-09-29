@@ -225,7 +225,13 @@ export class UI {
 
     const ride = document.createElement('button');
     ride.className = 'ride-btn';
-    ride.addEventListener('click', () => this.game.toggleRide());
+    // pointerdown e non click: su telefono il "click" non arriva se un altro dito sta già
+    // tenendo il joystick, così si può salire/scendere anche mentre ci si muove
+    ride.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.game.toggleRide();
+    });
     this.root.appendChild(ride);
     this.rideEl = ride;
 
@@ -292,7 +298,7 @@ export class UI {
     this.camEl.style.display = this.game.firstPerson ? 'none' : '';
     this.camEl.classList.toggle('changed', this.game.view.changed);
     const r = s.riding;
-    const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
+    const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.lastRide && s.vehicles.includes(s.lastRide) ? s.lastRide : s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {
       this.rideEl.dataset.k = rideTxt;
       this.rideEl.innerHTML = rideTxt;

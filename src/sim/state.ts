@@ -116,6 +116,8 @@ export interface GameState {
   vehicles: VehicleId[];
   /** veicolo su cui si è ora (null = a piedi) */
   riding: VehicleId | null;
+  /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
+  lastRide?: VehicleId;
   orderSeq: number;
   /** nome della partita scelto dal giocatore */
   saveName: string;

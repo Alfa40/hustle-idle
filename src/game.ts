@@ -1098,6 +1098,7 @@ export class Game {
       return;
     }
     this.state.riding = id;
+    this.state.lastRide = id;
     this.applyRide();
     toast(`${VEHICLES[id].icon} In sella: ${VEHICLES[id].name}`, 'info');
   }
@@ -1119,8 +1120,10 @@ export class Game {
       toast('Non hai veicoli: passa dalla 🛵 concessionaria', 'info');
       return;
     }
-    if (s.vehicles.length === 1) this.mount(s.vehicles[0]);
-    else this.ui.openGarage();
+    // sale subito sull'ultimo veicolo usato (niente finestra: il joystick non si ferma);
+    // gli altri veicoli si scelgono dalla concessionaria
+    const id = s.lastRide && s.vehicles.includes(s.lastRide) ? s.lastRide : s.vehicles[s.vehicles.length - 1];
+    this.mount(id);
   }
 
   // ---------------- casa ----------------
