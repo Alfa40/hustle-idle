@@ -25,6 +25,8 @@ export interface LbEntry {
 /** Un amico (o te) nella classifica tra amici, con le sue attività da mostrare sulla mappa. */
 export interface FriendEntry extends LbEntry {
   code: string;
+  /** sta giocando adesso (furgone aperto, piano con le luci accese) */
+  online?: boolean;
   bizs: { lot: string; type: string; lvl: number }[];
 }
 export interface LbData {
@@ -106,6 +108,20 @@ export async function fetchBoard(limit = 50): Promise<LbData | null> {
     return d;
   } catch {
     return null;
+  }
+}
+
+/** "Sto giocando": i tuoi amici vedono aperto il tuo furgone (e accese le luci del tuo piano). */
+export async function ping() {
+  if (!nickname() || document.hidden) return;
+  try {
+    await fetch(API + '/leaderboard/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game: 'hustle', player_id: playerId() }),
+    });
+  } catch {
+    /* offline */
   }
 }
 

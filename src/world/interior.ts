@@ -923,6 +923,12 @@ export class TruckInterior {
   update(dt: number) {
     const s = this.game.state;
     const gm = dt * TIME.GAME_MIN_PER_SEC;
+    // all'ora di chiusura, servito l'ultimo cliente, si esce e la porta resta chiusa fino al mattino
+    if (!isOpenHour(s) && !this.customers.length) {
+      toast(`🔒 L'attività ha chiuso: riapre alle ${BUSINESS.OPEN_HOUR}:00`, 'info');
+      this.game.exitTruck();
+      return;
+    }
     if (isOpenHour(s)) {
       this.spawnAcc += (totalDemand(s, this.biz) * gm) / 60;
       while (this.spawnAcc >= 1) {

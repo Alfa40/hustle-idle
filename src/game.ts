@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { fetchFriends, submit as submitScore, type FriendEntry } from './sim/leaderboard';
-import { logoSprite } from './logo';
+import { fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry } from './sim/leaderboard';
+import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
-import { JOB, TIME } from './config/balance';
+import { BUSINESS, JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
@@ -11,7 +11,7 @@ import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settin
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, genMissions, missionProgress, updateEvents, type OfflineReport } from './sim/calendar';
-import { bizAtLot, CHAR_MODELS, lotZone, refreshCandidates } from './sim/economy';
+import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
 import {
   day, hourOf, loadState, newState, pick, rand, saveState, setCurrentSlot,
@@ -95,7 +95,18 @@ interface TruckSite {
   slot: Slot;
   group: THREE.Group;
   inter: Interactable;
+  /** furgoni e piani degli amici sullo stesso posto */
+  extra: Interactable[];
   built: boolean;
+  /** era aperto quando è stato disegnato */
+  open: boolean;
+}
+
+/** Attività di un amico su un posto della tua città. */
+export interface FriendBiz {
+  friend: FriendEntry;
+  type: BusinessType;
+  lvl: number;
 }
 
 const PLAYER_MODEL = 'character-male-a';
@@ -244,8 +255,11 @@ export class Game {
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
     void this.refreshFriends();
-    // le attività degli amici si aggiornano ogni 5 minuti
-    setInterval(() => void this.refreshFriends(), 5 * 60_000);
+    // le attività degli amici (e chi sta giocando) si aggiornano ogni 2 minuti;
+    // ogni minuto si dice al server che stai giocando
+    setInterval(() => void this.refreshFriends(), 2 * 60_000);
+    void pingOnline();
+    setInterval(() => void pingOnline(), 60_000);
     this.spawnPlayer();
     this.mode = 'play';
     this.snapCamera();
@@ -378,30 +392,146 @@ export class Game {
 
   /** amici (te compreso) dall'ultima classifica tra amici */
   friends: FriendEntry[] = [];
-  /** attività degli amici mostrate sui lotti liberi della tua città */
-  friendBiz = new Map<string, { friend: FriendEntry; type: BusinessType; lvl: number }>();
+  /** attività degli amici per lotto, dalla fama più alta alla più bassa */
+  friendBiz = new Map<string, FriendBiz[]>();
 
   /**
-   * Scarica amici, loghi e attività; ogni attività di un amico compare sul suo lotto
-   * se da te è libero (se più amici hanno lo stesso lotto, vince chi ha più fama).
+   * Scarica amici, loghi, attività e chi sta giocando. Sullo stesso posto possono stare
+   * la tua attività e quelle degli amici: più furgoni affiancati, o un piano per amico sugli edifici.
    */
   async refreshFriends() {
     const d = await fetchFriends();
     if (!d) return;
     this.friends = d.entries;
-    const next = new Map<string, { friend: FriendEntry; type: BusinessType; lvl: number }>();
+    const next = new Map<string, FriendBiz[]>();
     for (const f of d.entries) {
       if (f.me) continue;
       for (const b of f.bizs) {
-        if (next.has(b.lot) || !this.city.lots.some((l) => l.id === b.lot) || !(b.type in BUSINESS_TYPES)) continue;
+        if (!this.city.lots.some((l) => l.id === b.lot) || !(b.type in BUSINESS_TYPES)) continue;
         if (!typesForLot(b.lot).includes(b.type as BusinessType)) continue;
-        next.set(b.lot, { friend: f, type: b.type as BusinessType, lvl: b.lvl });
+        const list = next.get(b.lot) ?? [];
+        list.push({ friend: f, type: b.type as BusinessType, lvl: b.lvl });
+        next.set(b.lot, list);
       }
     }
-    const changed = new Set([...this.friendBiz.keys(), ...next.keys()]);
+    for (const list of next.values()) list.sort((a, b) => b.friend.fame - a.friend.fame);
+    // si ridisegnano solo i posti che cambiano (amici nuovi, tolti, o che entrano/escono dal gioco)
+    const key = (l?: FriendBiz[]) => (l ?? []).map((x) => `${x.friend.code}${x.type}${x.friend.online ? 1 : 0}${JSON.stringify(x.friend.logo)}`).join();
+    const changed = [...new Set([...this.friendBiz.keys(), ...next.keys()])].filter((id) => key(this.friendBiz.get(id)) !== key(next.get(id)));
     this.friendBiz = next;
-    for (const id of changed) if (!bizAtLot(this.state, id)) this.setupLot(id);
+    for (const id of changed) this.setupLot(id);
     this.ui?.refresh();
+  }
+
+  /** Altezza del tetto dell'edificio di un locale (per aggiungere i piani degli amici). */
+  private roofTop(slot: Slot) {
+    const ray = new THREE.Raycaster(new THREE.Vector3(slot.center.x, 80, slot.center.z), new THREE.Vector3(0, -1, 0));
+    const hit = ray.intersectObjects(this.city.group.children, true).find((h) => (h.object as THREE.Mesh).isMesh && h.point.y > 1.5);
+    return hit ? hit.point.y : 6;
+  }
+
+  /** Impronta dell'edificio di un locale (dai muri per le collisioni). */
+  private footprint(slot: Slot) {
+    const area = (c: { minX: number; maxX: number; minZ: number; maxZ: number }) => (c.maxX - c.minX) * (c.maxZ - c.minZ);
+    const b = this.city.colliders
+      .filter((c) => slot.center.x > c.minX - 0.5 && slot.center.x < c.maxX + 0.5 && slot.center.z > c.minZ - 0.5 && slot.center.z < c.maxZ + 0.5)
+      .sort((a, c) => area(c) - area(a))[0];
+    return b ??{ minX: slot.center.x - 2.5, maxX: slot.center.x + 2.5, minZ: slot.center.z - 2.5, maxZ: slot.center.z + 2.5 };
+  }
+
+  /**
+   * Un furgone con il logo stampato sul fianco verso la strada. Aperto = tendone e bancone;
+   * chiuso = serranda abbassata. Sopra: logo e nome.
+   */
+  private buildVan(slot: Slot, logo: Logo | null, title: string, open: boolean, color: string) {
+    const g = new THREE.Group();
+    const van = model('cars/van.glb', 1.55);
+    van.rotation.y = DIR_ROT[slot.dir] - Math.PI / 2;
+    g.add(van);
+    const box = new THREE.Box3().setFromObject(van);
+    const [dx, , dz] = this.dirVec(slot, 1);
+    const reach = dx > 0 ? box.max.x : dx < 0 ? -box.min.x : dz > 0 ? box.max.z : -box.min.z;
+    const side = new THREE.Group();
+    side.rotation.y = DIR_ROT[slot.dir];
+    g.add(side);
+    if (open) {
+      const awn = model('commercial/detail-awning-wide.glb', 4.2);
+      awn.position.z = 0.75;
+      awn.position.y = 0.3;
+      side.add(awn);
+    } else {
+      // serranda abbassata sul lato di servizio
+      const sh = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.75, 0.05), new THREE.MeshLambertMaterial({ color: 0x8a94a6 }));
+      sh.position.set(0, box.max.y * 0.62, reach + 0.03);
+      side.add(sh);
+    }
+    // marchio sul fianco, ben visibile dalla strada
+    if (logo) {
+      const plate = logoPlate(logo, 0.95);
+      plate.position.set(open ? -0.75 : 0.9, box.max.y * 0.5, reach + 0.05);
+      side.add(plate);
+      // e grande sul tetto: dalla camera dall'alto è la prima cosa che si vede
+      const roof = logoPlate(logo, 1.35);
+      roof.rotation.x = -Math.PI / 2;
+      roof.position.set(0, box.max.y + 0.02, 0);
+      side.add(roof);
+      const lg = logoSprite(logo, 1.15);
+      lg.position.y = box.max.y + 1.55;
+      g.add(lg);
+    }
+    const sign = label(title, { bg: color, scale: 0.5 });
+    sign.position.y = box.max.y + 0.75;
+    g.add(sign);
+    return g;
+  }
+
+  /** Piano in più sopra un edificio per l'attività di un amico: luci accese se sta giocando. */
+  private buildFloor(slot: Slot, f: FriendBiz, y: number, h: number) {
+    const fp = this.footprint(slot);
+    const w = fp.maxX - fp.minX - 0.3;
+    const d = fp.maxZ - fp.minZ - 0.3;
+    const cx = (fp.minX + fp.maxX) / 2 - slot.center.x;
+    const cz = (fp.minZ + fp.maxZ) / 2 - slot.center.z;
+    const g = new THREE.Group();
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h - 0.02, d), new THREE.MeshLambertMaterial({ color: 0xf1ede4 }));
+    wall.position.set(cx, y + h / 2, cz);
+    wall.castShadow = true;
+    g.add(wall);
+    // fascia col colore del logo in cima al piano
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, 0.14, d + 0.08), new THREE.MeshLambertMaterial({ color: new THREE.Color(f.friend.logo?.bg ?? '#5b4bb7') }));
+    band.position.set(cx, y + h - 0.06, cz);
+    // il tetto del piano un filo più in alto della fascia (niente sfarfallio)
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.06, d - 0.1), new THREE.MeshLambertMaterial({ color: 0xcfc8b8 }));
+    roof.position.set(cx, y + h + 0.03, cz);
+    g.add(roof);
+    g.add(band);
+    // finestre sul fronte: accese (gialle) se l'amico sta giocando, spente altrimenti
+    const [dx, , dz] = this.dirVec(slot, 1);
+    const half = dx !== 0 ? w / 2 : d / 2;
+    const along = dx !== 0 ? d : w;
+    const lit = !!f.friend.online;
+    const winMat = new THREE.MeshBasicMaterial({ color: lit ? 0xffd966 : 0x33415a, toneMapped: !lit });
+    const face = new THREE.Group();
+    face.position.set(cx + dx * (half + 0.03), y, cz + dz * (half + 0.03));
+    face.rotation.y = DIR_ROT[slot.dir];
+    g.add(face);
+    const n = Math.max(2, Math.floor(along / 1.1));
+    for (let i = 0; i < n; i++) {
+      const x = -along / 2 + (i + 0.5) * (along / n);
+      if (Math.abs(x) < 0.7) continue; // al centro c'è il logo
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.55, h * 0.45), winMat);
+      win.position.set(x, h * 0.5, 0);
+      face.add(win);
+    }
+    if (f.friend.logo) {
+      const plate = logoPlate(f.friend.logo, Math.min(0.95, h * 0.85));
+      plate.position.set(0, h * 0.48, 0.01);
+      face.add(plate);
+    }
+    const tag = label(`${lit ? '💡' : '💤'} ${f.friend.nickname}`, { bg: '#5b4bb7', scale: 0.42 });
+    tag.position.set(cx + dx * (half + 0.4), y + h * 0.5, cz + dz * (half + 0.4));
+    g.add(tag);
+    return g;
   }
 
   // ---------------- lotti e food truck ----------------
@@ -411,6 +541,7 @@ export class Game {
     if (old) {
       this.scene.remove(old.group);
       this.removeInteractable(old.inter);
+      for (const x of old.extra) this.removeInteractable(x);
     }
     const slot = this.city.lots.find((l) => l.id === lotId)!;
     const lot = LOTS.find((l) => l.id === lotId)!;
@@ -419,36 +550,46 @@ export class Game {
     g.position.copy(slot.center);
     this.scene.add(g);
     let inter: Interactable;
+    const extra: Interactable[] = [];
     const [dx, , dz] = this.dirVec(slot, 1);
-    const fb = biz ? null : this.friendBiz.get(lotId);
-    if (fb) {
-      // attività di un amico: stesso aspetto delle tue, col suo logo e il suo nome
-      const def = bizType(fb.type);
-      if (slot.kind === 'truck') {
-        const van = model('cars/van.glb', 1.55);
-        van.rotation.y = DIR_ROT[slot.dir] - Math.PI / 2;
+    // collisioni dei furgoni di questo posto (si rifanno qui sotto)
+    this.city.colliders = this.city.colliders.filter((c) => (c as { lot?: string }).lot !== lotId);
+    // attività degli amici sullo stesso posto
+    const friends = this.friendBiz.get(lotId) ?? [];
+    if (slot.kind === 'truck' && friends.length) {
+      // furgoni affiancati lungo la strada: il tuo al centro, poi quelli degli amici con più fama
+      // ben separati: tra un furgone e l'altro resta un passaggio
+      const offsets = biz ? [5.6, -5.6] : [0, 5.6, -5.6];
+      friends.slice(0, offsets.length).forEach((f, i) => {
+        const def = bizType(f.type);
+        const van = this.buildVan(slot, f.friend.logo ?? null, `${f.friend.online ? '🟢' : '💤'} ${f.friend.nickname}`, !!f.friend.online, '#5b4bb7');
+        van.position.set(dz * offsets[i], 0, -dx * offsets[i]);
         g.add(van);
-      } else {
-        const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
-        mat.position.set(dx * 2.8, 0.05, dz * 2.8);
-        g.add(mat);
-      }
-      const y = slot.kind === 'truck' ? 2.9 : 4.2;
-      const off = slot.kind === 'truck' ? 0 : 2.2;
-      const sign = label(`${def.icon} ${fb.friend.nickname}`, { bg: '#5b4bb7', scale: 0.55 });
-      sign.position.set(dx * off, y, dz * off);
-      g.add(sign);
-      if (fb.friend.logo) {
-        const lg = logoSprite(fb.friend.logo, 1.1);
-        lg.position.set(dx * off, y + 0.95, dz * off);
-        g.add(lg);
-      }
-      inter = this.addInteractable({
-        pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2.2,
-        label: `${def.name} di ${fb.friend.nickname}`, icon: '🤝',
-        action: () => this.ui.openFriendBiz(lotId),
+        const vx = slot.center.x + dz * offsets[i];
+        const vz = slot.center.z - dx * offsets[i];
+        const hw = dx !== 0 ? 1.3 : 2.3;
+        const hd = dz !== 0 ? 1.3 : 2.3;
+        this.city.colliders.push(Object.assign({ minX: vx - hw, maxX: vx + hw, minZ: vz - hd, maxZ: vz + hd }, { lot: lotId }));
+        extra.push(this.addInteractable({
+          pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3 + dz * offsets[i], 0, dz * 2.3 - dx * offsets[i])), radius: 1.8,
+          label: `${def.name} di ${f.friend.nickname}${f.friend.online ? '' : ' (chiuso)'}`, icon: '🤝',
+          action: () => this.ui.openFriendBiz(lotId, f.friend.code),
+        }));
       });
-    } else if (!biz) {
+    } else if (slot.kind === 'shop' && friends.length) {
+      // un piano per amico sopra l'edificio: più in alto chi ha più fama
+      const top = this.roofTop(slot);
+      const h = 1.25;
+      [...friends.slice(0, 3)].reverse().forEach((f, i) => {
+        g.add(this.buildFloor(slot, f, top + i * h - 0.05, h));
+        extra.push(this.addInteractable({
+          pos: slot.pos.clone().add(new THREE.Vector3(dz * (1.6 + i * 0.9), 0, -dx * (1.6 + i * 0.9))), radius: 1.2,
+          label: `Piano ${i + 1}: ${bizType(f.type).name} di ${f.friend.nickname}`, icon: '🤝',
+          action: () => this.ui.openFriendBiz(lotId, f.friend.code),
+        }));
+      });
+    }
+    if (!biz) {
       const d = slot.kind === 'truck' ? 1.8 : 2.9;
       const sign = saleSign('€' + lot.price.toLocaleString('it-IT'));
       sign.position.set(dx * d + dz * 1.2, 0, dz * d + dx * 1.2);
@@ -463,32 +604,24 @@ export class Game {
         action: () => this.ui.openLot(lotId),
       });
     } else if (slot.kind === 'truck') {
-      // furgone con il lato di servizio (+X locale) verso la strada
-      const van = model('cars/van.glb', 1.55);
-      van.rotation.y = DIR_ROT[slot.dir] - Math.PI / 2;
-      g.add(van);
-      const awn = model('commercial/detail-awning-wide.glb', 4.2);
-      const side = new THREE.Group();
-      side.rotation.y = DIR_ROT[slot.dir];
-      side.add(awn);
-      awn.position.z = 0.75;
-      awn.position.y = 0.3;
-      g.add(side);
+      // il tuo furgone: lato di servizio verso la strada, aperto solo in orario
       const icons = biz.products.map((p) => PRODUCTS[p].icon).join(' ');
-      const sign = label(`🚚 ${icons}`, { bg: '#e8590c', scale: 0.55 });
-      sign.position.y = 2.9;
-      g.add(sign);
-      const lg = logoSprite(this.state.logo, 1.1);
-      lg.position.y = 3.85;
-      g.add(lg);
+      g.add(this.buildVan(slot, this.state.logo, `🚚 ${icons}`, isOpenHour(this.state), '#e8590c'));
       // collisione del furgone (lungo il lato perpendicolare alla strada)
       const hw = dx !== 0 ? 1.3 : 2.3;
       const hd = dz !== 0 ? 1.3 : 2.3;
-      this.city.colliders = this.city.colliders.filter((c) => (c as { lot?: string }).lot !== lotId);
       this.city.colliders.push(Object.assign({ minX: slot.center.x - hw, maxX: slot.center.x + hw, minZ: slot.center.z - hd, maxZ: slot.center.z + hd }, { lot: lotId }));
+      const game = this;
       inter = this.addInteractable({
         pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2,
-        label: 'Entra nel food truck', icon: '🚪', action: () => this.enterBusiness(lotId),
+        // da chiuso la porta resta chiusa: si torna dopo aver dormito
+        get label() {
+          return isOpenHour(game.state) ? 'Entra nel food truck' : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
+        },
+        get icon() {
+          return isOpenHour(game.state) ? '🚪' : '🔒';
+        },
+        action: () => this.enterBusiness(lotId),
       });
     } else {
       // negozio in un edificio: insegna colorata sopra l'ingresso
@@ -497,26 +630,57 @@ export class Game {
       const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.6 });
       sign.position.set(dx * 2.2, 4.2, dz * 2.2);
       g.add(sign);
-      const lg = logoSprite(this.state.logo, 1.2);
-      lg.position.set(dx * 2.2, 5.2, dz * 2.2);
-      g.add(lg);
+      // logo sospeso sopra l'insegna (se sopra ci sono i piani degli amici basta quello sulla facciata)
+      if (!friends.length) {
+        const lg = logoSprite(this.state.logo, 1.3);
+        lg.position.set(dx * 2.2, 5.3, dz * 2.2);
+        g.add(lg);
+      }
+      // marchio sulla facciata, sopra l'ingresso
+      const fp = this.footprint(slot);
+      const reach = dx > 0 ? fp.maxX - slot.center.x : dx < 0 ? slot.center.x - fp.minX : dz > 0 ? fp.maxZ - slot.center.z : slot.center.z - fp.minZ;
+      const plate = logoPlate(this.state.logo, 1.3);
+      plate.position.set(dx * (reach + 0.06), 3.25, dz * (reach + 0.06));
+      plate.rotation.y = DIR_ROT[slot.dir];
+      g.add(plate);
       const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
       mat.position.set(dx * 2.8, 0.05, dz * 2.8);
       g.add(mat);
       const service = def.kind === 'service';
+      const game = this;
       inter = this.addInteractable({
         pos: slot.pos, radius: 2.2,
-        label: service ? `Ufficio ${def.name.toLowerCase()}` : `Entra: ${def.name}`, icon: service ? '📋' : '🚪',
+        // l'ufficio delle imprese di servizi è sempre raggiungibile; i locali solo da aperti
+        get label() {
+          if (service) return `Ufficio ${def.name.toLowerCase()}`;
+          return isOpenHour(game.state) ? `Entra: ${def.name}` : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
+        },
+        get icon() {
+          return service ? '📋' : isOpenHour(game.state) ? '🚪' : '🔒';
+        },
         action: () => (service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
       });
     }
-    this.trucks.set(lotId, { lotId, slot, group: g, inter, built: !!biz });
+    this.trucks.set(lotId, { lotId, slot, group: g, inter, extra, built: !!biz, open: isOpenHour(this.state) });
+  }
+
+  /** All'apertura e alla chiusura i tuoi furgoni alzano o abbassano la serranda. */
+  private updateLotsOpen() {
+    const open = isOpenHour(this.state);
+    for (const t of this.trucks.values()) if (t.built && t.open !== open && LOTS.find((l) => l.id === t.lotId)?.kind === 'truck') this.setupLot(t.lotId);
   }
 
   enterBusiness(lotId: string) {
     const biz = bizAtLot(this.state, lotId);
     if (!biz || this.run) {
       if (this.run) toast('Finisci prima il lavoro in corso', 'bad');
+      return;
+    }
+    if (!isOpenHour(this.state)) {
+      const h = hourOf(this.state);
+      toast(h >= 19 || h < 6
+        ? `🔒 Chiuso: apre alle ${BUSINESS.OPEN_HOUR}:00. Vai a dormire a casa 🏠 e torna domattina`
+        : `🔒 Chiuso: apre alle ${BUSINESS.OPEN_HOUR}:00`, 'bad');
       return;
     }
     this.dismount();
@@ -760,19 +924,20 @@ export class Game {
       const def = LOTS.find((l) => l.id === lot.id)!;
       const biz = bizAtLot(this.state, lot.id);
       const zone = ZONES[lot.zone].name;
+      const fr = this.friendBiz.get(lot.id) ?? [];
+      const names = fr.map((x) => x.friend.nickname).join(', ');
       if (biz) {
         const bt = bizType(biz.type);
         const prods = biz.products.map((x) => PRODUCTS[x].name).join(' ');
         add(lot.center, {
-          id: 'lot:' + lot.id, icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, sub: `La tua attività · ${zone}`,
-          kind: 'biz', cat: 'mine', keywords: `${prods} mia mie`,
+          id: 'lot:' + lot.id, icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, sub: `La tua attività · ${zone}${fr.length ? ` · con ${names}` : ''}`,
+          kind: 'biz', cat: 'mine', keywords: `${prods} mia mie ${names}`,
         });
-      } else if (this.friendBiz.has(lot.id)) {
-        const fb = this.friendBiz.get(lot.id)!;
-        const bt = bizType(fb.type);
+      } else if (fr.length) {
+        const bt = bizType(fr[0].type);
         add(lot.center, {
-          id: 'lot:' + lot.id, icon: '🤝', color: '#5b4bb7', label: `${bt.name} di ${fb.friend.nickname}`, sub: `Attività di un amico · ${zone}`,
-          kind: 'lot', cat: 'forsale', keywords: `amico amici ${fb.friend.nickname} ${bt.name}`,
+          id: 'lot:' + lot.id, icon: '🤝', color: '#5b4bb7', label: fr.length > 1 ? `Attività di ${names}` : `${bt.name} di ${names}`, sub: `Amici · ${zone} · il posto è libero per te`,
+          kind: 'lot', cat: 'forsale', keywords: `amico amici ${names} ${bt.name}`,
         });
       } else {
         const types = typesForLot(lot.id).map((t) => bizType(t).name).join(' ');
@@ -959,6 +1124,7 @@ export class Game {
     }
     this.player.update(dt);
     this.updateLighting();
+    this.updateLotsOpen();
 
     this.saveTimer += dt;
     if (this.saveTimer > 10) this.save();

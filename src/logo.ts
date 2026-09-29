@@ -187,8 +187,7 @@ export function logoUrl(logo: Logo | null | undefined, s = 96) {
 export const logoImg = (logo: Logo | null | undefined, px = 32, cls = 'logo-img') =>
   logo ? `<img class="${cls}" src="${logoUrl(logo, px * 2)}" width="${px}" height="${px}" alt="">` : '';
 
-/** Logo come sprite 3D (insegne delle attività). */
-export function logoSprite(logo: Logo, size = 1) {
+function logoTexture(logo: Logo) {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   drawLogo(c.getContext('2d')!, logo, 256);
@@ -201,6 +200,25 @@ export function logoSprite(logo: Logo, size = 1) {
       tex.needsUpdate = true;
     });
   }
+  return tex;
+}
+
+/**
+ * Logo "stampato" come marchio su una superficie (fianco del furgone, facciata):
+ * un pannello piatto rivolto verso +Z, sempre ben illuminato.
+ */
+export function logoPlate(logo: Logo, size = 1) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(size, size),
+    new THREE.MeshBasicMaterial({ map: logoTexture(logo), transparent: true, alphaTest: 0.05, toneMapped: false }),
+  );
+  m.renderOrder = 3;
+  return m;
+}
+
+/** Logo come sprite 3D (insegne delle attività). */
+export function logoSprite(logo: Logo, size = 1) {
+  const tex = logoTexture(logo);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
   s.scale.set(size, size, 1);
   s.renderOrder = 12;

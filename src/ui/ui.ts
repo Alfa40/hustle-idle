@@ -1409,19 +1409,20 @@ export class UI {
   }
 
   /** Attività di un amico sulla tua mappa: chi è, che attività ha, e il lotto (che puoi comunque comprare). */
-  openFriendBiz(lotId: string) {
-    const fb = this.game.friendBiz.get(lotId);
+  openFriendBiz(lotId: string, code: string) {
+    const fb = this.game.friendBiz.get(lotId)?.find((x) => x.friend.code === code);
     if (!fb) return;
     const def = bizType(fb.type);
     const f = fb.friend;
+    const mine = !!bizAtLot(this.s, lotId);
     this.open({
       title: `🤝 ${def.name} di ${f.nickname}`,
       small: true,
       color: '#5b4bb7',
       render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small></div></div>
-        <div class="grid2"><div class="stat"><b>${def.icon} ${def.name}</b><span>attività dell'amico</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 dimensione</span></div></div>
-        <p class="muted small">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora puoi vederle sulla tua mappa. Questo posto da te è libero: se lo compri, la tua attività prende il posto di quella dell'amico.</p>
-        <div class="btnrow"><button class="btn sec" data-a="lot">🏷️ Vedi il posto</button><button class="btn" data-a="board">👥 Classifica amici</button></div>`,
+        <div class="grid2"><div class="stat ${f.online ? 's-green' : ''}"><b>${f.online ? '🟢 Aperto' : '💤 Chiuso'}</b><span>${f.online ? 'sta giocando adesso' : 'non sta giocando'}</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 ${def.icon} ${def.name}</span></div></div>
+        <p class="muted small">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora le vedi nella tua città: ${mine ? 'qui c\'è anche la tua attività.' : 'questo posto da te è libero e puoi comprarlo lo stesso: le attività degli amici restano accanto alla tua.'}</p>
+        <div class="btnrow">${mine ? '' : '<button class="btn sec" data-a="lot">🏷️ Vedi il posto</button>'}<button class="btn" data-a="board">👥 Classifica amici</button></div>`,
       actions: {
         lot: () => {
           this.close();
