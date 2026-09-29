@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { submit as submitScore } from './sim/leaderboard';
+import { fetchFriends, submit as submitScore, type FriendEntry } from './sim/leaderboard';
+import { logoSprite } from './logo';
 import { model, preload } from './assets';
 import { JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
@@ -30,7 +31,7 @@ import { board, exclamation, label, playerDot, ring, saleSign } from './world/pr
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
 import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
-import { bizType } from './config/business';
+import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
 import { completeOrder, lotPrice, typesForLot } from './sim/economy';
@@ -242,6 +243,9 @@ export class Game {
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
+    void this.refreshFriends();
+    // le attività degli amici si aggiornano ogni 5 minuti
+    setInterval(() => void this.refreshFriends(), 5 * 60_000);
     this.spawnPlayer();
     this.mode = 'play';
     this.snapCamera();
@@ -370,6 +374,36 @@ export class Game {
     this.camera.updateProjectionMatrix();
   }
 
+  // ---------------- amici ----------------
+
+  /** amici (te compreso) dall'ultima classifica tra amici */
+  friends: FriendEntry[] = [];
+  /** attività degli amici mostrate sui lotti liberi della tua città */
+  friendBiz = new Map<string, { friend: FriendEntry; type: BusinessType; lvl: number }>();
+
+  /**
+   * Scarica amici, loghi e attività; ogni attività di un amico compare sul suo lotto
+   * se da te è libero (se più amici hanno lo stesso lotto, vince chi ha più fama).
+   */
+  async refreshFriends() {
+    const d = await fetchFriends();
+    if (!d) return;
+    this.friends = d.entries;
+    const next = new Map<string, { friend: FriendEntry; type: BusinessType; lvl: number }>();
+    for (const f of d.entries) {
+      if (f.me) continue;
+      for (const b of f.bizs) {
+        if (next.has(b.lot) || !this.city.lots.some((l) => l.id === b.lot) || !(b.type in BUSINESS_TYPES)) continue;
+        if (!typesForLot(b.lot).includes(b.type as BusinessType)) continue;
+        next.set(b.lot, { friend: f, type: b.type as BusinessType, lvl: b.lvl });
+      }
+    }
+    const changed = new Set([...this.friendBiz.keys(), ...next.keys()]);
+    this.friendBiz = next;
+    for (const id of changed) if (!bizAtLot(this.state, id)) this.setupLot(id);
+    this.ui?.refresh();
+  }
+
   // ---------------- lotti e food truck ----------------
 
   setupLot(lotId: string) {
@@ -386,7 +420,35 @@ export class Game {
     this.scene.add(g);
     let inter: Interactable;
     const [dx, , dz] = this.dirVec(slot, 1);
-    if (!biz) {
+    const fb = biz ? null : this.friendBiz.get(lotId);
+    if (fb) {
+      // attività di un amico: stesso aspetto delle tue, col suo logo e il suo nome
+      const def = bizType(fb.type);
+      if (slot.kind === 'truck') {
+        const van = model('cars/van.glb', 1.55);
+        van.rotation.y = DIR_ROT[slot.dir] - Math.PI / 2;
+        g.add(van);
+      } else {
+        const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
+        mat.position.set(dx * 2.8, 0.05, dz * 2.8);
+        g.add(mat);
+      }
+      const y = slot.kind === 'truck' ? 2.9 : 4.2;
+      const off = slot.kind === 'truck' ? 0 : 2.2;
+      const sign = label(`${def.icon} ${fb.friend.nickname}`, { bg: '#5b4bb7', scale: 0.55 });
+      sign.position.set(dx * off, y, dz * off);
+      g.add(sign);
+      if (fb.friend.logo) {
+        const lg = logoSprite(fb.friend.logo, 1.1);
+        lg.position.set(dx * off, y + 0.95, dz * off);
+        g.add(lg);
+      }
+      inter = this.addInteractable({
+        pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2.2,
+        label: `${def.name} di ${fb.friend.nickname}`, icon: '🤝',
+        action: () => this.ui.openFriendBiz(lotId),
+      });
+    } else if (!biz) {
       const d = slot.kind === 'truck' ? 1.8 : 2.9;
       const sign = saleSign('€' + lot.price.toLocaleString('it-IT'));
       sign.position.set(dx * d + dz * 1.2, 0, dz * d + dx * 1.2);
@@ -416,6 +478,9 @@ export class Game {
       const sign = label(`🚚 ${icons}`, { bg: '#e8590c', scale: 0.55 });
       sign.position.y = 2.9;
       g.add(sign);
+      const lg = logoSprite(this.state.logo, 1.1);
+      lg.position.y = 3.85;
+      g.add(lg);
       // collisione del furgone (lungo il lato perpendicolare alla strada)
       const hw = dx !== 0 ? 1.3 : 2.3;
       const hd = dz !== 0 ? 1.3 : 2.3;
@@ -432,6 +497,9 @@ export class Game {
       const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.6 });
       sign.position.set(dx * 2.2, 4.2, dz * 2.2);
       g.add(sign);
+      const lg = logoSprite(this.state.logo, 1.2);
+      lg.position.set(dx * 2.2, 5.2, dz * 2.2);
+      g.add(lg);
       const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
       mat.position.set(dx * 2.8, 0.05, dz * 2.8);
       g.add(mat);
@@ -698,6 +766,13 @@ export class Game {
         add(lot.center, {
           id: 'lot:' + lot.id, icon: bt.icon, color: bt.color, label: `${bt.name} · ${def.name}`, sub: `La tua attività · ${zone}`,
           kind: 'biz', cat: 'mine', keywords: `${prods} mia mie`,
+        });
+      } else if (this.friendBiz.has(lot.id)) {
+        const fb = this.friendBiz.get(lot.id)!;
+        const bt = bizType(fb.type);
+        add(lot.center, {
+          id: 'lot:' + lot.id, icon: '🤝', color: '#5b4bb7', label: `${bt.name} di ${fb.friend.nickname}`, sub: `Attività di un amico · ${zone}`,
+          kind: 'lot', cat: 'forsale', keywords: `amico amici ${fb.friend.nickname} ${bt.name}`,
         });
       } else {
         const types = typesForLot(lot.id).map((t) => bizType(t).name).join(' ');

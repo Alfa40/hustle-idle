@@ -1,5 +1,6 @@
 import type { GameState } from './state';
 import { rank, totalFame } from './progress';
+import { preloadLogo, safeLogo, type Logo } from '../logo';
 
 /**
  * Classifica mondiale per fama. Stesso servizio della classifica di Magic Trip,
@@ -18,7 +19,13 @@ export interface LbEntry {
   fame: number;
   money: number;
   title: string;
+  logo?: Logo | null;
   me?: boolean;
+}
+/** Un amico (o te) nella classifica tra amici, con le sue attività da mostrare sulla mappa. */
+export interface FriendEntry extends LbEntry {
+  code: string;
+  bizs: { lot: string; type: string; lvl: number }[];
 }
 export interface LbData {
   entries: LbEntry[];
@@ -79,7 +86,10 @@ export async function submit(s: GameState, force = false) {
     const r = await fetch(API + '/leaderboard/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ game: 'hustle', player_id: playerId(), nickname: nick, fame, money: Math.floor(s.totalEarned), title: rank(s) }),
+      body: JSON.stringify({
+        game: 'hustle', player_id: playerId(), nickname: nick, fame, money: Math.floor(s.totalEarned), title: rank(s),
+        logo: s.logo, bizs: s.businesses.map((b) => ({ lot: b.lotId, type: b.type, lvl: b.upgrades.ampliamento ?? 0 })),
+      }),
     });
     if (r.ok) set(BEST_KEY, String(fame));
   } catch {
@@ -91,7 +101,65 @@ export async function fetchBoard(limit = 50): Promise<LbData | null> {
   try {
     const r = await fetch(`${API}/leaderboard?game=hustle&limit=${limit}&player_id=${playerId()}`);
     if (!r.ok) return null;
-    return (await r.json()) as LbData;
+    const d = (await r.json()) as LbData;
+    for (const e of [...d.entries, ...(d.me ? [d.me] : [])]) e.logo = safeLogo(e.logo);
+    return d;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------- amici ----------------
+
+const FRIENDS_KEY = 'hustle.friends';
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+/** Il tuo codice amico: 6 caratteri ricavati dall'id (lo stesso calcolo è sul server). */
+export function friendCode(id = playerId()) {
+  const n = parseInt(id.slice(0, 8), 16) >>> 2;
+  let code = '';
+  for (let i = 5; i >= 0; i--) code += CODE_ALPHABET[(n >>> (i * 5)) & 31];
+  return code;
+}
+
+export function friendCodes(): string[] {
+  try {
+    const v = JSON.parse(get(FRIENDS_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((c) => typeof c === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Aggiunge un amico col suo codice; restituisce un messaggio d'errore o null. */
+export function addFriend(raw: string): string | null {
+  const code = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) return 'Il codice ha 6 caratteri (lettere e numeri)';
+  if (code === friendCode()) return 'Questo è il tuo codice!';
+  const list = friendCodes();
+  if (list.includes(code)) return 'Amico già aggiunto';
+  if (list.length >= 50) return 'Hai già 50 amici';
+  set(FRIENDS_KEY, JSON.stringify([...list, code]));
+  return null;
+}
+
+export function removeFriend(code: string) {
+  set(FRIENDS_KEY, JSON.stringify(friendCodes().filter((c) => c !== code)));
+}
+
+/** Classifica tra amici (te compreso), con loghi e attività; `missing` = codici che non esistono (ancora). */
+export async function fetchFriends(): Promise<{ entries: FriendEntry[]; missing: string[] } | null> {
+  try {
+    const r = await fetch(`${API}/leaderboard/friends?game=hustle&player_id=${playerId()}&codes=${friendCodes().join(',')}`);
+    if (!r.ok) return null;
+    const d = (await r.json()) as { entries: FriendEntry[]; missing: string[] };
+    for (const e of d.entries) {
+      e.logo = safeLogo(e.logo);
+      e.bizs = Array.isArray(e.bizs) ? e.bizs : [];
+    }
+    // le foto dei loghi si decodificano prima di disegnarle
+    await Promise.all(d.entries.map((e) => preloadLogo(e.logo)));
+    return d;
   } catch {
     return null;
   }

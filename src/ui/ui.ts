@@ -22,7 +22,8 @@ import {
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, rank, skillLevel, totalFame } from '../sim/progress';
-import { fetchBoard, MAX_NICK, nickname as lbNickname, setNickname as setLbNickname, submit as submitScore, type LbData, type LbEntry } from '../sim/leaderboard';
+import { addFriend, fetchBoard, fetchFriends, friendCode, MAX_NICK, nickname as lbNickname, removeFriend, setNickname as setLbNickname, submit as submitScore, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
+import { drawLogo, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type ServiceOrder,
@@ -1118,8 +1119,8 @@ export class UI {
             <div class="bar purple"><i style="width:${((s.xp[k] - a) / (b - a)) * 100}%"></i></div>
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(s.xp[k] - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div></div>`;
         }).join('');
-        return `<div class="card hero tint"><div class="emoji">🧑‍💼</div><div class="muted small">Il tuo rango</div><div class="big">${rank(s)}</div></div>
-          <button class="btn full" data-a="board" style="margin-bottom:10px">🏆 Classifica mondiale · fama ${totalFame(s).toFixed(1)}</button>
+        return `<div class="card hero tint"><div class="emoji">${logoImg(s.logo, 72)}</div><div class="muted small">${esc(lbNickname() || 'Il tuo rango')}</div><div class="big">${rank(s)}</div></div>
+          <div class="btnrow" style="margin:0 0 10px"><button class="btn purple" data-a="logo">🎨 Il tuo logo</button><button class="btn" data-a="board">🏆 Classifica · ⭐ ${totalFame(s).toFixed(1)}</button></div>
           <div class="grid2" style="margin-bottom:10px"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
           <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div></div>
           <p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>
@@ -1130,57 +1131,241 @@ export class UI {
           this.close();
           this.openLeaderboard();
         },
+        logo: () => {
+          this.close();
+          this.openLogoEditor();
+        },
       },
     });
   }
 
-  // ---------------- classifica mondiale ----------------
+  // ---------------- logo ----------------
 
-  openLeaderboard() {
+  /**
+   * Schermata per creare il logo delle attività di questa partita (e il nome del giocatore).
+   * Il logo può essere disegnato (forma, colori, simbolo, iniziali) oppure una foto
+   * caricata dal telefono, ritagliata e ritoccata dentro la forma scelta.
+   */
+  openLogoEditor() {
     const s = this.s;
+    let draft: Logo = { ...s.logo };
+    let mode: 'logo' | 'photo' = 'logo';
+    let edit: PhotoEdit | null = null;
+    const read = (cls: string) => (this.modal?.querySelector(cls) as HTMLInputElement | null)?.value ?? '';
+    const swatches = (key: string, cur: string) =>
+      `<div class="lg-row">${LOGO_COLORS.map((c) => `<button class="lg-sw ${c === cur ? 'on' : ''}" style="background:${c}" data-a="${key}:${c}"></button>`).join('')}</div>`;
+    const slider = (k: keyof PhotoEdit, name: string, min: number, max: number, v: number) =>
+      `<label class="ph-sl"><span>${name}</span><input type="range" min="${min}" max="${max}" value="${v}" data-k="${k}"></label>`;
+    const startEdit = (src: string) => {
+      const img = new Image();
+      img.onload = () => {
+        edit = newPhotoEdit(img);
+        mode = 'photo';
+        if (this.panel === panel) this.renderPanel();
+      };
+      img.onerror = () => this.toast('Non riesco ad aprire questa foto', 'bad');
+      img.src = src;
+    };
+    const drawPreview = (body: HTMLElement) => {
+      const cv = body.querySelector('.ph-canvas') as HTMLCanvasElement | null;
+      if (!cv || !edit) return;
+      drawLogo(cv.getContext('2d')!, draft, cv.width, renderPhoto(edit, 240));
+    };
+    const panel: Panel = {
+      title: '🎨 Il tuo logo',
+      color: 'var(--purple)',
+      after: (body) => {
+        // foto scelta dal telefono
+        const file = body.querySelector('.lg-file') as HTMLInputElement | null;
+        file?.addEventListener('change', () => {
+          const f = file.files?.[0];
+          if (f) startEdit(URL.createObjectURL(f));
+        });
+        if (mode !== 'photo' || !edit) return;
+        drawPreview(body);
+        // cursori: anteprima dal vivo, senza ridisegnare il pannello
+        body.querySelectorAll<HTMLInputElement>('.ph-sl input').forEach((inp) =>
+          inp.addEventListener('input', () => {
+            const e = edit!;
+            const k = inp.dataset.k as 'zoom' | 'bright' | 'contrast' | 'sat';
+            e[k] = k === 'zoom' ? +inp.value / 100 : +inp.value;
+            drawPreview(body);
+          }),
+        );
+        // trascinare col dito sposta la foto dentro la forma
+        const cv = body.querySelector('.ph-canvas') as HTMLCanvasElement;
+        let last: { x: number; y: number } | null = null;
+        cv.addEventListener('pointerdown', (ev) => {
+          last = { x: ev.clientX, y: ev.clientY };
+          cv.setPointerCapture(ev.pointerId);
+        });
+        cv.addEventListener('pointermove', (ev) => {
+          if (!last || !edit) return;
+          const size = cv.getBoundingClientRect().width;
+          edit.ox += (ev.clientX - last.x) / size;
+          edit.oy += (ev.clientY - last.y) / size;
+          last = { x: ev.clientX, y: ev.clientY };
+          drawPreview(body);
+        });
+        const up = () => (last = null);
+        cv.addEventListener('pointerup', up);
+        cv.addEventListener('pointercancel', up);
+      },
+      render: () => {
+        if (mode === 'photo' && edit) {
+          const e = edit;
+          return `<div class="ph-stage"><canvas class="ph-canvas" width="480" height="480"></canvas><small>👆 Trascina la foto per spostarla dentro la forma</small></div>
+            ${slider('zoom', '🔍 Zoom', 100, 400, Math.round(e.zoom * 100))}
+            ${slider('bright', '☀️ Luminosità', 40, 160, e.bright)}
+            ${slider('contrast', '◐ Contrasto', 40, 160, e.contrast)}
+            ${slider('sat', '🎨 Colori', 0, 200, e.sat)}
+            <div class="lg-row" style="margin-top:8px"><button class="btn sm sec" data-a="rot">↻ Ruota</button><button class="btn sm ${e.bw ? 'purple' : 'sec'}" data-a="bw">⚫ Bianco e nero</button><button class="btn sm sec" data-a="reset">↺ Ripristina</button></div>
+            <h4 class="lg-h">Forma</h4>
+            <div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${draft.shape === k ? 'on' : ''}" data-a="shape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>
+            <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-a="back">◀ Indietro</button><button class="btn good" data-a="usephoto">✅ Usa questa foto</button></div>`;
+        }
+        return `
+        <div class="lg-preview"><img src="${logoUrl(draft, 200)}" width="120" height="120" alt=""><div><b>${esc(lbNickname() || 'Senza nome')}</b><small>Il logo delle tue attività in questa partita: insegne, classifica e mappa dei tuoi amici.</small></div></div>
+        <h4 class="lg-h">Il tuo nome</h4>
+        <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick">
+        <h4 class="lg-h">📷 Una tua foto come logo</h4>
+        <input class="lg-file" type="file" accept="image/*" hidden>
+        <div class="lg-row">${draft.photo
+          ? '<button class="btn sm purple" data-a="retouch">✏️ Ritocca la foto</button><button class="btn sm sec" data-a="upload">📷 Cambia</button><button class="btn sm sec" data-a="nophoto">🗑️ Togli</button>'
+          : '<button class="btn sm purple" data-a="upload">📷 Carica una foto</button>'}</div>
+        <small class="muted">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato.</small>
+        <h4 class="lg-h">Forma</h4>
+        <div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${draft.shape === k ? 'on' : ''}" data-a="shape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>
+        <h4 class="lg-h">Colore di sfondo</h4>${swatches('bg', draft.bg)}
+        <h4 class="lg-h">Simbolo${draft.photo ? ' (quando non c\'è la foto)' : ''}</h4>
+        <div class="lg-row lg-syms">${LOGO_SYMBOLS.map((e) => `<button class="lg-sym ${draft.symbol === e ? 'on' : ''}" data-a="sym:${e}">${e}</button>`).join('')}</div>
+        <h4 class="lg-h">Iniziali (facoltative, max 3)</h4>
+        <input class="lb-input lg-text" maxlength="3" placeholder="es. LB" value="${esc(draft.text)}" data-c="text">
+        <h4 class="lg-h">Colore delle iniziali</h4>${swatches('fg', draft.fg)}
+        <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-a="rnd">🎲 A caso</button><button class="btn good" data-a="save">✅ Salva il logo</button></div>`;
+      },
+      actions: {
+        shape: (k) => (draft.shape = k as Logo['shape']),
+        bg: (c) => (draft.bg = c),
+        fg: (c) => (draft.fg = c),
+        sym: (e) => (draft.symbol = e),
+        text: () => (draft.text = read('.lg-text').slice(0, 3)),
+        nick: () => {
+          if (!setLbNickname(read('.lg-nick'))) this.toast('✏️ Scrivi un nome');
+        },
+        rnd: () => (draft = { ...randomLogo(), text: draft.text }),
+        upload: () => (this.modal?.querySelector('.lg-file') as HTMLInputElement | null)?.click(),
+        retouch: () => draft.photo && startEdit(draft.photo),
+        nophoto: () => delete draft.photo,
+        rot: () => edit && (edit.rot = (edit.rot + 1) % 4),
+        bw: () => edit && (edit.bw = !edit.bw),
+        reset: () => edit && (edit = newPhotoEdit(edit.img)),
+        back: () => {
+          mode = 'logo';
+          edit = null;
+        },
+        usephoto: () => {
+          if (edit) draft.photo = photoData(edit);
+          mode = 'logo';
+          edit = null;
+        },
+        save: () => {
+          draft.text = read('.lg-text').slice(0, 3);
+          const nick = read('.lg-nick');
+          if (nick && nick !== lbNickname()) setLbNickname(nick);
+          s.logo = { ...draft };
+          void preloadLogo(s.logo).then(() => {
+            for (const b of s.businesses) this.game.setupLot(b.lotId);
+          });
+          this.game.save();
+          void submitScore(s, true);
+          this.toast('🎨 Logo salvato: ora è sulle insegne delle tue attività', 'good');
+          this.close();
+        },
+      },
+    };
+    this.open(panel);
+  }
+
+  // ---------------- classifica mondiale e tra amici ----------------
+
+  openLeaderboard(startTab: 'mondo' | 'amici' = 'mondo') {
+    const s = this.s;
+    let tab = startTab;
     let data: LbData | null = null;
+    let friends: { entries: FriendEntry[]; missing: string[] } | null = null;
     let state: 'loading' | 'ok' | 'error' = 'loading';
     let editing = !lbNickname();
     let panel: Panel;
     const load = async () => {
       state = 'loading';
+      if (this.panel === panel) this.renderPanel();
       await submitScore(s, true);
-      data = await fetchBoard(50);
-      state = data ? 'ok' : 'error';
+      if (tab === 'mondo') {
+        data = await fetchBoard(50);
+        state = data ? 'ok' : 'error';
+      } else {
+        friends = await fetchFriends();
+        state = friends ? 'ok' : 'error';
+        void this.game.refreshFriends();
+      }
       if (this.panel === panel) this.renderPanel();
     };
-    const row = (e: LbEntry) => {
+    const row = (e: LbEntry, extra = '') => {
       const medal = ['🥇', '🥈', '🥉'][e.rank - 1] ?? `<b>${e.rank}</b>`;
-      return `<div class="lb-row ${e.me ? 'me' : ''}"><span class="lb-pos">${medal}</span>
+      return `<div class="lb-row ${e.me ? 'me' : ''}"><span class="lb-pos">${medal}</span>${logoImg(e.logo, 34) || '<span class="logo-img empty"></span>'}
         <span class="lb-name"><b>${esc(e.nickname)}</b><small>${esc(e.title)}</small></span>
-        <span class="lb-fame">⭐ ${e.fame.toFixed(1)}</span></div>`;
+        <span class="lb-fame">⭐ ${e.fame.toFixed(1)}</span>${extra}</div>`;
     };
+    const loadingHtml = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
+    const errorHtml = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p><button class="btn full" data-a="reload">🔄 Riprova</button>`;
     panel = {
-      title: '🏆 Classifica mondiale',
+      title: '🏆 Classifica',
       color: 'var(--orange)',
       render: () => {
         const fame = totalFame(s).toFixed(1);
         if (editing) {
           return `<div class="card hero tint"><div class="emoji">🏆</div><div class="muted small">La tua fama</div><div class="big">⭐ ${fame}</div></div>
-            <p class="muted small">Scegli il nome con cui comparire nella classifica mondiale. Conta la fama totale della tua partita migliore su questo dispositivo.</p>
+            <p class="muted small">Scegli il nome con cui comparire in classifica e sulla mappa dei tuoi amici. Conta la fama totale della tua partita migliore su questo dispositivo.</p>
             <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
-            <button class="btn good full" data-a="save" style="margin-top:10px">✅ Salva il nome</button>`;
+            <button class="btn good full" data-a="savename" style="margin-top:10px">✅ Salva il nome</button>`;
         }
+        const tabs = `<div class="tabs">${[['mondo', '🌍 Mondo'], ['amici', '👥 Amici']].map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        const me = `<div class="card row between"><span class="row">${logoImg(s.logo, 40)}<span><small class="muted">Tu sei</small><br><b>${esc(lbNickname())}</b> · ⭐ ${fame}</span></span>
+          <span class="row"><button class="btn sm sec" data-a="logo">🎨</button><button class="btn sm sec" data-a="edit">✏️</button></span></div>`;
         let list = '';
-        if (state === 'loading') list = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
-        else if (state === 'error' || !data) list = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p><button class="btn full" data-a="reload">🔄 Riprova</button>`;
-        else {
-          const d = data;
-          list = d.entries.length ? d.entries.map(row).join('') : `<p class="center muted">Nessuno in classifica: sii il primo!</p>`;
-          if (d.me && !d.entries.some((e) => e.me)) list += `<div class="lb-gap">…</div>` + row({ ...d.me, me: true });
-          list = `<div class="muted small" style="margin-bottom:6px">${d.total} giocatori in classifica</div>${list}
-            <button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>`;
+        if (state === 'loading') list = loadingHtml;
+        else if (tab === 'mondo') {
+          if (state === 'error' || !data) list = errorHtml;
+          else {
+            const d = data as LbData;
+            list = d.entries.length ? d.entries.map((e) => row(e)).join('') : `<p class="center muted">Nessuno in classifica: sii il primo!</p>`;
+            if (d.me && !d.entries.some((e) => e.me)) list += `<div class="lb-gap">…</div>` + row({ ...d.me, me: true });
+            list = `<div class="muted small" style="margin-bottom:6px">${d.total} giocatori in classifica</div>${list}`;
+          }
+        } else {
+          const code = friendCode();
+          const add = `<div class="card"><div class="row between"><span><small class="muted">Il tuo codice amico</small><br><b class="fr-code">${code}</b></span>
+              <span class="row"><button class="btn sm sec" data-a="copy">📋 Copia</button><button class="btn sm blue" data-a="share">📤 Invia</button></span></div>
+            <div class="row" style="margin-top:8px;gap:6px"><input class="lb-input fr-input" maxlength="7" placeholder="Codice di un amico" style="flex:1;font-size:16px;padding:9px 12px"><button class="btn sm good" data-a="addf">➕ Aggiungi</button></div>
+            <small class="muted">Le attività dei tuoi amici compaiono sulla tua mappa, nei posti liberi, con il loro logo.</small></div>`;
+          if (state === 'error' || !friends) list = add + errorHtml;
+          else {
+            const f = friends as { entries: FriendEntry[]; missing: string[] };
+            const others = f.entries.filter((e) => !e.me).length;
+            list = add + (others ? '' : `<p class="center muted">Non hai ancora amici in classifica: invia il tuo codice e aggiungi il loro!</p>`) +
+              f.entries.map((e) => row(e, e.me ? '' : `<button class="lb-x" data-a="rmf:${e.code}" aria-label="Togli">✕</button>`)).join('') +
+              f.missing.map((c) => `<div class="lb-row"><span class="lb-pos">❔</span><span class="lb-name"><b>${c}</b><small>Nessun giocatore con questo codice (ancora)</small></span><button class="lb-x" data-a="rmf:${c}">✕</button></div>`).join('');
+          }
         }
-        return `<div class="card row between"><span><small class="muted">Tu sei</small><br><b>${esc(lbNickname())}</b> · ⭐ ${fame}</span>
-          <button class="btn sm sec" data-a="edit">✏️ Nome</button></div>${list}`;
+        return `${tabs}${me}${list}${state === 'loading' ? '' : '<button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>'}`;
       },
       actions: {
-        save: () => {
+        tab: (k) => {
+          tab = k as 'mondo' | 'amici';
+          void load();
+        },
+        savename: () => {
           const v = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
           if (!setLbNickname(v)) {
             this.toast('✏️ Scrivi un nome');
@@ -1189,16 +1374,65 @@ export class UI {
           editing = false;
           void load();
         },
-        edit: () => {
-          editing = true;
+        edit: () => (editing = true),
+        logo: () => {
+          this.close();
+          this.openLogoEditor();
         },
-        reload: () => {
+        reload: () => void load(),
+        copy: () => {
+          void navigator.clipboard?.writeText(friendCode()).then(() => this.toast('📋 Codice copiato', 'good'), () => this.toast(`Il tuo codice: ${friendCode()}`));
+        },
+        share: () => {
+          const text = `Giochiamo a Hustle Idle! Aggiungimi con il mio codice amico: ${friendCode()} 👉 https://alfa40.github.io/hustle-idle/`;
+          if (navigator.share) void navigator.share({ text }).catch(() => {});
+          else void navigator.clipboard?.writeText(text).then(() => this.toast('📋 Messaggio copiato', 'good'));
+        },
+        addf: () => {
+          const v = (this.modal?.querySelector('.fr-input') as HTMLInputElement | null)?.value ?? '';
+          const err = addFriend(v);
+          if (err) {
+            this.toast(err, 'bad');
+            return;
+          }
+          this.toast('👥 Amico aggiunto', 'good');
+          void load();
+        },
+        rmf: (c) => {
+          removeFriend(c);
           void load();
         },
       },
     };
     this.open(panel);
     if (!editing) void load();
+  }
+
+  /** Attività di un amico sulla tua mappa: chi è, che attività ha, e il lotto (che puoi comunque comprare). */
+  openFriendBiz(lotId: string) {
+    const fb = this.game.friendBiz.get(lotId);
+    if (!fb) return;
+    const def = bizType(fb.type);
+    const f = fb.friend;
+    this.open({
+      title: `🤝 ${def.name} di ${f.nickname}`,
+      small: true,
+      color: '#5b4bb7',
+      render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small></div></div>
+        <div class="grid2"><div class="stat"><b>${def.icon} ${def.name}</b><span>attività dell'amico</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 dimensione</span></div></div>
+        <p class="muted small">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora puoi vederle sulla tua mappa. Questo posto da te è libero: se lo compri, la tua attività prende il posto di quella dell'amico.</p>
+        <div class="btnrow"><button class="btn sec" data-a="lot">🏷️ Vedi il posto</button><button class="btn" data-a="board">👥 Classifica amici</button></div>`,
+      actions: {
+        lot: () => {
+          this.close();
+          this.openLot(lotId);
+        },
+        board: () => {
+          this.close();
+          this.openLeaderboard('amici');
+        },
+      },
+    });
   }
 
   // ---------------- casa ----------------

@@ -145,7 +145,14 @@ Nuove categorie arriveranno insieme alle nuove attività.
 - Dal Profilo → **🏆 Classifica mondiale**: primi 50 giocatori per fama totale (somma della fama di tutte le categorie), con nome e rango; la propria riga è evidenziata e compare anche se si è fuori dai primi 50.
 - Al primo accesso si sceglie il nome (max 20 caratteri, modificabile). Identità anonima per dispositivo: un solo posto per dispositivo, vale la partita con più fama.
 - Il punteggio si invia in automatico col salvataggio (al massimo una volta al minuto) e all'apertura della classifica; senza rete il gioco continua normalmente.
-- Backend: lo stesso servizio Render + Upstash Redis della classifica di Magic Trip (`crazy-town.onrender.com`), con chiavi separate (`hustle:leaderboard`, `?game=hustle`).
+- Backend: lo stesso servizio Render + Upstash Redis della classifica di Magic Trip (`crazy-town.onrender.com`), con chiavi separate (`hustle:leaderboard`, `hustle:player:<id>` con logo e attività, `hustle:code:<codice>`; `?game=hustle`, `/leaderboard/friends`).
+
+### Logo, amici e città condivisa
+- **Logo** (uno per partita, `state.logo`, src/logo.ts): dal Profilo → 🎨 Il tuo logo. Si sceglie forma (cerchio, scudo, quadrato, stella, esagono), colore di sfondo, simbolo (30 emoji), iniziali (max 3) e il loro colore, più il nome del giocatore. Compare sopra le insegne delle proprie attività, nel profilo, in classifica e sulla mappa degli amici
+- **Foto come logo**: si carica una foto dal telefono e la si ritocca (trascinare per spostarla, zoom, rotazione, luminosità, contrasto, colori, bianco e nero) dentro la forma scelta; salvata come JPEG 160×160. La foto la vedono solo gli amici: nella classifica mondiale (pubblica) compare il logo disegnato
+- **Amici**: ogni dispositivo ha un codice amico di 6 caratteri (ricavato dall'id anonimo). Nella classifica, scheda 👥 Amici: il proprio codice (copia / invia con la condivisione del telefono), aggiunta di un amico col suo codice, classifica tra amici con i loghi, amici da togliere. L'amicizia è da una parte sola (vedi chi aggiungi)
+- **Attività degli amici sulla tua mappa**: ogni 5 minuti si scaricano le attività degli amici; quelle su lotti liberi nella tua città compaiono con furgone/insegna, il nome e il logo dell'amico (🤝 nella mappa). Toccandole: scheda con l'amico e il posto (che resta acquistabile: se lo compri, la tua attività prende il posto di quella dell'amico). Se più amici hanno lo stesso lotto, si vede quello con più fama
+- **In futuro — città condivisa**: un server in tempo reale (WebSocket, come il co-op di Crazy Town) dove più amici giocano nella stessa città: ognuno con i propri lavoretti, attività e loghi; si vedono i personaggi degli altri muoversi, si può entrare nelle attività degli amici per guardarle lavorare e girare la città insieme. Servirà: stanze per gruppi di amici, lotti assegnati una volta sola per città, sincronizzazione di posizioni/animazioni e dello stato delle attività (il tempo di gioco condiviso), e regole per chi è offline (le sue attività continuano come ora in idle)
 
 ## 10. Tempo di gioco
 

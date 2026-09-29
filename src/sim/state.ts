@@ -1,3 +1,4 @@
+import { randomLogo, safeLogo, type Logo } from '../logo';
 import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
 import type { JobType } from '../config/jobs';
@@ -118,6 +119,8 @@ export interface GameState {
   orderSeq: number;
   /** nome della partita scelto dal giocatore */
   saveName: string;
+  /** logo delle attività di questa partita */
+  logo: Logo;
 }
 
 // ---- salvataggi a slot ----
@@ -164,6 +167,7 @@ export function newState(): GameState {
     riding: null,
     orderSeq: 1,
     saveName: 'La mia partita',
+    logo: randomLogo(),
   };
 }
 
@@ -195,6 +199,7 @@ function parse(raw: string | null): GameState | null {
       st.fame[k] ??= 0;
     }
     for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
+    st.logo = safeLogo(s.logo) ?? randomLogo();
     for (const b of st.businesses) {
       b.orders ??= [];
       // prodotti che ora richiedono un ampliamento: tolti dalla vendita
