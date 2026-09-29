@@ -280,6 +280,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Guida nelle attività: riquadro in basso con il percorso del prodotto (✅ fatte, fase attuale evidenziata) e le capienze sempre scritte (in mano 0/1, piastra/forno x/y, pronti x/4); la prossima postazione ha anello verde, freccia e nome
 - Scritte 3D più piccole: le postazioni mostrano solo l'icona (e i posti occupati), il nome completo solo sulla prossima
 
+### Cucina stile Cooking Fever
+- Si può preparare in anticipo senza ordini (alle postazioni di partenza, a rotazione tra i prodotti) e appoggiare i pronti sul ripiano (max 4)
+- A mani vuote al bancone si serve direttamente dal ripiano
+- Ogni prodotto pronto resta caldo 45 s (secondi visibili sopra la testa e nella guida), poi è ❄️ freddo: non si serve e va buttato
+- Cotture e lavorazioni +30%; pazienza clienti ×2,2
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

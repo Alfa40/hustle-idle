@@ -29,6 +29,10 @@ const BACK = -2.2;
 const FRONT = 1.3; // fin dove arriva il giocatore (il bancone è a COUNTER_Z)
 /** Oltre questo valore di cottura il prodotto brucia. */
 const BURN = 1.6;
+/** Cotture e lavorazioni un po' più lente. */
+const SLOW = 1.3;
+/** Secondi in cui un prodotto pronto resta caldo: poi va buttato. */
+const WARM_SEC = 45;
 
 /** Un prodotto in lavorazione: `step` è la prossima fase da fare. */
 interface Item {
@@ -36,6 +40,8 @@ interface Item {
   step: number;
   /** ordine da asporto: in più c'è la fase di imballaggio */
   takeaway: boolean;
+  /** secondi di calore rimasti (solo quando è pronto) */
+  warm?: number;
 }
 
 interface OrderLine {
@@ -101,6 +107,7 @@ export class TruckInterior {
   private player!: Character;
   private held: Item | null = null;
   private heldSprite: THREE.Sprite | null = null;
+  private heldSec = 0;
   private spawnAcc = 0;
   private cookAcc = 0;
   private serveAcc = 0;
@@ -112,6 +119,8 @@ export class TruckInterior {
   private smokeT = 0;
   private earned = 0;
   private served = 0;
+  /** alle postazioni di partenza, senza ordini, si prepara in anticipo a rotazione */
+  private advanceIdx = 0;
 
   constructor(private game: Game, public biz: Business) {
     this.layout = LAYOUTS[biz.type as keyof typeof LAYOUTS];
@@ -252,13 +261,15 @@ export class TruckInterior {
   private nextStation(): Station | null {
     const it = this.held;
     if (it) {
-      if (this.finished(it)) return this.stationOf('counter') ?? null;
+      if (this.cold(it)) return this.stationOf('bin') ?? null;
+      if (this.finished(it)) return this.deliverable(it) ? this.stationOf('counter') ?? null : this.stationOf('pass') ?? null;
       return this.stations.find((s) => s.def.id === this.recipe(it)[it.step]) ?? null;
     }
     // qualcosa è pronto sul fuoco? prima si ritira
     const ready = this.stations.find((s) => s.slots.some((sl) => sl.item && sl.p >= 1));
     if (ready) return ready;
-    if (this.pass.some((p) => this.deliverable(p))) return this.stationOf('pass') ?? null;
+    if (this.pass.some((p) => this.deliverable(p))) return this.stationOf('counter') ?? null;
+    if (this.pass.some((p) => this.cold(p))) return this.stationOf('pass') ?? null;
     const need = this.needed()[0];
     if (need) return this.stations.find((s) => s.def.id === this.layout.recipes[need.pid]?.steps[0]) ?? null;
     return null;
@@ -310,16 +321,21 @@ export class TruckInterior {
         .join('<b>›</b>');
     };
     const next = this.nextStation();
-    if (it) {
-      title = `${PRODUCTS[it.pid].icon} ${PRODUCTS[it.pid].name}${it.takeaway ? ' 🥡 da asporto' : ''}`;
+    if (it && this.cold(it)) {
+      title = `❄️ ${PRODUCTS[it.pid].name} freddo: buttalo nel 🗑️ cestino`;
+    } else if (it) {
+      const warm = this.finished(it) ? ` · 🌡️ caldo ${Math.ceil(it.warm ?? 0)}s` : '';
+      title = `${PRODUCTS[it.pid].icon} ${PRODUCTS[it.pid].name}${it.takeaway ? ' 🥡 da asporto' : ''}${warm}`;
       steps = stepChips(it.pid, it.takeaway, it.step);
     } else if (next?.slots.some((sl) => sl.item && sl.p >= 1)) {
       title = `✅ Pronto! Ritira da ${next.def.icon} ${next.def.name}`;
+    } else if (next?.def.kind === 'counter') {
+      title = '🍽️ Un cliente aspetta quello che hai sul ripiano: servilo dal bancone';
     } else if (next?.def.kind === 'pass') {
-      title = '🍽️ C\'è un prodotto pronto: prendilo e servilo';
+      title = '❄️ Sul ripiano c\'è un prodotto freddo: prendilo e buttalo';
     } else {
       const need = this.needed()[0];
-      title = need ? `Prossimo ordine: ${PRODUCTS[need.pid].icon} ${PRODUCTS[need.pid].name}${need.takeaway ? ' 🥡' : ''}` : this.customers.length ? '⏳ Aspetta che la cottura finisca' : '😴 Nessun cliente: aspetta';
+      title = need ? `Prossimo ordine: ${PRODUCTS[need.pid].icon} ${PRODUCTS[need.pid].name}${need.takeaway ? ' 🥡' : ''}` : this.customers.length ? '⏳ Aspetta che la cottura finisca' : '💡 Nessun cliente: prepara in anticipo (resta caldo ' + WARM_SEC + 's)';
       if (need) steps = stepChips(need.pid, need.takeaway, 0);
     }
     const key = title + steps + caps;
@@ -405,6 +421,15 @@ export class TruckInterior {
     return it.step >= this.recipe(it).length;
   }
 
+  private cold(it: Item) {
+    return this.finished(it) && (it.warm ?? WARM_SEC) <= 0;
+  }
+
+  /** Il prodotto è appena diventato pronto: parte il timer del calore. */
+  private markReady(it: Item) {
+    if (this.finished(it) && it.warm === undefined) it.warm = WARM_SEC;
+  }
+
   /** Prodotti in vendita che si possono preparare qui con il livello attuale. */
   private makeable() {
     return this.biz.products.filter((p) => (this.layout.recipes[p]?.level ?? 99) <= this.level && (this.biz.stock[p] ?? 0) > 0);
@@ -452,8 +477,8 @@ export class TruckInterior {
     const pending: { pid: ProductId; takeaway: boolean }[] = [];
     for (const c of this.customers) for (const l of c.lines) if (!l.done) pending.push({ pid: l.pid, takeaway: c.takeaway });
     const inWork = [
-      ...(this.held ? [this.held] : []),
-      ...this.pass,
+      ...(this.held && !this.cold(this.held) ? [this.held] : []),
+      ...this.pass.filter((x) => !this.cold(x)),
       ...this.stations.flatMap((s) => s.slots.flatMap((sl) => (sl.item ? [sl.item] : []))),
     ];
     for (const it of inWork) {
@@ -464,6 +489,7 @@ export class TruckInterior {
   }
 
   private deliverable(it: Item) {
+    if (this.cold(it)) return false;
     return this.customers.some((c) => c.takeaway === it.takeaway && c.lines.some((l) => !l.done && l.pid === it.pid));
   }
 
@@ -523,10 +549,13 @@ export class TruckInterior {
     this.heldSprite = null;
     if (!it) return;
     const steps = this.recipe(it);
-    const txt = this.finished(it)
-      ? `${PRODUCTS[it.pid].icon}${it.takeaway ? '🥡' : ''} pronto!`
+    const txt = this.cold(it)
+      ? `${PRODUCTS[it.pid].icon} ❄️ freddo: buttalo`
+      : this.finished(it)
+      ? `${PRODUCTS[it.pid].icon}${it.takeaway ? '🥡' : ''} caldo ${Math.ceil(it.warm ?? WARM_SEC)}s`
       : `${PRODUCTS[it.pid].icon} ${it.step}/${steps.length} → ${this.stationDef(steps[it.step])?.icon ?? ''}`;
-    this.heldSprite = label(txt, { bg: this.finished(it) ? '#35c46a' : '#ffffff', fg: this.finished(it) ? '#fff' : '#3a2f55', scale: 0.45 });
+    const bg = this.cold(it) ? '#2d9cdb' : this.finished(it) ? '#35c46a' : '#ffffff';
+    this.heldSprite = label(txt, { bg, fg: bg === '#ffffff' ? '#3a2f55' : '#fff', scale: 0.45 });
     this.heldSprite.position.y = 2.3;
     this.player.root.add(this.heldSprite);
   }
@@ -545,6 +574,7 @@ export class TruckInterior {
     }
     this.updateCustomers(dt, gm);
     this.updateStations(dt);
+    this.coolDown(dt);
     this.updateWorkers(dt, gm);
     this.updatePlayer(dt);
     this.placeCamera();
@@ -559,6 +589,25 @@ export class TruckInterior {
     // linea verso la prossima postazione (davanti al mobile, dove ci si ferma)
     const next = this.nextStation();
     this.guide.update(dt, this.player.root.position, next ? this.nextRing.position : null, 0.4);
+  }
+
+  /** I prodotti pronti (in mano o sul ripiano) si raffreddano col tempo. */
+  private coolDown(dt: number) {
+    for (const it of [...this.pass, ...(this.held ? [this.held] : [])]) {
+      if (!this.finished(it) || it.warm === undefined) continue;
+      const was = it.warm > 0;
+      it.warm -= dt;
+      if (was && it.warm <= 0) toast(`❄️ ${PRODUCTS[it.pid].name} si è raffreddato: va buttato`, 'bad');
+    }
+    // il testo sopra la testa mostra i secondi di calore rimasti
+    if (this.held && this.finished(this.held)) {
+      const it = this.held;
+      const sec = this.cold(it) ? -1 : Math.ceil(it.warm ?? 0);
+      if (sec !== this.heldSec) {
+        this.heldSec = sec;
+        this.setHeld(it);
+      }
+    }
   }
 
   private updateCustomers(dt: number, gm: number) {
@@ -594,7 +643,7 @@ export class TruckInterior {
     for (const st of this.stations) {
       for (const sl of st.slots) {
         if (!sl.item) continue;
-        sl.p += (dt * speed) / (st.def.sec ?? 3);
+        sl.p += (dt * speed) / ((st.def.sec ?? 3) * SLOW);
         const state = sl.p >= BURN ? 'burnt' : sl.p >= 1 ? 'ready' : 'cook';
         // fumo mentre cuoce: grigio scuro se sta bruciando
         if (puff) this.fx.emit('smoke', st.pos.clone().setY(1.2), 1, state === 'burnt' ? 0x444444 : state === 'ready' ? 0xfff3c4 : undefined);
@@ -622,11 +671,14 @@ export class TruckInterior {
           this.cookAcc -= 1;
           const it: Item = { pid: need[0].pid, step: 0, takeaway: need[0].takeaway };
           it.step = this.recipe(it).length;
+          this.markReady(it);
           this.pass.push(it);
           employeeGainXp(cooks[0].emp, 1);
         }
       } else for (const w of cooks) w.char.play('idle');
     }
+    // il personale butta via i prodotti freddi
+    if (cashiers.length || cooks.length) this.pass = this.pass.filter((it) => !this.cold(it));
     if (cashiers.length && this.pass.some((it) => this.deliverable(it))) {
       const rate = cashiers.reduce((a, w) => a + employeeRate(w.emp, this.biz), 0) * 2;
       this.serveAcc += (rate * gm) / 60;
@@ -641,12 +693,12 @@ export class TruckInterior {
   }
 
   private renderPass() {
-    const key = this.pass.map((i) => i.pid + i.takeaway).join();
+    const key = this.pass.map((i) => i.pid + i.takeaway + this.cold(i)).join();
     if (this.passGroup.userData.key === key) return;
     this.passGroup.userData.key = key;
     this.passGroup.clear();
     this.pass.forEach((it, i) => {
-      const l = label(PRODUCTS[it.pid].icon + (it.takeaway ? '🥡' : ''), { bg: 'rgba(255,255,255,0.9)', fg: '#000', scale: 0.32 });
+      const l = label(PRODUCTS[it.pid].icon + (it.takeaway ? '🥡' : '') + (this.cold(it) ? '❄️' : ''), { bg: this.cold(it) ? 'rgba(160,210,255,0.95)' : 'rgba(255,255,255,0.9)', fg: '#000', scale: 0.32 });
       l.position.set(i * 0.45 - 0.6, 0.25, 0);
       this.passGroup.add(l);
     });
@@ -717,15 +769,23 @@ export class TruckInterior {
       case 'source': {
         if (it) return { label: `Mani piene (${TruckInterior.HAND_MAX}/${TruckInterior.HAND_MAX})`, icon: '✋' };
         const need = this.needed().find((n) => this.layout.recipes[n.pid]?.steps[0] === d.id);
-        if (!need) {
-          const anyHere = this.makeable().some((pid) => this.layout.recipes[pid]?.steps[0] === d.id);
-          return { label: anyHere ? 'Nessun ordine da qui' : 'Scorte finite o prodotto non in vendita', icon: d.icon };
+        if (need) {
+          if (pressed) {
+            this.setHeld({ pid: need.pid, step: 1, takeaway: need.takeaway });
+            this.player.once('pick-up');
+          }
+          return { label: `${d.verb}: ${PRODUCTS[need.pid].name}${need.takeaway ? ' 🥡' : ''}`, icon: d.icon };
         }
+        // nessun ordine: si può preparare in anticipo (a rotazione tra i prodotti di qui)
+        const here = this.makeable().filter((pid) => this.layout.recipes[pid]?.steps[0] === d.id);
+        if (!here.length) return { label: 'Scorte finite o prodotto non in vendita', icon: d.icon };
+        const pid = here[this.advanceIdx % here.length];
         if (pressed) {
-          this.setHeld({ pid: need.pid, step: 1, takeaway: need.takeaway });
+          this.advanceIdx++;
+          this.setHeld({ pid, step: 1, takeaway: false });
           this.player.once('pick-up');
         }
-        return { label: `${d.verb}: ${PRODUCTS[need.pid].name}${need.takeaway ? ' 🥡' : ''}`, icon: d.icon };
+        return { label: `Prepara in anticipo: ${PRODUCTS[pid].name}`, icon: d.icon };
       }
       case 'hold': {
         if (!it || next !== d.id) {
@@ -734,13 +794,14 @@ export class TruckInterior {
           return { label: d.name, icon: d.icon };
         }
         if (held) {
-          st.hold += (dt * (1 + 0.15 * upg(this.biz, 'attrezzatura'))) / (d.sec ?? 1);
+          st.hold += (dt * (1 + 0.15 * upg(this.biz, 'attrezzatura'))) / ((d.sec ?? 1) * SLOW);
           if (Math.random() < dt * 12) this.fx.emit('dust', st.pos.clone().setY(1.1), 1, 0xf5e6c8);
           this.player.play('interact-right', 0.1, 1.5);
           this.player.faceTowards(st.pos.x, st.pos.z - 2, dt);
           if (st.hold >= 1) {
             st.hold = 0;
             it.step++;
+            this.markReady(it);
             addXp(this.game.state, skill, 1);
             this.setHeld(it);
             this.player.play('idle');
@@ -760,6 +821,7 @@ export class TruckInterior {
             if (burnt) toast('🔥 Bruciato! Buttato via', 'bad');
             else {
               r.step++;
+              this.markReady(r);
               this.setHeld(r);
               this.fx.emit('spark', st.pos.clone().setY(1.3), 8);
               addXp(this.game.state, skill, 2);
@@ -781,8 +843,9 @@ export class TruckInterior {
         return { label: st.slots.some((sl) => sl.item) ? 'Sta cuocendo…' : d.name, icon: d.icon };
       }
       case 'counter': {
+        if (it && this.cold(it)) return { label: 'È freddo: buttalo nel cestino', icon: '❄️' };
         if (it && this.finished(it)) {
-          if (!this.deliverable(it)) return { label: 'Nessuno lo ha ordinato', icon: '🤷' };
+          if (!this.deliverable(it)) return { label: 'Nessuno lo ha ordinato: mettilo sul ripiano', icon: '🍽️' };
           if (pressed) {
             this.fx.emit('spark', st.pos.clone().setY(1.4), 12);
             this.deliver(it, true);
@@ -792,14 +855,39 @@ export class TruckInterior {
           return { label: d.verb, icon: PRODUCTS[it.pid].icon };
         }
         if (it && next) return { label: `Non è pronto: vai a ${this.stationDef(next)?.icon}`, icon: '👉' };
+        // a mani vuote: si serve direttamente dal ripiano dei pronti
+        const fromPass = this.pass.find((x) => this.deliverable(x));
+        if (!it && fromPass) {
+          if (pressed) {
+            this.pass.splice(this.pass.indexOf(fromPass), 1);
+            this.fx.emit('spark', st.pos.clone().setY(1.4), 12);
+            this.deliver(fromPass, true);
+            this.player.once('interact-right');
+          }
+          return { label: `Servi dal ripiano ${PRODUCTS[fromPass.pid].icon}`, icon: '🍽️' };
+        }
         return { label: 'Clienti', icon: d.icon };
       }
       case 'pass': {
-        if (!it && this.pass.length) {
-          if (pressed) this.setHeld(this.pass.shift()!);
-          return { label: 'Prendi dai pronti', icon: PRODUCTS[this.pass[0]?.pid ?? 'panini'].icon };
+        // appoggia un prodotto pronto (anche preparato in anticipo)
+        if (it && this.finished(it) && !this.cold(it)) {
+          if (this.pass.length >= TruckInterior.PASS_MAX) return { label: `Ripiano pieno (${TruckInterior.PASS_MAX}/${TruckInterior.PASS_MAX})`, icon: '🍽️' };
+          if (pressed) {
+            this.pass.push(it);
+            this.setHeld(null);
+          }
+          return { label: `Appoggia sul ripiano (${this.pass.length}/${TruckInterior.PASS_MAX})`, icon: PRODUCTS[it.pid].icon };
         }
-        return { label: it ? 'Portalo al bancone' : 'Ripiano vuoto', icon: d.icon };
+        if (!it && this.pass.length) {
+          // prende prima quelli freddi (da buttare), poi i più vecchi
+          const pick = this.pass.find((x) => this.cold(x)) ?? this.pass[0];
+          if (pressed) {
+            this.pass.splice(this.pass.indexOf(pick), 1);
+            this.setHeld(pick);
+          }
+          return { label: this.cold(pick) ? 'Prendi (freddo) e buttalo' : 'Prendi dai pronti', icon: PRODUCTS[pick.pid].icon };
+        }
+        return { label: it ? 'Non ancora pronto' : 'Ripiano vuoto', icon: d.icon };
       }
       case 'bin': {
         if (!it) return { label: 'Cestino', icon: d.icon };

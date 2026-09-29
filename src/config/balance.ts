@@ -40,7 +40,7 @@ export const BUSINESS = {
   OPEN_HOUR: 8,
   CLOSE_HOUR: 22,
   /** pazienza cliente in minuti di gioco (25 secondi reali) */
-  CUSTOMER_PATIENCE_MIN: ((30 * 24 * 60) / 7200) * 25,
+  CUSTOMER_PATIENCE_MIN: ((30 * 24 * 60) / 7200) * 55,
   MAX_QUEUE: 5,
   PLAYER_COOK_SEC: 1.4,
   UTILITIES_MONTH: 90,
