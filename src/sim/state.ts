@@ -123,6 +123,8 @@ export interface GameState {
   saveName: string;
   /** logo delle attività di questa partita */
   logo: Logo;
+  /** il giocatore ha scelto nome e logo (finché no, glielo si chiede a ogni avvio) */
+  logoChosen?: boolean;
   /** aspetto del personaggio: stile (modello), stili comprati, accessori comprati e indossati */
   style: { model: string; owned: string[]; accOwned: string[]; acc: string[] };
   /** case comprate all'agenzia immobiliare (indice nella lista delle case in vendita) */

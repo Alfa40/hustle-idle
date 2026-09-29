@@ -42,6 +42,8 @@ interface Panel {
   /** colore dell'intestazione */
   color?: string;
   title: string;
+  /** non si chiude con ✕ o toccando fuori: solo con i suoi pulsanti */
+  locked?: boolean;
   /** dopo ogni render (es. per disegnare un canvas) */
   after?: (body: HTMLElement) => void;
   onClose?: () => void;
@@ -371,8 +373,9 @@ export class UI {
     modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head"><h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
+    if (p.locked) (modal.querySelector('.x') as HTMLElement).style.display = 'none';
     modal.addEventListener('pointerdown', (e) => {
-      if (e.target === modal) this.close();
+      if (e.target === modal && !this.panel?.locked) this.close();
     });
     modal.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-a]');
@@ -1363,7 +1366,12 @@ export class UI {
   /** ritocchi di ogni foto usata come logo (per ritoccarla di nuovo dall'originale) */
   private photoEdits = new Map<string, PhotoEdit>();
 
-  openLogoEditor() {
+  /** Nome e logo non ancora scelti: si chiedono (a ogni avvio finché non si sceglie). */
+  needsIdentity() {
+    return !lbNickname() || !this.s.logoChosen;
+  }
+
+  openLogoEditor(required = false) {
     const s = this.s;
     let draft: Logo = { ...s.logo };
     let mode: 'logo' | 'photo' = 'logo';
@@ -1399,8 +1407,9 @@ export class UI {
       drawLogo(cv.getContext('2d')!, draft, cv.width, renderPhoto(edit, 320));
     };
     const panel: Panel = {
-      title: '🎨 Il tuo logo',
+      title: required ? '👋 Scegli nome e logo' : '🎨 Il tuo logo',
       color: 'var(--purple)',
+      locked: required,
       after: (body) => {
         if (mode !== 'photo' || !edit) return;
         drawPreview(body);
@@ -1446,6 +1455,7 @@ export class UI {
             <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-a="back">◀ Indietro</button><button class="btn good" data-a="usephoto">✅ Usa questa foto</button></div>`;
         }
         return `
+        ${required ? '<div class="card tint small">Prima di iniziare scegli il <b>tuo nome</b> e il <b>logo</b> delle tue attività: comparirà sulle insegne, in classifica e nella città dei tuoi amici. Potrai cambiarli quando vuoi dal 👤 Profilo.</div>' : ''}
         <div class="lg-preview"><img src="${logoUrl(draft, 200)}" width="120" height="120" alt=""><div><b>${esc(lbNickname() || 'Senza nome')}</b><small>Il logo delle tue attività in questa partita: insegne, classifica e mappa dei tuoi amici.</small></div></div>
         <h4 class="lg-h">Il tuo nome</h4>
         <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick">
@@ -1505,7 +1515,13 @@ export class UI {
           draft.text = read('.lg-text').slice(0, 3);
           const nick = read('.lg-nick');
           if (nick && nick !== lbNickname()) setLbNickname(nick);
+          if (!lbNickname()) {
+            this.toast('✏️ Scrivi il tuo nome', 'bad');
+            (this.modal?.querySelector('.lg-nick') as HTMLInputElement | null)?.focus();
+            return;
+          }
           s.logo = { ...draft };
+          s.logoChosen = true;
           void preloadLogo(s.logo).then(() => {
             for (const b of s.businesses) this.game.setupLot(b.lotId);
           });

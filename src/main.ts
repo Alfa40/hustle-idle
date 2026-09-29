@@ -31,6 +31,8 @@ async function boot() {
     title.hide();
     game.begin(slot, newName);
     game.ui = new UI(game);
+    // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
+    if (game.ui.needsIdentity()) game.ui.openLogoEditor(true);
     if (!game.state.tutorialDone) game.ui.openWelcome();
     else if (game.offlineReport) game.ui.openOffline(game.offlineReport);
     game.ui.refresh();
