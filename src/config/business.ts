@@ -1,13 +1,21 @@
 import type { ProductId } from './products';
 import type { SkillId } from './skills';
 
-export type Role = 'cucina' | 'cassa' | 'manager';
+export type Role = 'cucina' | 'cassa' | 'manager' | 'sala' | 'magazzino';
 
 export const ROLES: Record<Role, { name: string; icon: string; baseSalary: number }> = {
   cucina: { name: 'Cuoco', icon: '👨‍🍳', baseSalary: 380 },
   cassa: { name: 'Cassiere', icon: '💁', baseSalary: 330 },
   manager: { name: 'Manager', icon: '👔', baseSalary: 700 },
+  sala: { name: 'Cameriere', icon: '🤵', baseSalary: 320 },
+  magazzino: { name: 'Magazziniere', icon: '📦', baseSalary: 310 },
 };
+
+/** Ruoli facoltativi delle attività con interno e ampliamento che li rende utili. */
+export const EXTRA_ROLES: { role: Role; level: number; desc: string }[] = [
+  { role: 'magazzino', level: 1, desc: 'Organizza le scorte in magazzino e riordina da solo, anche senza manager.' },
+  { role: 'sala', level: 2, desc: 'Porta il cibo ai tavoli della sala: clienti più contenti e mance più alte.' },
+];
 
 export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
 
@@ -71,7 +79,7 @@ export interface BusinessTypeDef {
   /** attrezzatura iniziale, da aggiungere al prezzo del lotto */
   setupCost: number;
   products: ProductId[];
-  roles: Exclude<Role, 'manager'>[];
+  roles: Exclude<Role, 'manager' | 'sala' | 'magazzino'>[];
   /** nome dei ruoli per questa attività */
   roleNames: Partial<Record<Role, string>>;
   /** esperienze che fanno salire la domanda e che guadagni lavorando di persona */

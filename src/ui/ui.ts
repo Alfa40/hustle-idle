@@ -1,5 +1,5 @@
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
+import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -788,11 +788,13 @@ export class UI {
         ? b.staff.map((e) => this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`)).join('')
         : '<p class="muted small">Nessun dipendente.</p>';
       const cands = s.candidates
-        .filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role))
+        .filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role) ||
+          (hasInterior(b.type) && EXTRA_ROLES.some((x) => x.role === e.role)))
         .map((e) => this.empCard(e, b.type, `<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button>`))
         .join('');
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
-        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}<h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
+        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${EXTRA_ROLES.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>${upg(b, 'ampliamento') < x.level ? ` (dall'ampliamento ${x.level})` : ''}: ${x.desc}`).join('<br>')}</div>` : ''}
+        <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)

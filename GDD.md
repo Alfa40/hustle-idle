@@ -291,6 +291,16 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Ogni miglioramento si vede: attrezzatura = postazioni dorate, look = piante e tappeto, pubblicità = manifesti, magazzino = scatoloni, più prodotti = lavagna del menù
 - Cuochi: di base aiutano (tolgono dal fuoco ciò che il giocatore non prende, lo finiscono e lo mettono sul ripiano, buttano il freddo); con la coda lunga (3+ clienti) preparano anche da zero. Si possono assumere quanti dipendenti si vuole (8 candidati al giorno, pulsante per cercarne altri a €40)
 
+### Catena di montaggio (attività con interno)
+- Aree: 🍳 Cucina, 💰 Cassa, 📦 Magazzino (dal 1° ampliamento), 🍽️ Sala con tavoli (dal 2° ampliamento)
+- Cuochi: ognuno prende un prodotto mancante e lo segue da zero (materia prima → fuoco → lo toglie lui → lavorazioni → ripiano); più cuochi si dividono il lavoro; i liberi fanno i jolly (salvano dal fuoco, buttano il freddo)
+- Cassieri: prendono dal ripiano, portano al bancone, consegnano e incassano
+- Camerieri (nuovo ruolo): portano il cibo ai clienti seduti in sala, mance più alte
+- Magazzinieri (nuovo ruolo): portano le scorte dal magazzino al frigo e riordinano anche senza manager
+
+### Lavoretti
+- Gli oggetti da usare nella fase attuale brillano (luce che pulsa + alone): cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

@@ -293,3 +293,19 @@ export function foam() {
   }
   return g;
 }
+
+let haloTex: THREE.Texture | undefined;
+/** Alone luminoso che pulsa sopra un oggetto da usare. */
+export function halo(color = 0xffe066) {
+  haloTex ??= canvasTexture(64, 64, (g) => {
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.4, 'rgba(255,255,255,0.5)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+  });
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  s.scale.setScalar(1.6);
+  return s;
+}

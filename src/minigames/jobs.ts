@@ -4,7 +4,7 @@ import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
 import type { ParticleKind } from '../world/particles';
-import { arrow, boxProp, bush, cone, cylProp, foam, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
+import { arrow, boxProp, bush, cone, cylProp, foam, halo, label, leafPile, plateStack, ring, trimmedBush } from '../world/props';
 
 export interface JobRun {
   title: string;
@@ -152,6 +152,7 @@ export class PhasedRun extends BaseRun {
     );
     fill.rotation.set(-Math.PI / 2, 0, rot - Math.PI / 2);
     fill.position.set(c.x, 0.035, c.z);
+    fill.userData.noGlow = true;
     this.add(fill);
     const edge = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.PlaneGeometry(w, d)),
@@ -159,12 +160,14 @@ export class PhasedRun extends BaseRun {
     );
     edge.rotation.copy(fill.rotation);
     edge.position.set(c.x, 0.05, c.z);
+    edge.userData.noGlow = true;
     this.add(edge);
     const pts: [number, number][] = [];
     for (const f of [-1, 1]) for (const r of [-1, 0, 1]) pts.push([f * z.halfF, r * z.halfR]);
     pts.push([0, -z.halfR], [0, z.halfR]);
     for (const [f, r] of pts) {
       const k = this.add(cone());
+      k.userData.noGlow = true;
       k.position.copy(zonePoint(z, f, r));
       k.scale.setScalar(0.6);
     }
@@ -184,9 +187,64 @@ export class PhasedRun extends BaseRun {
     return this.add(o);
   }
 
+  /** oggetti di scena che brillano per ogni punto da fare, con i materiali originali */
+  private glows = new Map<Task, { meshes: { m: THREE.Mesh; orig: THREE.Material | THREE.Material[] }[]; halo: THREE.Sprite }>();
+
+  /** Fa brillare gli oggetti vicini a un punto da fare (cassetta, cespuglio, muretto…). */
+  private addGlow(t: Task) {
+    const meshes: { m: THREE.Mesh; orig: THREE.Material | THREE.Material[] }[] = [];
+    for (const o of this.objs) {
+      if ((o as THREE.Sprite).isSprite || o.userData.noGlow) continue;
+      if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.05) continue;
+      o.traverse((c) => {
+        const m = c as THREE.Mesh;
+        if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite) return;
+        const orig = m.material;
+        const glowMat = (mat: THREE.Material) => {
+          const g = mat.clone() as THREE.MeshLambertMaterial;
+          g.emissive = new THREE.Color(0xffd54a);
+          g.emissiveIntensity = 0.5;
+          return g;
+        };
+        m.material = Array.isArray(orig) ? orig.map(glowMat) : glowMat(orig);
+        meshes.push({ m, orig });
+      });
+    }
+    const h = halo();
+    h.position.set(t.pos.x, 0.8, t.pos.z);
+    h.renderOrder = 4;
+    this.game.scene.add(h);
+    this.glows.set(t, { meshes, halo: h });
+  }
+
+  private removeGlow(t: Task) {
+    const g = this.glows.get(t);
+    if (!g) return;
+    for (const { m, orig } of g.meshes) m.material = orig;
+    this.game.scene.remove(g.halo);
+    this.glows.delete(t);
+  }
+
+  /** Luce che pulsa sugli oggetti ancora da usare (solo quelli attivi adesso). */
+  private pulseGlows() {
+    const pend = new Set(this.pending());
+    const k = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(performance.now() / 180));
+    for (const [t, g] of this.glows) {
+      const on = pend.has(t) && !t.done;
+      g.halo.visible = on;
+      g.halo.material.opacity = 0.35 + k * 0.6;
+      g.halo.scale.setScalar(1.3 + k * 0.6);
+      for (const { m } of g.meshes) {
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        for (const mat of mats) (mat as THREE.MeshLambertMaterial).emissiveIntensity = on ? k : 0;
+      }
+    }
+  }
+
   private nextPhase() {
     for (const m of this.markers.values()) this.game.scene.remove(m);
     this.markers.clear();
+    for (const t of [...this.glows.keys()]) this.removeGlow(t);
     this.idx++;
     if (this.idx >= this.phases.length) {
       this.done();
@@ -194,6 +252,7 @@ export class PhasedRun extends BaseRun {
     }
     this.tasks = this.phases[this.idx].tasks();
     for (const t of this.tasks) {
+      this.addGlow(t);
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
       m.position.set(t.pos.x, 2.3, t.pos.z);
       this.game.scene.add(m);
@@ -216,6 +275,7 @@ export class PhasedRun extends BaseRun {
     if (!ph) return;
     const p = this.game.player.root.position;
     const pend = this.pending();
+    this.pulseGlows();
     // freccette sopra i punti ancora da fare (solo quelli attivi)
     const t0 = performance.now() / 250;
     for (const [t, m] of this.markers) {
@@ -278,6 +338,7 @@ export class PhasedRun extends BaseRun {
 
   private complete(t: Task) {
     t.done = true;
+    this.removeGlow(t);
     this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.8), t.fx ? 8 : 5, t.fxColor);
     this.game.player.play('idle');
     t.onDone?.();
@@ -289,6 +350,7 @@ export class PhasedRun extends BaseRun {
 
   dispose() {
     for (const m of this.markers.values()) this.game.scene.remove(m);
+    for (const t of [...this.glows.keys()]) this.removeGlow(t);
     if (this.zone) this.game.city.restoreView();
     super.dispose();
     this.game.player.hold();
