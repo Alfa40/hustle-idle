@@ -1175,13 +1175,12 @@ export class Game {
   private lastFrame = 0;
 
   private frame() {
-    if (settings.battery) {
-      // 30 immagini al secondo; 15 dopo 5 secondi senza toccare lo schermo
-      const now = performance.now();
-      const idle = now - this.lastInput > 5000;
-      if (now - this.lastFrame < (idle ? 1000 / 15 : 1000 / 30) - 2) return;
-      this.lastFrame = now;
-    }
+    // mai più di 60 immagini al secondo (gli schermi a 120 Hz scalderebbero troppo il telefono);
+    // col risparmio batteria 30, e 15 dopo 5 secondi senza toccare lo schermo
+    const now = performance.now();
+    const fps = settings.battery ? (now - this.lastInput > 5000 ? 15 : 30) : 60;
+    if (now - this.lastFrame < 1000 / fps - 2) return;
+    this.lastFrame = now;
     const dt = Math.min(settings.battery ? 0.1 : 0.05, this.clock.getDelta());
     if (this.mode === 'title') {
       this.titleFrame(dt);
