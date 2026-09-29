@@ -433,6 +433,9 @@ export class TruckInterior {
     return 4 + 2 * upg(this.biz, 'ripiano');
   }
   private guideEl: HTMLDivElement | null = null;
+  /** riquadro sotto la guida: cosa hai in mano, per nome */
+  private handEl: HTMLDivElement | null = null;
+  private handHtml = '';
   private guideKey = '';
   private nextRing!: THREE.Mesh;
   private nextArrow!: THREE.Object3D;
@@ -530,7 +533,6 @@ export class TruckInterior {
     const caps = [
       `💰 €${Math.round(s.money).toLocaleString('it-IT')}`,
       `${isOpenHour(s) ? '🟢 Aperto' : '🔴 Chiuso'} · coda ${this.customers.length}/${BUSINESS.MAX_QUEUE}`,
-      `✋ In mano ${this.hand.length}/${this.handMax}`,
       // tutti i fuochi/forni insieme: posti occupati sul totale
       ...(onFire.length ? [`${onFire[0].def.icon} ${onFire[0].def.name.replace(/ \d+$/, '')} ${onFire.reduce((a, x) => a + x.slots.filter((y) => y.item).length, 0)}/${onFire.reduce((a, x) => a + x.slots.length, 0)}`] : []),
       ...(this.workers.some((w) => w.emp.role === 'cucina') ? [`👨‍🍳 Cuochi al lavoro ${this.workers.filter((w) => w.emp.role === 'cucina' && w.job).length}/${this.workers.filter((w) => w.emp.role === 'cucina').length}`] : []),
@@ -563,6 +565,48 @@ export class TruckInterior {
     if (key === this.guideKey) return;
     this.guideKey = key;
     this.guideEl.innerHTML = `${title ? `<div class="gd-title">${title}</div>` : ''}<div class="gd-caps">${caps}</div>`;
+    this.placeHandBadge();
+  }
+
+  /**
+   * Riquadro "in mano": ogni prodotto per nome, con la prossima fase (col suo colore),
+   * pronto o freddo. Uguali raggruppati (Panini ×2).
+   */
+  private updateHandBadge() {
+    if (!this.handEl) return;
+    const groups = new Map<string, { n: number; html: string }>();
+    for (const x of this.hand) {
+      const p = PRODUCTS[x.pid];
+      let state: string;
+      let css: string;
+      if (this.cold(x)) {
+        state = '❄️ freddo → 🗑️ butta';
+        css = '#2d9cdb';
+      } else if (this.finished(x)) {
+        state = this.deliverable(x) ? '✅ pronto → 🍽️ servi' : '✅ pronto → ripiano';
+        css = PHASE.counter.css;
+      } else {
+        const d = this.stationDef(this.recipe(x)[x.step])!;
+        state = `→ ${d.icon} ${d.verb}`;
+        css = PHASE[d.kind].css;
+      }
+      const key = `${x.pid}|${x.takeaway}|${state}`;
+      const g = groups.get(key);
+      if (g) g.n++;
+      else groups.set(key, { n: 1, html: `<b>${p.icon} ${p.name}${x.takeaway ? ' 🥡' : ''}</b><em style="background:${css}">${state}</em>` });
+    }
+    const items = [...groups.values()].map((g) => `<span>${g.html.replace('</b>', g.n > 1 ? ` ×${g.n}</b>` : '</b>')}</span>`).join('');
+    const html = `<i>✋ ${this.hand.length}/${this.handMax}</i>${items || '<span class="empty">Mani vuote</span>'}`;
+    if (html === this.handHtml) return;
+    this.handHtml = html;
+    this.handEl.innerHTML = html;
+    this.placeHandBadge();
+  }
+
+  /** Il riquadro "in mano" sta subito sotto la guida (la cui altezza cambia). */
+  private placeHandBadge() {
+    if (!this.handEl || !this.guideEl) return;
+    this.handEl.style.top = `${this.guideEl.getBoundingClientRect().bottom + 6}px`;
   }
 
   private stationOf(kind: StationDef['kind']) {
@@ -582,6 +626,10 @@ export class TruckInterior {
     this.guideEl = document.createElement('div');
     this.guideEl.className = 'guide';
     document.body.appendChild(this.guideEl);
+    this.handEl = document.createElement('div');
+    this.handEl.className = 'hand-badge';
+    document.body.appendChild(this.handEl);
+    this.handHtml = '';
     document.body.classList.add('guide-on');
     this.resize();
     window.addEventListener('resize', this.resize);
@@ -591,6 +639,9 @@ export class TruckInterior {
     this.biz.__playerInside = false;
     this.guideEl?.remove();
     this.guideEl = null;
+    this.handEl?.remove();
+    this.handEl = null;
+    this.camera.clearViewOffset();
     document.body.classList.remove('guide-on');
     window.removeEventListener('resize', this.resize);
     this.hand = [];
@@ -616,6 +667,11 @@ export class TruckInterior {
       pitch: THREE.MathUtils.degToRad(aspect < 1 ? 58 : 55),
       z: aspect < 1 ? 0.3 : 1,
     };
+    // in verticale la stanza scende un po': sopra c'è spazio per la guida e il riquadro "in mano"
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (aspect < 1) this.camera.setViewOffset(W, H, 0, -Math.round(H * 0.07), W, H);
+    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
     this.placeCamera(true);
   };
@@ -862,6 +918,7 @@ export class TruckInterior {
       this.uiT = 0;
       this.renderPass();
       this.updateGuide();
+      this.updateHandBadge();
     }
     this.updateTags();
     // linea verso la prossima postazione (davanti al mobile, dove ci si ferma)
