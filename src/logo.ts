@@ -227,8 +227,34 @@ export function logoSprite(logo: Logo, size = 1) {
 
 // ---------------- foto: ritaglio e ritocco ----------------
 
+let pickerEl: HTMLInputElement | null = null;
+/** Campo "scegli una foto" fisso nella pagina (uno solo, fuori dai pannelli). */
+export function photoPicker() {
+  if (!pickerEl) {
+    pickerEl = document.createElement('input');
+    pickerEl.type = 'file';
+    pickerEl.accept = 'image/*';
+    pickerEl.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+    document.body.appendChild(pickerEl);
+  }
+  return pickerEl;
+}
+
+/** Una foto grande rimpicciolita (lato lungo al massimo `max` pixel). */
+export function shrinkImage(img: HTMLImageElement, max: number): HTMLImageElement | HTMLCanvasElement {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const k = Math.min(1, max / Math.max(w, h));
+  if (k >= 1) return img;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * k);
+  c.height = Math.round(h * k);
+  c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+
 export interface PhotoEdit {
-  img: HTMLImageElement;
+  img: HTMLImageElement | HTMLCanvasElement;
   /** 1 = la foto copre il quadrato; di più = ingrandita */
   zoom: number;
   /** spostamento in frazioni del lato */
@@ -242,7 +268,7 @@ export interface PhotoEdit {
   bw: boolean;
 }
 
-export const newPhotoEdit = (img: HTMLImageElement): PhotoEdit => ({ img, zoom: 1, ox: 0, oy: 0, rot: 0, bright: 100, contrast: 100, sat: 100, bw: false });
+export const newPhotoEdit = (img: HTMLImageElement | HTMLCanvasElement): PhotoEdit => ({ img, zoom: 1, ox: 0, oy: 0, rot: 0, bright: 100, contrast: 100, sat: 100, bw: false });
 
 /**
  * La foto ritagliata e ritoccata, su un canvas quadrato di lato `s`.
@@ -254,8 +280,8 @@ export function renderPhoto(e: PhotoEdit, s: number): HTMLCanvasElement {
   const g = c.getContext('2d', { willReadFrequently: true })!;
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, s, s);
-  const w = e.img.naturalWidth;
-  const h = e.img.naturalHeight;
+  const w = e.img instanceof HTMLImageElement ? e.img.naturalWidth : e.img.width;
+  const h = e.img instanceof HTMLImageElement ? e.img.naturalHeight : e.img.height;
   const k = (s / Math.min(w, h)) * e.zoom;
   g.save();
   g.translate(s / 2 + e.ox * s, s / 2 + e.oy * s);

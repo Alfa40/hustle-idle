@@ -6,6 +6,7 @@ import { Game } from './game';
 import { UI } from './ui/ui';
 import { TitleScreen } from './ui/title';
 import { showInstallTip } from './ui/install';
+import { preloadLogo } from './logo';
 
 async function boot() {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -33,6 +34,8 @@ async function boot() {
     if (!game.state.tutorialDone) game.ui.openWelcome();
     else if (game.offlineReport) game.ui.openOffline(game.offlineReport);
     game.ui.refresh();
+    // la foto del logo (se c'è) si decodifica subito: profilo e classifica la mostrano
+    void preloadLogo(game.state.logo).then(() => game.ui.refresh());
   });
   (window as unknown as { title: TitleScreen }).title = title;
 }

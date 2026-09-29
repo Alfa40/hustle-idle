@@ -24,7 +24,7 @@ import {
 } from '../sim/economy';
 import { addFame, addMoney, rank, skillLevel, totalFame } from '../sim/progress';
 import { addFriend, fetchBoard, fetchFriends, friendCode, MAX_NICK, nickname as lbNickname, removeFriend, setNickname as setLbNickname, submit as submitScore, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
-import { drawLogo, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
+import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type ServiceOrder,
@@ -1327,6 +1327,9 @@ export class UI {
    * Il logo può essere disegnato (forma, colori, simbolo, iniziali) oppure una foto
    * caricata dal telefono, ritagliata e ritoccata dentro la forma scelta.
    */
+  /** ritocchi di ogni foto usata come logo (per ritoccarla di nuovo dall'originale) */
+  private photoEdits = new Map<string, PhotoEdit>();
+
   openLogoEditor() {
     const s = this.s;
     let draft: Logo = { ...s.logo };
@@ -1337,31 +1340,35 @@ export class UI {
       `<div class="lg-row">${LOGO_COLORS.map((c) => `<button class="lg-sw ${c === cur ? 'on' : ''}" style="background:${c}" data-a="${key}:${c}"></button>`).join('')}</div>`;
     const slider = (k: keyof PhotoEdit, name: string, min: number, max: number, v: number) =>
       `<label class="ph-sl"><span>${name}</span><input type="range" min="${min}" max="${max}" value="${v}" data-k="${k}"></label>`;
-    const startEdit = (src: string) => {
+    const startEdit = (src: string, revoke = false) => {
       const img = new Image();
       img.onload = () => {
-        edit = newPhotoEdit(img);
+        if (revoke) URL.revokeObjectURL(src);
+        // le foto del telefono sono enormi: si rimpiccioliscono una volta sola (il trascinamento resta fluido)
+        edit = newPhotoEdit(shrinkImage(img, 1024));
         mode = 'photo';
         if (this.panel === panel) this.renderPanel();
       };
       img.onerror = () => this.toast('Non riesco ad aprire questa foto', 'bad');
       img.src = src;
     };
+    // campo "scegli foto" fisso nella pagina: se stesse nel pannello verrebbe tolto quando
+    // il pannello si ridisegna e su iPhone la foto scelta andrebbe persa
+    const picker = photoPicker();
+    picker.onchange = () => {
+      const f = picker.files?.[0];
+      picker.value = ''; // così si può scegliere di nuovo la stessa foto
+      if (f && this.panel === panel) startEdit(URL.createObjectURL(f), true);
+    };
     const drawPreview = (body: HTMLElement) => {
       const cv = body.querySelector('.ph-canvas') as HTMLCanvasElement | null;
       if (!cv || !edit) return;
-      drawLogo(cv.getContext('2d')!, draft, cv.width, renderPhoto(edit, 240));
+      drawLogo(cv.getContext('2d')!, draft, cv.width, renderPhoto(edit, 320));
     };
     const panel: Panel = {
       title: '🎨 Il tuo logo',
       color: 'var(--purple)',
       after: (body) => {
-        // foto scelta dal telefono
-        const file = body.querySelector('.lg-file') as HTMLInputElement | null;
-        file?.addEventListener('change', () => {
-          const f = file.files?.[0];
-          if (f) startEdit(URL.createObjectURL(f));
-        });
         if (mode !== 'photo' || !edit) return;
         drawPreview(body);
         // cursori: anteprima dal vivo, senza ridisegnare il pannello
@@ -1410,7 +1417,6 @@ export class UI {
         <h4 class="lg-h">Il tuo nome</h4>
         <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick">
         <h4 class="lg-h">📷 Una tua foto come logo</h4>
-        <input class="lg-file" type="file" accept="image/*" hidden>
         <div class="lg-row">${draft.photo
           ? '<button class="btn sm purple" data-a="retouch">✏️ Ritocca la foto</button><button class="btn sm sec" data-a="upload">📷 Cambia</button><button class="btn sm sec" data-a="nophoto">🗑️ Togli</button>'
           : '<button class="btn sm purple" data-a="upload">📷 Carica una foto</button>'}</div>
@@ -1435,8 +1441,15 @@ export class UI {
           if (!setLbNickname(read('.lg-nick'))) this.toast('✏️ Scrivi un nome');
         },
         rnd: () => (draft = { ...randomLogo(), text: draft.text }),
-        upload: () => (this.modal?.querySelector('.lg-file') as HTMLInputElement | null)?.click(),
-        retouch: () => draft.photo && startEdit(draft.photo),
+        upload: () => picker.click(),
+        retouch: () => {
+          // si riparte dalla foto originale con i ritocchi di prima (non dal ritaglio già salvato)
+          const prev = this.photoEdits.get(draft.photo ?? '');
+          if (prev) {
+            edit = { ...prev };
+            mode = 'photo';
+          } else if (draft.photo) startEdit(draft.photo);
+        },
         nophoto: () => delete draft.photo,
         rot: () => edit && (edit.rot = (edit.rot + 1) % 4),
         bw: () => edit && (edit.bw = !edit.bw),
@@ -1446,9 +1459,14 @@ export class UI {
           edit = null;
         },
         usephoto: () => {
-          if (edit) draft.photo = photoData(edit);
+          if (edit) {
+            draft.photo = photoData(edit);
+            this.photoEdits.set(draft.photo, { ...edit });
+          }
           mode = 'logo';
           edit = null;
+          // l'anteprima si aggiorna appena la foto nuova è pronta
+          void preloadLogo(draft).then(() => this.panel === panel && this.renderPanel());
         },
         save: () => {
           draft.text = read('.lg-text').slice(0, 3);
