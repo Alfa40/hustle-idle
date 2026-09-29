@@ -6,11 +6,13 @@ export interface Settings {
   pointers: boolean;
   minimap: boolean;
   outlines: boolean;
+  /** risparmio batteria: 30 fotogrammi al secondo (15 da fermo) e meno pixel */
+  battery: boolean;
 }
 
 const KEY = 'hustleidle.settings';
 
-const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true };
+const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false };
 
 export const settings: Settings = { ...DEFAULTS };
 

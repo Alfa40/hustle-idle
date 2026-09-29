@@ -1,7 +1,7 @@
 import { setSetting, settings, SETTING_OPTIONS, type Settings } from '../settings';
 
 type Choice = 'quality' | 'camera';
-type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap';
+type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap' | 'battery';
 
 function segmented(key: Choice, label: string, hint: string) {
   const opts = SETTING_OPTIONS[key].map(
@@ -19,6 +19,7 @@ function toggle(key: Toggle, label: string, hint: string) {
 /** Controlli delle impostazioni: uguali nella schermata iniziale e in partita. */
 export function settingsHtml() {
   return [
+    toggle('battery', '🔋 Risparmio batteria', 'Il gioco disegna 30 immagini al secondo (15 quando non tocchi lo schermo) e con un po\' meno dettaglio: consuma circa la metà.'),
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),
     toggle('outlines', '✏️ Contorni', 'Bordi scuri attorno agli oggetti: tutto più distinguibile. Spenti con qualità Bassa.'),

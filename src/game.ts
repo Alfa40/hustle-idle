@@ -175,6 +175,8 @@ export class Game {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: dpr < 2, powerPreference: 'high-performance' });
     this.applySettings();
     onSettings(() => this.applySettings());
+    for (const ev of ['pointerdown', 'pointermove', 'keydown', 'wheel'] as const)
+      window.addEventListener(ev, () => (this.lastInput = performance.now()), { passive: true });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -205,7 +207,8 @@ export class Game {
   /** Qualità grafica e ombre dalle impostazioni. */
   applySettings() {
     const dpr = window.devicePixelRatio || 1;
-    this.renderer.setPixelRatio(Math.min(dpr, QUALITY_PIXEL_RATIO[settings.quality]));
+    // con il risparmio batteria meno pixel da disegnare (massimo 1,1)
+    this.renderer.setPixelRatio(Math.min(dpr, QUALITY_PIXEL_RATIO[settings.quality], settings.battery ? 1.1 : 9));
     this.sun.castShadow = settings.shadows;
     this.sun.shadow.mapSize.setScalar(settings.quality === 'alta' ? 2048 : settings.quality === 'media' ? 1024 : 512);
     this.renderer.shadowMap.type = settings.quality === 'bassa' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
@@ -1167,8 +1170,19 @@ export class Game {
     if (!this.renderPaused) this.draw(this.scene, this.camera);
   }
 
+  /** ultimo tocco/tasto: da fermi, col risparmio batteria, si disegna ancora meno spesso */
+  private lastInput = performance.now();
+  private lastFrame = 0;
+
   private frame() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    if (settings.battery) {
+      // 30 immagini al secondo; 15 dopo 5 secondi senza toccare lo schermo
+      const now = performance.now();
+      const idle = now - this.lastInput > 5000;
+      if (now - this.lastFrame < (idle ? 1000 / 15 : 1000 / 30) - 2) return;
+      this.lastFrame = now;
+    }
+    const dt = Math.min(settings.battery ? 0.1 : 0.05, this.clock.getDelta());
     if (this.mode === 'title') {
       this.titleFrame(dt);
       return;
