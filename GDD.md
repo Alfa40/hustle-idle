@@ -162,7 +162,7 @@ Nuove categorie arriveranno insieme alle nuove attività.
 - **Stile e accessori**: 9 stili (i personaggi Kenney, il primo gratis) e accessori agganciati alla testa (seguono le animazioni), uno per parte del corpo: testa (cappellino, cilindro, corona), occhi (occhiali da sole, a cuore), collo (collana d'oro, di perle, sciarpa), schiena (zaino, mantello). Si comprano una volta per partita e si indossano/tolgono quando si vuole
 
 ### Installazione sulla schermata Home
-- Ogni volta che il gioco si apre dal browser (non dall'icona sulla Home) compare un consiglio: perché conviene (schermo intero, si apre con un tocco, salvataggi più al sicuro, più fluido) e i passaggi giusti per il telefono in uso (iPhone con Safari o altri browser, Android con Chrome, computer). Su Android con Chrome c'è anche il pulsante "Installa adesso". Si chiude con "Più tardi"
+- Ogni volta che il gioco si apre dal browser (non dall'icona sulla Home) compare un consiglio: perché conviene (schermo intero, si apre con un tocco, salvataggi più al sicuro, più fluido) e i passaggi giusti per il telefono in uso (iPhone: 3 puntini → Condividi → Aggiungi alla schermata Home, con Safari o altri browser; Android con Chrome, computer). Su Android con Chrome c'è anche il pulsante "Installa adesso". Si chiude con "Più tardi"
 - Manifest con icone 192/512 (anche maskable) e apple-touch-icon, così l'icona sulla Home è quella del gioco
 
 ### Orari delle attività

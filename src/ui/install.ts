@@ -35,12 +35,14 @@ function platform(): Platform {
 
 const STEPS: Record<Platform, [string, string][]> = {
   'ios-safari': [
-    ['⬆️', 'Tocca il pulsante <b>Condividi</b> (il quadrato con la freccia) nella barra di Safari'],
+    ['•••', 'Tocca i <b>3 puntini</b> nella barra di Safari: così compare il pulsante Condividi'],
+    ['⬆️', 'Tocca <b>Condividi</b> (il quadrato con la freccia)'],
     ['➕', 'Scorri e tocca <b>Aggiungi alla schermata Home</b>'],
     ['✅', 'Tocca <b>Aggiungi</b> in alto a destra: l\'icona di Hustle Idle compare sulla Home'],
   ],
   'ios-other': [
-    ['⬆️', 'Tocca il pulsante <b>Condividi</b> nella barra degli indirizzi (in alto a destra)'],
+    ['•••', 'Tocca i <b>3 puntini</b> nella barra del browser per vedere il pulsante Condividi'],
+    ['⬆️', 'Tocca <b>Condividi</b> (il quadrato con la freccia)'],
     ['➕', 'Tocca <b>Aggiungi alla schermata Home</b> (se non c\'è, apri il link in <b>Safari</b>)'],
     ['✅', 'Tocca <b>Aggiungi</b>: l\'icona compare sulla Home'],
   ],
@@ -74,7 +76,7 @@ export function showInstallTip() {
     </ul>
     <button class="btn good full inst-go" style="${deferred ? '' : 'display:none'}">📲 Installa adesso</button>
     <div class="inst-steps">${STEPS[p].map(([i, t], n) => `<div class="inst-step"><span class="inst-n">${n + 1}</span><span class="inst-i">${i}</span><span>${t}</span></div>`).join('')}</div>
-    ${p === 'ios-safari' ? '<div class="inst-arrow">⬇️ il pulsante Condividi è qui sotto</div>' : ''}
+    ${p === 'ios-safari' ? '<div class="inst-arrow">⬇️ i 3 puntini sono nella barra qui sotto</div>' : ''}
     <button class="btn sec full inst-later">Più tardi, gioco dal browser</button>
   </div>`;
   document.body.appendChild(el);
