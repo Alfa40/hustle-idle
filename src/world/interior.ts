@@ -1057,19 +1057,24 @@ export class TruckInterior {
         }
       }
     }
-    // 2) prende un nuovo prodotto da preparare (il lavoro si divide tra i cuochi)
-    if (this.pass.length < this.passMax) {
-      const need = this.needed()[0];
+    // 2) prende un nuovo prodotto da preparare (il lavoro si divide tra i cuochi).
+    //    Se il giocatore sta lavorando, i cuochi iniziano prodotti nuovi solo quando la coda
+    //    è più lunga di quanto lui riesce a portare: il resto lo lasciano a lui e lo aiutano.
+    const needs = this.needed();
+    const helpOnly = this.playerWorking && needs.length <= this.handMax;
+    if (this.pass.length < this.passMax && !helpOnly) {
+      const need = needs[this.playerWorking ? this.handMax : 0] ?? needs[needs.length - 1];
       const src = need && this.bestStation(this.layout.recipes[need.pid]?.steps[0] ?? '', p, w);
       if (need && src) {
         this.setWorkerItem(w, { pid: need.pid, step: 0, takeaway: need.takeaway });
         return { act: 'start', target: src, t: 0 };
       }
     }
-    // 3) jolly: salva dal fuoco ciò che nessuno toglie (del giocatore o di chi è occupato)
+    // 3) jolly: salva dal fuoco ciò che nessuno toglie. Quelli del giocatore solo quando
+    //    stanno per bruciare (prima li lascia a lui); quelli di un cuoco occupato subito.
     for (const st of this.stations) {
       for (const sl of st.slots) {
-        const ownerBusy = !sl.owner || sl.owner.item || sl.p >= 1.25;
+        const ownerBusy = sl.owner ? !!sl.owner.item || sl.p >= 1.25 : sl.p >= 1 + (BURN - 1) * 0.45;
         if (sl.item && sl.p >= 1.05 && sl.p < BURN && !sl.claim && ownerBusy) {
           sl.claim = w;
           return { act: 'rescue', target: st, slot: sl, t: 0 };
@@ -1374,7 +1379,20 @@ export class TruckInterior {
       g.ui.setAction(null);
       return;
     }
-    g.ui.setAction(this.interact(best, dt, input.actionHeld, input.consumeAction()));
+    const pressed = input.consumeAction();
+    if (pressed || input.actionHeld) this.lastPlayerWork = performance.now();
+    g.ui.setAction(this.interact(best, dt, input.actionHeld, pressed));
+  }
+
+  /** ultima volta (ms) che il giocatore ha lavorato a una postazione */
+  private lastPlayerWork = -1e9;
+
+  /**
+   * Il giocatore sta lavorando (ha qualcosa in mano o ha usato una postazione da poco):
+   * i cuochi lo aiutano invece di prendersi i suoi ordini.
+   */
+  private get playerWorking() {
+    return this.hand.length > 0 || performance.now() - this.lastPlayerWork < 8000;
   }
 
   /** Cosa succede a una postazione; restituisce il testo del pulsante azione. */
