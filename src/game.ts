@@ -902,7 +902,7 @@ export class Game {
   // ---------------- prima persona ----------------
 
   /**
-   * Prima persona automatica: solo durante i lavoretti in città.
+   * Prima persona automatica durante i lavoretti in città (ora disattivata: vedi FP_JOBS).
    * In giro per la città, nelle attività e nelle case dei clienti si resta in terza persona.
    */
   firstPerson = false;
@@ -922,8 +922,11 @@ export class Game {
     return this.interior?.camera ?? this.house?.camera ?? this.camera;
   }
 
+  /** Prima persona nei lavoretti: disattivata (troppo difficile da telefono), il codice resta per il futuro. */
+  static readonly FP_JOBS = false;
+
   private wantFirstPerson() {
-    return !!(this.run && this.runOffer) && !this.interior && !this.house;
+    return Game.FP_JOBS && !!(this.run && this.runOffer) && !this.interior && !this.house;
   }
 
   setFirstPerson(on: boolean) {

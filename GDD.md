@@ -268,7 +268,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Visuale
 - Terza persona in giro per la città, nelle attività e nelle case dei clienti
-- Prima persona automatica solo durante i lavoretti: occhi sopra e un po' dietro la testa (non entrano nei muri), campo visivo ampio, oggetti in mano nascosti (indicati nella barra), sguardo che si gira da solo verso il prossimo punto quando non si trascina il dito, leggero ondeggiare camminando, passaggio morbido tra le visuali
+- Lavoretti di nuovo in terza persona (la prima persona rendeva i lavori più difficili da telefono; il codice resta, `Game.FP_JOBS`, per riprovarla più avanti in modo meno confusionario). Prima: Prima persona automatica solo durante i lavoretti: occhi sopra e un po' dietro la testa (non entrano nei muri), campo visivo ampio, oggetti in mano nascosti (indicati nella barra), sguardo che si gira da solo verso il prossimo punto quando non si trascina il dito, leggero ondeggiare camminando, passaggio morbido tra le visuali
 
 ### Grafica 0.9
 - Cielo a gradiente con sole che segue l'ora (alba, giorno, tramonto dorato, notte) e nuvole low-poly in movimento
