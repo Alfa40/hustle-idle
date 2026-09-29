@@ -299,7 +299,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Magazzinieri (nuovo ruolo): portano le scorte dal magazzino al frigo e riordinano anche senza manager
 
 ### Lavoretti
-- Gli oggetti da usare nella fase attuale hanno il loro colore più acceso che pulsa (niente luce esterna): cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
+- Gli oggetti da usare nella fase attuale hanno il loro colore più acceso e chiaro che pulsa (niente luce esterna); la scena è leggermente più scura per farli risaltare: cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
 - Volantinaggio e consegne: al negozio c'è un espositore giallo dei volantini o una pila di pacchi; a ogni indirizzo una cassetta della posta su palo con bandierina, così il punto si trova subito
 
 ### Prossimi passi proposti

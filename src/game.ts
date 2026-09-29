@@ -1172,8 +1172,10 @@ export class Game {
     const ang = ((h - 6) / 12) * Math.PI;
     const elev = Math.max(0.25, Math.sin(ang));
     this.sunDir.set(Math.cos(ang) * 0.9, elev * 1.6, 0.45).normalize();
-    this.sun.intensity = 0.35 + 2.1 * k;
-    this.hemi.intensity = 0.55 + 0.75 * k;
+    // scena un po' più scura: gli oggetti dei lavoretti che si accendono risaltano di più
+    const DIM = 0.82;
+    this.sun.intensity = (0.35 + 2.1 * k) * DIM;
+    this.hemi.intensity = (0.55 + 0.75 * k) * DIM;
     // tramonto/alba: luce più calda
     const golden = THREE.MathUtils.clamp(1 - Math.min(Math.abs(h - 18.6), Math.abs(h - 6.8)) / 1.6, 0, 1);
     this.sun.color.setRGB(1, 0.96 - 0.2 * golden, 0.9 - 0.35 * golden);

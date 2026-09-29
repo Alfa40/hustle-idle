@@ -160,9 +160,9 @@ export class TruckInterior {
     const s = this.scene;
     const def = bizType(this.biz.type);
     s.background = new THREE.Color(0x2a3350);
-    s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.6));
+    s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.4));
     s.add(this.fx.group);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
     sun.position.set(this.center - 3, 9, 7);
     sun.target.position.set(this.center, 0, 0);
     s.add(sun, sun.target);

@@ -184,7 +184,9 @@ export class PhasedRun extends BaseRun {
     o.position.copy(pos);
     o.rotation.y = rotY;
     o.scale.multiplyScalar(scale);
-    return this.add(o);
+    const r = this.add(o);
+    for (const t of this.tasks) this.glowObj(t, o);
+    return r;
   }
 
   /** oggetti di scena che brillano per ogni punto da fare, con i materiali originali */
@@ -192,27 +194,31 @@ export class PhasedRun extends BaseRun {
 
   /** Fa brillare gli oggetti vicini a un punto da fare (cassetta, cespuglio, muretto…). */
   private addGlow(t: Task) {
-    const meshes: { m: THREE.Mesh; orig: THREE.Material | THREE.Material[] }[] = [];
-    for (const o of this.objs) {
-      if ((o as THREE.Sprite).isSprite || o.userData.noGlow) continue;
-      if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.05) continue;
-      o.traverse((c) => {
-        const m = c as THREE.Mesh;
-        if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite) return;
-        const orig = m.material;
-        // nessuna luce esterna: il colore dell'oggetto stesso si accende
-        const glowMat = (mat: THREE.Material) => {
-          const g = mat.clone() as THREE.MeshLambertMaterial;
-          g.emissive = g.color ? g.color.clone() : new THREE.Color(0xffffff);
-          if (g.map) g.emissiveMap = g.map;
-          g.emissiveIntensity = 0;
-          return g;
-        };
-        m.material = Array.isArray(orig) ? orig.map(glowMat) : glowMat(orig);
-        meshes.push({ m, orig });
-      });
-    }
-    this.glows.set(t, { meshes });
+    if (!this.glows.has(t)) this.glows.set(t, { meshes: [] });
+    for (const o of this.objs) this.glowObj(t, o);
+  }
+
+  /** Accende un oggetto di scena se è vicino al punto da fare (anche se aggiunto dopo l'inizio della fase). */
+  private glowObj(t: Task, o: THREE.Object3D) {
+    const g = this.glows.get(t);
+    if (!g || (o as THREE.Sprite).isSprite || o.userData.noGlow) return;
+    if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.05) return;
+    o.traverse((c) => {
+      const m = c as THREE.Mesh;
+      if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite || g.meshes.some((x) => x.m === m)) return;
+      const orig = m.material;
+      // nessuna luce esterna: il colore dell'oggetto stesso si accende
+      const glowMat = (mat: THREE.Material) => {
+        const c2 = mat.clone() as THREE.MeshLambertMaterial;
+        // un colore già saturo (rosso pieno) non può diventare "più rosso": si schiarisce verso il bianco
+        c2.emissive = (c2.color ? c2.color.clone() : new THREE.Color(0xffffff)).lerp(WHITE, 0.25);
+        if (c2.map) c2.emissiveMap = c2.map;
+        c2.emissiveIntensity = 0;
+        return c2;
+      };
+      m.material = Array.isArray(orig) ? orig.map(glowMat) : glowMat(orig);
+      g.meshes.push({ m, orig });
+    });
   }
 
   private removeGlow(t: Task) {
@@ -225,8 +231,8 @@ export class PhasedRun extends BaseRun {
   /** Luce che pulsa sugli oggetti ancora da usare (solo quelli attivi adesso). */
   private pulseGlows() {
     const pend = new Set(this.pending());
-    // colore più vivo che pulsa (da +55% a +120%)
-    const k = 0.55 + 0.65 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
+    // colore più chiaro e vivo che pulsa
+    const k = 0.1 + 0.5 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
     for (const [t, g] of this.glows) {
       const on = pend.has(t) && !t.done;
       for (const { m } of g.meshes) {
@@ -388,6 +394,7 @@ function zoneFor(slot: Slot, base: THREE.Vector3, f0: number, f1: number, r: num
   };
 }
 
+const WHITE = new THREE.Color(0xffffff);
 const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
 
 /** Giardinaggio: attrezzi → taglia i cespugli → raccogli le foglie → svuota nel bidone. */

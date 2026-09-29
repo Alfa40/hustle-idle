@@ -145,9 +145,9 @@ export class ClientHouse {
   private buildRooms(rooms: number) {
     const s = this.scene;
     s.background = new THREE.Color(0x2a3350);
-    s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.7));
+    s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.5));
     s.add(this.fx.group, this.guide.mesh);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+    const sun = new THREE.DirectionalLight(0xffffff, 1.15);
     sun.position.set(this.center - 3, 9, 7);
     sun.target.position.set(this.center, 0, 0);
     s.add(sun, sun.target);
