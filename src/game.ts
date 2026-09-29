@@ -588,7 +588,7 @@ export class Game {
         run.status = text;
       },
       done: (stars) => this.finishJob(stars),
-    });
+    }, this.state.businesses.find((b) => b.id === this.runOrder?.bizId)?.staff ?? []);
     this.house.enter(this.player);
     run.target = undefined;
   }

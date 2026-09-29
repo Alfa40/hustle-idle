@@ -272,7 +272,9 @@ export class UI {
 
     if (this.panel?.live) {
       this.liveTimer += dt;
-      if (this.liveTimer > 1) this.renderPanel();
+      // niente aggiornamenti mentre il dito scorre il pannello (interromperebbero lo scorrimento)
+      const busy = this.touching || performance.now() - this.lastScroll < 900;
+      if (this.liveTimer > 1 && !busy) this.renderPanel(true);
     }
   }
 
@@ -348,19 +350,34 @@ export class UI {
       this.panel.actions[name]?.(arg);
       this.renderPanel();
     });
+    const sb = modal.querySelector('.sheet-body') as HTMLElement;
+    sb.addEventListener('touchstart', () => (this.touching = true), { passive: true });
+    sb.addEventListener('touchend', () => (this.touching = false), { passive: true });
+    sb.addEventListener('touchcancel', () => (this.touching = false), { passive: true });
+    sb.addEventListener('scroll', () => (this.lastScroll = performance.now()), { passive: true });
+    this.touching = false;
+    this.lastHtml = '';
     document.body.appendChild(modal);
     this.modal = modal;
     this.renderPanel();
   }
 
-  private renderPanel() {
+  private touching = false;
+  private lastScroll = 0;
+  private lastHtml = '';
+
+  private renderPanel(onlyIfChanged = false) {
     if (!this.modal || !this.panel) return;
     this.liveTimer = 0;
     const body = this.modal.querySelector('.sheet-body') as HTMLElement;
     const scroll = body.scrollTop;
     const html = this.panel.render();
+    // contenuto uguale: non si tocca nulla (lo scorrimento resta fluido)
+    if (onlyIfChanged && html === this.lastHtml) return;
+    this.lastHtml = html;
     const [tabs, content] = html.includes('<!--tabs-->') ? html.split('<!--tabs-->') : ['', html];
-    (this.modal.querySelector('.tabs-slot') as HTMLElement).innerHTML = tabs;
+    const tabsEl = this.modal.querySelector('.tabs-slot') as HTMLElement;
+    if (tabsEl.innerHTML !== tabs) tabsEl.innerHTML = tabs;
     body.innerHTML = content;
     // prima si ridisegna (il canvas cambia l'altezza), poi si ripristina lo scorrimento
     this.panel.after?.(body);

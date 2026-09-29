@@ -81,6 +81,10 @@ interface Station {
 interface Worker {
   emp: Employee;
   char: Character;
+  home: THREE.Vector3;
+  /** prodotto che sta preparando e tappe da percorrere */
+  job?: { item: Item; stops: THREE.Vector3[]; leg: number; t: number };
+  pause: number;
 }
 
 const barGeo = new THREE.PlaneGeometry(0.7, 0.1);
@@ -109,7 +113,6 @@ export class TruckInterior {
   private heldSprite: THREE.Sprite | null = null;
   private heldSec = 0;
   private spawnAcc = 0;
-  private cookAcc = 0;
   private serveAcc = 0;
   private queueBase: THREE.Vector3;
   private door: THREE.Vector3;
@@ -235,7 +238,7 @@ export class TruckInterior {
         char.root.rotation.y = Math.PI;
       }
       s.add(char.root);
-      this.workers.push({ emp: e, char });
+      this.workers.push({ emp: e, char, home: char.root.position.clone(), pause: 0 });
     }
   }
 
@@ -306,7 +309,10 @@ export class TruckInterior {
     if (!this.guideEl) return;
     const it = this.held;
     const onFire = this.stations.filter((s) => s.def.kind === 'timed');
+    const s = this.game.state;
     const caps = [
+      `💰 €${Math.round(s.money).toLocaleString('it-IT')}`,
+      `${isOpenHour(s) ? '🟢 Aperto' : '🔴 Chiuso'} · coda ${this.customers.length}/${BUSINESS.MAX_QUEUE}`,
       `✋ In mano ${it ? 1 : 0}/${TruckInterior.HAND_MAX}`,
       ...onFire.map((s) => `${s.def.icon} ${s.def.name} ${s.slots.filter((x) => x.item).length}/${s.slots.length}`),
       `${this.stationOf('pass')!.def.icon} Pronti ${this.pass.length}/${TruckInterior.PASS_MAX}`,
@@ -361,6 +367,7 @@ export class TruckInterior {
     this.guideEl = document.createElement('div');
     this.guideEl.className = 'guide';
     document.body.appendChild(this.guideEl);
+    document.body.classList.add('guide-on');
     this.resize();
     window.addEventListener('resize', this.resize);
   }
@@ -369,6 +376,7 @@ export class TruckInterior {
     this.biz.__playerInside = false;
     this.guideEl?.remove();
     this.guideEl = null;
+    document.body.classList.remove('guide-on');
     window.removeEventListener('resize', this.resize);
     this.setHeld(null);
     this.scene.remove(this.player.root);
@@ -480,6 +488,7 @@ export class TruckInterior {
       ...(this.held && !this.cold(this.held) ? [this.held] : []),
       ...this.pass.filter((x) => !this.cold(x)),
       ...this.stations.flatMap((s) => s.slots.flatMap((sl) => (sl.item ? [sl.item] : []))),
+      ...this.workers.flatMap((w) => (w.job ? [w.job.item] : [])),
     ];
     for (const it of inWork) {
       const i = pending.findIndex((p) => p.pid === it.pid && p.takeaway === it.takeaway);
@@ -502,7 +511,9 @@ export class TruckInterior {
       line.done = true;
       const s = this.game.state;
       const frac = Math.max(0, c.patience / c.maxPatience);
-      const tip = manual ? 1 + 0.3 * frac : 1 + (emp ? emp.kindness * 0.01 : 0);
+      // con un cassiere al bancone i clienti sono serviti meglio: mance più alte
+      const cashierBonus = this.workers.filter((w) => w.emp.role === 'cassa').reduce((a, w) => a + w.emp.kindness * 0.015, 0);
+      const tip = (manual ? 1 + 0.3 * frac : 1 + (emp ? emp.kindness * 0.01 : 0)) + cashierBonus;
       const amount = recordSale(s, this.biz, it.pid, manual, tip * (it.takeaway ? 1.1 : 1));
       c.paid += amount;
       this.earned += amount;
@@ -656,39 +667,107 @@ export class TruckInterior {
     }
   }
 
-  /** I dipendenti preparano e servono da soli, alla loro velocità. */
+  /**
+   * I dipendenti lavorano anche mentre ci sei tu:
+   * - i cuochi girano tra le postazioni e preparano ciò che manca, appoggiandolo sul ripiano;
+   * - tolgono dal fuoco ciò che è pronto (così non brucia) e buttano il cibo freddo;
+   * - i cassieri servono dal ripiano e, se ci sono, i clienti lasciano mance più alte.
+   */
   private updateWorkers(dt: number, gm: number) {
     for (const w of this.workers) w.char.update(dt);
     const cooks = this.workers.filter((w) => w.emp.role === 'cucina');
     const cashiers = this.workers.filter((w) => w.emp.role === 'cassa');
-    if (cooks.length) {
-      const need = this.needed();
-      if (need.length && this.pass.length < TruckInterior.PASS_MAX) {
-        const rate = cooks.reduce((a, w) => a + employeeRate(w.emp, this.biz), 0);
-        this.cookAcc += (rate * gm) / 60;
-        for (const w of cooks) w.char.play('interact-right', 0.15, 1.2);
-        if (this.cookAcc >= 1) {
-          this.cookAcc -= 1;
-          const it: Item = { pid: need[0].pid, step: 0, takeaway: need[0].takeaway };
-          it.step = this.recipe(it).length;
-          this.markReady(it);
-          this.pass.push(it);
-          employeeGainXp(cooks[0].emp, 1);
+    for (const w of cooks) this.updateCook(w, dt);
+    // un cuoco libero toglie dal fuoco ciò che è pronto prima che bruci
+    for (const st of this.stations) {
+      for (const sl of st.slots) {
+        if (!sl.item || sl.p < 1.15 || sl.p >= BURN || !cooks.some((w) => !w.job)) continue;
+        const it = sl.item;
+        sl.item = null;
+        sl.bar.visible = sl.fill.visible = false;
+        it.step++;
+        this.markReady(it);
+        if (this.finished(it) && this.pass.length < TruckInterior.PASS_MAX) this.pass.push(it);
+        else {
+          // serve ancora una fase: la finisce il cuoco
+          const w = cooks.find((x) => !x.job)!;
+          this.startCookJob(w, it);
         }
-      } else for (const w of cooks) w.char.play('idle');
+        this.fx.emit('spark', st.pos.clone().setY(1.3), 6);
+      }
     }
     // il personale butta via i prodotti freddi
     if (cashiers.length || cooks.length) this.pass = this.pass.filter((it) => !this.cold(it));
     if (cashiers.length && this.pass.some((it) => this.deliverable(it))) {
       const rate = cashiers.reduce((a, w) => a + employeeRate(w.emp, this.biz), 0) * 2;
       this.serveAcc += (rate * gm) / 60;
+      for (const w of cashiers) w.char.play('interact-right', 0.15, 1.2);
       if (this.serveAcc >= 1) {
         this.serveAcc -= 1;
         const i = this.pass.findIndex((it) => this.deliverable(it));
         const [it] = this.pass.splice(i, 1);
+        this.fx.emit('spark', cashiers[0].char.root.position.clone().setY(1.4), 8);
         this.deliver(it, false, cashiers[0].emp);
         employeeGainXp(cashiers[0].emp, 1);
       }
+    } else for (const w of cashiers) if (w.char.currentName === 'interact-right') w.char.play('idle');
+  }
+
+  /** Dove sta un dipendente per usare una postazione. */
+  private standAt(id: string) {
+    const st = this.stations.find((x) => x.def.id === id);
+    if (!st) return null;
+    return new THREE.Vector3(st.pos.x + 0.35, 0, st.def.z > 1 ? FRONT - 0.2 : st.pos.z + 0.85);
+  }
+
+  private startCookJob(w: Worker, item: Item) {
+    const ids = this.recipe(item).slice(item.step);
+    const stops = [...ids, 'passe'].map((id) => this.standAt(id)).filter((v): v is THREE.Vector3 => !!v);
+    w.job = { item, stops, leg: 0, t: 0 };
+  }
+
+  private updateCook(w: Worker, dt: number) {
+    const p = w.char.root.position;
+    if (!w.job) {
+      const need = this.needed()[0];
+      if (need && this.pass.length < TruckInterior.PASS_MAX) {
+        this.startCookJob(w, { pid: need.pid, step: 0, takeaway: need.takeaway });
+        return;
+      }
+      // niente da fare: torna al suo posto
+      const d = p.distanceTo(w.home);
+      if (d > 0.1) {
+        p.lerp(w.home, Math.min(1, (dt * 2.5) / d));
+        w.char.faceTowards(w.home.x, w.home.z, dt);
+        w.char.play('walk');
+      } else w.char.play('idle');
+      return;
+    }
+    const job = w.job;
+    const target = job.stops[job.leg];
+    const d = p.distanceTo(target);
+    // più il dipendente è bravo, più cammina e lavora in fretta
+    const speed = employeeRate(w.emp, this.biz) / 4;
+    if (d > 0.08) {
+      const step = Math.min(d, dt * 3 * Math.max(0.7, speed));
+      p.addScaledVector(target.clone().sub(p).normalize(), step);
+      w.char.faceTowards(target.x, target.z, dt);
+      w.char.play('walk');
+      return;
+    }
+    // lavora un po' alla postazione
+    w.char.faceTowards(p.x, p.z - 2, dt);
+    w.char.play('interact-right', 0.1, 1.3);
+    job.t += (dt * Math.max(0.6, speed)) / 1.4;
+    if (job.t < 1) return;
+    job.t = 0;
+    job.leg++;
+    if (job.leg >= job.stops.length) {
+      job.item.step = this.recipe(job.item).length;
+      this.markReady(job.item);
+      if (this.pass.length < TruckInterior.PASS_MAX) this.pass.push(job.item);
+      employeeGainXp(w.emp, 1);
+      w.job = undefined;
     }
   }
 

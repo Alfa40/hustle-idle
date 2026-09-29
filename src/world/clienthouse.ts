@@ -4,7 +4,9 @@ import { JOB } from '../config/balance';
 import { PRODUCTS, type ProductId } from '../config/products';
 import type { Game } from '../game';
 import { toast } from '../sim/bus';
-import type { Character } from './character';
+import { Character } from './character';
+import type { Employee } from '../sim/state';
+import { employeeGainXp } from '../sim/economy';
 import { label } from './props';
 import { Particles } from './particles';
 import { GuideLine } from './guideline';
@@ -36,6 +38,16 @@ interface Dirt {
   obj: THREE.Object3D;
   cut: number;
   done: boolean;
+}
+
+interface Helper {
+  emp: Employee;
+  char: Character;
+  task: Dirt | Thing | null;
+  stage?: 'go' | 'carry';
+  work: number;
+  speed: number;
+  box?: THREE.Object3D;
 }
 
 /** Oggetto da portare via nel trasloco. */
@@ -105,7 +117,7 @@ export class ClientHouse {
   private fx = new Particles();
   private guide = new GuideLine(0xffffff, 0.24);
 
-  constructor(private game: Game, private pid: ProductId, level: number, private hooks: HouseRunHooks) {
+  constructor(private game: Game, private pid: ProductId, level: number, private hooks: HouseRunHooks, private staff: Employee[] = []) {
     this.cleaning = !!CLEAN_MIX[pid];
     const rooms = (this.cleaning ? CLEAN_MIX[pid]!.rooms : MOVE_MIX[pid]?.rooms) ?? 2;
     this.width = rooms * ROOM_W;
@@ -338,6 +350,7 @@ export class ClientHouse {
   // ---------------- entrata/uscita ----------------
 
   enter(player: Character) {
+    this.spawnHelpers();
     this.player = player;
     player.root.position.copy(this.door).add(new THREE.Vector3(0.8, 0, -0.6));
     player.root.rotation.y = Math.PI;
@@ -394,7 +407,112 @@ export class ClientHouse {
     this.hooks.done(stars);
   }
 
+  // ---------------- dipendenti che aiutano ----------------
+
+  private helpers: Helper[] = [];
+
+  /** I dipendenti dell'impresa vengono con te e fanno una parte del lavoro. */
+  private spawnHelpers() {
+    this.staff.filter((e) => e.role !== 'manager').slice(0, 3).forEach((e, i) => {
+      const char = new Character(e.model || 'character-female-b');
+      const tag = label(e.name.split(' ')[0], { scale: 0.2 });
+      tag.position.y = 1.75;
+      char.root.add(tag);
+      char.root.position.copy(this.door).add(new THREE.Vector3(1.2 + i * 0.6, 0, -0.9));
+      this.scene.add(char.root);
+      // velocità: più il dipendente è bravo, più in fretta lavora
+      this.helpers.push({ emp: e, char, task: null, work: 0, speed: 0.6 + e.speed * 0.08 + (e.level - 1) * 0.05 });
+    });
+  }
+
+  /** Il prossimo lavoro libero per un aiutante (non quello a cui sta lavorando il giocatore). */
+  private helperTask(h: Helper): Dirt | Thing | null {
+    const busy = new Set(this.helpers.map((x) => x.task));
+    const p = h.char.root.position;
+    const byDist = <T extends { pos: THREE.Vector3 }>(l: T[]) => l.sort((a, b) => a.pos.distanceTo(p) - b.pos.distanceTo(p));
+    if (this.cleaning) {
+      const player = this.player.root.position;
+      return byDist(this.dirts.filter((d) => !d.done && !busy.has(d) && d.pos.distanceTo(player) > 1.3))[0] ?? null;
+    }
+    return byDist(this.things.filter((t) => !t.done && t !== this.carrying && !busy.has(t)))[0] ?? null;
+  }
+
+  private updateHelpers(dt: number) {
+    for (const h of this.helpers) {
+      h.char.update(dt);
+      if (!h.task) {
+        h.task = this.helperTask(h);
+        h.work = 0;
+        h.stage = 'go';
+        if (!h.task) {
+          h.char.play('idle');
+          continue;
+        }
+      }
+      const t = h.task;
+      if ((t as Dirt).done && h.stage !== 'carry') {
+        h.task = null;
+        continue;
+      }
+      const goal = h.stage === 'carry' ? this.van : t.pos;
+      const p = h.char.root.position;
+      const d = Math.hypot(goal.x - p.x, goal.z - p.z);
+      if (d > 0.9) {
+        const step = Math.min(d - 0.8, dt * 3.2 * h.speed);
+        p.x += ((goal.x - p.x) / d) * step;
+        p.z += ((goal.z - p.z) / d) * step;
+        h.char.faceTowards(goal.x, goal.z, dt);
+        h.char.play(h.stage === 'carry' ? 'holding-both' : 'walk');
+        continue;
+      }
+      if (this.cleaning) {
+        const dirt = t as Dirt;
+        h.work += (dt * h.speed) / 2.2;
+        h.char.faceTowards(dirt.pos.x, dirt.pos.z - 0.5, dt);
+        h.char.play('interact-right', 0.1, 1.4);
+        if (Math.random() < dt * 8) this.fx.emit(dirt.tool === 'piumino' ? 'dust' : 'bubble', dirt.pos.clone().setY(0.8), 1);
+        dirt.cut = Math.max(dirt.cut, h.work);
+        if (h.work >= 1 && !dirt.done) {
+          dirt.done = true;
+          if (dirt.tool !== 'tergivetro') this.scene.remove(dirt.obj);
+          else {
+            const fog = dirt.obj.getObjectByName('fog') as THREE.Mesh | undefined;
+            if (fog) (fog.material as THREE.MeshBasicMaterial).opacity = 0;
+          }
+          employeeGainXp(h.emp, 1);
+          h.task = null;
+          if (this.dirts.every((x) => x.done)) toast('✨ Tutto pulito! Esci dalla porta per finire', 'good');
+        }
+      } else {
+        const thing = t as Thing;
+        if (h.stage === 'go') {
+          // prende l'oggetto (i dipendenti lo imballano al volo)
+          h.work += (dt * h.speed) / (thing.kind === 'heavy' ? 2.4 : 1.2);
+          h.char.play('interact-right', 0.1, 1.2);
+          if (h.work >= 1) {
+            this.scene.remove(thing.obj);
+            thing.packed = true;
+            h.stage = 'carry';
+            const box = model('furniture/cardboardBoxClosed.glb', 3);
+            box.position.set(-0.3, 0.9, 0.35);
+            h.char.root.add(box);
+            h.box = box;
+          }
+        } else {
+          thing.done = true;
+          if (h.box) h.char.root.remove(h.box);
+          h.box = undefined;
+          employeeGainXp(h.emp, 1);
+          h.task = null;
+          if (this.things.every((x) => x.done)) this.finish(this.stars());
+        }
+      }
+    }
+  }
+
   update(dt: number) {
+    if (this.ended) return;
+    this.updateHelpers(dt);
     if (this.ended) return;
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) {

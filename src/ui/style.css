@@ -254,7 +254,7 @@ body.job-on .hud-top { display: none; }
   width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.25);
   font-size: 17px; color: #fff; font-weight: 700; flex: none;
 }
-.sheet-body { overflow-y: auto; padding: 12px 16px 16px; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.sheet-body { overflow-y: auto; padding: 12px 16px calc(24px + var(--sab)); -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; min-height: 0; flex: 1 1 auto; }
 .tabs { display: flex; gap: 6px; padding: 10px 16px 2px; overflow-x: auto; touch-action: pan-x; scrollbar-width: none; }
 .tab {
   border: none; background: #fff; border-radius: 14px; padding: 7px 12px; font-size: 14px; font-weight: 600;
@@ -533,12 +533,14 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .camctl.changed .cam-toggle { box-shadow: 0 0 0 3px var(--blue), 0 4px 0 var(--gray-d); }
 @media (orientation: landscape) { .cam-grid { right: 0; top: 64px; } }
 
-/* ---------- guida nelle attività ---------- */
+/* ---------- guida nelle attività (in alto, al posto di soldi/data/eventi) ---------- */
 .guide {
-  position: fixed; left: var(--sal); right: calc(var(--sar) + 124px); bottom: calc(var(--sab) + 14px); z-index: 6;
-  background: rgba(255,255,255,.95); border-radius: 18px; padding: 8px 10px; border: 3px solid var(--green);
-  box-shadow: 0 4px 14px rgba(0,0,0,.2); pointer-events: none; max-width: 520px;
+  position: fixed; left: var(--sal); top: var(--sat); z-index: 6;
+  width: calc(100vw - var(--sal) - var(--sar) - 122px); max-width: 460px;
+  background: rgba(255,255,255,.97); border-radius: 18px; padding: 8px 10px; border: 3px solid var(--green);
+  box-shadow: 0 4px 14px rgba(0,0,0,.2); pointer-events: none;
 }
+body.guide-on .hud-top { display: none; }
 .gd-title { font-weight: 700; font-size: 14px; }
 .gd-steps { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; margin-top: 5px; font-size: 12px; }
 .gd-steps i { font-style: normal; background: #f1ead9; border-radius: 8px; padding: 2px 6px; color: var(--ink-2); font-weight: 600; }
@@ -547,4 +549,5 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .gd-steps b { color: var(--ink-2); }
 .gd-caps { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .gd-caps span { background: var(--ink); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; }
-@media (orientation: landscape) { .guide { left: 50%; right: auto; transform: translateX(-50%); width: min(520px, 55vw); } }
+.gd-caps span.money { background: var(--green-d); }
+@media (orientation: landscape) { .guide { width: min(480px, 46vw); } }
