@@ -932,9 +932,9 @@ export class UI {
             <div class="row" style="justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap">${btns}</div></div>`;
         }).join('');
         const tot = canRent(s) ? s.houses.filter((x) => x.rent).reduce((a, x) => a + g.houseRent(x.i), 0) : 0;
-        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi). Con <b>almeno 2 case</b> puoi <b>affittare</b> quelle dove non vivi: l'affitto si guadagna <b>solo mentre il gioco è chiuso</b> (fino a ${RENT_MAX_HOURS} ore). Rivendendola recuperi l'85% del prezzo.</div>
+        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi). Con <b>almeno 2 case</b> (conta anche quella di partenza) puoi <b>affittare</b> quelle dove non vivi: l'affitto si guadagna <b>solo mentre il gioco è chiuso</b> (fino a ${RENT_MAX_HOURS} ore). Rivendendola recuperi l'85% del prezzo.</div>
           ${tot ? `<div class="stat s-green" style="margin-bottom:10px"><b class="money-t">+${euro(tot)}/ora</b><span>🔑 affitti mentre sei offline</span></div>` : ''}
-          ${s.houses.length === 1 ? '<p class="muted small center">🔑 Compra un\'altra casa per poter affittare quella dove non vivi.</p>' : ''}
+
           ${s.homeIdx >= 0 ? '<button class="btn sm sec" data-a="live:-1" style="margin-bottom:10px">🏠 Torna a vivere nella casa di partenza</button>' : ''}${rows}`;
       },
       actions: {

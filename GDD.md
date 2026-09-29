@@ -158,7 +158,7 @@ Nuove categorie arriveranno insieme alle nuove attività.
 
 ### Negozio (pulsante 🛍️ sotto Casa)
 - **Concessionaria**: si comprano i veicoli da qui, senza andare in centro
-- **Agenzia immobiliare**: 10 case in vendita (prezzo per zona: periferia ~9.000 €, residenziale ~15.000 €, centro ~26.000 €). Una casa comprata si può: 🏠 viverci (il pulsante Casa ti porta lì e lì dormi; la casa di partenza resta), 🔑 affittare (solo con almeno 2 case comprate, e non quella dove vivi): l'affitto si guadagna **solo mentre il gioco è chiuso**, 0,15% del prezzo per ogni ora reale, fino a 48 ore, e compare nel riepilogo "Bentornato", vendere all'85%. Il 📍 mette il segnaposto sulla mappa
+- **Agenzia immobiliare**: 10 case in vendita (prezzo per zona: periferia ~9.000 €, residenziale ~15.000 €, centro ~26.000 €). Una casa comprata si può: 🏠 viverci (il pulsante Casa ti porta lì e lì dormi; la casa di partenza resta), 🔑 affittare (solo con almeno 2 case, contando quella di partenza, e non quella dove vivi): l'affitto si guadagna **solo mentre il gioco è chiuso**, 0,15% del prezzo per ogni ora reale, fino a 48 ore, e compare nel riepilogo "Bentornato", vendere all'85%. Il 📍 mette il segnaposto sulla mappa
 - **Stile e accessori**: 9 stili (i personaggi Kenney, il primo gratis) e accessori agganciati alla testa (seguono le animazioni), uno per parte del corpo: testa (cappellino, cilindro, corona), occhi (occhiali da sole, a cuore), collo (collana d'oro, di perle, sciarpa), schiena (zaino, mantello). Si comprano una volta per partita e si indossano/tolgono quando si vuole
 
 ### Installazione sulla schermata Home

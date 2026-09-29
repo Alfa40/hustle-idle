@@ -151,8 +151,8 @@ export interface OfflineReport {
 export const RENT_PER_HOUR = 0.0015;
 /** Oltre 48 ore di assenza l'affitto non cresce più. */
 export const RENT_MAX_HOURS = 48;
-/** Per affittare servono almeno 2 case comprate (una dove vivere, l'altra da affittare). */
-export const canRent = (s: GameState) => s.houses.length >= 2;
+/** Per affittare servono almeno 2 case, contando quella di partenza (una dove vivere, l'altra da affittare). */
+export const canRent = (s: GameState) => s.houses.length + 1 >= 2;
 
 /**
  * Tempo passato con il gioco chiuso: il tempo di gioco scorre 100 volte più
