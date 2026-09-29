@@ -406,12 +406,35 @@ export class UI {
 
   openJobOffer(offer: JobOffer) {
     const def = JOBS[offer.type];
+    // mini "video" della procedura: i passi si illuminano uno alla volta, con il gesto da fare
+    let timer = 0;
+    const GEST = { tap: ['👆', 'Tocca'], hold: ['✊', 'Tieni premuto'], walk: ['🚶', 'Vai'] } as const;
     this.open({
       title: `${def.icon} ${def.name}`,
       small: true,
       color: 'var(--orange)',
+      after: (body) => {
+        if (timer) return;
+        const stage = body.querySelector('.ht-stage') as HTMLElement | null;
+        if (!stage) return;
+        let i = 0;
+        const show = () => {
+          const cur = this.modal?.querySelector('.ht-stage') as HTMLElement | null;
+          if (!cur) return;
+          const [icon, text, how] = def.steps[i];
+          cur.innerHTML = `<div class="ht-n">Passo ${i + 1} di ${def.steps.length}</div>
+            <div class="ht-big">${icon}</div><div class="ht-text">${text}</div>
+            <div class="ht-gest ${how}"><span class="ht-hand">${GEST[how][0]}</span><b>${GEST[how][1]}</b>${how === 'hold' ? '<i class="ht-bar"><i></i></i>' : ''}</div>`;
+          this.modal?.querySelectorAll('.ht-list li').forEach((li, k) => li.classList.toggle('on', k === i));
+          i = (i + 1) % def.steps.length;
+        };
+        show();
+        timer = window.setInterval(show, 2200);
+      },
+      onClose: () => clearInterval(timer),
       render: () => `
-        <div class="card tint row"><div class="icon-bubble" style="background:#fff">${def.icon}</div><p style="margin:0">${def.intro}</p></div>
+        <div class="howto"><div class="ht-stage"></div>
+          <ol class="ht-list">${def.steps.map(([icon, text, how]) => `<li><span>${icon}</span>${text}<small>${GEST[how][0]}</small></li>`).join('')}</ol></div>
         <div class="grid2">
           <div class="stat s-green"><b class="money-t">${euro(offer.pay)}</b><span>💰 paga (⭐⭐)</span></div>
           <div class="stat s-yellow"><b class="money-t">${euro(offer.pay * 1.35)}</b><span>🤩 paga con ⭐⭐⭐</span></div>

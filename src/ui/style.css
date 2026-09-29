@@ -563,3 +563,39 @@ body.guide-on .hud-top { display: none; }
 .lb-fame { font-weight: 800; white-space: nowrap; }
 .lb-gap { text-align: center; color: #8a8aa0; margin: 2px 0 6px; }
 .lb-input { width: 100%; box-sizing: border-box; font: inherit; font-size: 18px; padding: 12px 14px; border-radius: 14px; border: 2px solid #d6d6e4; }
+
+/* ---------- come si fa (offerta di lavoro) ---------- */
+.howto { margin-bottom: 10px; }
+.ht-stage { background: linear-gradient(160deg, #fff4dd, #ffe2c2); border-radius: 18px; padding: 10px 12px 12px; text-align: center; min-height: 176px; box-sizing: border-box; }
+.ht-n { font-size: 12px; font-weight: 800; color: #e0701e; text-transform: uppercase; letter-spacing: .04em; }
+.ht-big { font-size: 52px; line-height: 1.15; animation: ht-pop .35s ease-out; }
+.ht-text { font-weight: 800; font-size: 16px; color: var(--ink); margin: 2px 0 8px; animation: ht-pop .35s ease-out; }
+.ht-gest { display: inline-flex; align-items: center; gap: 6px; background: #fff; border-radius: 999px; padding: 4px 12px 4px 8px; font-size: 14px; box-shadow: 0 2px 0 rgba(0,0,0,.08); }
+.ht-hand { font-size: 22px; display: inline-block; }
+.ht-gest.tap .ht-hand { animation: ht-tap .7s ease-in-out infinite; }
+.ht-gest.walk .ht-hand { animation: ht-walk .8s ease-in-out infinite alternate; }
+.ht-gest.hold .ht-hand { animation: ht-press 1.8s ease-in-out infinite; }
+.ht-bar { display: inline-block; width: 60px; height: 8px; border-radius: 99px; background: #eee; overflow: hidden; }
+.ht-bar i { display: block; height: 100%; width: 0; background: var(--green); animation: ht-fill 1.8s linear infinite; }
+.ht-list { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: ht; }
+.ht-list li { counter-increment: ht; display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); transition: background .2s; }
+.ht-list li::before { content: counter(ht); width: 20px; height: 20px; border-radius: 50%; background: #eadfca; color: #7a6a4f; font-size: 12px; font-weight: 800; display: grid; place-items: center; flex: none; }
+.ht-list li span { font-size: 18px; }
+.ht-list li small { margin-left: auto; font-size: 16px; }
+.ht-list li.on { background: #fff0d6; color: var(--ink); }
+.ht-list li.on::before { background: #ff8a3d; color: #fff; }
+@keyframes ht-pop { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ht-tap { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px) scale(.9); } }
+@keyframes ht-walk { from { transform: translateX(-4px) rotate(-6deg); } to { transform: translateX(4px) rotate(6deg); } }
+@keyframes ht-press { 0% { transform: none; } 15%, 85% { transform: translateY(4px) scale(.9); } 100% { transform: none; } }
+@keyframes ht-fill { 0% { width: 0; } 85% { width: 100%; } 100% { width: 100%; } }
+
+/* ---------- banner di fase durante i lavoretti ---------- */
+.phase-banner { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 60; pointer-events: none; background: rgba(255,255,255,.96); border: 4px solid #ff8a3d; border-radius: 22px; padding: 12px 20px 14px; text-align: center; min-width: 240px; max-width: 86vw; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: pb-in .35s cubic-bezier(.2,1.4,.4,1); }
+.phase-banner.out { animation: pb-out .35s ease-in forwards; }
+.phase-banner .pb-n { font-size: 12px; font-weight: 800; color: #e0701e; text-transform: uppercase; letter-spacing: .05em; }
+.phase-banner .pb-icon { font-size: 46px; line-height: 1.1; }
+.phase-banner .pb-name { font-size: 20px; font-weight: 900; color: var(--ink); }
+.phase-banner .pb-how { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--ink-2); }
+@keyframes pb-in { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+@keyframes pb-out { to { transform: translate(-50%, -60%) scale(.9); opacity: 0; } }

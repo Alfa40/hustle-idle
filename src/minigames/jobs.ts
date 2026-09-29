@@ -123,6 +123,7 @@ export class PhasedRun extends BaseRun {
   private markers = new Map<Task, THREE.Sprite>();
   private zone: Zone | null;
   private outTimer = 0;
+  private wasInZone = false;
 
   constructor(game: Game, level: number, title: string, phases: Phase[], opts: { zone?: Zone; time: number; keep?: THREE.Vector3 }) {
     super(game, level);
@@ -252,6 +253,7 @@ export class PhasedRun extends BaseRun {
       return;
     }
     this.tasks = this.phases[this.idx].tasks();
+    this.banner();
     for (const t of this.tasks) {
       this.addGlow(t);
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
@@ -259,6 +261,30 @@ export class PhasedRun extends BaseRun {
       this.game.scene.add(m);
       this.markers.set(t, m);
     }
+  }
+
+  /**
+   * Cartello grande al centro a ogni nuova fase: numero, cosa fare e il gesto
+   * (tocca / tieni premuto), così non serve leggere la barra in alto.
+   */
+  private bannerEl: HTMLDivElement | null = null;
+  private banner() {
+    const ph = this.phases[this.idx];
+    this.bannerEl?.remove();
+    const el = document.createElement('div');
+    el.className = 'phase-banner';
+    const n = this.tasks.length;
+    const hold = this.tasks.some((t) => t.kind === 'hold');
+    const how = hold ? '✊ Avvicinati e <b>TIENI PREMUTO</b> il pulsante' : '👆 Avvicinati e <b>TOCCA</b> il pulsante';
+    const many = n > 1 ? `<br>${ph.ordered ? `${n} passaggi, in ordine` : `${n} punti: quelli colorati che si accendono`}` : '';
+    el.innerHTML = `<div class="pb-n">Fase ${this.idx + 1} di ${this.phases.length}</div><div class="pb-icon">${ph.icon}</div><div class="pb-name">${ph.name}</div><div class="pb-how">${how}${many}</div>`;
+    document.body.appendChild(el);
+    this.bannerEl = el;
+    setTimeout(() => el.classList.add('out'), 2600);
+    setTimeout(() => {
+      el.remove();
+      if (this.bannerEl === el) this.bannerEl = null;
+    }, 3000);
   }
 
   private pending() {
@@ -295,11 +321,14 @@ export class PhasedRun extends BaseRun {
     this.target = near?.pos;
     const done = this.tasks.filter((t) => t.done).length;
     let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${this.tasks.length > 1 ? ` ${done}/${this.tasks.length}` : ''}`;
+    // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla
     if (this.zone && !inZone(this.zone, p, 1.2)) {
       this.outTimer += dt;
-      status = '⚠️ Torna nella zona di lavoro!';
-      if (this.outTimer > 0 && this.outTimer - dt <= 0) this.game.player.play('idle');
-    } else this.outTimer = 0;
+      status = this.wasInZone ? `⚠️ Rientra nella zona · ${status}` : '🚶 Vai alla zona di lavoro: segui le frecce';
+    } else {
+      this.outTimer = 0;
+      this.wasInZone = true;
+    }
     this.status = status + (this.heldIcon && this.game.player.held ? ` · in mano ${this.heldIcon}` : '');
     if (!near || nd > this.reach()) {
       this.game.prompt = null;
@@ -350,6 +379,7 @@ export class PhasedRun extends BaseRun {
   }
 
   dispose() {
+    this.bannerEl?.remove();
     for (const m of this.markers.values()) this.game.scene.remove(m);
     for (const t of [...this.glows.keys()]) this.removeGlow(t);
     if (this.zone) this.game.city.restoreView();
