@@ -152,7 +152,20 @@ Nuove categorie arriveranno insieme alle nuove attività.
 - **Foto come logo**: si carica una foto dal telefono e la si ritocca (trascinare per spostarla, zoom, rotazione, luminosità, contrasto, colori, bianco e nero) dentro la forma scelta; salvata come JPEG 160×160. La foto la vedono solo gli amici: nella classifica mondiale (pubblica) compare il logo disegnato
 - **Amici**: ogni dispositivo ha un codice amico di 6 caratteri (ricavato dall'id anonimo). Nella classifica, scheda 👥 Amici: il proprio codice (copia / invia con la condivisione del telefono), aggiunta di un amico col suo codice, classifica tra amici con i loghi, amici da togliere. L'amicizia è da una parte sola (vedi chi aggiungi)
 - **Attività degli amici sulla tua mappa**: ogni 5 minuti si scaricano le attività degli amici; quelle su lotti liberi nella tua città compaiono con furgone/insegna, il nome e il logo dell'amico (🤝 nella mappa). Toccandole: scheda con l'amico e il posto (che resta acquistabile: se lo compri, la tua attività prende il posto di quella dell'amico). Se più amici hanno lo stesso lotto, si vede quello con più fama
+- **Stesso posto, più attività**: se tu e i tuoi amici avete un'attività nello stesso posto, sui posteggi i furgoni stanno affiancati e ben separati (il tuo al centro, poi fino a 2 amici con più fama); sugli edifici ogni amico ha un piano in più sopra il tuo locale (fino a 3), più in alto chi ha più fama. Il furgone di un amico è aperto (tendone) e il suo piano ha le luci accese solo se sta giocando in quel momento (segnale "sto giocando" ogni minuto, valido 3 minuti); altrimenti serranda abbassata e finestre spente
+- **Logo come marchio**: stampato grande sul tetto e sul fianco di ogni furgone (tuo e degli amici), sulla facciata dei locali sopra l'ingresso e sospeso sopra l'insegna
 - **In futuro — città condivisa**: un server in tempo reale (WebSocket, come il co-op di Crazy Town) dove più amici giocano nella stessa città: ognuno con i propri lavoretti, attività e loghi; si vedono i personaggi degli altri muoversi, si può entrare nelle attività degli amici per guardarle lavorare e girare la città insieme. Servirà: stanze per gruppi di amici, lotti assegnati una volta sola per città, sincronizzazione di posizioni/animazioni e dello stato delle attività (il tempo di gioco condiviso), e regole per chi è offline (le sue attività continuano come ora in idle)
+
+### Negozio (pulsante 🛍️ sotto Casa)
+- **Concessionaria**: si comprano i veicoli da qui, senza andare in centro
+- **Agenzia immobiliare**: 10 case in vendita (prezzo per zona: periferia ~9.000 €, residenziale ~15.000 €, centro ~26.000 €). Una casa comprata si può: 🏠 viverci (il pulsante Casa ti porta lì e lì dormi; la casa di partenza resta), 🔑 affittare (0,5% del prezzo al giorno, pagato a ogni nuovo giorno di gioco), vendere all'85%. Il 📍 mette il segnaposto sulla mappa
+- **Stile e accessori**: 9 stili (i personaggi Kenney, il primo gratis) e accessori agganciati alla testa (seguono le animazioni), uno per parte del corpo: testa (cappellino, cilindro, corona), occhi (occhiali da sole, a cuore), collo (collana d'oro, di perle, sciarpa), schiena (zaino, mantello). Si comprano una volta per partita e si indossano/tolgono quando si vuole
+
+### Orari delle attività
+- I locali e i furgoni si possono usare solo da aperti (8:00–22:00): fuori orario la porta è chiusa ("🔒 Chiuso · apre alle 8:00") e il gioco suggerisce di andare a dormire; a chiusura, servito l'ultimo cliente, si esce da soli. I tuoi furgoni abbassano la serranda di notte. L'ufficio delle imprese di servizi resta sempre raggiungibile
+
+### Dipendenti mentre lavori tu
+- Se stai lavorando (hai qualcosa in mano o hai usato una postazione negli ultimi 8 s) i cuochi iniziano prodotti nuovi solo quando gli ordini da preparare sono più di quanti ne porti tu, e prendono quelli in fondo alla coda; i tuoi prodotti sul fuoco li tolgono solo quando stanno per bruciare. Se sei fermo lavorano da soli come prima
 
 ## 10. Tempo di gioco
 

@@ -13,6 +13,7 @@ import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
 import { settings } from '../settings';
 import { MapScreen } from './mapscreen';
+import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
 import type { OfflineReport } from '../sim/calendar';
@@ -115,6 +116,7 @@ export class UI {
         <button class="hbtn c-purple" data-h="missions"><span class="i">📋</span><span class="l">Missioni</span><span class="dot" id="h-dot" style="display:none">!</span></button>
         <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span></button>
         <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
+        <button class="hbtn c-pink" data-h="shop"><span class="i">🛍️</span><span class="l">Negozio</span></button>
         <button class="hbtn c-gray" data-h="settings"><span class="i">⚙️</span><span class="l">Opzioni</span></button>
       </div>`;
     this.root.appendChild(right);
@@ -135,6 +137,7 @@ export class UI {
         if (k === 'missions') this.openMissions();
         if (k === 'profile') this.openProfile();
         if (k === 'home') this.game.goHome();
+        if (k === 'shop') this.openShop();
         if (k === 'settings') this.openSettings();
       }),
     );
@@ -867,6 +870,180 @@ export class UI {
           <div class="stat s-purple"><b>+${xp} XP</b><span>esperienza</span></div></div>` : '<p class="center">Il cliente non è soddisfatto: ordine perso.</p>'}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
+    });
+  }
+
+  // ---------------- negozio ----------------
+
+  /** Negozio: accesso veloce a concessionaria, agenzia immobiliare e stile del personaggio. */
+  openShop() {
+    const card = (a: string, icon: string, title: string, sub: string, color: string) =>
+      `<button class="shop-card" data-a="${a}" style="--sc:${color}"><span class="shop-ico">${icon}</span><span><b>${title}</b><small>${sub}</small></span><span class="shop-go">›</span></button>`;
+    this.open({
+      title: '🛍️ Negozio',
+      small: true,
+      color: '#e84393',
+      render: () => `
+        ${card('dealer', '🛵', 'Concessionaria', 'Monopattini, scooter e auto per girare più in fretta', 'var(--blue)')}
+        ${card('houses', '🏡', 'Agenzia immobiliare', 'Compra case: vivici o affittale per un\'entrata ogni giorno', 'var(--green)')}
+        ${card('style', '👕', 'Stile e accessori', 'Cambia look: collane, cappelli, occhiali, zaini…', 'var(--purple)')}
+        <p class="muted small center">💰 Hai ${euro(this.s.money)}</p>`,
+      actions: {
+        dealer: () => {
+          this.close();
+          this.openDealer(true);
+        },
+        houses: () => {
+          this.close();
+          this.openRealEstate();
+        },
+        style: () => {
+          this.close();
+          this.openStyle();
+        },
+      },
+    });
+  }
+
+  /** Agenzia immobiliare: case in vendita, le tue case (vivici, affittale, vendile). */
+  openRealEstate() {
+    const s = this.s;
+    const g = this.game;
+    this.open({
+      title: '🏡 Agenzia immobiliare',
+      color: 'var(--green)',
+      live: true,
+      render: () => {
+        const rows = g.houseSlots.map((h, i) => {
+          const own = s.houses.find((x) => x.i === i);
+          const price = g.housePrice(i);
+          const rent = g.houseRent(i);
+          const zone = ZONES[h.zone].name;
+          const home = s.homeIdx === i;
+          const state = !own ? '' : home ? '<span class="tag g">🏠 ci vivi</span>' : own.rent ? '<span class="tag y">🔑 in affitto</span>' : '<span class="tag b">tua, libera</span>';
+          const btns = !own
+            ? `<button class="btn sm good" data-a="buy:${i}" ${s.money < price ? 'disabled' : ''}>Compra ${euro(price)}</button>`
+            : `${home ? '' : `<button class="btn sm" data-a="live:${i}">🏠 Vivi qui</button>`}
+               ${home ? '' : `<button class="btn sm ${own.rent ? 'sec' : 'blue'}" data-a="rent:${i}">${own.rent ? 'Togli dall\'affitto' : `🔑 Affitta +${euro(rent)}/g`}</button>`}
+               <button class="btn sm danger" data-a="sell:${i}">Vendi ${euro(Math.round(price * 0.85))}</button>`;
+          return `<div class="card ${own ? 'hl' : ''}"><div class="row between"><div><h3 style="margin:0">🏡 Casa ${i + 1} ${state}</h3><div class="muted small">${zone} · affitto ${euro(rent)} al giorno</div></div>
+            <button class="btn sm sec" data-a="map:${i}" aria-label="Mostra sulla mappa">📍</button></div>
+            <div class="row" style="justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap">${btns}</div></div>`;
+        }).join('');
+        const tot = s.houses.filter((x) => x.rent).reduce((a, x) => a + g.houseRent(x.i), 0);
+        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi) oppure <b>affittala</b>: l'affitto arriva ogni giorno. Rivendendola recuperi l'85% del prezzo.</div>
+          ${tot ? `<div class="stat s-green" style="margin-bottom:10px"><b class="money-t">+${euro(tot)}</b><span>🔑 affitti al giorno</span></div>` : ''}
+          ${s.homeIdx >= 0 ? '<button class="btn sm sec" data-a="live:-1" style="margin-bottom:10px">🏠 Torna a vivere nella casa di partenza</button>' : ''}${rows}`;
+      },
+      actions: {
+        buy: (a) => {
+          const i = +a;
+          const price = g.housePrice(i);
+          if (s.houses.some((x) => x.i === i) || s.money < price) return;
+          addMoney(s, -price);
+          s.houses.push({ i, rent: false });
+          toast(`🏡 Hai comprato la casa ${i + 1}!`, 'good');
+          g.refreshHomes();
+          g.save();
+        },
+        live: (a) => {
+          const i = +a;
+          s.homeIdx = i;
+          const own = s.houses.find((x) => x.i === i);
+          if (own) own.rent = false;
+          toast(i >= 0 ? `🏠 Ora vivi nella casa ${i + 1}` : '🏠 Sei tornato nella casa di partenza', 'good');
+          g.refreshHomes();
+          g.save();
+        },
+        rent: (a) => {
+          const own = s.houses.find((x) => x.i === +a);
+          if (!own || s.homeIdx === own.i) return;
+          own.rent = !own.rent;
+          g.refreshHomes();
+          g.save();
+        },
+        sell: (a) => {
+          const i = +a;
+          if (!s.houses.some((x) => x.i === i)) return;
+          s.houses = s.houses.filter((x) => x.i !== i);
+          if (s.homeIdx === i) s.homeIdx = -1;
+          const back = Math.round(g.housePrice(i) * 0.85);
+          addMoney(s, back);
+          toast(`💰 Casa ${i + 1} venduta: +${euro(back)}`, 'money');
+          g.refreshHomes();
+          g.save();
+        },
+        map: (a) => {
+          const h = g.houseSlots[+a];
+          g.setWaypoint({ id: 'house:' + a, x: h.pos.x, z: h.pos.z, icon: '🏡', label: `Casa ${+a + 1}`, color: '#35c46a', kind: 'home', cat: 'places', dist: 0 });
+          toast('📍 Segui le frecce fino alla casa', 'good');
+          this.close();
+        },
+      },
+    });
+  }
+
+  /** Stile del personaggio (modello) e accessori: si comprano una volta, poi si indossano quando vuoi. */
+  openStyle() {
+    const s = this.s;
+    const st = s.style;
+    const apply = () => {
+      this.game.applyStyle();
+      this.game.save();
+    };
+    this.open({
+      title: '👕 Stile e accessori',
+      color: 'var(--purple)',
+      render: () => {
+        const styles = STYLES.map((d) => {
+          const own = st.owned.includes(d.id);
+          const on = st.model === d.id;
+          return `<button class="st-opt ${on ? 'on' : ''}" data-a="${own ? 'wear' : 'buys'}:${d.id}" ${!own && s.money < d.price ? 'disabled' : ''}>
+            <span class="st-ico">${d.id.includes('female') ? '👩' : '🧑'}</span><b>${d.name}</b><small>${on ? '✅ indossato' : own ? 'Indossa' : euro(d.price)}</small></button>`;
+        }).join('');
+        const slots = (Object.keys(ACC_SLOT_NAME) as AccSlot[]).map((slot) => {
+          const items = ACCESSORIES.filter((a) => a.slot === slot).map((a) => {
+            const own = st.accOwned.includes(a.id);
+            const on = st.acc.includes(a.id);
+            return `<button class="st-opt ${on ? 'on' : ''}" data-a="${own ? 'toggle' : 'buya'}:${a.id}" ${!own && s.money < a.price ? 'disabled' : ''}>
+              <span class="st-ico">${a.icon}</span><b>${a.name}</b><small>${on ? '✅ indossato' : own ? 'Indossa' : euro(a.price)}</small></button>`;
+          }).join('');
+          return `<h4 class="lg-h">${ACC_SLOT_NAME[slot]}</h4><div class="st-grid">${items}</div>`;
+        }).join('');
+        return `<div class="card tint small">Quello che compri resta tuo in questa partita: puoi cambiare quando vuoi. 💰 Hai ${euro(s.money)}</div>
+          <h4 class="lg-h">Stile</h4><div class="st-grid">${styles}</div>${slots}`;
+      },
+      actions: {
+        buys: (id) => {
+          const d = STYLES.find((x) => x.id === id);
+          if (!d || st.owned.includes(id) || s.money < d.price) return;
+          addMoney(s, -d.price);
+          st.owned.push(id);
+          st.model = id;
+          toast(`👕 Nuovo stile: ${d.name}!`, 'good');
+          apply();
+        },
+        wear: (id) => {
+          st.model = id;
+          apply();
+        },
+        buya: (id) => {
+          const a = accById(id);
+          if (!a || st.accOwned.includes(id) || s.money < a.price) return;
+          addMoney(s, -a.price);
+          st.accOwned.push(id);
+          st.acc = [...st.acc.filter((x) => accById(x)?.slot !== a.slot), id];
+          toast(`${a.icon} Hai comprato: ${a.name}!`, 'good');
+          apply();
+        },
+        toggle: (id) => {
+          const a = accById(id);
+          if (!a) return;
+          // un accessorio per parte del corpo
+          st.acc = st.acc.includes(id) ? st.acc.filter((x) => x !== id) : [...st.acc.filter((x) => accById(x)?.slot !== a.slot), id];
+          apply();
+        },
+      },
     });
   }
 

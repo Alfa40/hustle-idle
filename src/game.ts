@@ -34,6 +34,7 @@ import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
+import { applyAccessories } from './world/style';
 import { completeOrder, lotPrice, typesForLot } from './sim/economy';
 import { ZONES } from './config/map';
 import { SKILLS } from './config/skills';
@@ -254,6 +255,7 @@ export class Game {
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
+    this.refreshHomes();
     void this.refreshFriends();
     // le attività degli amici (e chi sta giocando) si aggiornano ogni 2 minuti;
     // ogni minuto si dice al server che stai giocando
@@ -263,7 +265,10 @@ export class Game {
     this.spawnPlayer();
     this.mode = 'play';
     this.snapCamera();
-    bus.on('newday', () => this.ui?.refresh());
+    bus.on('newday', () => {
+      this.payRents();
+      this.ui?.refresh();
+    });
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('pagehide', () => this.save());
     this.save();
@@ -282,15 +287,8 @@ export class Game {
       action: () => this.ui.openMissions(),
     });
 
-    // casa del giocatore
-    const home = this.city.homes[0];
-    const homeLabel = label('🏠 Casa tua', { bg: '#35c46a', scale: 0.5 });
-    homeLabel.position.set(home.pos.x, 3.2, home.pos.z);
-    this.scene.add(homeLabel);
-    this.addInteractable({
-      pos: home.pos, radius: 1.8, label: 'Casa', icon: '🏠',
-      action: () => this.ui.openHome(),
-    });
+    // casa del giocatore (e case comprate all'agenzia immobiliare)
+    this.refreshHomes();
 
     // concessionaria e agenzia affari
     const dealer = this.city.dealer;
@@ -320,10 +318,11 @@ export class Game {
   }
 
   private spawnPlayer() {
-    const home = this.city.homes[0];
+    const home = this.homeSlot;
 
-    // giocatore
-    this.player = new Character(PLAYER_MODEL);
+    // giocatore (stile e accessori scelti nel Negozio)
+    this.player = new Character(this.state.style.model || PLAYER_MODEL);
+    applyAccessories(this.player, this.state.style.acc);
     const p = this.state.player;
     if (Number.isFinite(p.x)) this.player.root.position.set(p.x, 0, p.z);
     else this.player.root.position.copy(home.pos).add(new THREE.Vector3(...this.dirVec(home, 1.2)));
@@ -339,6 +338,102 @@ export class Game {
     this.state.jobs = this.state.jobs.filter((j) => this.slotsFor(j.type)[j.slot]);
     for (const j of this.state.jobs) this.spawnNpc(j);
 
+  }
+
+  /** Cambia stile o accessori: il personaggio si rifà nello stesso punto. */
+  applyStyle() {
+    if (!this.player) return;
+    const old = this.player;
+    const inScene = old.root.parent;
+    const next = new Character(this.state.style.model || PLAYER_MODEL);
+    applyAccessories(next, this.state.style.acc);
+    next.root.position.copy(old.root.position);
+    next.root.rotation.y = old.root.rotation.y;
+    if (this.playerMarker) {
+      old.root.remove(this.playerMarker);
+      next.root.add(this.playerMarker);
+    }
+    inScene?.remove(old.root);
+    inScene?.add(next.root);
+    this.player = next;
+    this.applyRide();
+  }
+
+  // ---------------- case ----------------
+
+  /** Case in vendita all'agenzia immobiliare (sempre le stesse: dipendono dalla mappa). */
+  private houseCache: Slot[] | null = null;
+  get houseSlots(): Slot[] {
+    if (!this.houseCache) {
+      const all = [...this.city.homes.slice(1), ...this.city.gardens].filter((h) => h.dir !== 'N');
+      const seen = new Set<string>();
+      this.houseCache = all.filter((h) => {
+        const k = `${Math.round(h.pos.x)},${Math.round(h.pos.z)}`;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      }).slice(0, 10);
+    }
+    return this.houseCache;
+  }
+
+  /** Prezzo di una casa: dipende dalla zona (in centro costa di più). */
+  housePrice(i: number) {
+    const h = this.houseSlots[i];
+    const base = { periferia: 9000, residenziale: 15000, centro: 26000 }[h.zone];
+    return Math.round((base * (0.9 + ((i * 37) % 10) / 25)) / 100) * 100;
+  }
+
+  /** Affitto al giorno di una casa data in affitto. */
+  houseRent(i: number) {
+    return Math.round(this.housePrice(i) * 0.005);
+  }
+
+  /** La casa dove vivi (il pulsante Casa ti porta qui, e qui dormi). */
+  get homeSlot(): Slot {
+    const i = this.state?.homeIdx ?? -1;
+    return i >= 0 ? this.houseSlots[i] ?? this.city.homes[0] : this.city.homes[0];
+  }
+
+  private homeObjs: THREE.Object3D[] = [];
+  private homeInter: Interactable | null = null;
+  /** Cartelli sopra le case: "Casa tua", "Tua (in affitto)". */
+  refreshHomes() {
+    for (const o of this.homeObjs) this.scene.remove(o);
+    this.homeObjs = [];
+    if (this.homeInter) this.removeInteractable(this.homeInter);
+    const home = this.homeSlot;
+    const tag = label('🏠 Casa tua', { bg: '#35c46a', scale: 0.5 });
+    tag.position.set(home.pos.x, 3.2, home.pos.z);
+    this.scene.add(tag);
+    this.homeObjs.push(tag);
+    this.homeInter = this.addInteractable({ pos: home.pos, radius: 1.8, label: 'Casa', icon: '🏠', action: () => this.ui.openHome() });
+    for (const h of this.state?.houses ?? []) {
+      if (h.i === this.state.homeIdx) continue;
+      const sl = this.houseSlots[h.i];
+      if (!sl) continue;
+      const t = label(h.rent ? '🔑 Tua · in affitto' : '🏡 Tua', { bg: '#8e5bd6', scale: 0.42 });
+      t.position.set(sl.pos.x, 3.2, sl.pos.z);
+      this.scene.add(t);
+      this.homeObjs.push(t);
+    }
+    // la vecchia casa di partenza resta tua (e resta un posto dove dormire)
+    if ((this.state?.homeIdx ?? -1) >= 0) {
+      const h0 = this.city.homes[0];
+      const t = label('🏡 Casa di prima', { bg: '#8e5bd6', scale: 0.42 });
+      t.position.set(h0.pos.x, 3.2, h0.pos.z);
+      this.scene.add(t);
+      this.homeObjs.push(t);
+    }
+  }
+
+  /** Ogni nuovo giorno arrivano gli affitti delle case date in affitto. */
+  private payRents() {
+    const rented = this.state.houses.filter((h) => h.rent);
+    if (!rented.length) return;
+    const tot = rented.reduce((a, h) => a + this.houseRent(h.i), 0);
+    addMoney(this.state, tot);
+    toast(`🔑 Affitti incassati: +€${tot.toLocaleString('it-IT')}`, 'money');
   }
 
   // ---------------- utilità ----------------
@@ -917,7 +1012,7 @@ export class Game {
     const add = (pos: { x: number; z: number }, m: Omit<MapMarker, 'x' | 'z' | 'dist'>) =>
       out.push({ ...m, x: pos.x, z: pos.z, dist: Math.hypot(pos.x - p.x, pos.z - p.z) });
     add(this.city.board.pos, { id: 'board', icon: '📋', color: '#8e5bd6', label: 'Bacheca missioni', kind: 'board', cat: 'places', keywords: 'missioni piazza' });
-    add(this.city.homes[0].pos, { id: 'home', icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home', cat: 'places', keywords: 'dormire teletrasporto' });
+    add(this.homeSlot.pos, { id: 'home', icon: '🏠', color: '#2fb36b', label: 'Casa tua', kind: 'home', cat: 'places', keywords: 'dormire teletrasporto' });
     add(this.city.dealer.pos, { id: 'dealer', icon: '🛵', color: '#2d9cdb', label: 'Concessionaria', kind: 'dealer', cat: 'places', keywords: 'veicoli auto scooter monopattino macchina' });
     add(this.city.agency.pos, { id: 'agency', icon: '🏢', color: '#8e5bd6', label: 'Agenzia affari', kind: 'agency', cat: 'places', keywords: 'comprare attività lotti resoconti' });
     for (const lot of this.city.lots) {
@@ -1045,7 +1140,7 @@ export class Game {
       return;
     }
     if (this.interior) this.exitTruck();
-    const home = this.city.homes[0];
+    const home = this.homeSlot;
     this.player.root.position.copy(this.frontOf(home, 0.8));
     this.player.root.rotation.y = DIR_ROT[home.dir];
     this.moveTarget = null;

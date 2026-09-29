@@ -121,6 +121,12 @@ export interface GameState {
   saveName: string;
   /** logo delle attività di questa partita */
   logo: Logo;
+  /** aspetto del personaggio: stile (modello), stili comprati, accessori comprati e indossati */
+  style: { model: string; owned: string[]; accOwned: string[]; acc: string[] };
+  /** case comprate all'agenzia immobiliare (indice nella lista delle case in vendita) */
+  houses: { i: number; rent: boolean }[];
+  /** dove vivi: -1 = la casa di partenza, altrimenti l'indice di una casa comprata */
+  homeIdx: number;
 }
 
 // ---- salvataggi a slot ----
@@ -168,6 +174,9 @@ export function newState(): GameState {
     orderSeq: 1,
     saveName: 'La mia partita',
     logo: randomLogo(),
+    style: { model: 'character-male-a', owned: ['character-male-a'], accOwned: [], acc: [] },
+    houses: [],
+    homeIdx: -1,
   };
 }
 
@@ -200,6 +209,9 @@ function parse(raw: string | null): GameState | null {
     }
     for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
     st.logo = safeLogo(s.logo) ?? randomLogo();
+    st.style = { ...newState().style, ...(s.style ?? {}) };
+    st.houses ??= [];
+    if (!st.houses.some((h) => h.i === st.homeIdx)) st.homeIdx = -1;
     for (const b of st.businesses) {
       b.orders ??= [];
       // prodotti che ora richiedono un ampliamento: tolti dalla vendita
