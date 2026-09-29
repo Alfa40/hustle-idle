@@ -309,7 +309,6 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Lavoretti
 - Spiegazione prima di accettare: nella scheda del lavoretto un "mini video" mostra la procedura passo passo (icona grande, cosa fare, gesto animato: 👆 tocca, ✊ tieni premuto con barra che si riempie, 🚶 vai), con l'elenco numerato dei passi sotto (config/jobs.ts `steps`)
-- A ogni nuova fase compare per 3 s un cartello grande al centro: "Fase 2 di 4", icona, nome, gesto da fare e quanti punti ci sono
 - Prima di arrivare nella zona di lavoro la barra dice "🚶 Vai alla zona di lavoro: segui le frecce"; se poi si esce, l'avviso compare accanto alla fase senza nasconderla
 - Gli oggetti da usare nella fase attuale hanno il loro colore più acceso e chiaro che pulsa (niente luce esterna); la scena è leggermente più scura per farli risaltare: cassetta attrezzi, cespugli, bidone, cassette postali, lavello, secchio, muretto…
 - Volantinaggio e consegne: al negozio c'è un espositore giallo dei volantini o una pila di pacchi; a ogni indirizzo una cassetta della posta su palo con bandierina, così il punto si trova subito

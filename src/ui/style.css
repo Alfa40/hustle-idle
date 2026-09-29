@@ -589,13 +589,3 @@ body.guide-on .hud-top { display: none; }
 @keyframes ht-walk { from { transform: translateX(-4px) rotate(-6deg); } to { transform: translateX(4px) rotate(6deg); } }
 @keyframes ht-press { 0% { transform: none; } 15%, 85% { transform: translateY(4px) scale(.9); } 100% { transform: none; } }
 @keyframes ht-fill { 0% { width: 0; } 85% { width: 100%; } 100% { width: 100%; } }
-
-/* ---------- banner di fase durante i lavoretti ---------- */
-.phase-banner { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 60; pointer-events: none; background: rgba(255,255,255,.96); border: 4px solid #ff8a3d; border-radius: 22px; padding: 12px 20px 14px; text-align: center; min-width: 240px; max-width: 86vw; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: pb-in .35s cubic-bezier(.2,1.4,.4,1); }
-.phase-banner.out { animation: pb-out .35s ease-in forwards; }
-.phase-banner .pb-n { font-size: 12px; font-weight: 800; color: #e0701e; text-transform: uppercase; letter-spacing: .05em; }
-.phase-banner .pb-icon { font-size: 46px; line-height: 1.1; }
-.phase-banner .pb-name { font-size: 20px; font-weight: 900; color: var(--ink); }
-.phase-banner .pb-how { margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--ink-2); }
-@keyframes pb-in { from { transform: translate(-50%, -50%) scale(.6); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
-@keyframes pb-out { to { transform: translate(-50%, -60%) scale(.9); opacity: 0; } }

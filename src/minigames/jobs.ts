@@ -253,7 +253,6 @@ export class PhasedRun extends BaseRun {
       return;
     }
     this.tasks = this.phases[this.idx].tasks();
-    this.banner();
     for (const t of this.tasks) {
       this.addGlow(t);
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
@@ -261,30 +260,6 @@ export class PhasedRun extends BaseRun {
       this.game.scene.add(m);
       this.markers.set(t, m);
     }
-  }
-
-  /**
-   * Cartello grande al centro a ogni nuova fase: numero, cosa fare e il gesto
-   * (tocca / tieni premuto), così non serve leggere la barra in alto.
-   */
-  private bannerEl: HTMLDivElement | null = null;
-  private banner() {
-    const ph = this.phases[this.idx];
-    this.bannerEl?.remove();
-    const el = document.createElement('div');
-    el.className = 'phase-banner';
-    const n = this.tasks.length;
-    const hold = this.tasks.some((t) => t.kind === 'hold');
-    const how = hold ? '✊ Avvicinati e <b>TIENI PREMUTO</b> il pulsante' : '👆 Avvicinati e <b>TOCCA</b> il pulsante';
-    const many = n > 1 ? `<br>${ph.ordered ? `${n} passaggi, in ordine` : `${n} punti: quelli colorati che si accendono`}` : '';
-    el.innerHTML = `<div class="pb-n">Fase ${this.idx + 1} di ${this.phases.length}</div><div class="pb-icon">${ph.icon}</div><div class="pb-name">${ph.name}</div><div class="pb-how">${how}${many}</div>`;
-    document.body.appendChild(el);
-    this.bannerEl = el;
-    setTimeout(() => el.classList.add('out'), 2600);
-    setTimeout(() => {
-      el.remove();
-      if (this.bannerEl === el) this.bannerEl = null;
-    }, 3000);
   }
 
   private pending() {
@@ -379,7 +354,6 @@ export class PhasedRun extends BaseRun {
   }
 
   dispose() {
-    this.bannerEl?.remove();
     for (const m of this.markers.values()) this.game.scene.remove(m);
     for (const t of [...this.glows.keys()]) this.removeGlow(t);
     if (this.zone) this.game.city.restoreView();
