@@ -428,10 +428,6 @@ export class TruckInterior {
     const lvl = skillLevel(this.game.state, bizType(this.biz.type).skills[0]);
     return HAND_LEVELS.filter((l) => lvl >= l).length;
   }
-  /** livello necessario per portare un prodotto in più (null se già al massimo) */
-  private get nextHandLevel() {
-    return HAND_LEVELS[this.handMax] ?? null;
-  }
   /** posti sul ripiano dei pronti (+2 per livello del miglioramento) */
   get passMax() {
     return 4 + 2 * upg(this.biz, 'ripiano');
@@ -534,7 +530,7 @@ export class TruckInterior {
     const caps = [
       `💰 €${Math.round(s.money).toLocaleString('it-IT')}`,
       `${isOpenHour(s) ? '🟢 Aperto' : '🔴 Chiuso'} · coda ${this.customers.length}/${BUSINESS.MAX_QUEUE}`,
-      `✋ In mano ${this.hand.length}/${this.handMax}${this.nextHandLevel ? ` · ${this.handMax + 1} al Liv. ${this.nextHandLevel}` : ''}`,
+      `✋ In mano ${this.hand.length}/${this.handMax}`,
       // tutti i fuochi/forni insieme: posti occupati sul totale
       ...(onFire.length ? [`${onFire[0].def.icon} ${onFire[0].def.name.replace(/ \d+$/, '')} ${onFire.reduce((a, x) => a + x.slots.filter((y) => y.item).length, 0)}/${onFire.reduce((a, x) => a + x.slots.length, 0)}`] : []),
       ...(this.workers.some((w) => w.emp.role === 'cucina') ? [`👨‍🍳 Cuochi al lavoro ${this.workers.filter((w) => w.emp.role === 'cucina' && w.job).length}/${this.workers.filter((w) => w.emp.role === 'cucina').length}`] : []),
@@ -549,9 +545,10 @@ export class TruckInterior {
       title = `❄️ ${PRODUCTS[c.pid].name} freddo: buttalo nel 🗑️ cestino`;
     } else if (next?.slots.some((sl) => sl.item && sl.p >= 1) && !this.hand.some((x) => !this.finished(x))) {
       title = `✅ Pronto! Ritira da ${next.def.icon} ${next.def.name}`;
-    } else if (it && next) {
+    } else if (it) {
+      // la fase la dicono le postazioni (anello, freccia, etichetta): qui solo il calore
       const warm = this.hand.filter((x) => this.finished(x)).map((x) => Math.ceil(x.warm ?? 0));
-      title = `👉 ${next.def.icon} ${next.def.verb} (${next.def.name})${warm.length ? ` · 🌡️ caldo ${Math.min(...warm)}s` : ''}`;
+      title = warm.length ? `🌡️ Caldo ancora ${Math.min(...warm)}s` : '';
     } else if (next?.def.kind === 'counter') {
       title = '🍽️ Un cliente aspetta quello che hai sul ripiano: servilo dal bancone';
     } else if (next?.def.kind === 'pass') {
@@ -565,7 +562,7 @@ export class TruckInterior {
     const key = title + caps;
     if (key === this.guideKey) return;
     this.guideKey = key;
-    this.guideEl.innerHTML = `<div class="gd-title">${title}</div><div class="gd-caps">${caps}</div>`;
+    this.guideEl.innerHTML = `${title ? `<div class="gd-title">${title}</div>` : ''}<div class="gd-caps">${caps}</div>`;
   }
 
   private stationOf(kind: StationDef['kind']) {
