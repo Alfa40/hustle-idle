@@ -2,6 +2,7 @@ import type { BusinessType } from '../config/business';
 import { bizType } from '../config/business';
 import type { StationDef, StationKind } from '../config/recipes';
 import type { Game } from '../game';
+import { placeTutHand } from './jobtutorial';
 
 /**
  * Tutorial contestuale della cucina: la prima volta che entri in un tipo di attività
@@ -19,7 +20,7 @@ export interface TutStep {
   /** cosa fare alla prossima postazione */
   status: 'get' | 'put' | 'wait' | 'take' | 'work' | 'serve' | 'pass' | 'bin' | 'idle';
   station: StationDef | null;
-  /** il giocatore è già lì (compare il pulsante giallo) */
+  /** il giocatore è già lì (sull'oggetto compare l'anello da toccare) */
   near: boolean;
 }
 
@@ -52,18 +53,21 @@ export class KitchenTutorial {
     this.hand = document.createElement('div');
     this.hand.className = 'tut-hand';
     this.hand.style.display = 'none';
+    document.body.classList.remove('tut-pointing');
     document.body.append(this.el, this.hand);
   }
 
   remove() {
     this.el.remove();
     this.hand.remove();
+    document.body.classList.remove('tut-pointing');
   }
 
   update(t: TutStep) {
     if (this.game.ui?.isOpen) {
       this.el.style.display = 'none';
       this.hand.style.display = 'none';
+      document.body.classList.remove('tut-pointing');
       return;
     }
     this.el.style.display = '';
@@ -118,10 +122,10 @@ export class KitchenTutorial {
       else if (!t.near) foot = '🚶 Trascina il dito per muoverti e segui l\'<b>anello colorato</b> e la freccia';
       else if (t.status === 'work') {
         gesture = 'hold';
-        foot = '✊ <b>Tieni premuto</b> il pulsante giallo finché la barra è piena';
+        foot = '✊ <b>Tieni il dito</b> sull\'oggetto che lampeggia finché il cerchio è pieno';
       } else {
         gesture = 'tap';
-        foot = '👆 <b>Tocca</b> il pulsante giallo';
+        foot = '👆 <b>Tocca l\'oggetto</b> che lampeggia';
       }
     } else if (t.stage === 'tips') {
       head = '🎉 Cliente servito!';
@@ -156,18 +160,8 @@ export class KitchenTutorial {
     this.el.style.width = `${r.width}px`;
   }
 
-  /** Manina sul pulsante giallo: tocca o tieni premuto. */
+  /** Manina sull'oggetto da usare (l'anello che lampeggia): tocca o tieni premuto. */
   private placeHand(gesture: 'tap' | 'hold' | null) {
-    const act = document.querySelector('.action') as HTMLElement | null;
-    if (!gesture || !act || getComputedStyle(act).display === 'none') {
-      this.hand.style.display = 'none';
-      return;
-    }
-    const r = act.getBoundingClientRect();
-    this.hand.style.display = '';
-    this.hand.style.left = `${r.right - r.width * 0.32}px`;
-    this.hand.style.top = `${r.top + r.height * 0.6}px`;
-    this.hand.className = `tut-hand ${gesture}`;
-    this.hand.textContent = gesture === 'hold' ? '✊' : '👆';
+    placeTutHand(this.hand, gesture);
   }
 }

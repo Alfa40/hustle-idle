@@ -49,8 +49,9 @@ anche per ogni schermata nuova.
      fumetto del tutorial), larghi al massimo fino alla colonna e alla minimappa
      (`100vw - … - max(var(--hud-w), var(--mm))`).
      In orizzontale diventano un **pannello laterale a sinistra** (`min(360px, 40vw)`).
-   - pulsante azione giallo in basso a destra; Sali/Scendi alla sua sinistra (orizzontale)
-     o sopra a sinistra della colonna (verticale).
+   - niente pulsante azione fisso: l'anello da toccare (`.action`, `--ring`) segue l'oggetto sullo
+     schermo (`UI.placeAction`), sempre dentro la safe area; Sali/Scendi in basso a destra.
+   - anteprima delle migliorie (`.preview-bar`) in alto a sinistra, sopra il riquadro "in mano".
    - la **scena 3D** va nella zona libera: per le stanze `layout.freeRect` + `frameRoom` (camera ferma sulla stanza intera, oppure
      che segue il personaggio se la stanza è troppo larga);
      la città resta centrata sul personaggio (in orizzontale si vede più città, mai deformata).

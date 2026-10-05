@@ -138,7 +138,7 @@ interface Worker {
 const barGeo = new THREE.PlaneGeometry(0.7, 0.1);
 const COLORS = { cook: 0xffc21a, ready: 0x35c46a, burnt: 0xff5d73 };
 
-type Prompt = { label: string; icon: string; progress?: number } | null;
+type Prompt = { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null;
 
 /**
  * Le fasi del lavoro, ognuna col suo colore: tappetino davanti alla postazione,
@@ -1438,7 +1438,7 @@ export class TruckInterior {
 
     if (Math.hypot(p.x - this.door.x, p.z - this.door.z) < 0.9) {
       this.nearSt = null;
-      g.ui.setAction({ label: 'Esci', icon: '🚪' });
+      g.ui.setAction({ label: 'Esci', icon: '🚪', at: this.door.clone().setY(0.9) });
       if (input.consumeAction()) g.exitTruck();
       return;
     }
@@ -1460,7 +1460,10 @@ export class TruckInterior {
     }
     const pressed = input.consumeAction();
     if (pressed || input.actionHeld) this.lastPlayerWork = performance.now();
-    g.ui.setAction(this.interact(best, dt, input.actionHeld, pressed));
+    const pr = this.interact(best, dt, input.actionHeld, pressed);
+    // l'anello da toccare sta sul mobile della postazione
+    const k = best.def.kind;
+    g.ui.setAction(pr && { ...pr, at: best.pos.clone().setY(k === 'counter' || k === 'pass' ? 1.15 : best.tagY > 2 ? 1.3 : 1.0) });
   }
 
   /** ultima volta (ms) che il giocatore ha lavorato a una postazione */

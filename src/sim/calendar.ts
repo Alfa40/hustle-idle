@@ -46,6 +46,7 @@ export function newDay(s: GameState, online = true) {
   s.demandDay = d;
   updateEvents(s, online);
   genMissions(s);
+  ensureWeekly(s);
   refreshCandidates(s);
   if (dayOfMonth(d) === 1) payMonth(s);
   bus.emit('newday');
@@ -80,11 +81,12 @@ export function updateEvents(s: GameState, announce = true) {
 
 export function genMissions(s: GameState) {
   const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
-  const list: Mission[] = [];
+  // stesso giorno (es. partita salvata con meno missioni): si tengono quelle che ci sono e si aggiungono le altre
+  const list: Mission[] = s.missionsDay === day(s) ? [...s.missions] : [];
   const owns = s.businesses.length > 0;
   const kinds: Mission['kind'][] = ['jobs', 'jobType', 'stars3', owns ? 'served' : 'jobType', 'earn'];
-  const chosen = new Set<string>();
-  while (list.length < 3) {
+  const chosen = new Set<string>(list.map((m) => (m.kind === 'jobType' ? m.kind + m.jobType : m.kind)));
+  while (list.length < DAILY_MISSIONS) {
     const kind = pick(kinds);
     const jt = pick(JOB_TYPES);
     const key = kind === 'jobType' ? kind + jt : kind;
@@ -124,9 +126,73 @@ export function genMissions(s: GameState) {
   s.missionsDay = day(s);
 }
 
+/** Missioni del giorno (cambiano ogni giorno). */
+const DAILY_MISSIONS = 5;
+
+export const weekOf = (d: number) => Math.floor(d / 7);
+
+/** Giorni che restano alle missioni della settimana (compreso oggi). */
+export const weeklyDaysLeft = (s: GameState) => 7 - (day(s) % 7);
+
+/** Se è cominciata una nuova settimana, nuove missioni settimanali (2, più lunghe e ricche). */
+export function ensureWeekly(s: GameState) {
+  const w = weekOf(day(s));
+  if (s.weeklyWeek === w && s.weekly?.length) return;
+  s.weeklyWeek = w;
+  s.weekEarned = 0;
+  const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
+  const owns = s.businesses.length > 0;
+  const pool: Mission['kind'][] = ['jobs', 'stars3', 'variety', 'earn', ...(owns ? ['served' as const] : [])];
+  const kinds: Mission['kind'][] = [];
+  while (kinds.length < 2) {
+    const k = pick(pool);
+    if (!kinds.includes(k)) kinds.push(k);
+  }
+  s.weekly = kinds.map((kind, i) => {
+    let m: Pick<Mission, 'kind' | 'text' | 'target' | 'reward'>;
+    switch (kind) {
+      case 'jobs': {
+        const n = randInt(15, 20);
+        m = { kind, text: `🗓️ Completa ${n} lavoretti questa settimana`, target: n, reward: 60 * n * scale };
+        break;
+      }
+      case 'stars3': {
+        const n = randInt(6, 9);
+        m = { kind, text: `🗓️ ⭐ Ottieni 3 stelle in ${n} lavori`, target: n, reward: 110 * n * scale };
+        break;
+      }
+      case 'variety':
+        m = { kind, text: '🗓️ Fai almeno un lavoretto di ogni tipo (tutti e 6)', target: JOB_TYPES.length, reward: 160 * JOB_TYPES.length * scale };
+        break;
+      case 'served': {
+        const n = randInt(50, 80);
+        m = { kind, text: `🗓️ 🍔 Servi ${n} clienti di persona`, target: n, reward: 16 * n * scale };
+        break;
+      }
+      default: {
+        const n = Math.round((1200 * scale) / 50) * 50;
+        m = { kind: 'earn', text: `🗓️ 💶 Guadagna €${n} questa settimana`, target: n, reward: n * 0.5 };
+      }
+    }
+    const skill = kind === 'served' ? 'clientela' : pick(SKILL_IDS);
+    return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: 8 + 3 * scale, types: [] };
+  });
+}
+
 export function missionProgress(s: GameState, kind: Mission['kind'], opts: { jobType?: string; amount?: number } = {}) {
   let changed = false;
-  for (const m of s.missions) {
+  for (const m of [...s.missions, ...(s.weekly ?? [])]) {
+    // "ogni tipo di lavoretto": conta i tipi diversi fatti nella settimana
+    if (kind === 'jobType' && m.kind === 'variety' && !m.claimed && opts.jobType) {
+      const t = opts.jobType as NonNullable<Mission['types']>[number];
+      if (!(m.types ??= []).includes(t)) {
+        m.types.push(t);
+        m.progress = Math.min(m.target, m.types.length);
+        if (m.progress >= m.target) toast(`✅ Missione completata: ${m.text}`, 'good');
+        changed = true;
+      }
+      continue;
+    }
     if (m.claimed || m.kind !== kind || m.progress >= m.target) continue;
     if (kind === 'jobType' && m.jobType !== opts.jobType) continue;
     m.progress = Math.min(m.target, m.progress + (opts.amount ?? 1));

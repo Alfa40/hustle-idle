@@ -7,7 +7,7 @@ import { toast } from '../sim/bus';
 /**
  * Tutorial contestuale dei lavoretti: la prima volta che fai un lavoretto (o quando lo scegli
  * nella scheda), un fumetto sopra il punto da raggiungere spiega cosa fare in quella fase,
- * e una manina sul pulsante giallo mostra il gesto (tocca / tieni premuto). Il tempo è fermo.
+ * e una manina sull'oggetto da usare mostra il gesto (tocca / tieni premuto). Il tempo è fermo.
  */
 
 /** Cosa fare in ogni fase, con il perché (null = si usa il punto da fare, es. lavapiatti). */
@@ -101,6 +101,7 @@ export class JobTutorial {
   private hide() {
     this.bubble.style.display = 'none';
     this.hand.style.display = 'none';
+    document.body.classList.remove('tut-pointing');
     this.key = '';
   }
 
@@ -110,6 +111,7 @@ export class JobTutorial {
     if (!run || !g || !this.type || this.game.ui?.isOpen) {
       this.bubble.style.display = 'none';
       this.hand.style.display = 'none';
+      document.body.classList.remove('tut-pointing');
       return;
     }
     const head = `<div class="tut-head">🎓 Fase ${g.phase + 1} di ${g.phases}${g.left > 1 ? ` · ${g.left} da fare` : ''}</div>`;
@@ -130,7 +132,7 @@ export class JobTutorial {
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
-      foot = gesture === 'hold' ? '✊ <b>Tieni premuto</b> il pulsante giallo finché la barra è piena' : '👆 <b>Tocca</b> il pulsante giallo';
+      foot = gesture === 'hold' ? '✊ <b>Tieni il dito</b> sull\'oggetto che lampeggia finché il cerchio è pieno' : '👆 <b>Tocca l\'oggetto</b> che lampeggia';
       anchor = g.task.pos;
     } else {
       body = tip;
@@ -156,19 +158,31 @@ export class JobTutorial {
     b.style.width = `${r.width}px`;
   }
 
-  /** Manina che mostra il gesto sopra il pulsante giallo. */
+  /** Manina sull'oggetto da usare (l'anello che lampeggia): tocca o tieni premuto. */
   private placeHand(gesture: 'tap' | 'hold' | null) {
-    const act = document.querySelector('.action') as HTMLElement | null;
-    if (!gesture || !act || getComputedStyle(act).display === 'none') {
-      this.hand.style.display = 'none';
-      return;
-    }
-    const r = act.getBoundingClientRect();
-    this.hand.style.display = '';
-    // sul bordo in basso a destra del pulsante: la scritta resta leggibile e non copre Sali/Scendi
-    this.hand.style.left = `${r.right - r.width * 0.32}px`;
-    this.hand.style.top = `${r.top + r.height * 0.6}px`;
-    this.hand.className = `tut-hand ${gesture}`;
-    this.hand.textContent = gesture === 'hold' ? '✊' : '👆';
+    placeTutHand(this.hand, gesture);
   }
+}
+
+
+/**
+ * Manina grande del tutorial sull'oggetto da usare: il dito tocca il centro dell'anello che
+ * lampeggia (la scritta dell'anello passa sopra, così la manina non la copre).
+ */
+export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) {
+  const act = document.querySelector('.action') as HTMLElement | null;
+  const show = !!gesture && !!act && getComputedStyle(act).display !== 'none';
+  document.body.classList.toggle('tut-pointing', show);
+  if (!show) {
+    hand.style.display = 'none';
+    return;
+  }
+  const r = act!.getBoundingClientRect();
+  const size = hand.offsetHeight || 70;
+  hand.style.display = '';
+  // la punta del dito (in alto, un po' a sinistra del disegno) sul centro dell'anello
+  hand.style.left = `${r.left + r.width / 2 - size * 0.42}px`;
+  hand.style.top = `${r.top + r.height / 2 - size * 0.06}px`;
+  hand.className = `tut-hand ${gesture}`;
+  hand.textContent = gesture === 'hold' ? '✊' : '👆';
 }

@@ -47,7 +47,23 @@ export const BUSINESS = {
   BASE_STOCK_CAP: 40,
 };
 
+/**
+ * Livelli di esperienza: all'inizio si sale in fretta (fino al Liv. 5 servono il 40% di XP in meno
+ * di prima), poi la salita è graduale e più lenta.
+ *   Liv. 2: 30 · 3: 120 · 4: 270 · 5: 480 · 6: 990 · 7: 1620 · 8: 2370 · 10: 4230
+ */
+const xpForLevel = (lvl: number) => (lvl <= 5 ? 30 * (lvl - 1) ** 2 : 480 + 450 * (lvl - 5) + 60 * (lvl - 5) ** 2);
 export const LEVEL = {
-  xpForLevel: (lvl: number) => 50 * (lvl - 1) * (lvl - 1),
-  levelFromXp: (xp: number) => Math.floor(Math.sqrt(xp / 50)) + 1,
+  xpForLevel,
+  levelFromXp: (xp: number) => {
+    let l = 1;
+    while (l < 200 && xpForLevel(l + 1) <= xp) l++;
+    return l;
+  },
 };
+
+/**
+ * Difficoltà dei lavoretti per livello: cresce di un gradino a livello fino al Liv. 5 (si passa
+ * presto a lavori più complessi), poi più piano (0,6 a livello).
+ */
+export const jobDifficulty = (lvl: number) => (lvl <= 5 ? lvl : 5 + (lvl - 5) * 0.6);

@@ -1,10 +1,11 @@
+import * as THREE from 'three';
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
 import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
 import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
-import { JOBS } from '../config/jobs';
+import { JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
@@ -17,7 +18,7 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
-import { canRent, RENT_MAX_HOURS, type OfflineReport } from '../sim/calendar';
+import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
   autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
@@ -28,7 +29,7 @@ import { addFriend, fetchBoard, fetchFriends, friendCode, MAX_NICK, nickname as 
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
-  type Business, type Employee, type JobOffer, type ServiceOrder,
+  type Business, type Employee, type JobOffer, type Mission, type ServiceOrder,
 } from '../sim/state';
 
 
@@ -184,7 +185,8 @@ export class UI {
     };
     act.addEventListener('pointerup', up);
     act.addEventListener('pointercancel', up);
-    this.root.appendChild(act);
+    // fuori da #ui: l'anello sta sopra i riquadri e i fumetti dei tutorial (ma sotto le finestre)
+    document.body.appendChild(act);
     this.actionEl = act;
 
     // comandi della camera (terza persona)
@@ -346,6 +348,10 @@ export class UI {
     }
   }
 
+  /**
+   * Azione disponibile: un anello che lampeggia sopra l'oggetto da usare, con la scritta sotto.
+   * Si tocca (o si tiene premuto) l'oggetto stesso: niente pulsante fisso.
+   */
   setAction(p: ActionPrompt | null) {
     const key = p ? p.icon + p.label : '';
     if (key !== this.lastAction) {
@@ -354,9 +360,41 @@ export class UI {
       if (p) {
         this.actionIco.textContent = p.icon;
         this.actionTxt.textContent = p.label;
+        this.actionTxt.dataset.ico = p.icon;
       }
     }
     this.actionProg.style.setProperty('--p', `${Math.round((p?.progress ?? 0) * 100)}%`);
+    if (p) this.placeAction(p);
+  }
+
+  private actionV = new THREE.Vector3();
+  private actionV2 = new THREE.Vector3();
+  /** Porta l'anello sul punto dello schermo dove si vede l'oggetto (dentro lo schermo e la safe area). */
+  private placeAction(p: ActionPrompt) {
+    const g = this.game;
+    const v = this.actionV;
+    if (p.at) v.copy(p.at);
+    else v.copy(g.player.root.position).setY(1.1);
+    const cam = g.activeCamera;
+    cam.updateMatrixWorld();
+    // grandezza dell'anello: circa quanto un oggetto di 1,3 m sullo schermo (tra 62 e 96 px)
+    const side = this.actionV2.setFromMatrixColumn(cam.matrixWorld, 0).normalize().multiplyScalar(1.3).add(v).project(cam);
+    v.project(cam);
+    const { w, h, safe } = layout.info;
+    const px = Math.hypot((side.x - v.x) * w, (side.y - v.y) * h) / 2;
+    const d = Math.round(THREE.MathUtils.clamp(px, 62, 96));
+    this.actionEl.style.setProperty('--ring', `${d}px`);
+    const r = d / 2;
+    const x = THREE.MathUtils.clamp(((v.x + 1) / 2) * w, safe.left + r + 4, w - safe.right - r - 4);
+    const y = THREE.MathUtils.clamp(((1 - v.y) / 2) * h, safe.top + r + 4, h - safe.bottom - r - 40);
+    this.actionEl.style.left = `${Math.round(x)}px`;
+    this.actionEl.style.top = `${Math.round(y)}px`;
+    // la scritta va sopra l'anello quando l'oggetto è in basso
+    this.actionEl.classList.toggle('lbl-up', y > h - safe.bottom - r - 90);
+    // la scritta resta tutta dentro lo schermo (si sposta di lato se l'anello è vicino al bordo)
+    const tw = this.actionTxt.offsetWidth;
+    const lx = THREE.MathUtils.clamp(0, safe.left + 6 - (x - tw / 2), w - safe.right - 6 - (x + tw / 2));
+    this.actionEl.style.setProperty('--lx', `${Math.round(lx)}px`);
   }
 
   jobBar(on: boolean) {
@@ -370,7 +408,7 @@ export class UI {
   }
 
   private updateDot() {
-    const claimable = this.s.missions.some((m) => !m.claimed && m.progress >= m.target);
+    const claimable = [...this.s.missions, ...(this.s.weekly ?? [])].some((m) => !m.claimed && m.progress >= m.target);
     this.missionDot.style.display = claimable ? '' : 'none';
     // se Missioni è nel menu, il "!" compare anche sul pulsante ☰
     const dot2 = this.root.querySelector('#h-dot2') as HTMLElement | null;
@@ -476,37 +514,14 @@ export class UI {
 
   openJobOffer(offer: JobOffer) {
     const def = JOBS[offer.type];
-    // la prima volta il tutorial è acceso; dopo si può riattivare
+    // il tutorial è acceso solo finché non hai completato quel tipo di lavoretto (vale per ogni livello);
+    // dopo resta spento, ma lo puoi riaccendere
     let tut = !this.game.tutorial.isDone(offer.type);
-    // mini "video" della procedura: i passi si illuminano uno alla volta, con il gesto da fare
-    let timer = 0;
-    const GEST = { tap: ['👆', 'Tocca'], hold: ['✊', 'Tieni premuto'], walk: ['🚶', 'Vai'] } as const;
     this.open({
       title: `${def.icon} ${def.name}`,
       small: true,
       color: 'var(--orange)',
-      after: (body) => {
-        if (timer) return;
-        const stage = body.querySelector('.ht-stage') as HTMLElement | null;
-        if (!stage) return;
-        let i = 0;
-        const show = () => {
-          const cur = this.modal?.querySelector('.ht-stage') as HTMLElement | null;
-          if (!cur) return;
-          const [icon, text, how] = def.steps[i];
-          cur.innerHTML = `<div class="ht-n">Passo ${i + 1} di ${def.steps.length}</div>
-            <div class="ht-big">${icon}</div><div class="ht-text">${text}</div>
-            <div class="ht-gest ${how}"><span class="ht-hand">${GEST[how][0]}</span><b>${GEST[how][1]}</b>${how === 'hold' ? '<i class="ht-bar"><i></i></i>' : ''}</div>`;
-          this.modal?.querySelectorAll('.ht-list li').forEach((li, k) => li.classList.toggle('on', k === i));
-          i = (i + 1) % def.steps.length;
-        };
-        show();
-        timer = window.setInterval(show, 2200);
-      },
-      onClose: () => clearInterval(timer),
       render: () => `
-        <div class="howto"><div class="ht-stage"></div>
-          <ol class="ht-list">${def.steps.map(([icon, text, how]) => `<li><span>${icon}</span>${text}<small>${GEST[how][0]}</small></li>`).join('')}</ol></div>
         <div class="grid2">
           <div class="stat s-green"><b class="money-t">${euro(offer.pay)}</b><span>💰 paga (⭐⭐)</span></div>
           <div class="stat s-yellow"><b class="money-t">${euro(offer.pay * 1.35)}</b><span>🤩 paga con ⭐⭐⭐</span></div>
@@ -1264,16 +1279,18 @@ export class UI {
       live: true,
       color: 'var(--purple)',
       render: () => {
-        const ms = s.missions
-          .map((m) => {
+        const card = (m: Mission) => {
             const done = m.progress >= m.target;
             return `<div class="card ${done && !m.claimed ? 'hl' : ''}"><div class="row between"><b style="flex:1">${m.text}</b>${
               m.claimed ? '<span class="tag g">Riscossa</span>' : done ? `<button class="btn sm good" data-a="claim:${m.id}">Riscuoti</button>` : ''
             }</div>
             <div class="bar green"><i style="width:${(m.progress / m.target) * 100}%"></i></div>
+            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${JOB_TYPES.map((t) => `<span style="opacity:${m.types?.includes(t) ? 1 : 0.3}">${JOBS[t].icon}</span>`).join(' ')}</div>` : ''}
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(m.progress)}/${m.target}</span><span>Premio ${euro(m.reward)} · +${m.fame.toFixed(0)} fama ${SKILLS[m.fameSkill].icon}</span></div></div>`;
-          })
-          .join('');
+        };
+        const ms = s.missions.map(card).join('');
+        const left = weeklyDaysLeft(s);
+        const wk = (s.weekly ?? []).map(card).join('');
         const today = day(s);
         const evs = [0, 1, 2].map((k) => this.dayCard(today + k, false)).join('');
         const prods = (Object.keys(PRODUCTS) as ProductId[])
@@ -1282,7 +1299,8 @@ export class UI {
             return `<div class="row between small"><span>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>${demandBars(d, 2.4)}</div>`;
           })
           .join('');
-        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama.</p>${ms}
+        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama. I premi delle missioni non contano per "Guadagna".</p>${ms}
+          <h3 class="sec-title">🗓️ Missioni della settimana</h3><p class="muted small" style="margin-top:-4px">Più lunghe, con premi più ricchi. ${left > 1 ? `Restano ${left} giorni` : 'Ultimo giorno'}.</p>${wk}
           <h3 class="sec-title">📅 Prossimi giorni</h3>${evs}
           <button class="btn blue full" data-a="cal" style="margin-bottom:10px">📅 Apri il calendario completo</button>
           <div class="card"><h3>📊 Domanda del giorno</h3>${prods}</div>`;
@@ -1293,10 +1311,10 @@ export class UI {
           this.openCalendar();
         },
         claim: (id) => {
-          const m = s.missions.find((x) => x.id === id);
+          const m = [...s.missions, ...(s.weekly ?? [])].find((x) => x.id === id);
           if (!m || m.claimed || m.progress < m.target) return;
           m.claimed = true;
-          addMoney(s, m.reward, 'missione');
+          addMoney(s, m.reward, 'missione', true);
           addFame(s, m.fameSkill, m.fame);
           this.game.save();
         },
@@ -1859,7 +1877,7 @@ export class UI {
         return tabs + `
           <div class="card"><h3>🕹️ Comandi</h3><p class="muted small" style="margin:0">
             Trascina il dito sullo schermo per muoverti: compare un joystick.
-            Avvicinati alle persone con il <b>!</b> per un lavoretto e usa il pulsante giallo in basso a destra.
+            Avvicinati alle persone con il <b>!</b> per un lavoretto. Per fare un'azione tocca direttamente l'oggetto che lampeggia (cerchio giallo); se c'è scritto "Tieni premuto" tieni il dito sopra.
             Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
       },
@@ -1922,7 +1940,7 @@ export class UI {
           <li><div class="icon-bubble">👥</div><span>Assumi <b>dipendenti</b> e un <b>manager</b> per farlo lavorare da solo.</span></li>
           <li><div class="icon-bubble">🗺️</div><span>Tocca la <b>mappa</b> in alto per vedere tutta la città.</span></li>
         </ul>
-        <p class="muted small center">Trascina il dito per muoverti oppure tocca dove vuoi andare. Il pulsante giallo fa le azioni.</p>
+        <p class="muted small center">Trascina il dito per muoverti. Per usare un oggetto avvicinati e tocca l'oggetto che lampeggia.</p>
         <button class="btn full" data-a="ok">Iniziamo! 🚀</button>`,
       actions: {
         ok: () => {

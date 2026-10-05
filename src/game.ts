@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry } from './sim/leaderboard';
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
-import { BUSINESS, JOB, TIME } from './config/balance';
+import { BUSINESS, JOB, jobDifficulty, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS, OLD_HALF, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
@@ -10,7 +10,7 @@ import { Input } from './input';
 import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
-import { advance, applyOffline, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
+import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
 import {
@@ -86,6 +86,11 @@ export interface ActionPrompt {
   label: string;
   icon: string;
   progress?: number;
+  /**
+   * Dove sta l'oggetto da toccare (punto 3D, all'altezza dell'oggetto). Non c'è più il pulsante
+   * fisso: l'anello da toccare compare sopra l'oggetto. Senza `at` l'anello sta sul personaggio.
+   */
+  at?: THREE.Vector3;
 }
 
 interface JobNpc {
@@ -257,7 +262,8 @@ export class Game {
       this.offlineReport = applyOffline(this.state, Date.now() - this.state.lastSeen);
     }
     ensureWeather(this.state);
-    if (this.state.missionsDay !== day(this.state)) genMissions(this.state);
+    if (this.state.missionsDay !== day(this.state) || this.state.missions.length < 5) genMissions(this.state);
+    ensureWeekly(this.state);
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
@@ -554,23 +560,19 @@ export class Game {
       sh.position.set(0, box.max.y * 0.62, reach + 0.03);
       side.add(sh);
     }
-    // marchio sul fianco, ben visibile dalla strada
+    // un solo marchio, grande sul tetto: dalla camera dall'alto è la prima cosa che si vede
     if (logo) {
-      const plate = logoPlate(logo, 0.95);
-      plate.position.set(open ? -0.75 : 0.9, box.max.y * 0.5, reach + 0.05);
-      side.add(plate);
-      // e grande sul tetto: dalla camera dall'alto è la prima cosa che si vede
-      const roof = logoPlate(logo, 1.35);
+      const roof = logoPlate(logo, Math.min(box.max.x - box.min.x, box.max.z - box.min.z) * 0.92);
       roof.rotation.x = -Math.PI / 2;
-      roof.position.set(0, box.max.y + 0.02, 0);
+      roof.position.set(0, box.max.y + 0.03, 0);
       side.add(roof);
-      const lg = logoSprite(logo, 1.15);
-      lg.position.y = box.max.y + 1.55;
-      g.add(lg);
     }
-    const sign = label(title, { bg: color, scale: 0.5 });
-    sign.position.y = box.max.y + 0.75;
-    g.add(sign);
+    // senza logo (es. furgone di un amico senza marchio) resta l'insegna con il nome
+    if (!logo) {
+      const sign = label(title, { bg: color, scale: 0.5 });
+      sign.position.y = box.max.y + 0.75;
+      g.add(sign);
+    }
     return g;
   }
 
@@ -911,7 +913,7 @@ export class Game {
     const def = JOBS[offer.type];
     if (!def.vehicleOk) this.dismount();
     const title = `${def.icon} ${def.name}`;
-    const lv = offer.level;
+    const lv = jobDifficulty(offer.level);
     switch (offer.type) {
       case 'giardino': this.run = gardenJob(this, lv, slot, title); break;
       case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
@@ -943,7 +945,7 @@ export class Game {
     const houses = this.deliveryHouses;
     const slot = houses[order.house % houses.length];
     const def = bizType(biz.type);
-    const lv = skillLevel(this.state, def.skills[0]);
+    const lv = jobDifficulty(skillLevel(this.state, def.skills[0]));
     const pr = PRODUCTS[order.pid];
     const title = `${pr.icon} ${pr.name}`;
     this.runOrder = { bizId: biz.id, order };
@@ -1048,6 +1050,8 @@ export class Game {
       addMoney(s, pay);
       addXp(s, def.skill, xp);
       addFame(s, def.skill, fame);
+      // fatto sul serio almeno una volta: il tutorial di questo tipo resta spento (a ogni livello)
+      s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), offer.type])];
       missionProgress(s, 'jobs');
       missionProgress(s, 'jobType', { jobType: offer.type });
       if (stars === 3) missionProgress(s, 'stars3');
@@ -1543,7 +1547,7 @@ export class Game {
         bd = d;
       }
     }
-    this.ui.setAction(best ? { label: best.label, icon: best.icon } : null);
+    this.ui.setAction(best ? { label: best.label, icon: best.icon, at: best.pos.clone().setY(1.2) } : null);
     if (best && this.input.consumeAction()) {
       best.action();
     }

@@ -600,11 +600,11 @@ export class ClientHouse {
 
   // ---- pulizie ----
 
-  private cleanInteract(dt: number): { label: string; icon: string; progress?: number } | null {
+  private cleanInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
     const input = this.game.input;
     if (this.near(this.door, 0.8) && this.dirts.every((d) => d.done)) {
       if (input.consumeAction()) this.finish(this.stars());
-      return { label: 'Lavoro finito: esci', icon: '🚪' };
+      return { label: 'Lavoro finito: esci', icon: '🚪', at: this.door.clone().setY(1.0) };
     }
     // carrello: cambia attrezzo (spugna → piumino → tergivetro)
     if (this.near(new THREE.Vector3(this.cart.x + 0.8, 0, this.cart.z), 1.3)) {
@@ -615,7 +615,7 @@ export class ClientHouse {
         this.setToolSprite(`${TOOLS[nextTool].icon} ${TOOLS[nextTool].name}`);
         this.player.once('pick-up');
       }
-      return { label: `Prendi ${TOOLS[nextTool].name}`, icon: TOOLS[nextTool].icon };
+      return { label: `Prendi ${TOOLS[nextTool].name}`, icon: TOOLS[nextTool].icon, at: new THREE.Vector3(this.cart.x, 1.0, this.cart.z) };
     }
     let best: Dirt | null = null;
     let bd = Infinity;
@@ -662,12 +662,15 @@ export class ClientHouse {
         if (this.dirts.every((d) => d.done)) toast('✨ Tutto pulito! Esci dalla porta per finire', 'good');
       }
     }
-    return { label: 'Tieni premuto: pulisci', icon: TOOLS[best.tool].icon, progress: best.cut };
+    const dirtAt = best.pos.clone().setY(best.tool === 'spugna' ? 0.2 : best.tool === 'piumino' ? 1.3 : 1.5);
+    if (best.tool === 'tergivetro') dirtAt.z -= 0.9;
+    else if (best.tool === 'piumino') dirtAt.z -= 0.5;
+    return { label: 'Tieni premuto: pulisci', icon: TOOLS[best.tool].icon, progress: best.cut, at: dirtAt };
   }
 
   // ---- traslochi ----
 
-  private moveInteract(dt: number): { label: string; icon: string; progress?: number } | null {
+  private moveInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
     const input = this.game.input;
     const c = this.carrying;
     // zona furgone all'ingresso
@@ -681,7 +684,7 @@ export class ClientHouse {
           this.player.play('idle');
           if (this.things.every((t) => t.done)) this.finish(this.stars());
         }
-        return { label: `Carica ${c.name} sul furgone`, icon: '🚚' };
+        return { label: `Carica ${c.name} sul furgone`, icon: '🚚', at: this.van.clone().setY(1.0) };
       }
       if (c && !c.packed) {
         input.consumeAction();
@@ -704,7 +707,7 @@ export class ClientHouse {
           this.player.play('idle');
         }
       }
-      return { label: 'Tieni premuto: imballa', icon: '📦', progress: c.lift };
+      return { label: 'Tieni premuto: imballa', icon: '📦', progress: c.lift, at: this.packTable.clone().setY(1.0) };
     }
     if (c) {
       input.consumeAction();
@@ -743,12 +746,12 @@ export class ClientHouse {
         this.player.play('interact-right', 0.1, 1.2);
         if (best.lift >= 1) pick(best);
       } else best.lift = Math.max(0, best.lift - dt);
-      return { label: `Tieni premuto: solleva ${best.name}`, icon: best.icon, progress: best.lift };
+      return { label: `Tieni premuto: solleva ${best.name}`, icon: best.icon, progress: best.lift, at: best.pos.clone().setY(0.8) };
     }
     if (input.consumeAction()) {
       pick(best);
       this.player.once('pick-up', 'holding-both');
     }
-    return { label: `Prendi ${best.name}`, icon: best.icon };
+    return { label: `Prendi ${best.name}`, icon: best.icon, at: best.pos.clone().setY(0.6) };
   }
 }

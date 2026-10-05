@@ -71,8 +71,12 @@ export interface JobOffer {
 export interface Mission {
   id: string;
   text: string;
-  kind: 'jobs' | 'jobType' | 'stars3' | 'served' | 'earn';
+  kind: 'jobs' | 'jobType' | 'stars3' | 'served' | 'earn' | 'variety';
   jobType?: JobType;
+  /** missione della settimana (più lunga, premio più alto) */
+  weekly?: boolean;
+  /** 'variety': tipi di lavoretto già fatti questa settimana */
+  types?: JobType[];
   target: number;
   progress: number;
   reward: number;
@@ -101,6 +105,11 @@ export interface GameState {
   jobSeq: number;
   missionsDay: number;
   missions: Mission[];
+  /** missioni della settimana e settimana (giorno / 7) in cui sono state create */
+  weekly?: Mission[];
+  weeklyWeek?: number;
+  /** guadagnato questa settimana (senza i premi delle missioni) */
+  weekEarned?: number;
   events: CalEvent[];
   /** meteo reale per giorno (solo i prossimi giorni) */
   weather: Record<number, WeatherId>;

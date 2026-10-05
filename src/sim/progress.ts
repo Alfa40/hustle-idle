@@ -3,12 +3,15 @@ import { SKILLS, SKILL_IDS, type SkillId } from '../config/skills';
 import { bus, toast } from './bus';
 import { euro, type GameState } from './state';
 
-export function addMoney(s: GameState, amount: number, reason?: string) {
+/** `fromMission`: premio di una missione, che non conta per le missioni "Guadagna €…". */
+export function addMoney(s: GameState, amount: number, reason?: string, fromMission = false) {
   s.money += amount;
-  if (amount > 0) {
+  if (amount > 0 && !fromMission) {
     s.todayEarned += amount;
+    s.weekEarned = (s.weekEarned ?? 0) + amount;
     s.totalEarned += amount;
     for (const m of s.missions) if (m.kind === 'earn' && !m.claimed) m.progress = Math.min(m.target, s.todayEarned);
+    for (const m of s.weekly ?? []) if (m.kind === 'earn' && !m.claimed) m.progress = Math.min(m.target, s.weekEarned);
   }
   if (reason) toast(`${amount >= 0 ? '+' : ''}${euro(amount)} ${reason}`, amount >= 0 ? 'money' : 'bad');
   bus.emit('money');

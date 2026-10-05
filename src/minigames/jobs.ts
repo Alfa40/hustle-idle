@@ -376,6 +376,10 @@ export class PhasedRun extends BaseRun {
       if (this.game.player.currentName === 'interact-right' && !this.game.input.actionHeld) this.game.player.play('idle');
       return;
     }
+    // l'anello da toccare sta sull'oggetto (a metà altezza, sotto l'indicatore)
+    const mk = this.markers.get(near);
+    const mp = near.markerAt ?? near.pos;
+    const at = new THREE.Vector3(mp.x, Math.min(1.6, Math.max(0.5, ((mk?.userData.baseY ?? 2.3) - 0.75) * 0.55)), mp.z);
     if (near.kind === 'hold') {
       if (this.game.input.actionHeld) {
         near.progress = (near.progress ?? 0) + dt / (near.sec ?? 1.2);
@@ -389,9 +393,9 @@ export class PhasedRun extends BaseRun {
         this.game.player.play('interact-right', 0.1, 1.6);
         if (near.progress >= 1) this.complete(near);
       } else if (this.game.player.currentName === 'interact-right') this.game.player.play('idle');
-      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0 };
+      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at };
     } else {
-      this.game.prompt = { label: near.label, icon: near.icon };
+      this.game.prompt = { label: near.label, icon: near.icon, at };
     }
   }
 
@@ -823,7 +827,7 @@ export class VisitRun extends BaseRun {
     this.marker.position.y = 3 + Math.sin(performance.now() / 250) * 0.3;
     this.marker.rotation.y += dt * 2;
     this.status = `Vai ${this.where} · ${Math.round(d)} m`;
-    this.game.prompt = d < this.reach() ? { label: this.enterLabel, icon: '🚪' } : null;
+    this.game.prompt = d < this.reach() ? { label: this.enterLabel, icon: '🚪', at: this.dest.pos.clone().setY(1.2) } : null;
   }
 
   guide(): RunGuide | null {

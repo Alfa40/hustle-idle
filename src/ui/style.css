@@ -177,24 +177,35 @@ body.job-on .hud-top { display: none; }
 .jobbar .fill.danger { background: var(--red); }
 .jobbar .quit { background: #f1ead9; border: none; border-radius: 10px; padding: 3px 9px; font-size: 12px; color: var(--ink-2); font-weight: 600; flex: none; }
 
-/* ---------- pulsante azione ---------- */
+/* ---------- azione: anello da toccare sopra l'oggetto ---------- */
 .action {
-  position: fixed; right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px);
-  width: 96px; height: 96px; border-radius: 50%; border: 5px solid #fff;
-  background: radial-gradient(circle at 35% 30%, #ffe066, var(--yellow) 60%); color: #5a3d00;
-  font-weight: 700; font-size: 13px; line-height: 1.05;
-  display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  box-shadow: 0 6px 0 var(--yellow-d), 0 10px 18px rgba(0,0,0,.28); padding: 6px; touch-action: none;
-  animation: bob 1.2s ease-in-out infinite alternate;
+  position: fixed; left: 50%; top: 50%; z-index: 20; transform: translate(-50%, -50%);
+  width: var(--ring); height: var(--ring); border-radius: 50%; padding: 0;
+  border: 4px solid #fff; background: radial-gradient(circle, rgba(255,214,10,.10) 45%, rgba(255,214,10,.38) 70%);
+  box-shadow: 0 0 0 4px rgba(255,194,26,.9), 0 0 22px 6px rgba(255,214,10,.75);
+  display: none; touch-action: none; -webkit-tap-highlight-color: transparent;
+  animation: act-pulse 1s ease-in-out infinite;
 }
-@keyframes bob { to { transform: translateY(-3px); } }
-.action.on { display: flex; }
-.action .ico { font-size: 30px; line-height: 1; margin-bottom: 2px; }
-.action.pressed { transform: translateY(4px); box-shadow: 0 2px 0 var(--yellow-d); animation: none; }
+@keyframes act-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,194,26,.9), 0 0 18px 4px rgba(255,214,10,.6); }
+  50% { box-shadow: 0 0 0 7px rgba(255,194,26,.55), 0 0 30px 12px rgba(255,214,10,.9); }
+}
+.action.on { display: block; }
+.action .ico { display: none; }
+/* scritta sotto l'anello (sopra se l'oggetto è in basso nello schermo) */
+.action .txt {
+  position: absolute; left: 50%; top: calc(100% + 8px); transform: translateX(calc(-50% + var(--lx, 0px)));
+  background: #fff; color: #5a3d00; border: 3px solid var(--yellow); border-radius: 12px; padding: 3px 9px;
+  font-weight: 800; font-size: max(12px, calc(13px * var(--u))); line-height: 1.15; white-space: nowrap;
+  max-width: 72vw; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 3px 8px rgba(0,0,0,.25);
+}
+.action .txt::before { content: attr(data-ico) ' '; }
+.action.lbl-up .txt { top: auto; bottom: calc(100% + 8px); }
+.action.pressed { background: radial-gradient(circle, rgba(255,214,10,.35) 45%, rgba(255,214,10,.6) 70%); animation: none; }
 .action .prog {
-  position: absolute; inset: -5px; border-radius: 50%; pointer-events: none;
+  position: absolute; inset: -8px; border-radius: 50%; pointer-events: none;
   background: conic-gradient(var(--green) var(--p, 0%), transparent 0);
-  mask: radial-gradient(circle, transparent 60%, #000 62%); -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%); -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%);
 }
 
 /* ---------- joystick ---------- */
@@ -689,7 +700,12 @@ body.guide-on .hud-top { display: none; }
 .tut-head { font-size: 11px; font-weight: 800; color: #8e5bd6; text-transform: uppercase; letter-spacing: .03em; }
 .tut-body { font-size: 15px; font-weight: 600; line-height: 1.25; margin-top: 2px; }
 .tut-foot { font-size: 13px; font-weight: 700; color: var(--green-d); margin-top: 4px; }
-.tut-hand { position: fixed; z-index: 30; font-size: 40px; pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+.tut-hand {
+  position: fixed; z-index: 30; font-size: 66px; line-height: 1; pointer-events: none; transform-origin: 42% 6%;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #fff) drop-shadow(0 5px 5px rgba(0,0,0,.45));
+}
+/* con la manina sull'anello, la scritta dell'azione va sopra l'anello */
+body.tut-pointing .action .txt { top: auto; bottom: calc(100% + 8px); }
 .tut-hand.tap { animation: tut-tap .9s ease-in-out infinite; }
 .tut-hand.hold { animation: tut-hold 1.6s ease-in-out infinite; }
 @keyframes tut-tap { 0%, 100% { transform: translate(0, 0) scale(1); } 45% { transform: translate(-6px, -6px) scale(1.05); } 60% { transform: translate(0, 0) scale(.88); } }
@@ -705,6 +721,8 @@ body.guide-on .hud-top { display: none; }
   --u: 1;
   --btn: max(44px, calc(54px * var(--u)));
   --act: max(82px, calc(96px * var(--u)));
+  /* anello da toccare sopra gli oggetti */
+  --ring: max(84px, calc(92px * var(--u)));
   --ride: max(52px, calc(62px * var(--u)));
   --mm: max(84px, calc(104px * var(--u)));
   /* larghezza della colonna dei pulsanti (1 o 2 colonne, la imposta il LayoutManager) */
@@ -730,10 +748,8 @@ body.is-landscape .hud-drop { grid-template-columns: repeat(3, var(--btn)); }
 .hud-drop .cam-grid { right: 0; top: calc(var(--btn) + 10px); }
 
 /* pulsante azione e Sali/Scendi */
-.action { width: var(--act); height: var(--act); font-size: max(11px, calc(13px * var(--u))); }
-.action .ico { font-size: calc(var(--act) * .31); }
-.ride-btn { width: var(--ride); height: var(--ride); right: calc(var(--sar) + var(--hud-w) + 18px); bottom: calc(var(--sab) + var(--act) + 34px); }
-body.is-landscape .ride-btn { right: calc(var(--sar) + var(--act) + 26px); bottom: calc(var(--sab) + 26px); }
+/* Sali/Scendi: in basso a destra, dove prima c'era il pulsante azione */
+.ride-btn { width: var(--ride); height: var(--ride); right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px); }
 
 /* riquadri in alto a sinistra: non arrivano mai sotto la colonna di destra */
 .jobbar, .guide, .hand-badge, .preview-bar {

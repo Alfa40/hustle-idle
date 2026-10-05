@@ -20,7 +20,8 @@ export const KITCHEN_ASSETS = ['furniture/kitchenSink.glb', 'furniture/kitchenSt
 const LEFT = 0;
 const W = 8;
 const BACK = -2.4;
-const FRONT = 2.0;
+/** cucina più profonda: attorno al carrello dei piatti si passa sia davanti sia dietro */
+const FRONT = 3.4;
 const FURN = 2.3;
 
 export interface IndoorHooks {
@@ -50,10 +51,10 @@ export class DishKitchen {
   private line = new GuideLine(0xffffff, 0.24);
   private ringObj = ring(0x35c46a, 0.75);
   private arrowObj = arrow(0x35c46a);
-  private door = new THREE.Vector3(0.9, 0, 1.5);
+  private door = new THREE.Vector3(0.9, 0, 2.9);
   private sink = new THREE.Vector3(1.6, 0, -1.3);
   private rack = new THREE.Vector3(6.6, 0, -1.3);
-  private trolley = new THREE.Vector3(4.0, 0, 0.1);
+  private trolley = new THREE.Vector3(4.0, 0, 1.3);
   private stacks: THREE.Object3D[] = [];
   private clean: THREE.Object3D[] = [];
   private water!: THREE.Mesh;
@@ -357,7 +358,7 @@ export class DishKitchen {
     this.game.ui.setAction(this.interact(dt));
   }
 
-  private interact(dt: number): { label: string; icon: string; progress?: number } | null {
+  private interact(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
     const input = this.game.input;
     const st = this.step;
     if (!st) return null;
@@ -375,10 +376,12 @@ export class DishKitchen {
         if (Math.random() < dt * 14) this.fx.emit('bubble', this.sink.clone().setY(1.1).add(new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, 0)), 1);
         if (t.progress >= 1) this.next();
       }
-      return { label: `Tieni premuto: ${t.label}`, icon: t.icon, progress: t.progress ?? 0 };
+      return { label: `Tieni premuto: ${t.label}`, icon: t.icon, progress: t.progress ?? 0, at: this.sink.clone().setY(1.0) };
     }
     if (input.consumeAction()) this.next();
-    return { label: t.label, icon: t.icon };
+    // anello sull'oggetto: la pila di piatti sul carrello o lo scolapiatti
+    const at = this.idx % 3 === 0 ? this.stacks[st.stack].position.clone().setY(1.0) : this.rack.clone().setY(1.1);
+    return { label: t.label, icon: t.icon, at };
   }
 
   private next() {
