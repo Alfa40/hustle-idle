@@ -17,7 +17,7 @@ npm run dev        # avvia il server di sviluppo
 
 ## Comandi di gioco
 
-- **Telefono:** trascina il dito per muoverti (compare un joystick) oppure tocca un punto per andarci. Il pulsante giallo in basso a destra serve per le azioni: tocca, oppure tieni premuto quando lo chiede.
+- **Telefono:** trascina il dito per muoverti (compare un joystick). Il pulsante giallo in basso a destra serve per le azioni: tocca, oppure tieni premuto quando lo chiede.
 - **PC:** WASD o frecce per muoverti, E o spazio per l'azione.
 
 ## Struttura
