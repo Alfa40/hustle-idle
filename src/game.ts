@@ -28,7 +28,8 @@ import { ViewControl } from './world/viewcam';
 import { GuideLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
-import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
+import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
+import { hasInterior } from './config/recipes';
 import { carWashJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
@@ -775,7 +776,40 @@ export class Game {
     this.dismount();
     this.scene.remove(this.player.root);
     this.view.reset();
-    this.interior = new TruckInterior(this, biz);
+    // la prima volta in questo tipo di attività: tutorial della cucina (una volta per tipo)
+    const tutorial = hasInterior(biz.type) && !(this.state.bizTutorials ?? []).includes(biz.type);
+    this.interior = new TruckInterior(this, biz, { tutorial });
+    this.interior.enter(this.player);
+    this.ui.refresh();
+  }
+
+  /** dove tornare alla fine dell'anteprima e quale scheda riaprire */
+  private previewBack: { pos: THREE.Vector3; rot: number; bizId: string; tab: string } | null = null;
+
+  /**
+   * Anteprima di una miglioria o di un dipendente: si entra in una copia del locale con la
+   * modifica già fatta (`apply`) e scorte piene, a qualsiasi ora. Niente guadagni né spese;
+   * dal riquadro in alto si compra davvero o si esce e si torna dov'eri.
+   */
+  previewBusiness(bizId: string, apply: (copy: Business) => void, opts: PreviewOpts, tab: string) {
+    const real = this.state.businesses.find((b) => b.id === bizId);
+    if (!real || !hasInterior(real.type)) return;
+    if (this.run || this.house) {
+      toast('Finisci prima il lavoro in corso', 'bad');
+      return;
+    }
+    if (this.interior) this.exitTruck();
+    const copy = JSON.parse(JSON.stringify(real)) as Business;
+    copy.__playerInside = false;
+    copy.autoRestock = false;
+    for (const p of bizType(copy.type).products) copy.stock[p] = 99;
+    apply(copy);
+    this.previewBack = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y, bizId, tab };
+    this.ui.close();
+    this.dismount();
+    this.scene.remove(this.player.root);
+    this.view.reset();
+    this.interior = new TruckInterior(this, copy, { preview: opts });
     this.interior.enter(this.player);
     this.ui.refresh();
   }
@@ -783,9 +817,24 @@ export class Game {
   exitTruck() {
     if (!this.interior) return;
     const lotId = this.interior.biz.lotId;
+    const preview = this.interior.opts.preview ? this.previewBack : null;
+    const bought = this.interior.bought;
     this.interior.exit();
     this.interior = null;
     this.view.reset();
+    if (preview) {
+      // fine anteprima: si torna dov'eri e si riapre la scheda dell'attività
+      this.previewBack = null;
+      this.player.root.position.copy(preview.pos);
+      this.player.root.rotation.y = preview.rot;
+      this.scene.add(this.player.root);
+      this.player.play('idle');
+      if (bought) this.setupLot(lotId);
+      this.save();
+      this.ui.refresh();
+      this.ui.openBusiness(preview.bizId, preview.tab);
+      return;
+    }
     const site = this.trucks.get(lotId)!;
     this.player.root.position.copy(site.inter.pos);
     this.player.root.rotation.y = DIR_ROT[site.slot.dir];

@@ -18,10 +18,11 @@ import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
 import { frameRoom, layout, type Occluder } from '../ui/layout';
+import { KitchenTutorial, type TutStep } from '../ui/biztutorial';
 
 /** Interfaccia sopra la cucina: il riquadro "in mano" (toglie il lato che fa perdere meno spazio) e i pulsanti a destra. */
 const INTERIOR_UI = () =>
-  [{ sel: '.hand-badge' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+  [{ sel: '.preview-bar', dock: 'top' }, { sel: '.hand-badge' }, { sel: '.biz-tut' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
@@ -65,7 +66,30 @@ interface Customer {
   bubble: THREE.Sprite;
   bubbleKey: string;
   paid: number;
+  /** il cliente del tutorial: aspetta senza fretta */
+  tut?: boolean;
 }
+
+/** Anteprima di una miglioria o di un dipendente: copia del locale, niente guadagni né spese. */
+export interface PreviewOpts {
+  /** cosa si sta provando, es. "🔥 Fuochi e forni extra · Liv. 2" */
+  what: string;
+  /** testo del pulsante per comprare, es. "Compra · €900" o "Assumi · €380/mese" */
+  buyLabel: string;
+  /** null se si può comprare, altrimenti il motivo */
+  blocked: () => string | null;
+  /** compra davvero; true se è andata */
+  buy: () => boolean;
+}
+
+export interface InteriorOpts {
+  preview?: PreviewOpts;
+  /** tutorial della prima volta in questo tipo di attività */
+  tutorial?: boolean;
+}
+
+/** In anteprima arriva un cliente ogni tot secondi, a qualsiasi ora: si prova la cucina sotto pressione. */
+const PREVIEW_SPAWN_SEC = 7;
 
 interface Slot {
   item: Item | null;
@@ -181,7 +205,7 @@ export class TruckInterior {
   /** alle postazioni di partenza, senza ordini, si prepara in anticipo a rotazione */
   private advanceIdx = 0;
 
-  constructor(private game: Game, public biz: Business) {
+  constructor(private game: Game, public biz: Business, public opts: InteriorOpts = {}) {
     this.layout = LAYOUTS[biz.type as keyof typeof LAYOUTS];
     this.level = Math.min(2, upg(biz, 'ampliamento'));
     this.width = this.layout.width[this.level];
@@ -635,7 +659,8 @@ export class TruckInterior {
   /** Il riquadro "in mano" sta subito sotto la guida (la cui altezza cambia). */
   private placeHandBadge() {
     if (!this.handEl) return;
-    this.handEl.style.top = this.guideEl ? `${this.guideEl.getBoundingClientRect().bottom + 6}px` : 'var(--sat)';
+    const above = this.guideEl ?? this.previewEl;
+    this.handEl.style.top = above ? `${above.getBoundingClientRect().bottom + 6}px` : 'var(--sat)';
   }
 
   private stationOf(kind: StationDef['kind']) {
@@ -659,6 +684,15 @@ export class TruckInterior {
     document.body.appendChild(this.handEl);
     this.handHtml = '';
     document.body.classList.add('guide-on');
+    if (this.opts.preview) {
+      this.buildPreviewBar(this.opts.preview);
+      // il primo cliente arriva subito
+      this.spawnAcc = 0.9;
+    }
+    if (this.opts.tutorial) {
+      this.tut = new KitchenTutorial(this.game, this.biz.type, () => this.handEl, (a) => this.tutAction(a));
+      this.spawnCustomer(this.tutorialProduct());
+    }
     // dopo che guida e riquadro "in mano" sono nella pagina (servono per la zona libera)
     requestAnimationFrame(() => {
       this.offLayout = layout.on(() => this.resize());
@@ -672,6 +706,10 @@ export class TruckInterior {
     this.guideEl = null;
     this.handEl?.remove();
     this.handEl = null;
+    this.previewEl?.remove();
+    this.previewEl = null;
+    this.tut?.remove();
+    this.tut = null;
     this.camera.clearViewOffset();
     document.body.classList.remove('guide-on');
     this.offLayout?.();
@@ -679,7 +717,9 @@ export class TruckInterior {
     this.hand = [];
     this.renderHand();
     this.scene.remove(this.player.root);
-    if (this.served) toast(`Turno finito: ${this.served} ordini completati, +€${Math.round(this.earned)}`, 'money');
+    if (this.opts.preview) {
+      if (this.served) toast(`👁️ Prova finita: ${this.served} ordini serviti (incasso di prova €${Math.round(this.earned)}, non guadagnato)`, 'info');
+    } else if (this.served) toast(`Turno finito: ${this.served} ordini completati, +€${Math.round(this.earned)}`, 'money');
   }
 
   /** metà della larghezza inquadrata e distanza della camera */
@@ -750,21 +790,22 @@ export class TruckInterior {
     return this.biz.products.filter((p) => (this.layout.recipes[p]?.level ?? 99) <= this.level && (this.biz.stock[p] ?? 0) > 0);
   }
 
-  private spawnCustomer() {
+  /** `tutorial`: il cliente del tutorial, che ordina un solo prodotto e non ha fretta. */
+  private spawnCustomer(tutorial?: ProductId) {
     const ok = this.makeable();
-    if (this.customers.length >= BUSINESS.MAX_QUEUE || !ok.length) {
-      lostCustomer(this.biz);
+    if (!tutorial && (this.customers.length >= BUSINESS.MAX_QUEUE || !ok.length)) {
+      if (!this.sandbox) lostCustomer(this.biz);
       return;
     }
     // ordini più grandi quando il locale cresce
-    const n = 1 + (Math.random() < 0.3 + 0.1 * this.level ? 1 : 0) + (this.level >= 1 && Math.random() < 0.15 ? 1 : 0);
+    const n = tutorial ? 1 : 1 + (Math.random() < 0.3 + 0.1 * this.level ? 1 : 0) + (this.level >= 1 && Math.random() < 0.15 ? 1 : 0);
     const lines: OrderLine[] = [];
     for (let i = 0; i < n; i++) {
-      let pid = pickProduct(this.game.state, this.biz);
-      if (!ok.includes(pid)) pid = ok[Math.floor(Math.random() * ok.length)];
+      let pid = tutorial ?? pickProduct(this.game.state, this.biz);
+      if (!tutorial && !ok.includes(pid)) pid = ok[Math.floor(Math.random() * ok.length)];
       lines.push({ pid, done: false });
     }
-    const takeaway = this.hasStation('imballo') && Math.random() < 0.3;
+    const takeaway = !tutorial && this.hasStation('imballo') && Math.random() < 0.3;
     const char = new Character(CHAR_MODELS[Math.floor(Math.random() * CHAR_MODELS.length)]);
     char.root.position.set(this.queueBase.x + 4, 0, this.queueBase.z + 5);
     char.root.rotation.y = Math.PI;
@@ -773,9 +814,9 @@ export class TruckInterior {
     char.root.add(bubble);
     this.scene.add(char.root);
     const max = BUSINESS.CUSTOMER_PATIENCE_MIN * (0.8 + 0.45 * n) * (this.biz.type === 'artigianato' ? 1.6 : 1);
-    const c: Customer = { lines, takeaway, patience: max, maxPatience: max, char, bubble, bubbleKey: '', paid: 0 };
+    const c: Customer = { lines, takeaway, patience: max, maxPatience: max, char, bubble, bubbleKey: '', paid: 0, tut: !!tutorial };
     // nel locale grande metà dei clienti (non da asporto) mangia in sala
-    const seat = !takeaway && Math.random() < 0.5 ? this.seats.find((x) => !x.taken) : undefined;
+    const seat = !tutorial && !takeaway && Math.random() < 0.5 ? this.seats.find((x) => !x.taken) : undefined;
     if (seat) {
       seat.taken = c;
       c.table = seat.pos;
@@ -830,19 +871,24 @@ export class TruckInterior {
       const cashierBonus = this.workers.filter((w) => w.emp.role === 'cassa').reduce((a, w) => a + w.emp.kindness * 0.015, 0) +
         (c.table && emp?.role === 'sala' ? 0.2 + emp.kindness * 0.02 : 0);
       const tip = (manual ? 1 + 0.3 * frac : 1 + (emp ? emp.kindness * 0.01 : 0)) + cashierBonus;
-      const amount = recordSale(s, this.biz, it.pid, manual, tip * (it.takeaway ? 1.1 : 1));
+      // anteprima e tutorial: è solo una prova, niente soldi, scorte, esperienza o fama
+      const amount = this.sandbox
+        ? PRODUCTS[it.pid].price * tip * (it.takeaway ? 1.1 : 1)
+        : recordSale(s, this.biz, it.pid, manual, tip * (it.takeaway ? 1.1 : 1));
       c.paid += amount;
       this.earned += amount;
-      if (manual) {
+      if (manual && !this.sandbox) {
         addXp(s, 'clientela', 1);
         missionProgress(s, 'served');
       }
       if (c.lines.every((l) => l.done)) {
         this.served++;
-        if (manual) {
+        if (manual && this.sandbox) toast(`✅ Ordine completo (prova: €${c.paid.toFixed(2).replace('.', ',')} non incassati)`, 'info');
+        else if (manual) {
           addFame(s, 'clientela', 0.1 * c.lines.length);
           toast(`✅ Ordine completo: +€${c.paid.toFixed(2).replace('.', ',')}`, 'money');
         }
+        if (c.tut) this.tutServed = true;
         this.removeCustomer(c, true);
       } else this.refreshBubble(c);
       return;
@@ -935,12 +981,20 @@ export class TruckInterior {
     const s = this.game.state;
     const gm = dt * TIME.GAME_MIN_PER_SEC;
     // all'ora di chiusura, servito l'ultimo cliente, si esce e la porta resta chiusa fino al mattino
-    if (!isOpenHour(s) && !this.customers.length) {
+    if (!isOpenHour(s) && !this.customers.length && !this.opts.preview && !this.tut) {
       toast(`🔒 L'attività ha chiuso: riapre alle ${BUSINESS.OPEN_HOUR}:00`, 'info');
       this.game.exitTruck();
       return;
     }
-    if (isOpenHour(s)) {
+    if (this.tut) {
+      // nel tutorial c'è solo il suo cliente
+    } else if (this.opts.preview) {
+      this.spawnAcc += Math.max(dt / PREVIEW_SPAWN_SEC, (totalDemand(s, this.biz) * gm) / 60);
+      while (this.spawnAcc >= 1) {
+        this.spawnAcc -= 1;
+        this.spawnCustomer();
+      }
+    } else if (isOpenHour(s)) {
       this.spawnAcc += (totalDemand(s, this.biz) * gm) / 60;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
@@ -953,16 +1007,19 @@ export class TruckInterior {
     this.updateWorkers(dt, gm);
     this.updatePlayer(dt);
     this.placeCamera();
-    if (this.biz.autoRestock) restock(s, this.biz);
+    if (this.biz.autoRestock && !this.sandbox) restock(s, this.biz);
     this.uiT += dt;
     if (this.uiT > 0.2) {
       this.uiT = 0;
       this.renderPass();
       this.updateGuide();
       this.updateHandBadge();
+      this.updatePreviewBar();
+      this.placeHandBadge();
       this.refitIfNeeded();
     }
     this.updateTags();
+    if (this.tut) this.tut.update(this.tutStep());
     // linea verso la prossima postazione (davanti al mobile, dove ci si ferma)
     const next = this.nextStation();
     this.guide.update(dt, this.player.root.position, next ? this.nextRing.position : null, 0.4);
@@ -970,6 +1027,8 @@ export class TruckInterior {
 
   /** I prodotti pronti (in mano o sul ripiano) si raffreddano col tempo. */
   private coolDown(dt: number) {
+    // nel tutorial il tempo è fermo: i prodotti non si raffreddano
+    if (this.tut) return;
     for (const it of [...this.pass, ...this.hand]) {
       if (!this.finished(it) || it.warm === undefined) continue;
       const was = it.warm > 0;
@@ -994,13 +1053,15 @@ export class TruckInterior {
       } else c.char.play('idle');
       c.char.root.rotation.y = Math.PI;
       c.char.update(dt);
-      c.patience -= gm;
+      if (!c.tut) c.patience -= gm;
       this.refreshBubble(c);
       const f = Math.max(0, c.patience / c.maxPatience);
       (c.bubble.material as THREE.SpriteMaterial).color.setRGB(1, 0.55 + 0.45 * f, 0.55 + 0.45 * f);
       if (c.patience <= 0) {
-        lostCustomer(this.biz);
-        addFame(this.game.state, 'clientela', -0.2);
+        if (!this.sandbox) {
+          lostCustomer(this.biz);
+          addFame(this.game.state, 'clientela', -0.2);
+        }
         this.removeCustomer(c, false);
       }
     });
@@ -1016,6 +1077,8 @@ export class TruckInterior {
       for (const sl of st.slots) {
         if (!sl.item) continue;
         sl.p += (dt * speed) / ((st.def.sec ?? 3) * SLOW);
+        // nel tutorial non brucia niente
+        if (this.tut) sl.p = Math.min(sl.p, 1.1);
         const state = sl.p >= BURN ? 'burnt' : sl.p >= 1 ? 'ready' : 'cook';
         // fumo mentre cuoce: grigio scuro se sta bruciando
         if (puff) this.fx.emit('smoke', st.pos.clone().setY(1.2), 1, state === 'burnt' ? 0x444444 : state === 'ready' ? 0xfff3c4 : undefined);
@@ -1041,6 +1104,8 @@ export class TruckInterior {
   private updateWorkers(dt: number, _gm: number) {
     for (const w of this.workers) {
       w.char.update(dt);
+      // nel tutorial lavori solo tu: i dipendenti aspettano
+      if (this.tut) continue;
       if (w.emp.role === 'cucina') this.updateCook(w, dt);
       else if (w.emp.role === 'cassa' || w.emp.role === 'sala') this.updateServer(w, dt);
       else if (w.emp.role === 'magazzino') this.updateStocker(w, dt);
@@ -1372,6 +1437,7 @@ export class TruckInterior {
     } else if (this.player.currentName === 'walk') this.player.play('idle');
 
     if (Math.hypot(p.x - this.door.x, p.z - this.door.z) < 0.9) {
+      this.nearSt = null;
       g.ui.setAction({ label: 'Esci', icon: '🚪' });
       if (input.consumeAction()) g.exitTruck();
       return;
@@ -1387,6 +1453,7 @@ export class TruckInterior {
       }
     }
     for (const st of this.stations) if (st !== best) st.hold = 0;
+    this.nearSt = best;
     if (!best) {
       g.ui.setAction(null);
       return;
@@ -1469,7 +1536,7 @@ export class TruckInterior {
             st.hold = 0;
             it.step++;
             this.markReady(it);
-            addXp(this.game.state, skill, 1);
+            if (!this.sandbox) addXp(this.game.state, skill, 1);
             this.renderHand();
             if (todo.length === 1) this.player.play('idle');
           }
@@ -1496,7 +1563,7 @@ export class TruckInterior {
                 r.step++;
                 this.markReady(r);
                 hand.push(r);
-                addXp(this.game.state, skill, 2);
+                if (!this.sandbox) addXp(this.game.state, skill, 2);
               }
               sl.item = null;
               sl.bar.visible = sl.fill.visible = false;
@@ -1595,6 +1662,108 @@ export class TruckInterior {
         return { label: cold.length ? `Butta ${cold.length > 1 ? `${cold.length} freddi` : 'il freddo'}` : `Butta ${PRODUCTS[out[0].pid].name}`, icon: d.icon };
       }
     }
+  }
+
+  // ---------------- anteprima e tutorial ----------------
+
+  /** Anteprima o tutorial in corso: è solo una prova (niente soldi, scorte, esperienza, fama). */
+  private get sandbox() {
+    return !!this.opts.preview || !!this.tut;
+  }
+  private previewEl: HTMLDivElement | null = null;
+  private previewHtml = '';
+  /** in anteprima si è comprata la miglioria (o assunto il dipendente) */
+  bought = false;
+  private tut: KitchenTutorial | null = null;
+  private tutStage: TutStep['stage'] = 'intro';
+  private tutServed = false;
+  /** postazione accanto al giocatore (quella del pulsante giallo) */
+  private nearSt: Station | null = null;
+
+  get tutorialOn() {
+    return !!this.tut;
+  }
+
+  private buildPreviewBar(p: PreviewOpts) {
+    const el = document.createElement('div');
+    el.className = 'preview-bar';
+    el.addEventListener('click', (e) => {
+      const a = (e.target as HTMLElement).closest('[data-pv]')?.getAttribute('data-pv');
+      if (a === 'exit') this.game.exitTruck();
+      else if (a === 'buy' && !p.blocked() && p.buy()) {
+        this.bought = true;
+        this.game.exitTruck();
+      }
+    });
+    document.body.appendChild(el);
+    this.previewEl = el;
+    this.previewHtml = '';
+    this.updatePreviewBar();
+  }
+
+  /** Riquadro in alto dell'anteprima: cosa si prova, quanti ordini serviti, Compra / Esci. */
+  private updatePreviewBar() {
+    const p = this.opts.preview;
+    if (!p || !this.previewEl) return;
+    const why = p.blocked();
+    const html = `<div class="pv-head"><span class="pv-tag">👁️ PROVA</span> ${p.what}</div>
+      <div class="pv-sub">Gratis: non guadagni e non spendi niente${this.served ? ` · ${this.served} ordini serviti` : ''}</div>
+      <div class="pv-btns"><button class="btn sm sec" data-pv="exit">✖ Esci</button><button class="btn sm good" data-pv="buy" ${why ? 'disabled' : ''}>${why ?? `✅ ${p.buyLabel}`}</button></div>`;
+    if (html === this.previewHtml) return;
+    this.previewHtml = html;
+    this.previewEl.innerHTML = html;
+    this.placeHandBadge();
+  }
+
+  /** Prodotto del cliente del tutorial: se c'è, uno che passa dal fuoco e da un banco. */
+  private tutorialProduct(): ProductId {
+    const ok = this.biz.products.filter((p) => (this.layout.recipes[p]?.level ?? 99) <= this.level);
+    const kinds = (p: ProductId) => (this.layout.recipes[p]?.steps ?? []).map((id) => this.stationDef(id)?.kind);
+    return ok.find((p) => kinds(p).includes('timed') && kinds(p).includes('hold')) ?? ok.find((p) => kinds(p).includes('timed')) ??
+      ok[0] ?? (Object.keys(this.layout.recipes) as ProductId[])[0];
+  }
+
+  /** Cosa deve fare adesso il giocatore nel tutorial (lo traduce in testo KitchenTutorial). */
+  private tutStep(): TutStep {
+    if (this.tutStage === 'play' && this.tutServed) this.tutStage = 'tips';
+    const c = this.customers.find((x) => x.tut);
+    const pid = c?.lines[0].pid ?? this.tutorialProduct();
+    const counter = this.stationOf('counter')!.def;
+    const one = `${PRODUCTS[pid].icon} ${(SINGULAR[pid] ?? [PRODUCTS[pid].name])[0]}`;
+    const base = { stage: this.tutStage, one, counter, near: false, status: 'idle' as TutStep['status'], station: null as StationDef | null };
+    if (this.tutStage !== 'play') return base;
+    const next = this.nextStation();
+    let st = next;
+    let status: TutStep['status'];
+    if (!next) {
+      st = this.stations.find((s) => s.slots.some((sl) => sl.item)) ?? null;
+      status = st ? 'wait' : 'idle';
+    } else if (next.def.kind === 'source') status = 'get';
+    else if (next.def.kind === 'timed') status = this.hand.some((x) => !this.finished(x) && this.recipe(x)[x.step] === next.def.id) ? 'put' : 'take';
+    else if (next.def.kind === 'hold') status = 'work';
+    else if (next.def.kind === 'counter') status = 'serve';
+    else status = next.def.kind === 'bin' ? 'bin' : 'pass';
+    return { ...base, status, station: st?.def ?? null, near: !!st && this.nearSt === st };
+  }
+
+  private tutAction(a: 'next' | 'skip') {
+    if (a === 'skip' || this.tutStage === 'go') {
+      this.finishTutorial();
+      return;
+    }
+    this.tutStage = this.tutStage === 'intro' ? 'play' : this.tutStage === 'tips' ? 'go' : this.tutStage;
+  }
+
+  /** Fine del tutorial (o saltato): non si ripropone più per questo tipo di attività, e si apre davvero. */
+  private finishTutorial() {
+    const s = this.game.state;
+    s.bizTutorials = [...new Set([...(s.bizTutorials ?? []), this.biz.type])];
+    for (const c of this.customers) c.tut = false;
+    this.tut?.remove();
+    this.tut = null;
+    this.spawnAcc = 0;
+    this.game.save();
+    toast(isOpenHour(s) ? '🟢 Si apre! Arrivano i clienti' : '🔒 È l\'ora di chiusura: i clienti tornano domattina', 'info');
   }
 
   /** info per l'HUD */

@@ -1,5 +1,5 @@
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType } from '../config/business';
+import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -33,6 +33,9 @@ import {
 
 
 type Actions = Record<string, (arg: string) => void>;
+
+/** Migliorie che cambiano la cucina e si possono provare prima di comprarle. */
+const PREVIEW_UPGRADES: UpgradeId[] = ['ampliamento', 'fuochi', 'banco', 'ripiano', 'attrezzatura'];
 
 interface Panel {
   render: () => string;
@@ -794,6 +797,8 @@ export class UI {
           buyUpgrade(s, b(), id as never);
           this.game.setupLot(b().lotId);
         },
+        previewUpg: (id) => this.previewUpgrade(b(), id as UpgradeId),
+        previewHire: (id) => this.previewHire(b(), +id),
         exec: (id) => {
           const o = b().orders.find((x) => x.id === +id);
           if (!o) return;
@@ -907,7 +912,7 @@ export class UI {
       const cands = s.candidates
         .filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role) ||
           (hasInterior(b.type) && EXTRA_ROLES.some((x) => x.role === e.role)))
-        .map((e) => this.empCard(e, b.type, `<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button>`))
+        .map((e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`))
         .join('');
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
         <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${EXTRA_ROLES.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>${upg(b, 'ampliamento') < x.level ? ` (dall'ampliamento ${x.level})` : ''}: ${x.desc}`).join('<br>')}</div>` : ''}
@@ -924,10 +929,60 @@ export class UI {
       const noRoom = (id === 'fuochi' || id === 'banco') && hasInterior(b.type) &&
         extraRoom(b.type, Math.min(2, upg(b, 'ampliamento')), upg(b, 'fuochi'), upg(b, 'banco')) <= 0;
       const maxed = lvl >= u.max;
+      const buyBtn = `<button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || (!noRoom && s.money < cost) ? 'disabled' : ''}>${maxed ? 'Massimo' : noRoom ? `📏 Niente spazio sul muro: amplia prima ${b.type === 'foodtruck' ? 'il furgone' : 'il locale'}` : 'Migliora · ' + euro(cost)}</button>`;
+      // prova gratis prima di comprare (solo le migliorie che cambiano la cucina)
+      const canTry = hasInterior(b.type) && PREVIEW_UPGRADES.includes(id) && !maxed && !noRoom;
       return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
         <p class="muted small" style="margin:0 0 8px">${u.desc}${id === 'ampliamento' && !maxed ? `<br><b style="color:var(--ink)">Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b>` : ''}</p>
-        <button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || (!noRoom && s.money < cost) ? 'disabled' : ''}>${maxed ? 'Massimo' : noRoom ? `📏 Niente spazio sul muro: amplia prima ${b.type === 'foodtruck' ? 'il furgone' : 'il locale'}` : 'Migliora · ' + euro(cost)}</button></div>`;
+        ${canTry ? `<div class="btnrow upg-btns"><button class="btn sm purple" data-a="previewUpg:${id}">👁️ Prova</button>${buyBtn}</div>` : buyBtn}</div>`;
     }).join('');
+  }
+
+  /** Prova gratis di una miglioria: una copia del locale con un livello in più. */
+  private previewUpgrade(b: Business, id: UpgradeId) {
+    const s = this.s;
+    const u = UPGRADES[id];
+    const lvl = upg(b, id);
+    const cur = () => s.businesses.find((x) => x.id === b.id);
+    this.game.previewBusiness(b.id, (c) => {
+      c.upgrades[id] = lvl + 1;
+      // l'ampliamento sblocca prodotti nuovi: nella prova i clienti li ordinano già
+      if (id === 'ampliamento' && hasInterior(c.type)) {
+        const lay = LAYOUTS[c.type];
+        for (const p of Object.keys(lay.recipes) as ProductId[]) if (lay.recipes[p]!.level === lvl + 1 && !c.products.includes(p)) c.products.push(p);
+      }
+    }, {
+      what: `${u.icon} ${u.name} · Liv. ${lvl + 1}`,
+      buyLabel: `Compra · ${euro(u.cost(lvl))}`,
+      blocked: () => {
+        const c = cur();
+        if (!c || upg(c, id) !== lvl) return 'Già comprato';
+        return s.money < u.cost(lvl) ? `Mancano ${euro(u.cost(lvl) - s.money)}` : null;
+      },
+      buy: () => {
+        const c = cur();
+        return !!c && buyUpgrade(s, c, id);
+      },
+    }, 'migliorie');
+  }
+
+  /** Prova gratis di un candidato: lavora nella copia del locale insieme allo staff attuale. */
+  private previewHire(b: Business, candId: number) {
+    const s = this.s;
+    const e = s.candidates.find((x) => x.id === candId);
+    if (!e) return;
+    this.game.previewBusiness(b.id, (c) => c.staff.push({ ...e }), {
+      what: `${ROLES[e.role].icon} ${esc(e.name)} · ${roleName(b.type, e.role)} · ${euro(e.salary)}/mese`,
+      buyLabel: 'Assumi',
+      blocked: () => (s.candidates.some((x) => x.id === candId) ? null : 'Non più disponibile'),
+      buy: () => {
+        const c = s.businesses.find((x) => x.id === b.id);
+        if (!c) return false;
+        const n = c.staff.length;
+        hire(s, c, candId);
+        return c.staff.length > n;
+      },
+    }, 'personale');
   }
 
   /** Cosa aggiunge un livello di ampliamento: postazioni e prodotti. */

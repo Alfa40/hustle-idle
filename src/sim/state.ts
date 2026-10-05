@@ -121,6 +121,8 @@ export interface GameState {
   ws?: number;
   /** lavoretti di cui è stato completato il tutorial */
   jobTutorials?: JobType[];
+  /** tipi di attività (con interno) di cui si è già visto il tutorial della cucina */
+  bizTutorials?: BusinessType[];
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
   lastRide?: VehicleId;
   orderSeq: number;

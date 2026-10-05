@@ -736,12 +736,12 @@ body.is-landscape .hud-drop { grid-template-columns: repeat(3, var(--btn)); }
 body.is-landscape .ride-btn { right: calc(var(--sar) + var(--act) + 26px); bottom: calc(var(--sab) + 26px); }
 
 /* riquadri in alto a sinistra: non arrivano mai sotto la colonna di destra */
-.jobbar, .guide, .hand-badge {
+.jobbar, .guide, .hand-badge, .preview-bar {
   /* non arrivano sotto la minimappa né sotto la colonna dei pulsanti */
   width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 18px); max-width: 460px;
 }
 /* orizzontale: pannello laterale a sinistra (la scena resta al centro) */
-body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge { width: min(360px, 40vw); }
+body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge, body.is-landscape .preview-bar { width: min(360px, 40vw); }
 body.is-landscape .guide { max-height: calc(60vh - var(--sat)); overflow: hidden; }
 body.is-landscape.is-short .guide { font-size: 13px; padding: 6px 8px; }
 body.is-landscape.is-short .hb-slot { min-height: 20px; font-size: 12px; }
@@ -781,3 +781,31 @@ body.is-landscape .lg-pick p { margin: 4px 0 8px; }
 body.is-landscape .lg-photo-big { width: 110px; height: 110px; }
 body.is-landscape.is-short .lg-side .lg-h { margin-top: 6px; }
 body.is-landscape.is-short .lg-side .lb-input { padding: 8px 12px; font-size: 16px; }
+
+/* ---------- tutorial della cucina (prima volta in un tipo di attività) ---------- */
+.biz-tut .tut-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.biz-tut button { pointer-events: auto; }
+.tut-skip { border: 0; background: #efe6f9; color: #8e5bd6; font: inherit; font-weight: 800; font-size: 11px; border-radius: 8px; padding: 3px 8px; text-transform: none; }
+.biz-tut .tut-body ul { margin: 4px 0 2px; padding-left: 18px; }
+.biz-tut .tut-body li { margin: 2px 0; }
+.tut-legend { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.tut-legend span { font-size: 12px; font-weight: 800; background: #f5f1fb; border-radius: 8px; padding: 2px 7px; }
+.tut-btns { display: flex; justify-content: flex-end; margin-top: 6px; }
+body.is-landscape.is-short .biz-tut .tut-body { font-size: 13px; }
+
+/* ---------- anteprima di migliorie e dipendenti ---------- */
+.preview-bar {
+  position: fixed; top: var(--sat); left: var(--sal); z-index: 19; box-sizing: border-box;
+  background: #fff; border: 3px solid #8e5bd6; border-radius: 16px; padding: 6px 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.22); color: var(--ink);
+}
+.pv-head { font-size: 14px; font-weight: 800; line-height: 1.2; }
+.pv-tag { background: #8e5bd6; color: #fff; border-radius: 8px; padding: 1px 7px; font-size: 12px; margin-right: 2px; }
+.pv-sub { font-size: 12px; color: var(--muted, #777); font-weight: 600; margin-top: 2px; }
+.pv-btns { display: flex; gap: 6px; margin-top: 6px; }
+.pv-btns .btn { min-height: 34px; padding: 5px 10px; }
+.pv-btns .btn.good { flex: 1; }
+.upg-btns { margin-top: 0; }
+.upg-btns .btn.purple { flex: 0 0 auto; }
+.emp-btns { gap: 6px; flex-wrap: nowrap; }
+.emp-btns .btn { white-space: nowrap; }
