@@ -937,6 +937,8 @@ export class Game {
   /** stelle 0 = fallito */
   finishJob(stars: number) {
     const s = this.state;
+    // col tutorial il lavoretto non è pagato (si guadagna solo esperienza)
+    const tutorial = this.tutorial.active;
     this.tutorial.finish(stars);
     this.exitHouse();
     this.run?.dispose();
@@ -955,7 +957,7 @@ export class Game {
     let fame = 0;
     if (stars > 0) {
       this.fx.emit('spark', this.player.root.position.clone().setY(1.2), 14);
-      pay = Math.round(offer.pay * JOB.STAR_PAY[stars]);
+      pay = tutorial ? 0 : Math.round(offer.pay * JOB.STAR_PAY[stars]);
       xp = Math.round(def.xp * (1 + 0.1 * offer.level) * (0.6 + stars * 0.25));
       fame = def.fame * (stars / 2);
       addMoney(s, pay);

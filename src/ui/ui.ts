@@ -485,7 +485,7 @@ export class UI {
         </div>
         <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
           <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>
-        <p class="muted small center" style="margin:10px 0 0">${tut ? 'Con il tutorial prendi sempre ⭐⭐⭐' : 'Più sei veloce, più stelle prendi ⭐'}</p>
+        <p class="muted small center" style="margin:10px 0 0">${tut ? '🎓 Col tutorial il lavoretto non è pagato: guadagni solo esperienza' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
         tut: () => (tut = !tut),
