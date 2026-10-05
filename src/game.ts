@@ -937,7 +937,7 @@ export class Game {
   /** stelle 0 = fallito */
   finishJob(stars: number) {
     const s = this.state;
-    // col tutorial il lavoretto non è pagato (si guadagna solo esperienza)
+    // col tutorial il lavoretto è solo una prova: niente ricompense e l'offerta resta lì
     const tutorial = this.tutorial.active;
     this.tutorial.finish(stars);
     this.exitHouse();
@@ -952,12 +952,23 @@ export class Game {
     const offer = this.runOffer!;
     this.runOffer = null;
     const def = JOBS[offer.type];
+    if (tutorial) {
+      // il cliente torna al suo posto: il lavoretto si può fare subito "sul serio"
+      const npc = this.npcs.get(offer.id);
+      if (npc) npc.char.root.visible = true;
+      this.player.hold();
+      this.player.play('idle');
+      if (stars > 0) this.ui.openTutorialDone(offer);
+      else toast('🎓 Tutorial interrotto: il lavoretto è ancora disponibile', 'info');
+      this.save();
+      return;
+    }
     let pay = 0;
     let xp = 0;
     let fame = 0;
     if (stars > 0) {
       this.fx.emit('spark', this.player.root.position.clone().setY(1.2), 14);
-      pay = tutorial ? 0 : Math.round(offer.pay * JOB.STAR_PAY[stars]);
+      pay = Math.round(offer.pay * JOB.STAR_PAY[stars]);
       xp = Math.round(def.xp * (1 + 0.1 * offer.level) * (0.6 + stars * 0.25));
       fame = def.fame * (stars / 2);
       addMoney(s, pay);

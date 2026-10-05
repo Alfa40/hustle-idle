@@ -485,7 +485,7 @@ export class UI {
         </div>
         <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
           <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>
-        <p class="muted small center" style="margin:10px 0 0">${tut ? '🎓 Col tutorial il lavoretto non è pagato: guadagni solo esperienza' : 'Più sei veloce, più stelle prendi ⭐'}</p>
+        <p class="muted small center" style="margin:10px 0 0">${tut ? '🎓 Il tutorial è una prova: niente soldi né esperienza, ma il lavoretto resta disponibile per farlo sul serio' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
         tut: () => (tut = !tut),
@@ -494,6 +494,26 @@ export class UI {
           this.game.startJob(offer, tut);
         },
         no: () => this.close(),
+      },
+    });
+  }
+
+  /** Fine del tutorial: nessuna ricompensa, il lavoretto resta da fare (la scheda si riapre da qui). */
+  openTutorialDone(offer: JobOffer) {
+    const def = JOBS[offer.type];
+    this.open({
+      title: '🎓 Tutorial completato!',
+      small: true,
+      color: 'var(--purple)',
+      render: () => `<div class="card hero tint"><div class="emoji">${def.icon}</div><div class="big">Ora sai come si fa</div></div>
+        <p class="muted center">Il tutorial era una prova: niente soldi né esperienza. Il lavoretto <b>${def.name}</b> è ancora disponibile: fallo sul serio per essere pagato, più sei veloce più stelle prendi ⭐</p>
+        <div class="btnrow"><button class="btn sec" data-a="later">Più tardi</button><button class="btn good" data-a="go">▶ Fallo adesso</button></div>`,
+      actions: {
+        later: () => this.close(),
+        go: () => {
+          this.close();
+          this.game.startJob(offer, false);
+        },
       },
     });
   }

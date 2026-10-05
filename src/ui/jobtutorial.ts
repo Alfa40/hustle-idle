@@ -89,7 +89,6 @@ export class JobTutorial {
     if (stars > 0) {
       const s = this.game.state;
       s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), this.type])];
-      toast('🎓 Tutorial completato! La prossima volta il lavoretto è pagato e conta il tempo', 'good');
     }
     this.run = null;
     this.type = null;
