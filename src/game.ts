@@ -29,7 +29,8 @@ import { GuideLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS } from './world/interior';
-import { carWashJob, dishJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
@@ -127,7 +128,8 @@ export class Game {
   player!: Character;
   interior: TruckInterior | null = null;
   /** casa del cliente in cui si sta facendo un servizio (pulizie, trasloco) */
-  house: ClientHouse | null = null;
+  /** scena al chiuso di un lavoro: casa del cliente o cucina del ristorante */
+  house: ClientHouse | DishKitchen | null = null;
   private houseDoor = new THREE.Vector3();
   playerMarker?: THREE.Sprite;
 
@@ -220,7 +222,7 @@ export class Game {
   async init(onProgress: (f: number) => void) {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
-      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
+      ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...KITCHEN_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
       'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model ? [p.model] : [])),
       'furniture/cardboardBoxClosed.glb',
     ];
@@ -863,7 +865,12 @@ export class Game {
       case 'giardino': this.run = gardenJob(this, lv, slot, title); break;
       case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
       case 'volantini': this.run = routeJob(this, lv, slot, title, 'flyer'); break;
-      case 'piatti': this.run = dishJob(this, lv, slot, title); break;
+      case 'piatti': {
+        // si va al ristorante (chiuso) e si lavora nella sua cucina
+        const run: VisitRun = new VisitRun(this, lv, slot, title, () => this.enterKitchen(lv, slot.pos, run), 'al ristorante', 'Entra in cucina');
+        this.run = run;
+        break;
+      }
       case 'lavaggio': this.run = carWashJob(this, lv, slot, title); break;
       case 'imbianchino': this.run = paintJob(this, lv, slot, title); break;
     }
@@ -910,6 +917,27 @@ export class Game {
       done: (stars) => this.finishJob(stars),
     }, this.state.businesses.find((b) => b.id === this.runOrder?.bizId)?.staff ?? []);
     this.house.enter(this.player);
+    run.target = undefined;
+  }
+
+  /** Lavapiatti: la cucina del ristorante chiuso. */
+  private enterKitchen(level: number, door: THREE.Vector3, run: VisitRun) {
+    this.dismount();
+    this.houseDoor.copy(door);
+    this.scene.remove(this.player.root);
+    this.view.reset();
+    const k = new DishKitchen(this, level, {
+      status: (left, total, text) => {
+        run.timeLeft = left;
+        run.timeTotal = total;
+        run.status = text;
+      },
+      done: (stars) => this.finishJob(stars),
+      frozen: () => !!run.frozen,
+    });
+    this.house = k;
+    k.enter(this.player);
+    run.indoorGuide = () => k.guide();
     run.target = undefined;
   }
 

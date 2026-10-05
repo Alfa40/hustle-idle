@@ -19,33 +19,36 @@ const TIPS: Record<JobType, string[] | null> = {
     'Svuota il sacco di foglie nel <b>bidone verde</b>',
   ],
   consegna: [
-    'Carica i <b>pacchi</b> dalla pila davanti al negozio',
+    'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
     'Porta un pacco a ogni <b>cassetta gialla</b>: segui le frecce, l\'ordine lo scegli tu. Con un veicolo fai prima!',
-    'Hai consegnato tutto: torna in negozio a <b>firmare la ricevuta</b>',
+    'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [
-    'Prendi i <b>volantini</b> dall\'espositore giallo',
-    'Imbuca un volantino in ogni <b>cassetta blu</b> segnata: sono vicine, corri!',
-    'Torna in negozio per la <b>ricevuta</b>',
+    'Prendi i <b>giornali</b> all\'<b>edicola</b> (il chiosco verde)',
+    'Imbuca un giornale in ogni <b>cassetta blu</b> segnata: sono vicine, corri!',
+    'Torna all\'edicola per la <b>ricevuta</b>',
   ],
   lavaggio: [
-    'Prendi il <b>secchio</b> con la spugna',
-    '<b>Insapona</b> tutti e 4 i lati dell\'auto',
-    'Prendi la <b>canna dell\'acqua</b>',
-    '<b>Risciacqua</b> tutti e 4 i lati',
+    'Prendi lo <b>spruzzino del sapone</b> (la tanica rosa)',
+    '<b>Spruzza il sapone</b> su tutti e 4 i lati dell\'auto',
+    'Prendi la <b>canna dell\'acqua</b> dall\'avvolgitubo verde',
+    'Fai il <b>giro dell\'auto</b> e sciacquala tutta, un lato dopo l\'altro',
+    'Prendi lo <b>straccio</b> dal secchio blu',
+    '<b>Asciuga</b> tutti e 4 i lati finché l\'auto brilla',
   ],
   imbianchino: [
-    'Prima proteggi le piante: <b>coprile con i teli</b>',
-    'Prendi il <b>barattolo di vernice</b>',
-    '<b>Dipingi</b> ogni tratto del muretto',
-    'Lavoro finito: <b>togli i teli</b> dalle piante',
+    'Prima proteggi il giardino: copri ogni cosa (cespugli, aiuole, giochi…) con un <b>telone</b>',
+    'Prendi la <b>vernice</b> (i barattoli vicino al cancello)',
+    '<b>Dipingi</b> ogni tratto del muretto di recinzione',
+    'Lavoro finito: <b>togli i teloni</b>',
   ],
   piatti: null,
 };
 
 /** Per il lavapiatti: cosa vuol dire ogni punto (prendi → lava → appoggia, per ogni tavolo). */
 const PIATTI: Record<string, string> = {
-  'Prendi i piatti sporchi': 'Prendi i <b>piatti sporchi</b> dal tavolo',
+  'Entra in cucina': 'Vai al <b>ristorante</b> (ha chiuso) ed <b>entra in cucina</b>',
+  'Prendi i piatti sporchi': 'Prendi una pila di <b>piatti sporchi</b> dal carrello',
   'Lava i piatti': 'Lavali al <b>lavello</b>',
   'Appoggia sullo scolapiatti': 'Appoggiali sullo <b>scolapiatti</b> ad asciugare',
 };

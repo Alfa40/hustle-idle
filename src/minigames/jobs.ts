@@ -4,7 +4,8 @@ import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
 import type { ParticleKind } from '../world/particles';
-import { arrow, boxProp, bush, cone, cylProp, flyerStand, foam, label, leafPile, mailbox, plateStack, ring, trimmedBush } from '../world/props';
+import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
+import { bigPlanter, fencePillar, fenceSegment, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
 export interface JobRun {
   title: string;
@@ -124,6 +125,8 @@ export interface Task {
   onProgress?: (p: number) => void;
   done?: boolean;
   progress?: number;
+  /** dove mettere l'indicatore se sopra il punto coprirebbe un oggetto grande (edicola, negozio…) */
+  markerAt?: THREE.Vector3;
 }
 
 export interface Phase {
@@ -279,10 +282,26 @@ export class PhasedRun extends BaseRun {
     for (const t of this.tasks) {
       this.addGlow(t);
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
-      m.position.set(t.pos.x, 2.3, t.pos.z);
+      // l'indicatore sta sopra l'oggetto più alto lì vicino (mai sovrapposto a cassette, giochi…)
+      const mp = t.markerAt ?? t.pos;
+      m.userData.baseY = this.markerY({ ...t, pos: mp });
+      m.position.set(mp.x, m.userData.baseY, mp.z);
       this.game.scene.add(m);
       this.markers.set(t, m);
     }
+  }
+
+  /** Altezza dell'indicatore: sopra gli oggetti di scena entro 1,1 m dal punto. */
+  private markerY(t: Task) {
+    let top = 0;
+    const box = new THREE.Box3();
+    for (const o of this.objs) {
+      if ((o as THREE.Sprite).isSprite || o.userData.noGlow || !o.visible) continue;
+      if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.1) continue;
+      box.setFromObject(o);
+      if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
+    }
+    return Math.max(2.3, top + 0.75);
   }
 
   private pending() {
@@ -325,7 +344,7 @@ export class PhasedRun extends BaseRun {
     const t0 = performance.now() / 250;
     for (const [t, m] of this.markers) {
       m.visible = !t.done && pend.includes(t);
-      m.position.y = 2.3 + Math.sin(t0 + t.pos.x) * 0.12;
+      m.position.y = (m.userData.baseY ?? 2.3) + Math.sin(t0 + t.pos.x) * 0.12;
     }
     let near: Task | null = null;
     let nd = Infinity;
@@ -501,8 +520,9 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
     },
   ];
   run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, 3.1, 2.95), time: n * 5 + 16, keep: slot.center });
-  run.prop(boxProp(0.7, 0.45, 0.45, 0xd32f2f), box);
-  run.prop(cylProp(0.35, 1, 0x2e7d32), bin);
+  const [gx, gz] = DIR_VEC[slot.dir];
+  run.prop(toolbox(), box, Math.atan2(gx, gz), 1);
+  run.prop(wheelieBin(), bin, Math.atan2(gx, gz), 1);
   for (const pos of spots) bushes.push(run.prop(bush(), pos));
   return run;
 }
@@ -528,184 +548,237 @@ export function routeJob(game: Game, level: number, start: Slot, title: string, 
     b.position.x = -0.23;
     return b;
   };
+  // pila di giornali piegati (quella che si porta in mano)
+  const papers = () => {
+    const g = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.26), new THREE.MeshLambertMaterial({ color: i % 2 ? 0xf5f0e1 : 0xffffff }));
+      p.position.y = i * 0.06;
+      p.rotation.y = (i - 1.5) * 0.08;
+      g.add(p);
+    }
+    return g;
+  };
+  const face = (s: Slot) => Math.atan2(DIR_VEC[s.dir][0], DIR_VEC[s.dir][1]);
+  const at = frame(start);
+  // il punto di ritiro è una vera attività sul marciapiede, accanto a chi ti dà il lavoro
+  const shopPos = at(start.pos, 0.15, 1.9);
+  const counter = at(start.pos, 1.15, 1.9);
+  // l'indicatore del ritiro sta accanto al chiosco (sopra coprirebbe l'insegna)
+  const counterMark = at(start.pos, 1.0, 0.1);
+  // la cassetta di ogni indirizzo sta accanto al vialetto, verso la strada
+  const boxes = stops.map((s) => ({ s, pos: frame(s)(s.pos, 0.55, 1.05) }));
+  const front = (b: { s: Slot; pos: THREE.Vector3 }) => frame(b.s)(b.pos, 0.55, 0);
   const phases: Phase[] = [
     {
-      name: flyer ? 'Prendi i volantini' : 'Carica i pacchi', icon: flyer ? '📰' : '📦',
-      tasks: () => [{ pos: start.pos, kind: 'tap', label: flyer ? 'Prendi i volantini' : 'Carica i pacchi', icon: flyer ? '📰' : '📦', onDone: () => hold(game, flyer ? boxProp(0.3, 0.1, 0.4, 0xffffff) : box()) }],
+      name: flyer ? 'Prendi i giornali all\'edicola' : 'Ritira i pacchi al negozio', icon: flyer ? '📰' : '📦',
+      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', onDone: () => hold(game, flyer ? papers() : box()) }],
     },
     {
-      name: flyer ? 'Imbuca in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
-      tasks: () => stops.map((s) => ({ pos: s.pos, kind: 'tap' as const, label: flyer ? 'Imbuca il volantino' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
+      name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
+      tasks: () => boxes.map((b) => ({ pos: front(b), kind: 'tap' as const, label: flyer ? 'Imbuca il giornale' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
     },
     {
-      name: 'Torna in negozio per la ricevuta', icon: '🧾',
-      tasks: () => [{ pos: start.pos, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', onDone: () => hold(game) }],
+      name: flyer ? 'Torna all\'edicola per la ricevuta' : 'Torna al negozio per la ricevuta', icon: '🧾',
+      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', onDone: () => hold(game) }],
     },
   ];
   const run = new PhasedRun(game, level, title, phases, { time: (dist / 5.2) * (flyer ? 1.35 : 1.45) + 6 + n * 2 });
-  // al negozio: espositore dei volantini o pila di pacchi, accanto a chi ti dà il lavoro
-  const face = (s: Slot) => Math.atan2(DIR_VEC[s.dir][0], DIR_VEC[s.dir][1]);
-  const at = frame(start);
-  if (flyer) run.prop(flyerStand(), at(start.pos, 0.1, 0.8), face(start), 0.85);
-  else {
-    const pile = new THREE.Group();
-    [[0, 0, 0], [0.42, 0, 0.05], [0.2, 0.4, 0.02]].forEach(([x, y, z]) => {
-      const b = box();
-      b.position.set(x - 0.2, y, z);
-      pile.add(b);
-    });
-    run.prop(pile, at(start.pos, 0.1, 0.8), face(start), 0.9);
-  }
-  // a ogni indirizzo una cassetta della posta su palo accanto alla porta
-  for (const s of stops) run.prop(mailbox(flyer ? 0x2d9cdb : 0xffc21a), frame(s)(s.pos, 0.1, 0.7), face(s), 0.9);
+  run.prop(flyer ? newsstand() : parcelShop(), shopPos, face(start), 1);
+  // cassette della posta: blu per i giornali, gialle per i pacchi
+  for (const b of boxes) run.prop(postbox(flyer ? 0x2d6cdb : 0xffc21a), b.pos, face(b.s), 1);
   return run;
 }
 
-/** Lavapiatti: per ogni tavolo prendi i piatti sporchi → lava al lavello → appoggia sullo scolapiatti. */
-export function dishJob(game: Game, level: number, slot: Slot, title: string) {
-  const at = frame(slot);
-  const tables = Math.min(4, 2 + Math.floor(level / 3));
-  const sink = at(slot.pos, 0.3, -3.1);
-  const rack = at(slot.pos, 0.3, 3.1);
-  let run: PhasedRun;
-  const tpos: THREE.Vector3[] = [];
-  const stacks: THREE.Object3D[] = [];
-  const clean: THREE.Object3D[] = [];
-  for (let i = 0; i < tables; i++) tpos.push(at(slot.pos, 0.6, (i - (tables - 1) / 2) * 1.45));
-  const phases: Phase[] = [];
-  for (let i = 0; i < tables; i++) {
-    phases.push({
-      name: `Tavolo ${i + 1}: raccogli, lava, asciuga`, icon: '🍽️', ordered: true,
-      tasks: () => [
-        { pos: tpos[i], kind: 'tap', label: 'Prendi i piatti sporchi', icon: '🍽️', onDone: () => { stacks[i].visible = false; hold(game, plateStack(4, true)); } },
-        { pos: sink, kind: 'hold', sec: 1.6 / (1 + 0.04 * level), label: 'Lava i piatti', icon: '🫧', fx: 'bubble', onDone: () => hold(game, plateStack(4, false)) },
-        { pos: rack, kind: 'tap', label: 'Appoggia sullo scolapiatti', icon: '✨', onDone: () => { hold(game); clean[i].visible = true; } },
-      ],
-    });
-  }
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.pos, -0.4, 1.4, 3.7), time: tables * 11 + 6, keep: slot.center });
-  for (let i = 0; i < tables; i++) {
-    run.prop(boxProp(0.7, 0.75, 0.7, 0xffffff), tpos[i]);
-    const st = plateStack(4, true);
-    st.position.y = 0.76;
-    const g = new THREE.Group();
-    g.add(st);
-    stacks.push(run.prop(g, tpos[i]));
-  }
-  run.prop(boxProp(1.1, 0.9, 0.7, 0x90a4ae), sink);
-  const water = boxProp(0.8, 0.02, 0.45, 0x5fa8d3);
-  run.prop(water, sink).position.y = 0.9 * PROP_SCALE;
-  run.prop(boxProp(1.1, 1.1, 0.4, 0xbcaaa4), rack);
-  for (let i = 0; i < tables; i++) {
-    const c = plateStack(4, false);
-    const g = new THREE.Group();
-    c.position.set(-0.4 + i * 0.25, 1.1, 0);
-    c.rotation.z = Math.PI / 2.4;
-    g.add(c);
-    g.visible = false;
-    clean.push(run.prop(g, rack));
-  }
-  const tag = label('🍽️ Dehors del ristorante', { bg: '#ff9f6e', scale: 0.4 });
-  run.prop(tag, at(slot.pos, 0.3, 0), 0, 1).position.y = 2.6;
-  return run;
-}
-
-/** Lavaggio auto: secchio → insapona i 4 lati → canna dell'acqua → risciacqua i 4 lati. */
+/**
+ * Lavaggio auto: prendi lo spruzzino e spruzza il sapone su tutta l'auto (4 lati) →
+ * prendi la canna e fai il giro dell'auto sciacquandola (in ordine, tutto attorno) →
+ * prendi lo straccio e asciuga ogni lato finché brilla.
+ */
 export function carWashJob(game: Game, level: number, slot: Slot, title: string) {
   const at = frame(slot);
   const f0 = frontEdge(game, slot) + 0.3;
-  const cf = Math.max(2.05, f0 + 0.85);
+  const cf = Math.max(2.05, f0 + 0.95);
   const carPos = at(slot.center, cf, 0);
-  const sides = [at(slot.center, cf, 2), at(slot.center, cf, -2), at(slot.center, cf + 1.05, 0.7), at(slot.center, cf + 1.05, -0.7)];
-  const bucket = at(slot.center, 3.3, 2.7);
-  const hose = at(slot.center, 3.3, -2.7);
+  // i 4 lati, nell'ordine del giro: muso, lato strada, coda, lato casa
+  const sides = [at(slot.center, cf, 2.15), at(slot.center, cf + 1.0, 0), at(slot.center, cf, -2.15), at(slot.center, cf - 1.0, 0)];
+  const sideNames = ['il muso', 'il lato strada', 'la coda', 'il lato casa'];
+  const onSide = ['sul muso', 'sul lato strada', 'sulla coda', 'sul lato casa'];
+  const sprayer = at(slot.center, 3.35, 2.8);
+  const reel = at(slot.center, 3.35, -2.8);
+  const rags = at(slot.center, 3.35, 1.6);
+  const [dx, dz] = DIR_VEC[slot.dir];
+  const face = Math.atan2(dx, dz);
   let run: PhasedRun;
   const foams: THREE.Object3D[] = [];
+  const drops: THREE.Object3D[] = [];
+  const sp = 1 + 0.04 * level;
+  // schiuma che copre un lato dell'auto (tra il punto e il centro dell'auto)
+  const foamAt = (i: number) => {
+    const f = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 });
+    const mid = sides[i].clone().lerp(carPos, 0.62);
+    for (let k = 0; k < 12; k++) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.14 + Math.random() * 0.1, 8, 6), mat);
+      m.position.set((Math.random() - 0.5) * (i % 2 ? 1.6 : 0.7), 0.45 + Math.random() * 0.7, (Math.random() - 0.5) * (i % 2 ? 0.4 : 1.2));
+      f.add(m);
+    }
+    return run.prop(f, mid, i % 2 ? face + Math.PI / 2 : face, 1);
+  };
+  // gocce d'acqua dopo il risciacquo (spariscono asciugando)
+  const dropsAt = (i: number) => {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.8 });
+    for (let k = 0; k < 10; k++) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), mat);
+      m.position.set((Math.random() - 0.5) * (i % 2 ? 1.6 : 0.7), 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * (i % 2 ? 0.4 : 1.2));
+      g.add(m);
+    }
+    return run.prop(g, sides[i].clone().lerp(carPos, 0.62), i % 2 ? face + Math.PI / 2 : face, 1);
+  };
   const phases: Phase[] = [
-    { name: 'Prendi secchio e spugna', icon: '🪣', tasks: () => [{ pos: bucket, kind: 'tap', label: 'Prendi il secchio', icon: '🪣', onDone: () => hold(game, cylProp(0.2, 0.3, 0x2d9cdb)) }] },
+    { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
     {
-      name: 'Insapona ogni lato', icon: '🧽',
+      name: 'Spruzza il sapone su tutta l\'auto', icon: '🫧',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1.2 / (1 + 0.04 * level), label: 'Insapona', icon: '🧽', fx: 'bubble' as const,
+        pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[i]}`, icon: '🫧', fx: 'bubble' as const,
+        onDone: () => { foams[i] = foamAt(i); },
+      })),
+    },
+    { name: 'Prendi la canna dell\'acqua', icon: '🚿', tasks: () => [{ pos: reel, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.05, 0.6, 0x43a047)) }] },
+    {
+      // giro dell'auto in ordine: si sciacqua tutto attorno
+      name: 'Fai il giro e risciacqua', icon: '💦', ordered: true,
+      tasks: () => sides.map((pos, i) => ({
+        pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[i]}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff,
+        onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
         onDone: () => {
-          const f = foam();
-          const mid = pos.clone().lerp(carPos, 0.55);
-          foams[i] = run.prop(f, mid);
+          if (foams[i]) foams[i].visible = false;
+          drops[i] = dropsAt(i);
         },
       })),
     },
-    { name: 'Prendi la canna dell\'acqua', icon: '🚿', tasks: () => [{ pos: hose, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.06, 0.6, 0x35c46a)) }] },
+    { name: 'Prendi lo straccio', icon: '🧽', tasks: () => [{ pos: rags, kind: 'tap', label: 'Prendi lo straccio', icon: '🧽', onDone: () => hold(game, boxProp(0.25, 0.06, 0.3, 0xffc21a)) }] },
     {
-      name: 'Risciacqua ogni lato', icon: '💦',
+      name: 'Asciuga tutta l\'auto', icon: '✨',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1 / (1 + 0.04 * level), label: 'Risciacqua', icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff,
-        onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
-        onDone: () => { if (foams[i]) foams[i].visible = false; },
+        pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[i]}`, icon: '✨', fx: 'spark' as const,
+        onProgress: (p: number) => drops[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
+        onDone: () => { if (drops[i]) drops[i].visible = false; },
       })),
     },
   ];
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, Math.max(3.6, cf + 1.6), 3.1), time: 30, keep: slot.center });
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, Math.max(3.7, cf + 1.6), 3.2), time: 44, keep: slot.center });
   const car = model('cars/sedan.glb', 1);
-  const [dx, dz] = DIR_VEC[slot.dir];
   // l'auto è parcheggiata di traverso, parallela alla casa
-  run.prop(car, carPos, Math.atan2(dz, -dx), 1);
-  run.prop(cylProp(0.28, 0.4, 0x607d8b), bucket);
-  run.prop(new THREE.Group().add(cylProp(0.35, 0.12, 0x35c46a)), hose);
+  run.prop(car, carPos, Math.atan2(dz, -dx), 1).userData.noGlow = true;
+  run.prop(soapSprayer(), sprayer, face, 1);
+  run.prop(hoseReel(), reel, face, 1);
+  run.prop(ragBucket(), rags, face, 1);
   return run;
 }
 
-/** Imbianchino: copri le piante coi teli → prendi la vernice → dipingi ogni pannello → togli i teli. */
+/**
+ * Imbianchino: il muretto è la recinzione del giardino davanti alla casa (lì c'è spazio:
+ * dietro la casa arriva quasi al confine). Nel giardino ci sono cespugli, aiuole, giochi,
+ * tavolino… Prima si copre tutto con teloni su misura, poi si prende la vernice, si dipinge
+ * ogni tratto del muretto e alla fine si tolgono i teloni.
+ */
 export function paintJob(game: Game, level: number, slot: Slot, title: string) {
   const at = frame(slot);
-  const f0 = frontEdge(game, slot) + 0.3;
-  const n = Math.min(5, 3 + Math.floor(level / 3));
-  const panels: THREE.Mesh[] = [];
-  const ppos: THREE.Vector3[] = [];
-  const plants = [at(slot.center, Math.max(2.5, f0 + 0.9), 2.6), at(slot.center, Math.max(2.5, f0 + 0.9), -2.6)];
-  const cans = at(slot.center, Math.max(2.9, f0 + 1.3), 1.2);
-  const colors = [0xff8a3d, 0x2d9cdb, 0x35c46a, 0x8e5bd6, 0xffc21a];
+  const f0 = Math.max(1.15, frontEdge(game, slot) + 0.15);
+  const FENCE = 2.85; // confine del lotto, verso il marciapiede
+  const SIDE = 2.85;
+  const colors = [0xff8a3d, 0x2d9cdb, 0x35c46a, 0x8e5bd6, 0xffc21a, 0xe84393];
   const col = colors[Math.floor(Math.random() * colors.length)];
+  const [dx, dz] = DIR_VEC[slot.dir];
+  const along = Math.atan2(dx, dz); // ruota un oggetto "di fronte alla strada"
   let run: PhasedRun;
-  const tarps: THREE.Object3D[] = [];
-  for (let i = 0; i < n; i++) ppos.push(at(slot.center, f0 + 0.1, (i - (n - 1) / 2) * 1.02));
+  // ---- recinzione: davanti (con il cancello in mezzo) e sui due lati
+  const segs: { pos: THREE.Vector3; rot: number; len: number; inner: THREE.Vector3 }[] = [];
+  for (const sgn of [-1, 1]) {
+    for (const r of [0.55 + 0.6, 0.55 + 1.75]) {
+      // davanti: due tratti per parte, tra il cancello (|r| < 0.55) e l'angolo
+      segs.push({ pos: at(slot.center, FENCE, sgn * r), rot: along, len: 1.12, inner: at(slot.center, FENCE - 0.75, sgn * r) });
+    }
+  }
+  const sideLen = FENCE - f0;
+  const sideSegs = sideLen > 1.3 ? 2 : 1;
+  for (const sgn of [-1, 1]) {
+    for (let k = 0; k < sideSegs; k++) {
+      const f = f0 + (sideLen * (k + 0.5)) / sideSegs;
+      segs.push({ pos: at(slot.center, f, sgn * SIDE), rot: along + Math.PI / 2, len: sideLen / sideSegs - 0.05, inner: at(slot.center, f, sgn * (SIDE - 0.75)) });
+    }
+  }
+  // tratti da dipingere: il davanti sempre, i lati dai livelli più alti
+  const paintN = Math.min(segs.length, 4 + Math.floor(level / 2) * 2);
+  const toPaint = segs.slice(0, paintN);
+  // ---- cose in giardino (si coprono tutte): sempre qualcosa di diverso
+  const kinds = [roundShrub, flowerBed, slide, patioSet, bigPlanter, flowerBed];
+  const nItems = Math.min(4, 2 + Math.floor(level / 3));
+  const fMid = f0 + (FENCE - 0.5 - f0) * 0.5;
+  const spots = [at(slot.center, fMid, -1.85), at(slot.center, fMid, 1.85), at(slot.center, fMid, -1.0), at(slot.center, fMid, 1.0)];
+  const pool = [...kinds].sort(() => Math.random() - 0.5);
+  // le cose del giardino si creano subito (la prima fase le deve già conoscere); in scena dopo
+  const items: { pos: THREE.Vector3; obj: THREE.Object3D; tarp: THREE.Object3D }[] = [];
+  for (let i = 0; i < nItems; i++) {
+    const obj = pool[i % pool.length]();
+    obj.rotation.y = along;
+    obj.position.copy(spots[i]);
+    obj.updateMatrixWorld(true);
+    const tarp = tarpFor(obj);
+    tarp.visible = false;
+    items.push({ pos: spots[i], obj, tarp });
+  }
+  const cans = at(slot.center, FENCE - 0.55, 0);
   const phases: Phase[] = [
     {
-      name: 'Copri le piante con i teli', icon: '🪴',
-      tasks: () => plants.map((pos, i) => ({ pos, kind: 'tap' as const, label: 'Copri con il telo', icon: '🪴', onDone: () => { tarps[i].visible = true; } })),
+      name: 'Copri il giardino con i teloni', icon: '🛡️',
+      tasks: () => items.map((it) => ({
+        pos: it.pos, kind: 'tap' as const, label: 'Copri con il telone', icon: '🛡️',
+        onDone: () => dropTarp(it.tarp),
+      })),
     },
     { name: 'Prendi la vernice', icon: '🪣', tasks: () => [{ pos: cans, kind: 'tap', label: 'Prendi la vernice', icon: '🪣', onDone: () => hold(game, cylProp(0.16, 0.25, col)) }] },
     {
       name: 'Dipingi ogni tratto del muretto', icon: '🖌️',
-      tasks: () => ppos.map((pos, i) => ({
-        pos: at(pos, 0.8, 0), kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️', fx: 'paint' as const, fxColor: col,
-        onProgress: (p: number) => (panels[i].material as THREE.MeshLambertMaterial).color.lerpColors(new THREE.Color(0x9e9e9e), new THREE.Color(col), p),
+      tasks: () => toPaint.map((sg, i) => ({
+        pos: sg.inner, kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️', fx: 'paint' as const, fxColor: col,
+        onProgress: (p: number) => (bodies[i].material as THREE.MeshLambertMaterial).color.lerpColors(new THREE.Color(0x9e9e9e), new THREE.Color(col), p),
       })),
     },
     {
-      name: 'Togli i teli e metti in ordine', icon: '🧹',
-      tasks: () => plants.map((pos, i) => ({ pos, kind: 'tap' as const, label: 'Togli il telo', icon: '🧹', onDone: () => { tarps[i].visible = false; hold(game); } })),
+      name: 'Togli i teloni', icon: '🧹',
+      tasks: () => items.map((it) => ({ pos: it.pos, kind: 'tap' as const, label: 'Togli il telone', icon: '🧹', onDone: () => { it.tarp.visible = false; hold(game); } })),
     },
   ];
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.3, Math.max(3.3, f0 + 1.8), 3.2), time: n * 4.5 + 22, keep: slot.center });
-  const [dx, dz] = DIR_VEC[slot.dir];
-  for (const pos of ppos) {
-    // segmento di muretto: spesso abbastanza da vedere il colore anche dall'alto
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.9, 0.5), new THREE.MeshLambertMaterial({ color: 0x9e9e9e }));
-    m.position.y = 0.45;
-    m.castShadow = true;
-    const g = new THREE.Group();
-    g.add(m);
-    panels.push(m);
-    run.prop(g, pos, Math.atan2(dx, dz));
+  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, FENCE + 0.35, SIDE + 0.25), time: paintN * 4 + nItems * 6 + 18, keep: slot.center });
+  // il telone cala dall'alto sull'oggetto
+  const dropTarp = (t: THREE.Object3D) => {
+    t.visible = true;
+    const start = performance.now();
+    const y0 = 1.2;
+    const anim = () => {
+      const k = Math.min(1, (performance.now() - start) / 350);
+      t.position.y = y0 * (1 - k) * (1 - k);
+      t.scale.y = 0.4 + 0.6 * k;
+      if (k < 1) requestAnimationFrame(anim);
+    };
+    anim();
+  };
+  const bodies: THREE.Mesh[] = [];
+  segs.forEach((sg, i) => {
+    const { obj, body } = fenceSegment(sg.len);
+    run.prop(obj, sg.pos, sg.rot, 1);
+    if (i < paintN) bodies.push(body);
+  });
+  // pilastri: agli angoli e ai lati del cancello
+  for (const r of [-SIDE, -0.55, 0.55, SIDE]) run.prop(fencePillar(), at(slot.center, FENCE, r), along, 1).userData.noGlow = true;
+  for (const it of items) {
+    run.prop(it.obj, it.pos, along, 1);
+    run.prop(it.tarp, it.pos.clone(), 0, 1);
   }
-  for (const pos of plants) {
-    run.prop(bush(), pos);
-    const t = boxProp(1, 0.9, 1, 0xe0e0e0);
-    t.visible = false;
-    tarps.push(run.prop(t, pos));
-  }
-  run.prop(cylProp(0.18, 0.3, col), cans);
-  run.prop(cylProp(0.18, 0.3, 0xffffff), cans.clone().add(new THREE.Vector3(0.4, 0, 0)));
+  run.prop(paintKit(col), cans, along, 1);
   return run;
 }
 
@@ -720,7 +793,10 @@ export class VisitRun extends BaseRun {
   private ringObj: THREE.Object3D;
   inside = false;
 
-  constructor(game: Game, level: number, private dest: Slot, title: string, private onEnter: () => void) {
+  /** dentro (casa del cliente o cucina): il tutorial chiede a questa scena cosa fare */
+  indoorGuide: (() => RunGuide | null) | null = null;
+
+  constructor(game: Game, level: number, private dest: Slot, title: string, private onEnter: () => void, private where = 'dal cliente', private enterLabel = 'Entra in casa') {
     super(game, level);
     const p = game.player.root.position;
     const dist = Math.abs(dest.pos.x - p.x) + Math.abs(dest.pos.z - p.z);
@@ -743,8 +819,18 @@ export class VisitRun extends BaseRun {
     const d = Math.hypot(this.dest.pos.x - p.x, this.dest.pos.z - p.z);
     this.marker.position.y = 3 + Math.sin(performance.now() / 250) * 0.3;
     this.marker.rotation.y += dt * 2;
-    this.status = `Vai dal cliente · ${Math.round(d)} m`;
-    this.game.prompt = d < this.reach() ? { label: 'Entra in casa', icon: '🚪' } : null;
+    this.status = `Vai ${this.where} · ${Math.round(d)} m`;
+    this.game.prompt = d < this.reach() ? { label: this.enterLabel, icon: '🚪' } : null;
+  }
+
+  guide(): RunGuide | null {
+    if (this.inside) return this.indoorGuide?.() ?? null;
+    const p = this.game.player.root.position;
+    const near = Math.hypot(this.dest.pos.x - p.x, this.dest.pos.z - p.z) < this.reach();
+    return {
+      phase: 0, phases: 1, phaseName: this.enterLabel, phaseIcon: '🚪', left: 1,
+      task: { pos: this.dest.pos, kind: 'tap', label: this.enterLabel, icon: '🚪' }, near, inZone: true, arrived: true,
+    };
   }
 
   onAction() {

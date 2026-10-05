@@ -30,28 +30,28 @@ export const JOBS: Record<JobType, JobDef> = {
   },
   consegna: {
     name: 'Consegna pacchi', icon: '📦', skill: 'logistica', basePay: 26, xp: 12, fame: 1, where: 'shop', vehicleOk: true,
-    intro: 'Carica i pacchi in negozio, consegnali agli indirizzi segnati (nell\'ordine che vuoi) e torna a firmare la ricevuta. Con un veicolo fai prima!',
-    steps: [['📦', 'Carica i pacchi dalla pila in negozio', 'tap'], ['🏠', 'Porta un pacco a ogni cassetta gialla segnata, in qualsiasi ordine', 'walk'], ['🧾', 'Torna in negozio a firmare la ricevuta', 'tap']],
+    intro: 'Ritira i pacchi al negozio dei pacchi, consegnali alle cassette gialle segnate (nell\'ordine che vuoi) e torna a firmare la ricevuta. Con un veicolo fai prima!',
+    steps: [['📦', 'Ritira i pacchi al negozio dei pacchi', 'tap'], ['🏠', 'Consegna un pacco a ogni cassetta gialla segnata, in qualsiasi ordine', 'walk'], ['🧾', 'Torna al negozio a firmare la ricevuta', 'tap']],
   },
   piatti: {
     name: 'Lavapiatti part-time', icon: '🍽️', skill: 'cucina', basePay: 28, xp: 13, fame: 1, where: 'restaurant',
-    intro: 'Nel retro del ristorante: per ogni tavolo prendi i piatti sporchi, lavali al lavello e appoggiali sullo scolapiatti.',
-    steps: [['🍽️', 'Prendi i piatti sporchi dal tavolo', 'tap'], ['🫧', 'Lavali al lavello', 'hold'], ['✨', 'Appoggiali sullo scolapiatti', 'tap'], ['🔁', 'Ripeti per ogni tavolo', 'walk']],
+    intro: 'Il ristorante ha chiuso: entra nella sua cucina e lava tutti i piatti. Per ogni pila: prendila dal carrello, lavala al lavello e appoggiala sullo scolapiatti.',
+    steps: [['🚪', 'Entra nella cucina del ristorante (è chiuso)', 'walk'], ['🍽️', 'Prendi una pila di piatti sporchi dal carrello', 'tap'], ['🫧', 'Lavala al lavello', 'hold'], ['✨', 'Appoggiala sullo scolapiatti', 'tap']],
   },
   volantini: {
-    name: 'Volantinaggio', icon: '📰', skill: 'clientela', basePay: 24, xp: 12, fame: 1, where: 'shop', vehicleOk: true,
-    intro: 'Prendi i volantini in negozio, imbucali in tutte le cassette segnate e torna per la ricevuta. Sono tante e vicine: corri!',
-    steps: [['📰', 'Prendi i volantini dall\'espositore giallo', 'tap'], ['📬', 'Imbuca un volantino in ogni cassetta blu segnata', 'walk'], ['🧾', 'Torna in negozio per la ricevuta', 'tap']],
+    name: 'Consegna giornali', icon: '📰', skill: 'clientela', basePay: 24, xp: 12, fame: 1, where: 'shop', vehicleOk: true,
+    intro: 'Prendi i giornali all\'edicola, imbucane uno in ogni cassetta blu segnata e torna all\'edicola per la ricevuta. Sono tante e vicine: corri!',
+    steps: [['📰', 'Prendi i giornali all\'edicola', 'tap'], ['📬', 'Imbuca un giornale in ogni cassetta blu segnata', 'walk'], ['🧾', 'Torna all\'edicola per la ricevuta', 'tap']],
   },
   lavaggio: {
     name: 'Lavaggio auto', icon: '🚿', skill: 'manualita', basePay: 32, xp: 14, fame: 1.1, where: 'house',
-    intro: 'Prendi secchio e spugna, insapona i quattro lati dell\'auto, poi prendi la canna e risciacqua tutto.',
-    steps: [['🪣', 'Prendi il secchio', 'tap'], ['🧽', 'Insapona i 4 lati dell\'auto', 'hold'], ['🚿', 'Prendi la canna dell\'acqua', 'tap'], ['💦', 'Risciacqua i 4 lati', 'hold']],
+    intro: 'Spruzza il sapone su tutta l\'auto, poi prendi la canna e fai il giro dell\'auto sciacquandola tutta, infine asciugala con lo straccio.',
+    steps: [['🧴', 'Prendi lo spruzzino del sapone', 'tap'], ['🫧', 'Spruzza il sapone su tutti e 4 i lati', 'hold'], ['🚿', 'Prendi la canna e fai il giro sciacquando', 'hold'], ['🧽', 'Prendi lo straccio e asciuga tutto', 'hold']],
   },
   imbianchino: {
-    name: 'Dipingere il muretto', icon: '🖌️', skill: 'artigianato', basePay: 34, xp: 15, fame: 1.2, where: 'house',
-    intro: 'Copri le piante con i teli, prendi la vernice, dipingi ogni tratto del muretto e alla fine togli i teli.',
-    steps: [['🪴', 'Copri le 2 piante con i teli', 'tap'], ['🪣', 'Prendi la vernice', 'tap'], ['🖌️', 'Dipingi ogni tratto del muretto', 'hold'], ['🧹', 'Togli i teli dalle piante', 'tap']],
+    name: 'Dipingere la recinzione', icon: '🖌️', skill: 'artigianato', basePay: 34, xp: 15, fame: 1.2, where: 'house',
+    intro: 'Copri con i teloni tutto quello che c\'è in giardino (cespugli, aiuole, giochi…), prendi la vernice, dipingi ogni tratto del muretto di recinzione e alla fine togli i teloni.',
+    steps: [['🛡️', 'Copri con i teloni le cose del giardino', 'tap'], ['🪣', 'Prendi la vernice', 'tap'], ['🖌️', 'Dipingi ogni tratto del muretto', 'hold'], ['🧹', 'Togli i teloni', 'tap']],
   },
 };
 
