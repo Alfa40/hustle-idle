@@ -4,7 +4,7 @@ import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
 import { BUSINESS, JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
-import { LOTS, WS } from './config/map';
+import { LOTS, OLD_HALF, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
 import { Input } from './input';
 import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
@@ -234,7 +234,7 @@ export class Game {
     this.windows = new WindowLights(BUILDING_MODELS);
     this.lamps = new StreetLights(this.city.lampHeads);
     this.scene.add(this.lamps.group);
-    this.traffic = new Traffic(this.city, 28, 18, CHAR_MODELS);
+    this.traffic = new Traffic(this.city, 44, 26, CHAR_MODELS);
     this.scene.add(this.traffic.group);
     for (const l of this.city.lots) lotZone[l.id] = l.zone;
 
@@ -367,7 +367,8 @@ export class Game {
   private houseCache: Slot[] | null = null;
   get houseSlots(): Slot[] {
     if (!this.houseCache) {
-      const all = [...this.city.homes.slice(1), ...this.city.gardens].filter((h) => h.dir !== 'N');
+      // solo le case della città originale: le case già comprate restano le stesse anche con la città più grande
+      const all = [...this.city.homes.slice(1), ...this.city.gardens].filter((h) => h.dir !== 'N' && Math.abs(h.center.x) < OLD_HALF && Math.abs(h.center.z) < OLD_HALF);
       const seen = new Set<string>();
       this.houseCache = all.filter((h) => {
         const k = `${Math.round(h.pos.x)},${Math.round(h.pos.z)}`;

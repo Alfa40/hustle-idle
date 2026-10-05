@@ -36,18 +36,29 @@ const TEMPLATES: Record<string, string[]> = {
   T: ['ttt', 't.t', 'ppp'],
 };
 
-/** Pianta 9×9 degli isolati, da nord (alto) a sud. Il centro è in mezzo. */
+/**
+ * Pianta 13×13 degli isolati, da nord (alto) a sud. Il centro è in mezzo.
+ * Le 9 righe/colonne interne sono la città originale; attorno un anello di
+ * 2 isolati di nuovi quartieri (più vie, case, palazzi, parchi, negozi e ristoranti).
+ */
 const BLOCK_PLAN = [
-  'hhPhThPmh',
-  'hHmHHmHhP',
-  'PmHTmHmHh',
-  'hHmCcCmHT',
-  'TPcCSCcPh',
-  'hHmCcCmHh',
-  'hmHPmHPmh',
-  'PHhHTHhHP',
-  'hmThhPhhh',
+  'PhhmhPhThhmhP',
+  'hHmcHhmHPhcHh',
+  'mHhhPhThPmhHm',
+  'hchHmHHmHhPPh',
+  'PhPmHTmHmHhcH',
+  'hmhHmCcCmHThm',
+  'TcTPcCSCcPhcP',
+  'hmhHmCcCmHhmh',
+  'PhhmHPmHPmhHT',
+  'mHPHhHTHhHPcm',
+  'hchmThhPhhhHh',
+  'hHmPhcHmhTmHh',
+  'PhhThmhPhhmhP',
 ];
+
+/** I lotti e i luoghi sono indicati nella pianta originale 9×9: si spostano di 2 isolati. */
+const OFF = 2;
 
 /** Posizioni speciali: [riga isolato, colonna isolato, riga interna, colonna interna, carattere]. */
 const SPECIAL: [number, number, number, number, string][] = [
@@ -89,11 +100,14 @@ function buildMap() {
       TEMPLATES[k].forEach((line, ir) => [...line].forEach((ch, ic) => (grid[br * 4 + 1 + ir][bc * 4 + 1 + ic] = ch)));
     }),
   );
-  for (const [br, bc, ir, ic, ch] of SPECIAL) grid[br * 4 + 1 + ir][bc * 4 + 1 + ic] = ch;
+  for (const [br, bc, ir, ic, ch] of SPECIAL) grid[(br + OFF) * 4 + 1 + ir][(bc + OFF) * 4 + 1 + ic] = ch;
   return grid.map((r) => r.join(''));
 }
 
 export const CITY_MAP = buildMap();
+
+/** Metà lato (in metri) della città originale 9×9: case comprate e salvataggi si riferiscono a quella. */
+export const OLD_HALF = ((9 * 4 + 1) * TILE) / 2;
 
 export type ZoneId = 'centro' | 'residenziale' | 'periferia';
 
@@ -109,6 +123,7 @@ export function zoneAt(col: number, row: number): ZoneId {
   const d = Math.max(Math.abs(Math.floor((row - 1) / 4) - mid), Math.abs(Math.floor((col - 1) / 4) - mid));
   if (d <= 1) return 'centro';
   if (d <= 3) return 'residenziale';
+  // la vecchia periferia e i nuovi quartieri esterni
   return 'periferia';
 }
 

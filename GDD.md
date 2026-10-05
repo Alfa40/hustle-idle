@@ -46,6 +46,8 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 
 ## 4. Mappa
 
+- **Città più estesa**: pianta di 13×13 isolati (prima 9×9, area più che doppia): attorno alla città originale (rimasta identica, con lotti e luoghi al loro posto) un anello di 2 isolati di nuovi quartieri con case, palazzi, negozi, ristoranti e parchi. Più traffico (44 auto, 26 pedoni). Peso sul telefono quasi invariato: gli edifici sono disegnati a gruppi per zona e si disegnano solo quelli inquadrati (≈300 chiamate di disegno come prima). Le 10 case dell'agenzia immobiliare restano quelle della città originale, così le case già comprate non cambiano
+
 - **Scala del mondo** (`WS` in src/config/map.ts, ora 1,35): case, negozi, strade, alberi, lampioni e distanze sono più grandi del 35% rispetto al personaggio, ai veicoli e agli oggetti dei lavoretti (che restano della loro misura): più spazio attorno a tutto. Le posizioni nei lavoretti si scrivono in "metri di tessera" e `frame()` le moltiplica per `WS`; la posizione salvata del giocatore si converte da sola se cambia la scala
 
 - **Una sola città** all'inizio, divisa in **zone** (per esempio periferia, residenziale, centro, zona commerciale).
