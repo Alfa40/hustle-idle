@@ -667,7 +667,7 @@ export class Game {
     } else if (slot.kind === 'shop' && friends.length) {
       // un piano per amico sopra l'edificio: più in alto chi ha più fama
       const top = this.roofTop(slot);
-      const h = 1.25;
+      const h = 1.25 * WS;
       [...friends.slice(0, 3)].reverse().forEach((f, i) => {
         g.add(this.buildFloor(slot, f, top + i * h - 0.05, h));
         extra.push(this.addInteractable({
@@ -715,8 +715,9 @@ export class Game {
       // negozio in un edificio: insegna colorata sopra l'ingresso
       const def = bizType(biz.type);
       const icons = biz.products.map((p) => PRODUCTS[p].icon).join('');
-      const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.6 });
-      sign.position.set(dx * 2.2 * WS, 4.2 * WS, dz * 2.2 * WS);
+      const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.75 });
+      // con i piani degli amici sopra, l'insegna scende sulla facciata (non viene coperta)
+      sign.position.set(dx * 2.2 * WS, friends.length ? Math.min(4.2 * WS, this.roofTop(slot) - 0.9) : 4.2 * WS, dz * 2.2 * WS);
       g.add(sign);
       // logo sospeso sopra l'insegna (se sopra ci sono i piani degli amici basta quello sulla facciata)
       if (!friends.length) {
@@ -727,8 +728,8 @@ export class Game {
       // marchio sulla facciata, sopra l'ingresso
       const fp = this.footprint(slot);
       const reach = dx > 0 ? fp.maxX - slot.center.x : dx < 0 ? slot.center.x - fp.minX : dz > 0 ? fp.maxZ - slot.center.z : slot.center.z - fp.minZ;
-      const plate = logoPlate(this.state.logo, 1.3);
-      plate.position.set(dx * (reach + 0.06), 3.25, dz * (reach + 0.06));
+      const plate = logoPlate(this.state.logo, 1.3 * WS);
+      plate.position.set(dx * (reach + 0.06), 3.25 * WS, dz * (reach + 0.06));
       plate.rotation.y = DIR_ROT[slot.dir];
       g.add(plate);
       const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
