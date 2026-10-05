@@ -19,12 +19,9 @@ import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
 import { frameRoom, layout, type Occluder } from '../ui/layout';
 
-/** Interfaccia sopra la cucina: la stanza si inquadra nello spazio che lascia libero. */
-const INTERIOR_UI = () => {
-  // riquadri: in alto in verticale, pannello a sinistra in orizzontale; pulsanti sempre a destra
-  const side = layout.panelDock;
-  return [{ sel: '.guide', dock: side }, { sel: '.hand-badge', dock: side }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
-};
+/** Interfaccia sopra la cucina: il riquadro "in mano" (toglie il lato che fa perdere meno spazio) e i pulsanti a destra. */
+const INTERIOR_UI = () =>
+  [{ sel: '.hand-badge' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
@@ -637,8 +634,8 @@ export class TruckInterior {
 
   /** Il riquadro "in mano" sta subito sotto la guida (la cui altezza cambia). */
   private placeHandBadge() {
-    if (!this.handEl || !this.guideEl) return;
-    this.handEl.style.top = `${this.guideEl.getBoundingClientRect().bottom + 6}px`;
+    if (!this.handEl) return;
+    this.handEl.style.top = this.guideEl ? `${this.guideEl.getBoundingClientRect().bottom + 6}px` : 'var(--sat)';
   }
 
   private stationOf(kind: StationDef['kind']) {
@@ -655,9 +652,8 @@ export class TruckInterior {
     player.root.rotation.y = Math.PI;
     this.scene.add(player.root);
     this.biz.__playerInside = true;
-    this.guideEl = document.createElement('div');
-    this.guideEl.className = 'guide';
-    document.body.appendChild(this.guideEl);
+    // dentro le attività niente riquadro con soldi e capienze: solo quello con gli oggetti in mano
+    // (le capienze stanno sulle etichette delle postazioni)
     this.handEl = document.createElement('div');
     this.handEl.className = 'hand-badge';
     document.body.appendChild(this.handEl);
@@ -700,7 +696,8 @@ export class TruckInterior {
     const tall = free.w < free.h;
     const pitch = THREE.MathUtils.degToRad(tall ? 58 : 55);
     // la stanza, il bancone e la fila dei clienti (nel locale grande anche la sala)
-    const box = { x0: LEFT, x1: LEFT + this.width, z0: BACK, z1: this.level >= 2 ? 6.6 : 3.3, wall: 2.4 };
+    // la cucina, il bancone e la fila dei clienti (la sala con i tavoli resta fuori: la cucina viene più grande)
+    const box = { x0: LEFT, x1: LEFT + this.width, z0: BACK, z1: 3.3, wall: 2.4 };
     const f = frameRoom(this.camera, free, box, pitch);
     this.view = { d: f.d, pitch, z: f.z, follow: f.follow };
     this.placeCamera(true);
