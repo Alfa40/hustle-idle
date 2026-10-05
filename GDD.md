@@ -50,6 +50,7 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 - **La posizione conta:** ogni lotto ha un moltiplicatore di **passaggio/domanda** e un **costo** (affitto o acquisto). In centro ci sono più clienti ma costa di più.
 - Le attività si aprono in **lotti disponibili**, distribuiti nelle varie zone.
 - Il player **entra nei propri edifici dalla porta d'ingresso**. Dentro c'è la scena interna dell'attività (cucina, cassa, magazzino…).
+- **Traffico senza ingorghi infiniti**: un'auto ferma dietro altre auto da più di 2,5 s, se non è inquadrata dalla camera (o appena esce dalla visuale), riparte da un tratto di strada libero e fuori vista, lontano dal giocatore. Gli ingorghi davanti al giocatore restano finché si vedono; le auto ferme per il giocatore non spariscono
 
 ## 5. Loop di gioco
 

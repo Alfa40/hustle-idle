@@ -1247,7 +1247,7 @@ export class Game {
     this.clouds.update(dt);
     this.fx.update(dt);
     this.updateOcclusion(dt);
-    if (!this.interior && !this.house) this.traffic.update(dt, this.player.root.position, this.night);
+    if (!this.interior && !this.house) this.traffic.update(dt, this.player.root.position, this.night, this.camera);
     if (this.interior) this.draw(this.interior.scene, this.interior.camera);
     else if (this.house) this.draw(this.house.scene, this.house.camera);
     else this.draw(this.scene, this.camera);

@@ -19,7 +19,12 @@ interface Car {
   speed: number;
   yaw: number;
   lights: THREE.Mesh;
+  /** secondi passati fermi dietro un'altra auto (ingorgo) */
+  stuck: number;
 }
+
+/** Dopo quanti secondi fermo un'auto fa parte di un ingorgo da sciogliere. */
+const JAM_SEC = 2.5;
 
 interface Walker {
   char: Character;
@@ -66,7 +71,7 @@ export class Traffic {
     obj.add(lights);
     const from: [number, number] = [Math.floor(Math.random() * (this.n + 1)), Math.floor(Math.random() * (this.n + 1))];
     const nb = this.neighbors(from);
-    const car: Car = { obj, from, to: nb[Math.floor(Math.random() * nb.length)], t: Math.random(), speed: 6 + Math.random() * 2.5, yaw: 0, lights };
+    const car: Car = { obj, from, to: nb[Math.floor(Math.random() * nb.length)], t: Math.random(), speed: 6 + Math.random() * 2.5, yaw: 0, lights, stuck: 0 };
     this.group.add(obj);
     this.cars.push(car);
   }
@@ -101,9 +106,44 @@ export class Traffic {
     return { dx, dz };
   }
 
-  update(dt: number, player: THREE.Vector3, night: number) {
+  private frustum = new THREE.Frustum();
+  private mat = new THREE.Matrix4();
+  private sphere = new THREE.Sphere(new THREE.Vector3(), 3.2);
+
+  /** L'auto si vede (anche solo in parte) dalla camera del giocatore. */
+  private visible(p: THREE.Vector3) {
+    this.sphere.center.copy(p);
+    return this.frustum.intersectsSphere(this.sphere);
+  }
+
+  /**
+   * Scioglie un ingorgo fuori dalla vista: l'auto riparte da un tratto di strada libero e
+   * non inquadrato (nessuno la vede sparire né ricomparire).
+   */
+  private respawn(c: Car, player: THREE.Vector3) {
+    const tmp = new THREE.Vector3();
+    for (let k = 0; k < 40; k++) {
+      const from: [number, number] = [Math.floor(Math.random() * (this.n + 1)), Math.floor(Math.random() * (this.n + 1))];
+      const nb = this.neighbors(from);
+      const to = nb[Math.floor(Math.random() * nb.length)];
+      const t = 0.15 + Math.random() * 0.7;
+      const trial = { ...c, from, to, t };
+      this.lanePos(trial, tmp);
+      if (this.visible(tmp) || tmp.distanceTo(player) < 25) continue;
+      // niente altre auto vicine (altrimenti si ricreerebbe l'ingorgo)
+      if (this.cars.some((o) => o !== c && o.obj.position.distanceTo(tmp) < 7)) continue;
+      c.from = from;
+      c.to = to;
+      c.t = t;
+      c.stuck = 0;
+      return;
+    }
+  }
+
+  update(dt: number, player: THREE.Vector3, night: number, camera?: THREE.Camera) {
     this.lightsMat.opacity = night;
     const tmp = new THREE.Vector3();
+    if (camera) this.frustum.setFromProjectionMatrix(this.mat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     for (const c of this.cars) {
       const { dx, dz } = this.lanePos(c, tmp);
       // si ferma se davanti c'è il giocatore o un'altra auto nella stessa corsia
@@ -115,15 +155,22 @@ export class Traffic {
         const side = Math.abs(rx * -dz + rz * dx);
         return along > 0 && along < 5 && side < 1.4;
       };
+      let byCar = false;
       if (ahead(player)) blocked = true;
       else {
         for (const o of this.cars) {
           if (o === c) continue;
           if (ahead(o.obj.position)) {
-            blocked = true;
+            blocked = byCar = true;
             break;
           }
         }
+      }
+      // ingorgo (fermo dietro altre auto, non per il giocatore): se non si vede, sparisce
+      c.stuck = byCar ? c.stuck + dt : 0;
+      if (camera && c.stuck > JAM_SEC && !this.visible(c.obj.position)) {
+        this.respawn(c, player);
+        blocked = true;
       }
       if (!blocked) {
         const len = this.node(...c.from).distanceTo(this.node(...c.to));
