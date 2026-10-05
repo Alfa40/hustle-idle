@@ -534,7 +534,9 @@ export class ClientHouse {
     this.guide.update(dt, this.player.root.position, this.goal(), 0.6);
     this.placeCamera();
     this.fx.update(dt);
-    this.game.ui.setAction(this.cleaning ? this.cleanInteract(dt) : this.moveInteract(dt));
+    const pr = this.cleaning ? this.cleanInteract(dt) : this.moveInteract(dt);
+    // il cerchio sta sopra l'etichetta dell'attrezzo in mano
+    this.game.ui.setAction(pr && { ...pr, headY: this.toolSprite ? 3.0 : 2.6 });
   }
 
   private collide(p: THREE.Vector3) {

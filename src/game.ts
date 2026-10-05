@@ -25,7 +25,7 @@ import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
 import { ViewControl } from './world/viewcam';
-import { GuideLine } from './world/guideline';
+import { RouteLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
@@ -91,6 +91,8 @@ export interface ActionPrompt {
    * fisso: l'anello da toccare compare sopra l'oggetto. Senza `at` l'anello sta sul personaggio.
    */
   at?: THREE.Vector3;
+  /** altezza (m) sopra i piedi del personaggio dove compare il cerchio (più in alto se ha un'etichetta sulla testa) */
+  headY?: number;
 }
 
 interface JobNpc {
@@ -161,7 +163,8 @@ export class Game {
   /** particelle del mondo aperto (foglie, bolle, scintille…) */
   fx = new Particles();
   /** linea tratteggiata verso l'obiettivo (lavoretti, ordini, segnaposto) */
-  private guide = new GuideLine();
+  /** linea tratteggiata verso l'obiettivo: segue le strade (sparisce se esci dalla strada) */
+  private guide = new RouteLine(0xffffff, 0.6);
   /** oggetti fra camera e giocatore/obiettivo → trasparenti */
   private occluder = new Occluder();
   private occT = 0;
@@ -196,7 +199,7 @@ export class Game {
 
     this.scene.background = new THREE.Color(0x9fd3f0);
     this.scene.fog = new THREE.Fog(0x9fd3f0, 90, 290);
-    this.scene.add(this.sky.mesh, this.clouds.group, this.fx.group, this.guide.mesh);
+    this.scene.add(this.sky.mesh, this.clouds.group, this.fx.group, this.guide.group);
     this.scene.add(this.hemi);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024, 1024);
@@ -1111,6 +1114,15 @@ export class Game {
     this.waypoint = m ? { id: m.id, x: m.x, z: m.z, icon: m.icon, label: m.label } : null;
   }
 
+  /** Obiettivo sulla mappa: un lotto in vendita (dalla lista delle attività), per andarci a comprarlo. */
+  setLotTarget(lotId: string) {
+    const lot = this.city.lots.find((l) => l.id === lotId);
+    if (!lot) return;
+    const name = LOTS.find((l) => l.id === lotId)?.name ?? 'Lotto';
+    this.waypoint = { id: 'lot:' + lotId, x: lot.center.x, z: lot.center.z, icon: '🏷️', label: `${name} in vendita` };
+    toast(`📍 Obiettivo: ${name}. Segui la linea sulla strada e le frecce`, 'info');
+  }
+
   mapMarkers(): MapMarker[] {
     const p = this.player.root.position;
     const out: MapMarker[] = [];
@@ -1319,7 +1331,7 @@ export class Game {
         this.updateWaypoint();
         this.updateJobs(dt);
         const goal = this.run?.target ?? (this.waypoint ? new THREE.Vector3(this.waypoint.x, 0, this.waypoint.z) : null);
-        this.guide.update(dt, this.player.root.position, goal, this.run ? 1 : 3, this.firstPerson ? 1.6 : 0.45);
+        this.guide.update(dt, goal ? this.city.route(this.player.root.position, goal) : null, this.run ? 1 : 3, this.firstPerson ? 1.6 : 0.45);
         this.updateInteract();
         const fp = this.wantFirstPerson();
         if (fp !== this.firstPerson) this.setFirstPerson(fp);
@@ -1640,7 +1652,7 @@ export class Game {
     } else {
       targets.push(new THREE.Vector3(p.x, 1, p.z), new THREE.Vector3(p.x, 0.3, p.z));
     }
-    this.occluder.update(scene, cam, targets, [this.player.root, this.guide.mesh, this.sky.mesh]);
+    this.occluder.update(scene, cam, targets, [this.player.root, this.guide.group, this.sky.mesh]);
   }
 
   /** Disegna una scena, con i contorni se attivi nelle impostazioni. */

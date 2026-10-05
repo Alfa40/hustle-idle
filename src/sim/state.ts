@@ -139,6 +139,8 @@ export interface GameState {
   /** missioni della settimana e settimana (giorno / 7) in cui sono state create */
   weekly?: Mission[];
   weeklyWeek?: number;
+  /** versione delle regole delle missioni settimanali */
+  weeklyVer?: number;
   /** guadagnato questa settimana (senza i premi delle missioni) */
   weekEarned?: number;
   events: CalEvent[];

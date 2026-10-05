@@ -80,10 +80,14 @@ export class UI {
   private eventEl!: HTMLElement;
   private infoEl!: HTMLElement;
   private missionDot!: HTMLElement;
+  /** zona da toccare (invisibile) sull'oggetto */
   private actionEl!: HTMLButtonElement;
-  private actionIco!: HTMLElement;
-  private actionTxt!: HTMLElement;
-  private actionProg!: HTMLElement;
+  /** cerchio semitrasparente sopra la testa: si riempie tenendo premuto (o in un lampo con un tocco) */
+  private ringEl!: HTMLButtonElement;
+  /** scritta dell'azione in alto, sotto il riquadro */
+  private labelEl!: HTMLDivElement;
+  private actionPrompt: ActionPrompt | null = null;
+  private flashT = 0;
   private jobEl!: HTMLElement;
   private toastsEl!: HTMLElement;
   private modal: HTMLElement | null = null;
@@ -170,33 +174,43 @@ export class UI {
     job.querySelector('#j-quit')!.addEventListener('click', () => this.game.cancelJob());
     this.jobEl = job;
 
+    // azione: si tocca l'oggetto (zona invisibile un po' più grande dell'oggetto) oppure il cerchio
+    // sopra la testa; la scritta sta in alto. Fuori da #ui: sopra i riquadri, sotto le finestre.
     const act = document.createElement('button');
     act.className = 'action';
-    act.innerHTML = `<div class="prog"></div><div class="ico"></div><div class="txt"></div>`;
-    this.actionIco = act.querySelector('.ico')!;
-    this.actionTxt = act.querySelector('.txt')!;
-    this.actionProg = act.querySelector('.prog')!;
+    act.setAttribute('aria-label', 'Azione');
+    const ring = document.createElement('button');
+    ring.className = 'act-ring';
+    ring.setAttribute('aria-label', 'Azione');
+    ring.innerHTML = '<i></i>';
+    const lbl = document.createElement('div');
+    lbl.className = 'act-label';
     const inp = this.game.input;
-    act.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      try {
-        act.setPointerCapture(e.pointerId);
-      } catch {
-        /* puntatore già rilasciato */
-      }
-      inp.actionHeld = true;
-      inp.actionPressed = true;
-      act.classList.add('pressed');
-    });
-    const up = () => {
-      inp.actionHeld = false;
-      act.classList.remove('pressed');
-    };
-    act.addEventListener('pointerup', up);
-    act.addEventListener('pointercancel', up);
-    // fuori da #ui: l'anello sta sopra i riquadri e i fumetti dei tutorial (ma sotto le finestre)
-    document.body.appendChild(act);
+    for (const el of [act, ring]) {
+      el.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* puntatore già rilasciato */
+        }
+        inp.actionHeld = true;
+        inp.actionPressed = true;
+        document.body.classList.add('act-pressed');
+        // azione "tocca": il cerchio si riempie in un lampo, per far vedere che è partita
+        if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
+      });
+      const up = () => {
+        inp.actionHeld = false;
+        document.body.classList.remove('act-pressed');
+      };
+      el.addEventListener('pointerup', up);
+      el.addEventListener('pointercancel', up);
+    }
+    document.body.append(act, ring, lbl);
     this.actionEl = act;
+    this.ringEl = ring;
+    this.labelEl = lbl;
 
     // comandi della camera (terza persona)
     const cam = document.createElement('div');
@@ -362,48 +376,75 @@ export class UI {
    * Si tocca (o si tiene premuto) l'oggetto stesso: niente pulsante fisso.
    */
   setAction(p: ActionPrompt | null) {
+    this.actionPrompt = p;
     const key = p ? p.icon + p.label : '';
     if (key !== this.lastAction) {
       this.lastAction = key;
       this.actionEl.classList.toggle('on', !!p);
-      if (p) {
-        this.actionIco.textContent = p.icon;
-        this.actionTxt.textContent = p.label;
-        this.actionTxt.dataset.ico = p.icon;
-      }
+      this.labelEl.classList.toggle('on', !!p);
+      if (p) this.labelEl.textContent = `${p.icon} ${p.label}`;
     }
-    this.actionProg.style.setProperty('--p', `${Math.round((p?.progress ?? 0) * 100)}%`);
-    if (p) this.placeAction(p);
+    // cerchio: solo per le azioni da tenere premute (si riempie), o un lampo dopo un tocco
+    const flash = (performance.now() - this.flashT) / 260;
+    const hold = !!p && p.progress !== undefined;
+    // il lampo resta anche se l'azione è appena finita (l'oggetto preso non ha più un'azione)
+    const showRing = hold || flash < 1.3;
+    this.ringEl.classList.toggle('on', showRing);
+    const fill = hold ? p!.progress! : Math.min(1, flash);
+    this.ringEl.style.setProperty('--p', `${Math.round(Math.min(1, fill) * 100)}%`);
+    this.ringEl.classList.toggle('full', !hold && flash >= 1);
+    if (p) this.placeAction(p, showRing);
   }
 
   private actionV = new THREE.Vector3();
   private actionV2 = new THREE.Vector3();
-  /** Porta l'anello sul punto dello schermo dove si vede l'oggetto (dentro lo schermo e la safe area). */
-  private placeAction(p: ActionPrompt) {
+  /**
+   * Zona da toccare sull'oggetto (un po' più grande dell'oggetto sullo schermo), cerchio poco sopra
+   * la testa del personaggio, scritta in alto subito sotto il riquadro (soldi, lavoretto o "in mano").
+   */
+  private placeAction(p: ActionPrompt, ring: boolean) {
     const g = this.game;
     const v = this.actionV;
-    if (p.at) v.copy(p.at);
-    else v.copy(g.player.root.position).setY(1.1);
+    const { w, h, safe } = layout.info;
     const cam = g.activeCamera;
     cam.updateMatrixWorld();
-    // grandezza dell'anello: circa quanto un oggetto di 1,3 m sullo schermo (tra 62 e 96 px)
-    const side = this.actionV2.setFromMatrixColumn(cam.matrixWorld, 0).normalize().multiplyScalar(1.3).add(v).project(cam);
+    const toScreen = (q: THREE.Vector3) => ({ x: ((q.x + 1) / 2) * w, y: ((1 - q.y) / 2) * h });
+    if (p.at) v.copy(p.at);
+    else v.copy(g.player.root.position).setY(1.1);
+    // zona da toccare: quanto un oggetto di 1,6 m sullo schermo, tra 76 e 116 px
+    const side = this.actionV2.setFromMatrixColumn(cam.matrixWorld, 0).normalize().multiplyScalar(1.6).add(v).project(cam);
     v.project(cam);
-    const { w, h, safe } = layout.info;
-    const px = Math.hypot((side.x - v.x) * w, (side.y - v.y) * h) / 2;
-    const d = Math.round(THREE.MathUtils.clamp(px, 62, 96));
-    this.actionEl.style.setProperty('--ring', `${d}px`);
+    const o = toScreen(v);
+    const sd = toScreen(side);
+    const d = Math.round(THREE.MathUtils.clamp(Math.hypot(sd.x - o.x, sd.y - o.y), 76, 116));
     const r = d / 2;
-    const x = THREE.MathUtils.clamp(((v.x + 1) / 2) * w, safe.left + r + 4, w - safe.right - r - 4);
-    const y = THREE.MathUtils.clamp(((1 - v.y) / 2) * h, safe.top + r + 4, h - safe.bottom - r - 40);
-    this.actionEl.style.left = `${Math.round(x)}px`;
-    this.actionEl.style.top = `${Math.round(y)}px`;
-    // la scritta va sopra l'anello quando l'oggetto è in basso
-    this.actionEl.classList.toggle('lbl-up', y > h - safe.bottom - r - 90);
-    // la scritta resta tutta dentro lo schermo (si sposta di lato se l'anello è vicino al bordo)
-    const tw = this.actionTxt.offsetWidth;
-    const lx = THREE.MathUtils.clamp(0, safe.left + 6 - (x - tw / 2), w - safe.right - 6 - (x + tw / 2));
-    this.actionEl.style.setProperty('--lx', `${Math.round(lx)}px`);
+    this.actionEl.style.setProperty('--hit', `${d}px`);
+    this.actionEl.style.left = `${Math.round(THREE.MathUtils.clamp(o.x, safe.left + r, w - safe.right - r))}px`;
+    this.actionEl.style.top = `${Math.round(THREE.MathUtils.clamp(o.y, safe.top + r, h - safe.bottom - r))}px`;
+    // cerchio poco sopra la testa
+    if (ring) {
+      const head = toScreen(v.copy(g.player.root.position).setY(p.headY ?? 2.6).project(cam));
+      const rr = this.ringEl.offsetWidth / 2 || 42;
+      this.ringEl.style.left = `${Math.round(THREE.MathUtils.clamp(head.x, safe.left + rr, w - safe.right - rr))}px`;
+      this.ringEl.style.top = `${Math.round(THREE.MathUtils.clamp(head.y - rr * 0.6, safe.top + rr, h - safe.bottom - rr))}px`;
+    }
+    // scritta: subito sotto il riquadro più in basso tra quelli in alto a sinistra
+    let top = safe.top;
+    let left = safe.left + 10;
+    // (con il tutorial la scritta va sotto il suo fumetto, che resta fermo subito sotto il riquadro)
+    for (const sel of ['.hud-top .pills', '.jobbar.on', '.preview-bar', '.hand-badge', '.tut-bubble']) {
+      for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+        if (getComputedStyle(el).display === 'none') continue;
+        const b = el.getBoundingClientRect();
+        if (b.height < 2 || b.top > h / 2) continue;
+        if (b.bottom > top) {
+          top = b.bottom;
+          left = b.left;
+        }
+      }
+    }
+    this.labelEl.style.left = `${Math.round(left)}px`;
+    this.labelEl.style.top = `${Math.round(top + 6)}px`;
   }
 
   jobBar(on: boolean) {
@@ -658,13 +699,19 @@ export class UI {
         <div class="stat s-purple"><b>📍 ${ZONES[zone].name}</b><span>zona · clienti ×${ZONES[zone].demand}</span></div>
         <div class="stat s-orange"><b>${euro(lot.rent)}</b><span>${lot.kind === 'truck' ? '🅿️ posteggio' : '🏠 affitto'} al mese</span></div>
       </div>
-      ${canBuy ? '' : '<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all\'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>'}
+      ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>
+        <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
       <h3 class="sec-title">Cosa puoi aprire qui</h3>${opts}
       <p class="muted small">* Stima con la domanda di oggi, un dipendente per reparto e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.</p>`;
   }
 
   private buyActions() {
     return {
+      // il lotto diventa l'obiettivo sulla mappa: la linea e le frecce portano lì
+      target: (lotId: string) => {
+        this.game.setLotTarget(lotId);
+        this.close();
+      },
       buy: (arg: string) => {
         const [lotId, t] = arg.split('|');
         const b = buyLot(this.s, lotId, t as BusinessType);
@@ -928,6 +975,8 @@ export class UI {
       const slots = menuSlots(b);
       return `<p class="muted small">Scegli cosa offrire guardando la domanda di oggi (${b.products.length}/${slots} posti). La domanda cambia ogni giorno, con le stagioni, il meteo e gli eventi.</p>` +
         type.products
+          // i prodotti che servono un ampliamento non ancora comprato non si mostrano
+          .filter((p) => productLevel(b.type, p) <= upg(b, 'ampliamento'))
           .map((p) => {
             const pr = PRODUCTS[p];
             const on = b.products.includes(p);
@@ -1330,7 +1379,7 @@ export class UI {
               m.claimed ? '<span class="tag g">Riscossa</span>' : done ? `<button class="btn sm good" data-a="claim:${m.id}">Riscuoti</button>` : ''
             }</div>
             <div class="bar green"><i style="width:${(m.progress / m.target) * 100}%"></i></div>
-            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${JOB_TYPES.map((t) => `<span style="opacity:${m.types?.includes(t) ? 1 : 0.3}">${JOBS[t].icon}</span>`).join(' ')}</div>` : ''}
+            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${JOB_TYPES.map((t) => { const n = m.types?.filter((x) => x === t).length ?? 0; return `<span style="opacity:${n ? 1 : 0.35}">${JOBS[t].icon} ${n}/3</span>`; }).join(' · ')}</div>` : ''}
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(m.progress)}/${m.target}</span><span>Premio ${euro(m.reward)} · +${m.fame.toFixed(0)} fama ${SKILLS[m.fameSkill].icon}</span></div></div>`;
         };
         const ms = s.missions.map(card).join('');

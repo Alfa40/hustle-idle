@@ -374,7 +374,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **👁️ Prova prima di comprare**: accanto a "Migliora" per Ampliamento, Fuochi extra, Banco extra, Ripiano più grande e Attrezzatura, e accanto ad "Assumi" per i candidati (non il manager). Si entra in una copia del locale con la modifica già fatta (l'ampliamento mette in vendita anche i prodotti che sblocca), scorte piene e un cliente ogni 7 secondi a qualsiasi ora, insieme ai dipendenti che hai già. Niente guadagni né spese, l'attività vera continua a lavorare. Riquadro viola in alto: cosa stai provando, ordini serviti, "✖ Esci" e "✅ Compra" (o "Assumi"; dice "Mancano €…" se non bastano i soldi). Uscendo torni dov'eri e si riapre la scheda dell'attività
 
 ### Tocca l'oggetto (niente pulsante azione)
-- Non c'è più il pulsante giallo fisso: quando sei abbastanza vicino, sull'oggetto da usare compare un **anello giallo che lampeggia** con la scritta dell'azione (sotto, o sopra se l'oggetto è in basso). Si tocca l'oggetto per le azioni "tocca" e si tiene il dito sopra per quelle "tieni premuto" (l'anello si riempie di verde). Vale in città (entrare, lavoretti), nei lavoretti, nelle attività, nelle case dei clienti e nella cucina del lavapiatti. Su PC restano E e spazio
+- Non c'è più il pulsante giallo fisso: quando sei abbastanza vicino si tocca **l'oggetto che lampeggia** (la zona da toccare, invisibile, è un po' più grande dell'oggetto: 76–116 px). La **scritta dell'azione** sta in alto, subito sotto il riquadro (soldi, lavoretto o "in mano"; con il tutorial sotto il suo fumetto). Il **cerchio** semitrasparente, piccolo, poco sopra la testa del personaggio, compare solo per le azioni "tieni premuto" e si riempie di verde tenendo il dito sull'oggetto o sul cerchio (il pulsante del cerchio è più grande del disegno); con un tocco singolo il cerchio si riempie in un lampo per far vedere che l'azione è partita. Vale in città, nei lavoretti, nelle attività, nelle case dei clienti e nella cucina del lavapiatti. Su PC restano E e spazio
 - Ogni azione dice dove sta l'oggetto (`ActionPrompt.at`); il pulsante Sali/Scendi del veicolo è passato in basso a destra
 - Le manine dei tutorial sono più grandi, con il bordo bianco, e toccano il centro dell'anello
 
@@ -392,6 +392,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **👥 Amici**: in ordine di fama (tu evidenziato). Toccando un amico si apre l'anteprima del suo profilo (soldi, €/s, lavoretti, attività, clienti, livello, giorni di gioco) con "Togli dagli amici". "➕ Invita nuovi amici" apre la tendina con il tuo codice (Copia / Invia) e il campo per aggiungere un codice. Aggiungendo qualcuno gli arriva una **richiesta di amicizia**: la vede in "📨 Richieste" (pallino sul pulsante Profilo) e ricambia con "✅ Accetta", senza mandarti il suo codice
 - **🏆 Classifiche**: 🌍 Mondo o 👥 Amici, per ⭐ Fama, 💰 Soldi guadagnati, 🧰 Lavoretti, 🏢 Attività, 🍔 Clienti serviti
 - Server (`~/quartiere-ostile-3d-leaderboard/server.js`, solo chiavi `hustle:`): `stats` nel profilo del giocatore, classifiche `hustle:lb:money|jobs|biz|served` (`/leaderboard?game=hustle&kind=…`), richieste `hustle:req:<id>` (`POST /leaderboard/friend-request`, `GET /leaderboard/friend-requests`, `POST /leaderboard/friend-answer`)
+
+### Strada e obiettivi
+- La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
+- Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo
+- Prodotti delle attività: si vedono solo quelli già disponibili; quelli che servono un ampliamento compaiono quando lo compri
+- Missioni settimanali più difficili e meno ricche per unità: 30–40 lavoretti, 3 stelle in 15–20, 3 lavoretti di ogni tipo, 120–180 clienti, guadagna ~€3.000 (premio 20%)
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

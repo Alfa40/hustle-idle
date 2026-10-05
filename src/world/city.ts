@@ -88,6 +88,102 @@ export class City {
     return new THREE.Vector3((c - (this.cols - 1) / 2) * TILE, 0, (r - (this.rows - 1) / 2) * TILE);
   }
 
+  /** Tessera in cui sta un punto. */
+  tileOf(p: THREE.Vector3) {
+    return { c: Math.round(p.x / TILE + (this.cols - 1) / 2), r: Math.round(p.z / TILE + (this.rows - 1) / 2) };
+  }
+
+  isRoad(c: number, r: number) {
+    return this.at(c, r) === '#';
+  }
+
+  private routeKey = '';
+  private routeTiles: { c: number; r: number }[] | null = null;
+
+  /**
+   * Strada più breve (sulle tessere di strada) dal giocatore all'obiettivo, come punti da unire:
+   * parte dal giocatore, segue il centro delle strade girando agli incroci e finisce sull'obiettivo.
+   * null se il giocatore non è su una strada (allora resta solo la freccia).
+   */
+  route(from: THREE.Vector3, to: THREE.Vector3): THREE.Vector3[] | null {
+    const a = this.tileOf(from);
+    if (!this.isRoad(a.c, a.r)) return null;
+    // tessera di strada più vicina all'obiettivo
+    const g = this.tileOf(to);
+    let best: { c: number; r: number } | null = null;
+    let bd = Infinity;
+    for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) {
+      const c = g.c + dc;
+      const r = g.r + dr;
+      if (!this.isRoad(c, r)) continue;
+      const d = this.center(c, r).distanceToSquared(to);
+      if (d < bd) {
+        bd = d;
+        best = { c, r };
+      }
+    }
+    if (!best) return null;
+    const key = `${a.c},${a.r}>${best.c},${best.r}`;
+    if (key !== this.routeKey) {
+      this.routeKey = key;
+      this.routeTiles = this.bfs(a, best);
+    }
+    const tiles = this.routeTiles;
+    if (!tiles) return null;
+    // stessa tessera: basta un tratto dritto
+    if (tiles.length === 1) return [from.clone(), to.clone()];
+    const pts = tiles.map((t) => this.center(t.c, t.r));
+    // primo e ultimo tratto: si resta sull'asse della strada (niente andata e ritorno al centro della tessera)
+    if (pts.length >= 2) {
+      const [p0, p1] = pts;
+      if (p0.x === p1.x) p0.z = from.z;
+      else p0.x = from.x;
+      const q0 = pts[pts.length - 1];
+      const q1 = pts[pts.length - 2];
+      if (q0.x === q1.x) q0.z = THREE.MathUtils.clamp(to.z, Math.min(q0.z, q1.z) - TILE / 2, Math.max(q0.z, q1.z) + TILE / 2);
+      else q0.x = THREE.MathUtils.clamp(to.x, Math.min(q0.x, q1.x) - TILE / 2, Math.max(q0.x, q1.x) + TILE / 2);
+    }
+    // solo gli angoli (i punti in linea retta si tolgono)
+    const out = [from.clone()];
+    for (let i = 0; i < pts.length; i++) {
+      const prev = i ? pts[i - 1] : from;
+      const next = pts[i + 1] ?? to;
+      const straight = (Math.abs(prev.x - pts[i].x) < 0.01 && Math.abs(next.x - pts[i].x) < 0.01) || (Math.abs(prev.z - pts[i].z) < 0.01 && Math.abs(next.z - pts[i].z) < 0.01);
+      if (!straight) out.push(pts[i]);
+    }
+    out.push(to.clone());
+    return out;
+  }
+
+  /** Ricerca in ampiezza sulle tessere di strada (4 direzioni): il percorso con meno tessere. */
+  private bfs(a: { c: number; r: number }, b: { c: number; r: number }) {
+    const W = this.cols;
+    const prev = new Int32Array(W * this.rows).fill(-2);
+    const start = a.r * W + a.c;
+    const goal = b.r * W + b.c;
+    prev[start] = -1;
+    const q = [start];
+    for (let i = 0; i < q.length; i++) {
+      const cur = q[i];
+      if (cur === goal) break;
+      const c = cur % W;
+      const r = (cur - c) / W;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc;
+        const nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= W || nr >= this.rows || !this.isRoad(nc, nr)) continue;
+        const n = nr * W + nc;
+        if (prev[n] !== -2) continue;
+        prev[n] = cur;
+        q.push(n);
+      }
+    }
+    if (prev[goal] === -2) return null;
+    const path: { c: number; r: number }[] = [];
+    for (let k = goal; k !== -1; k = prev[k]) path.push({ c: k % W, r: Math.floor(k / W) });
+    return path.reverse();
+  }
+
   private roadDir(c: number, r: number): Dir {
     for (const d of ['S', 'N', 'E', 'W'] as Dir[]) {
       const [dx, dz] = DIR_VEC[d];

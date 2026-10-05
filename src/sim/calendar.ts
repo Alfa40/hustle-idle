@@ -130,6 +130,7 @@ export function genMissions(s: GameState) {
 const DAILY_MISSIONS = 5;
 
 export const weekOf = (d: number) => Math.floor(d / 7);
+const WEEKLY_VER = 2;
 
 /** Giorni che restano alle missioni della settimana (compreso oggi). */
 export const weeklyDaysLeft = (s: GameState) => 7 - (day(s) % 7);
@@ -137,8 +138,10 @@ export const weeklyDaysLeft = (s: GameState) => 7 - (day(s) % 7);
 /** Se è cominciata una nuova settimana, nuove missioni settimanali (2, più lunghe e ricche). */
 export function ensureWeekly(s: GameState) {
   const w = weekOf(day(s));
-  if (s.weeklyWeek === w && s.weekly?.length) return;
+  // WEEKLY_VER: le missioni create con le regole vecchie si rifanno
+  if (s.weeklyWeek === w && s.weekly?.length && s.weeklyVer === WEEKLY_VER) return;
   s.weeklyWeek = w;
+  s.weeklyVer = WEEKLY_VER;
   s.weekEarned = 0;
   const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
   const owns = s.businesses.length > 0;
@@ -151,43 +154,45 @@ export function ensureWeekly(s: GameState) {
   s.weekly = kinds.map((kind, i) => {
     let m: Pick<Mission, 'kind' | 'text' | 'target' | 'reward'>;
     switch (kind) {
+      // più difficili delle giornaliere e, a parità di lavoro, pagano meno: il premio è grosso solo perché sono lunghe
       case 'jobs': {
-        const n = randInt(15, 20);
-        m = { kind, text: `🗓️ Completa ${n} lavoretti questa settimana`, target: n, reward: 60 * n * scale };
+        const n = randInt(30, 40);
+        m = { kind, text: `🗓️ Completa ${n} lavoretti questa settimana`, target: n, reward: 25 * n * scale };
         break;
       }
       case 'stars3': {
-        const n = randInt(6, 9);
-        m = { kind, text: `🗓️ ⭐ Ottieni 3 stelle in ${n} lavori`, target: n, reward: 110 * n * scale };
+        const n = randInt(15, 20);
+        m = { kind, text: `🗓️ ⭐ Ottieni 3 stelle in ${n} lavori`, target: n, reward: 35 * n * scale };
         break;
       }
       case 'variety':
-        m = { kind, text: '🗓️ Fai almeno un lavoretto di ogni tipo (tutti e 6)', target: JOB_TYPES.length, reward: 160 * JOB_TYPES.length * scale };
+        m = { kind, text: '🗓️ Fai almeno 3 lavoretti di ogni tipo (tutti e 6)', target: JOB_TYPES.length * 3, reward: 30 * JOB_TYPES.length * 3 * scale };
         break;
       case 'served': {
-        const n = randInt(50, 80);
-        m = { kind, text: `🗓️ 🍔 Servi ${n} clienti di persona`, target: n, reward: 16 * n * scale };
+        const n = randInt(120, 180);
+        m = { kind, text: `🗓️ 🍔 Servi ${n} clienti di persona`, target: n, reward: 5 * n * scale };
         break;
       }
       default: {
-        const n = Math.round((1200 * scale) / 50) * 50;
-        m = { kind: 'earn', text: `🗓️ 💶 Guadagna €${n} questa settimana`, target: n, reward: n * 0.5 };
+        const n = Math.round((3000 * scale) / 50) * 50;
+        m = { kind: 'earn', text: `🗓️ 💶 Guadagna €${n} questa settimana`, target: n, reward: n * 0.2 };
       }
     }
     const skill = kind === 'served' ? 'clientela' : pick(SKILL_IDS);
-    return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: 8 + 3 * scale, types: [] };
+    return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: 6 + 2 * scale, types: [] };
   });
 }
 
 export function missionProgress(s: GameState, kind: Mission['kind'], opts: { jobType?: string; amount?: number } = {}) {
   let changed = false;
   for (const m of [...s.missions, ...(s.weekly ?? [])]) {
-    // "ogni tipo di lavoretto": conta i tipi diversi fatti nella settimana
+    // "3 lavoretti di ogni tipo": ogni tipo conta al massimo 3 volte (in `types` un elemento per lavoretto)
     if (kind === 'jobType' && m.kind === 'variety' && !m.claimed && opts.jobType) {
       const t = opts.jobType as NonNullable<Mission['types']>[number];
-      if (!(m.types ??= []).includes(t)) {
-        m.types.push(t);
-        m.progress = Math.min(m.target, m.types.length);
+      const list = (m.types ??= []);
+      if (list.filter((x) => x === t).length < 3 && m.progress < m.target) {
+        list.push(t);
+        m.progress = Math.min(m.target, list.length);
         if (m.progress >= m.target) toast(`✅ Missione completata: ${m.text}`, 'good');
         changed = true;
       }

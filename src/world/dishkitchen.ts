@@ -355,7 +355,8 @@ export class DishKitchen {
     this.fx.update(dt);
     // acqua del lavello che si muove un po'
     this.water.position.y = 1.0 + Math.sin(performance.now() / 300) * 0.01;
-    this.game.ui.setAction(this.interact(dt));
+    const pr = this.interact(dt);
+    this.game.ui.setAction(pr && { ...pr, headY: this.heldSprite ? 3.0 : 2.6 });
   }
 
   private interact(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {

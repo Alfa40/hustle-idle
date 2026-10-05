@@ -1464,7 +1464,7 @@ export class TruckInterior {
     const pr = this.interact(best, dt, input.actionHeld, pressed);
     // l'anello da toccare sta sul mobile della postazione
     const k = best.def.kind;
-    g.ui.setAction(pr && { ...pr, at: best.pos.clone().setY(k === 'counter' || k === 'pass' ? 1.15 : best.tagY > 2 ? 1.3 : 1.0) });
+    g.ui.setAction(pr && { ...pr, at: best.pos.clone().setY(k === 'counter' || k === 'pass' ? 1.15 : best.tagY > 2 ? 1.3 : 1.0), headY: this.hand.length ? 3.1 : 2.6 });
   }
 
   /** ultima volta (ms) che il giocatore ha lavorato a una postazione */
