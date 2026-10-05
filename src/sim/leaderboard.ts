@@ -1,5 +1,6 @@
-import type { GameState } from './state';
-import { rank, totalFame } from './progress';
+import { day, playStats, type GameState } from './state';
+import { rank, totalFame, totalLevel } from './progress';
+import { estimateMonthlyProfit, isAutonomous } from './economy';
 import { preloadLogo, safeLogo, type Logo } from '../logo';
 
 /**
@@ -18,9 +19,43 @@ export interface LbEntry {
   nickname: string;
   fame: number;
   money: number;
+  /** valore della classifica scelta (fama, soldi, lavoretti…) */
+  value?: number;
   title: string;
   logo?: Logo | null;
   me?: boolean;
+}
+
+/** Classifiche disponibili (oltre alla fama). */
+export type BoardKind = 'fame' | 'money' | 'jobs' | 'biz' | 'served';
+
+/** Statistiche principali inviate al server: le vedono gli amici nell'anteprima del profilo. */
+export interface PublicStats {
+  jobs?: number;
+  jobs3?: number;
+  served?: number;
+  orders?: number;
+  bizOpened?: number;
+  bizFailed?: number;
+  missions?: number;
+  playSec?: number;
+  days?: number;
+  level?: number;
+  perSec?: number;
+}
+
+/** Quanto rendono al secondo (tempo reale) le attività che lavorano da sole: 1 mese di gioco = 2 ore. */
+export function moneyPerSecond(s: GameState) {
+  return s.businesses.filter(isAutonomous).reduce((a, b) => a + estimateMonthlyProfit(s, b), 0) / 7200;
+}
+
+export function publicStats(s: GameState): PublicStats {
+  const st = playStats(s);
+  return {
+    jobs: st.jobs, jobs3: st.jobs3, served: st.served, orders: st.orders, bizOpened: st.bizOpened, bizFailed: st.bizFailed,
+    missions: st.missions, playSec: Math.round(st.playSec), days: day(s) - st.startDay + 1, level: totalLevel(s),
+    perSec: Math.round(moneyPerSecond(s) * 100) / 100,
+  };
 }
 /** Un amico (o te) nella classifica tra amici, con le sue attività da mostrare sulla mappa. */
 export interface FriendEntry extends LbEntry {
@@ -28,6 +63,7 @@ export interface FriendEntry extends LbEntry {
   /** sta giocando adesso (furgone aperto, piano con le luci accese) */
   online?: boolean;
   bizs: { lot: string; type: string; lvl: number }[];
+  stats?: PublicStats;
 }
 export interface LbData {
   entries: LbEntry[];
@@ -91,6 +127,7 @@ export async function submit(s: GameState, force = false) {
       body: JSON.stringify({
         game: 'hustle', player_id: playerId(), nickname: nick, fame, money: Math.floor(s.totalEarned), title: rank(s),
         logo: s.logo, bizs: s.businesses.map((b) => ({ lot: b.lotId, type: b.type, lvl: b.upgrades.ampliamento ?? 0 })),
+        stats: publicStats(s),
       }),
     });
     if (r.ok) set(BEST_KEY, String(fame));
@@ -99,9 +136,9 @@ export async function submit(s: GameState, force = false) {
   }
 }
 
-export async function fetchBoard(limit = 50): Promise<LbData | null> {
+export async function fetchBoard(limit = 50, kind: BoardKind = 'fame'): Promise<LbData | null> {
   try {
-    const r = await fetch(`${API}/leaderboard?game=hustle&limit=${limit}&player_id=${playerId()}`);
+    const r = await fetch(`${API}/leaderboard?game=hustle&limit=${limit}&kind=${kind}&player_id=${playerId()}`);
     if (!r.ok) return null;
     const d = (await r.json()) as LbData;
     for (const e of [...d.entries, ...(d.me ? [d.me] : [])]) e.logo = safeLogo(e.logo);
@@ -172,11 +209,67 @@ export async function fetchFriends(): Promise<{ entries: FriendEntry[]; missing:
     for (const e of d.entries) {
       e.logo = safeLogo(e.logo);
       e.bizs = Array.isArray(e.bizs) ? e.bizs : [];
+      e.stats = e.stats && typeof e.stats === 'object' ? e.stats : {};
     }
     // le foto dei loghi si decodificano prima di disegnarle
     await Promise.all(d.entries.map((e) => preloadLogo(e.logo)));
     return d;
   } catch {
     return null;
+  }
+}
+
+// ---------------- richieste di amicizia ----------------
+
+/** Chi ha aggiunto il tuo codice e aspetta che ricambi. */
+export interface FriendRequest {
+  code: string;
+  nickname: string;
+  fame: number;
+  title: string;
+  logo?: Logo | null;
+}
+
+/** Aggiungendo un amico gli arriva la richiesta: può ricambiare con un tocco. */
+export async function sendFriendRequest(code: string): Promise<'ok' | 'missing' | 'error'> {
+  try {
+    const r = await fetch(API + '/leaderboard/friend-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game: 'hustle', player_id: playerId(), code }),
+    });
+    return r.ok ? 'ok' : r.status === 404 ? 'missing' : 'error';
+  } catch {
+    return 'error';
+  }
+}
+
+/** Richieste ricevute (senza quelle di chi è già tuo amico). */
+export async function fetchFriendRequests(): Promise<FriendRequest[] | null> {
+  try {
+    const r = await fetch(`${API}/leaderboard/friend-requests?game=hustle&player_id=${playerId()}`);
+    if (!r.ok) return null;
+    const d = (await r.json()) as { requests: FriendRequest[] };
+    const mine = friendCodes();
+    const list = (d.requests ?? []).filter((x) => !mine.includes(x.code));
+    for (const x of list) x.logo = safeLogo(x.logo);
+    await Promise.all(list.map((x) => preloadLogo(x.logo)));
+    return list;
+  } catch {
+    return null;
+  }
+}
+
+/** Accetta (aggiunge l'amico, senza scambiarsi i codici) o rifiuta una richiesta. */
+export async function answerFriendRequest(code: string, accept: boolean) {
+  if (accept) addFriend(code);
+  try {
+    await fetch(API + '/leaderboard/friend-answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game: 'hustle', player_id: playerId(), code }),
+    });
+  } catch {
+    /* offline: la richiesta resta, ma è già tra gli amici e non si vede più */
   }
 }

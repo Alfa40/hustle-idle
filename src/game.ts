@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry } from './sim/leaderboard';
+import { fetchFriendRequests, fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry, type FriendRequest } from './sim/leaderboard';
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
 import { BUSINESS, JOB, jobDifficulty, TIME } from './config/balance';
@@ -14,7 +14,7 @@ import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
 import {
-  day, hourOf, loadState, newState, pick, rand, saveState, setCurrentSlot,
+  day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot,
   type GameState, type JobOffer,
 } from './sim/state';
 import { Character, charPath } from './world/character';
@@ -494,7 +494,17 @@ export class Game {
    * Scarica amici, loghi, attività e chi sta giocando. Sullo stesso posto possono stare
    * la tua attività e quelle degli amici: più furgoni affiancati, o un piano per amico sugli edifici.
    */
+  /** richieste di amicizia in attesa (pallino sul pulsante Profilo) */
+  friendRequests: FriendRequest[] = [];
+  async refreshFriendRequests() {
+    const r = await fetchFriendRequests();
+    if (!r) return;
+    this.friendRequests = r;
+    this.ui?.refresh();
+  }
+
   async refreshFriends() {
+    void this.refreshFriendRequests();
     const d = await fetchFriends();
     if (!d) return;
     this.friends = d.entries;
@@ -1052,12 +1062,17 @@ export class Game {
       addFame(s, def.skill, fame);
       // fatto sul serio almeno una volta: il tutorial di questo tipo resta spento (a ogni livello)
       s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), offer.type])];
+      const st = playStats(s);
+      st.jobs++;
+      if (stars === 3) st.jobs3++;
+      st.jobsByType[offer.type] = (st.jobsByType[offer.type] ?? 0) + 1;
       missionProgress(s, 'jobs');
       missionProgress(s, 'jobType', { jobType: offer.type });
       if (stars === 3) missionProgress(s, 'stars3');
     } else {
       fame = -1;
       addFame(s, def.skill, fame);
+      playStats(s).jobsFailed++;
     }
     this.removeNpc(offer.id);
     this.nextJobSpawn = Math.min(this.nextJobSpawn, rand(JOB.RESPAWN_MIN_SEC, JOB.RESPAWN_MAX_SEC));
@@ -1082,6 +1097,7 @@ export class Game {
       for (const k of def.skills) addXp(s, k, Math.round(xp / def.skills.length));
       missionProgress(s, 'served');
     } else addFame(s, def.skills[0], -1);
+    if (stars > 0) playStats(this.state).orders++;
     this.ui.openOrderResult(biz, order, stars, earned, xp);
     this.save();
   }
@@ -1290,6 +1306,7 @@ export class Game {
 
     // il tempo del gioco scorre sempre (è un idle), anche con i pannelli aperti
     advance(s, dt * TIME.GAME_MIN_PER_SEC);
+    playStats(s).playSec += dt;
     this.view.update(dt);
 
     if (!this.paused) {

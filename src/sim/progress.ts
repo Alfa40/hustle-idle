@@ -1,13 +1,15 @@
 import { LEVEL } from '../config/balance';
 import { SKILLS, SKILL_IDS, type SkillId } from '../config/skills';
 import { bus, toast } from './bus';
-import { euro, type GameState } from './state';
+import { euro, playStats, type GameState } from './state';
 
 /** `fromMission`: premio di una missione, che non conta per le missioni "Guadagna €…". */
 export function addMoney(s: GameState, amount: number, reason?: string, fromMission = false) {
   s.money += amount;
   if (amount > 0 && !fromMission) {
     s.todayEarned += amount;
+    const st = playStats(s);
+    st.bestDay = Math.max(st.bestDay, s.todayEarned);
     s.weekEarned = (s.weekEarned ?? 0) + amount;
     s.totalEarned += amount;
     for (const m of s.missions) if (m.kind === 'earn' && !m.claimed) m.progress = Math.min(m.target, s.todayEarned);

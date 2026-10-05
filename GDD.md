@@ -385,6 +385,14 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **Missioni**: 5 al giorno e 2 della settimana (più lunghe, premi ~5 volte più alti: 15–20 lavoretti, 3 stelle in 6–9 lavori, un lavoretto di ogni tipo, 50–80 clienti, guadagna ~€1.200 nella settimana). I premi delle missioni non contano per "Guadagna €…"
 - **Progressione**: fino al Liv. 5 servono il 40% di XP in meno (Liv. 2: 30, 3: 120, 4: 270, 5: 480), poi la salita è più graduale (6: 990, 7: 1.620, 8: 2.370, 10: 4.230). La difficoltà dei lavoretti cresce di un gradino a livello fino al 5, poi di 0,6 (`jobDifficulty` in config/balance.ts)
 
+### Finestre e profilo (ottobre)
+- **‹ Indietro**: ogni finestra aperta da un'altra finestra ha il tasto ‹ in alto a sinistra, che riporta alla precedente con la sua scheda (es. Attività → gestione di un'attività → ‹ → un'altra attività; Profilo → Statistiche → ‹). ✕ chiude tutto
+- **Profilo**: logo, nome (✏️ per cambiarlo), rango, fama e livello totale; sotto, una barra con 5 pulsanti: 📊 Statistiche, 👥 Amici (con il numero di richieste), ⭐ Esperienza (fama ed esperienza per campo, come prima), 🏆 Classifiche, 🎨 Logo (come prima); poi soldi guadagnati, €/s, attività e lavoretti
+- **📊 Statistiche** (`state.stats`): giorni e tempo di gioco, rango, fama, livello, missioni; soldi adesso, guadagnati in totale e oggi, miglior giornata, €/s delle attività autonome (utile stimato al mese ÷ 7.200 s, cioè un mese di gioco), utile al mese; lavoretti completati, con 3 stelle, falliti e per tipo; attività aperte, attive, autonome, fallite (per ora non possono fallire: resta 0), clienti serviti di persona, ordini a domicilio; scheda di ogni attività con incassi
+- **👥 Amici**: in ordine di fama (tu evidenziato). Toccando un amico si apre l'anteprima del suo profilo (soldi, €/s, lavoretti, attività, clienti, livello, giorni di gioco) con "Togli dagli amici". "➕ Invita nuovi amici" apre la tendina con il tuo codice (Copia / Invia) e il campo per aggiungere un codice. Aggiungendo qualcuno gli arriva una **richiesta di amicizia**: la vede in "📨 Richieste" (pallino sul pulsante Profilo) e ricambia con "✅ Accetta", senza mandarti il suo codice
+- **🏆 Classifiche**: 🌍 Mondo o 👥 Amici, per ⭐ Fama, 💰 Soldi guadagnati, 🧰 Lavoretti, 🏢 Attività, 🍔 Clienti serviti
+- Server (`~/quartiere-ostile-3d-leaderboard/server.js`, solo chiavi `hustle:`): `stats` nel profilo del giocatore, classifiche `hustle:lb:money|jobs|biz|served` (`/leaderboard?game=hustle&kind=…`), richieste `hustle:req:<id>` (`POST /leaderboard/friend-request`, `GET /leaderboard/friend-requests`, `POST /leaderboard/friend-answer`)
+
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
 - Offerte d'acquisto casuali per le attività redditizie

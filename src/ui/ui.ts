@@ -24,11 +24,11 @@ import {
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
-import { addFame, addMoney, rank, skillLevel, totalFame } from '../sim/progress';
-import { addFriend, fetchBoard, fetchFriends, friendCode, MAX_NICK, nickname as lbNickname, removeFriend, setNickname as setLbNickname, submit as submitScore, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
+import { addFame, addMoney, rank, skillLevel, totalFame, totalLevel } from '../sim/progress';
+import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
-  currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, wipeSave, yearOf,
+  currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, playStats, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type Mission, type ServiceOrder,
 } from '../sim/state';
 
@@ -52,7 +52,12 @@ interface Panel {
   /** dopo ogni render (es. per disegnare un canvas) */
   after?: (body: HTMLElement) => void;
   onClose?: () => void;
+  /** finestra da cui si è arrivati: il tasto "‹ Indietro" ci riporta lì */
+  back?: Panel;
 }
+
+/** Soldi al secondo con i centesimi (es. "€1,70/s"). */
+const perSec = (v: number) => `€${v.toFixed(2).replace('.', ',')}/s`;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -86,6 +91,10 @@ export class UI {
   private liveTimer = 0;
   private lastAction = '';
   private queue: Panel[] = [];
+  /** finestra in cui si è appena toccato un pulsante: se apre un'altra finestra, ci si potrà tornare */
+  private navFrom: Panel | null = null;
+  /** finestra appena lasciata durante una navigazione (diventa il "back" della prossima) */
+  private backCandidate: Panel | null = null;
   private minimap!: Minimap;
   private mapScreen!: MapScreen;
   private rideEl!: HTMLButtonElement;
@@ -121,7 +130,7 @@ export class UI {
       <div class="hud-btns">
         <button class="hbtn c-orange" data-h="biz"><span class="i">🏢</span><span class="l">Attività</span></button>
         <button class="hbtn c-purple" data-h="missions"><span class="i">📋</span><span class="l">Missioni</span><span class="dot" id="h-dot" style="display:none">!</span></button>
-        <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span></button>
+        <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span><span class="dot" id="h-dot-p" style="display:none">!</span></button>
         <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
         <button class="hbtn c-pink" data-h="shop"><span class="i">🛍️</span><span class="l">Negozio</span></button>
         <button class="hbtn c-gray" data-h="settings"><span class="i">⚙️</span><span class="l">Opzioni</span></button>
@@ -412,7 +421,11 @@ export class UI {
     this.missionDot.style.display = claimable ? '' : 'none';
     // se Missioni è nel menu, il "!" compare anche sul pulsante ☰
     const dot2 = this.root.querySelector('#h-dot2') as HTMLElement | null;
-    if (dot2) dot2.style.display = claimable && !this.hudShown.includes('missions') ? '' : 'none';
+    // richieste di amicizia: pallino su Profilo (e sul ☰ se Profilo è nel menu)
+    const req = this.game.friendRequests.length > 0;
+    const dotP = this.root.querySelector('#h-dot-p') as HTMLElement | null;
+    if (dotP) dotP.style.display = req ? '' : 'none';
+    if (dot2) dot2.style.display = (claimable && !this.hudShown.includes('missions')) || (req && !this.hudShown.includes('profile')) ? '' : 'none';
   }
 
   toast(text: string, kind = 'info') {
@@ -429,18 +442,25 @@ export class UI {
 
   private open(p: Panel) {
     if (this.panel) {
-      // un pannello alla volta: gli altri aspettano
-      this.queue.push(p);
-      return;
+      // da un pulsante di una finestra si apre un'altra finestra: si va avanti (con "Indietro")
+      if (this.navFrom && this.panel === this.navFrom) this.close();
+      else {
+        // un pannello alla volta: gli altri aspettano
+        this.queue.push(p);
+        return;
+      }
     }
+    if (this.backCandidate && this.backCandidate !== p && !p.locked) p.back = this.backCandidate;
+    this.backCandidate = null;
     this.panel = p;
     this.game.paused = true;
     this.game.input.cancel();
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head"><h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
+    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
+    modal.querySelector('.back')?.addEventListener('click', () => this.goBack());
     if (p.locked) (modal.querySelector('.x') as HTMLElement).style.display = 'none';
     modal.addEventListener('pointerdown', (e) => {
       if (e.target === modal && !this.panel?.locked) this.close();
@@ -449,8 +469,16 @@ export class UI {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-a]');
       if (!el || !this.panel) return;
       const [name, arg = ''] = el.dataset.a!.split(':');
-      this.panel.actions[name]?.(arg);
+      this.navFrom = this.panel;
+      try {
+        this.panel.actions[name]?.(arg);
+      } finally {
+        this.navFrom = null;
+        this.backCandidate = null;
+      }
       if (this.panel && this.modal === modal) this.renderPanel();
+      // il pulsante ha chiuso la finestra senza aprirne un'altra: ora tocca a quelle in attesa
+      if (!this.panel && this.queue.length) this.open(this.queue.shift()!);
       this.updateDot();
     });
     modal.addEventListener('change', (e) => {
@@ -502,8 +530,25 @@ export class UI {
     this.panel = null;
     this.game.paused = false;
     p?.onClose?.();
+    // chiusa da un suo pulsante: se subito dopo si apre un'altra finestra, potrà tornare qui
+    if (p && p === this.navFrom) {
+      this.backCandidate = p;
+      return;
+    }
     const next = this.queue.shift();
     if (next) this.open(next);
+  }
+
+  /** "‹ Indietro": si torna alla finestra precedente (con la sua scheda e il suo stato). */
+  goBack() {
+    const prev = this.panel?.back;
+    if (!prev) return;
+    const p = this.panel!;
+    this.modal?.remove();
+    this.modal = null;
+    this.panel = null;
+    p.onClose?.();
+    this.open(prev);
   }
 
   get isOpen() {
@@ -1315,6 +1360,7 @@ export class UI {
           if (!m || m.claimed || m.progress < m.target) return;
           m.claimed = true;
           addMoney(s, m.reward, 'missione', true);
+          playStats(s).missions++;
           addFame(s, m.fameSkill, m.fame);
           this.game.save();
         },
@@ -1446,10 +1492,107 @@ export class UI {
 
   openProfile() {
     const s = this.s;
+    void this.game.refreshFriendRequests();
     this.open({
       title: '👤 Profilo',
       live: true,
       color: 'var(--blue)',
+      render: () => {
+        const st = playStats(s);
+        const req = this.game.friendRequests.length;
+        const btn = (a: string, icon: string, name: string, badge = 0) =>
+          `<button class="prof-btn" data-a="${a}"><span class="i">${icon}</span><span class="l">${name}</span>${badge ? `<span class="dot">${badge}</span>` : ''}</button>`;
+        return `<div class="card hero tint prof-hero"><div class="emoji">${logoImg(s.logo, 72)}</div>
+            <div class="prof-name"><b>${esc(lbNickname() || 'Senza nome')}</b><button class="btn sm sec" data-a="name" aria-label="Cambia nome">✏️</button></div>
+            <div class="big">${rank(s)}</div><div class="muted small">⭐ Fama ${totalFame(s).toFixed(1)} · Livello totale ${totalLevel(s)}</div></div>
+          <div class="prof-bar">${btn('stats', '📊', 'Statistiche')}${btn('friends', '👥', 'Amici', req)}${btn('skills', '⭐', 'Esperienza')}${btn('boards', '🏆', 'Classifiche')}${btn('logo', '🎨', 'Logo')}</div>
+          <div class="grid2"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
+          <div class="stat s-yellow"><b class="money-t">${perSec(moneyPerSecond(s))}</b><span>⏱️ dalle attività autonome</span></div>
+          <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div>
+          <div class="stat s-purple"><b>${st.jobs}</b><span>🧰 lavoretti fatti</span></div></div>`;
+      },
+      actions: {
+        stats: () => this.openStats(),
+        friends: () => this.openFriends(),
+        skills: () => this.openSkills(),
+        boards: () => this.openLeaderboard(),
+        logo: () => this.openLogoEditor(),
+        name: () => this.openNameEditor(),
+      },
+    });
+  }
+
+  /** Nome con cui compari in classifica e sulla mappa degli amici. */
+  openNameEditor() {
+    this.open({
+      title: '✏️ Il tuo nome',
+      small: true,
+      color: 'var(--blue)',
+      render: () => `<p class="muted small">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici.</p>
+        <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
+        <button class="btn good full" data-a="save" style="margin-top:10px">✅ Salva il nome</button>`,
+      actions: {
+        save: () => {
+          const v = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
+          if (!setLbNickname(v)) {
+            this.toast('✏️ Scrivi un nome');
+            return;
+          }
+          void submitScore(this.s, true);
+          this.toast('✅ Nome salvato', 'good');
+          if (this.panel?.back) this.goBack();
+          else this.close();
+        },
+      },
+    });
+  }
+
+  /** Statistiche della partita: soldi, lavoretti, attività (una per una). */
+  openStats() {
+    const s = this.s;
+    this.open({
+      title: '📊 Statistiche',
+      live: true,
+      color: 'var(--blue)',
+      render: () => {
+        const st = playStats(s);
+        const h = Math.floor(st.playSec / 3600);
+        const m = Math.floor((st.playSec % 3600) / 60);
+        const row = (k: string, v: string) => `<div class="row between small st-row"><span>${k}</span><b>${v}</b></div>`;
+        const monthly = s.businesses.filter(isAutonomous).reduce((a, b) => a + estimateMonthlyProfit(s, b), 0);
+        const byType = JOB_TYPES.map((t) => `<span class="st-chip">${JOBS[t].icon} ${st.jobsByType[t] ?? 0}</span>`).join('');
+        const bizs = s.businesses.map((b) => {
+          const def = bizType(b.type);
+          return `<div class="card"><div class="row between"><b>${def.icon} ${def.name}</b>${this.autoTag(b)}</div>
+            <div class="muted small" style="margin-bottom:4px">${lotDef(b.lotId).name} · ${b.staff.length} dipendenti</div>
+            ${row('Incasso totale', euro(b.totalRevenue))}${row('Incasso del mese', euro(b.month.revenue))}${row('Oggi', `${euro(b.today.revenue)} · ${b.today.served} serviti · ${b.today.lost} persi`)}
+            ${isAutonomous(b) ? row('Utile stimato al mese', euro(estimateMonthlyProfit(s, b))) : ''}</div>`;
+        }).join('');
+        return `<div class="card"><h3>🎮 Partita</h3>
+            ${row('Giorni di gioco', String(day(s) - st.startDay + 1))}${row('Tempo giocato', `${h} h ${m} min`)}
+            ${row('Rango', rank(s))}${row('Fama totale', `⭐ ${totalFame(s).toFixed(1)}`)}${row('Livello totale', String(totalLevel(s)))}${row('Missioni completate', String(st.missions))}</div>
+          <div class="card"><h3>💰 Soldi</h3>
+            ${row('Soldi adesso', euro(s.money))}${row('Guadagnato in totale', euro(s.totalEarned))}${row('Guadagnato oggi', euro(s.todayEarned))}
+            ${row('Miglior giornata', euro(st.bestDay))}${row('Al secondo (attività autonome)', perSec(moneyPerSecond(s)))}${row('Utile stimato al mese', euro(monthly))}</div>
+          <div class="card"><h3>🧰 Lavoretti</h3>
+            ${row('Completati', String(st.jobs))}${row('Con 3 stelle', String(st.jobs3))}${row('Falliti', String(st.jobsFailed))}
+            <div class="st-chips">${byType}</div></div>
+          <div class="card"><h3>🏢 Attività</h3>
+            ${row('Aperte in tutto', String(st.bizOpened))}${row('Attive adesso', String(s.businesses.length))}${row('Autonome', String(s.businesses.filter(isAutonomous).length))}
+            ${row('Fallite', String(st.bizFailed))}${row('Clienti serviti di persona', String(st.served))}${row('Ordini a domicilio eseguiti', String(st.orders))}</div>
+          ${bizs ? `<h3 class="sec-title">🏪 Le tue attività</h3>${bizs}` : ''}`;
+      },
+      actions: {},
+    });
+  }
+
+  /** Esperienza e fama di ogni campo. */
+  openSkills() {
+    const s = this.s;
+    this.open({
+      title: '⭐ Esperienza e fama',
+      live: true,
+      color: 'var(--purple)',
       render: () => {
         const skills = SKILL_IDS.map((k) => {
           const lvl = skillLevel(s, k);
@@ -1461,21 +1604,136 @@ export class UI {
             <div class="bar purple"><i style="width:${((s.xp[k] - a) / (b - a)) * 100}%"></i></div>
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(s.xp[k] - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div></div>`;
         }).join('');
-        return `<div class="card hero tint"><div class="emoji">${logoImg(s.logo, 72)}</div><div class="muted small">${esc(lbNickname() || 'Il tuo rango')}</div><div class="big">${rank(s)}</div></div>
-          <div class="btnrow" style="margin:0 0 10px"><button class="btn purple" data-a="logo">🎨 Il tuo logo</button><button class="btn" data-a="board">🏆 Classifica · ⭐ ${totalFame(s).toFixed(1)}</button></div>
-          <div class="grid2" style="margin-bottom:10px"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
-          <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div></div>
-          <p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>
-          ${skills}`;
+        return `<p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>${skills}`;
+      },
+      actions: {},
+    });
+  }
+
+  /** Amici in ordine di fama, richieste di amicizia ricevute e tendina per invitarne di nuovi. */
+  openFriends() {
+    const s = this.s;
+    let friends: { entries: FriendEntry[]; missing: string[] } | null = null;
+    let state: 'loading' | 'ok' | 'error' = 'loading';
+    let invite = false;
+    let panel: Panel;
+    const load = async () => {
+      state = 'loading';
+      if (this.panel === panel) this.renderPanel();
+      await submitScore(s, true);
+      const [f] = await Promise.all([fetchFriends(), this.game.refreshFriendRequests()]);
+      friends = f;
+      state = f ? 'ok' : 'error';
+      void this.game.refreshFriends();
+      if (this.panel === panel) this.renderPanel();
+    };
+    panel = {
+      title: '👥 Amici',
+      color: '#5b4bb7',
+      render: () => {
+        const code = friendCode();
+        const inv = `<button class="btn ${invite ? 'sec' : 'purple'} full" data-a="invite">${invite ? '▲ Chiudi' : '➕ Invita nuovi amici'}</button>
+          ${invite ? `<div class="card fr-drop"><div class="row between"><span><small class="muted">Il tuo codice amico</small><br><b class="fr-code">${code}</b></span>
+              <span class="row"><button class="btn sm sec" data-a="copy">📋 Copia</button><button class="btn sm blue" data-a="share">📤 Invia</button></span></div>
+            <div class="row" style="margin-top:8px;gap:6px"><input class="lb-input fr-input" maxlength="7" placeholder="Codice di un amico" style="flex:1;font-size:16px;padding:9px 12px"><button class="btn sm good" data-a="addf">➕ Aggiungi</button></div>
+            <small class="muted">Quando aggiungi qualcuno, gli arriva una richiesta: può ricambiare con un tocco, senza mandarti il suo codice.</small></div>` : ''}`;
+        const reqs = this.game.friendRequests;
+        const reqHtml = reqs.length ? `<h3 class="sec-title">📨 Richieste di amicizia (${reqs.length})</h3>` + reqs.map((r) =>
+          `<div class="lb-row">${logoImg(r.logo, 34) || '<span class="logo-img empty"></span>'}<span class="lb-name"><b>${esc(r.nickname)}</b><small>${esc(r.title)} · ⭐ ${r.fame.toFixed(1)}</small></span>
+            <button class="btn sm good" data-a="acc:${r.code}">✅ Accetta</button><button class="lb-x" data-a="rej:${r.code}" aria-label="Rifiuta">✕</button></div>`).join('') : '';
+        let list: string;
+        if (state === 'loading') list = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
+        else if (state === 'error' || !friends) list = `<p class="center muted">📡 Amici non raggiungibili. Controlla la connessione.</p><button class="btn full" data-a="reload">🔄 Riprova</button>`;
+        else {
+          const f = friends as { entries: FriendEntry[]; missing: string[] };
+          const others = f.entries.filter((e) => !e.me);
+          list = (others.length ? '' : `<p class="center muted">Non hai ancora amici: tocca <b>➕ Invita nuovi amici</b> e manda il tuo codice!</p>`) +
+            f.entries.map((e, i) => {
+              const medal = ['🥇', '🥈', '🥉'][i] ?? `<b>${i + 1}</b>`;
+              return `<button class="lb-row lb-btn ${e.me ? 'me' : ''}" ${e.me ? '' : `data-a="fp:${e.code}"`}><span class="lb-pos">${medal}</span>${logoImg(e.logo, 34) || '<span class="logo-img empty"></span>'}
+                <span class="lb-name"><b>${esc(e.nickname)}${e.me ? ' (tu)' : ''}</b><small>${e.online ? '🟢 sta giocando · ' : ''}${esc(e.title)}</small></span>
+                <span class="lb-fame">⭐ ${e.fame.toFixed(1)}</span>${e.me ? '' : '<span class="lb-go">›</span>'}</button>`;
+            }).join('') +
+            f.missing.map((c) => `<div class="lb-row"><span class="lb-pos">⏳</span><span class="lb-name"><b>${c}</b><small>Nessun giocatore con questo codice (ancora)</small></span><button class="lb-x" data-a="rmf:${c}">✕</button></div>`).join('');
+        }
+        return `${inv}${reqHtml}<h3 class="sec-title">⭐ I tuoi amici per fama</h3>${list}${state === 'loading' ? '' : '<button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>'}`;
       },
       actions: {
-        board: () => {
-          this.close();
-          this.openLeaderboard();
+        invite: () => (invite = !invite),
+        reload: () => void load(),
+        copy: () => {
+          void navigator.clipboard?.writeText(friendCode()).then(() => this.toast('📋 Codice copiato', 'good'), () => this.toast(`Il tuo codice: ${friendCode()}`));
         },
-        logo: () => {
-          this.close();
-          this.openLogoEditor();
+        share: () => {
+          const text = `Giochiamo a Hustle Idle! Aggiungimi con il mio codice amico: ${friendCode()} 👉 https://alfa40.github.io/hustle-idle/`;
+          if (navigator.share) void navigator.share({ text }).catch(() => {});
+          else void navigator.clipboard?.writeText(text).then(() => this.toast('📋 Messaggio copiato', 'good'));
+        },
+        addf: () => {
+          const raw = (this.modal?.querySelector('.fr-input') as HTMLInputElement | null)?.value ?? '';
+          const err = addFriend(raw);
+          if (err) {
+            this.toast(err, 'bad');
+            return;
+          }
+          const code = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          void sendFriendRequest(code).then((r) => {
+            if (r === 'missing') this.toast('❔ Nessun giocatore con questo codice (ancora)', 'bad');
+          });
+          this.toast('👥 Amico aggiunto: gli è arrivata la tua richiesta', 'good');
+          invite = false;
+          void load();
+        },
+        acc: (c) => {
+          void answerFriendRequest(c, true).then(() => load());
+          this.game.friendRequests = this.game.friendRequests.filter((r) => r.code !== c);
+          this.toast('🤝 Ora siete amici', 'good');
+        },
+        rej: (c) => {
+          void answerFriendRequest(c, false);
+          this.game.friendRequests = this.game.friendRequests.filter((r) => r.code !== c);
+        },
+        rmf: (c) => {
+          removeFriend(c);
+          void load();
+        },
+        fp: (c) => {
+          const e = friends?.entries.find((x) => x.code === c);
+          if (e) this.openFriendProfile(e, () => void load());
+        },
+      },
+    };
+    this.open(panel);
+    void load();
+  }
+
+  /** Anteprima del profilo di un amico: le sue statistiche principali e le sue attività. */
+  openFriendProfile(f: FriendEntry, onRemoved?: () => void) {
+    const st = f.stats ?? {};
+    const n = (v?: number) => (v ?? 0).toLocaleString('it-IT');
+    this.open({
+      title: `👤 ${f.nickname}`,
+      small: true,
+      color: '#5b4bb7',
+      render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small><br><small>${f.online ? '🟢 Sta giocando adesso' : '💤 Non sta giocando'}</small></div></div>
+        <div class="grid2">
+          <div class="stat s-green"><b class="money-t">${euro(f.money)}</b><span>💰 guadagnato</span></div>
+          <div class="stat s-yellow"><b class="money-t">${perSec(st.perSec ?? 0)}</b><span>⏱️ dalle attività</span></div>
+          <div class="stat s-purple"><b>${n(st.jobs)}</b><span>🧰 lavoretti (${n(st.jobs3)} con ⭐⭐⭐)</span></div>
+          <div class="stat s-orange"><b>${f.bizs.length}</b><span>🏢 attività</span></div>
+          <div class="stat"><b>${n(st.served)}</b><span>🍔 clienti serviti</span></div>
+          <div class="stat"><b>${st.level ?? '—'}</b><span>📈 livello totale</span></div>
+        </div>
+        ${f.bizs.length ? `<p class="small" style="margin:10px 0 0">${f.bizs.map((b) => `<span class="st-chip">${BUSINESS_TYPES[b.type as BusinessType]?.icon ?? '🏢'} ${BUSINESS_TYPES[b.type as BusinessType]?.name ?? b.type}</span>`).join(' ')}</p>` : ''}
+        ${st.days ? `<p class="muted small center" style="margin:10px 0 0">In gioco da ${st.days} giorni · ${Math.round((st.playSec ?? 0) / 3600)} ore giocate</p>` : ''}
+        <div style="margin-top:12px"><button class="btn danger full" data-a="rm">🗑️ Togli dagli amici</button></div>`,
+      actions: {
+        rm: () => {
+          removeFriend(f.code);
+          this.toast(`${f.nickname} tolto dagli amici`);
+          onRemoved?.();
+          if (this.panel?.back) this.goBack();
+          else this.close();
         },
       },
     });
@@ -1681,123 +1939,81 @@ export class UI {
 
   // ---------------- classifica mondiale e tra amici ----------------
 
+  /** Classifiche: mondiale o tra amici, per fama, soldi, lavoretti, attività o clienti serviti. */
   openLeaderboard(startTab: 'mondo' | 'amici' = 'mondo') {
     const s = this.s;
     let tab = startTab;
+    let kind: BoardKind = 'fame';
     let data: LbData | null = null;
     let friends: { entries: FriendEntry[]; missing: string[] } | null = null;
     let state: 'loading' | 'ok' | 'error' = 'loading';
-    let editing = !lbNickname();
     let panel: Panel;
+    const KINDS: [BoardKind, string, string][] = [
+      ['fame', '⭐', 'Fama'], ['money', '💰', 'Soldi'], ['jobs', '🧰', 'Lavoretti'], ['biz', '🏢', 'Attività'], ['served', '🍔', 'Clienti'],
+    ];
+    const fmt = (k: BoardKind, v: number) =>
+      k === 'fame' ? `⭐ ${v.toFixed(1)}` : k === 'money' ? `💰 ${euro(v)}` : `${KINDS.find((x) => x[0] === k)![1]} ${Math.round(v).toLocaleString('it-IT')}`;
+    const friendValue = (e: FriendEntry, k: BoardKind) =>
+      k === 'fame' ? e.fame : k === 'money' ? e.money : k === 'biz' ? e.bizs.length : k === 'jobs' ? e.stats?.jobs ?? 0 : e.stats?.served ?? 0;
     const load = async () => {
       state = 'loading';
       if (this.panel === panel) this.renderPanel();
       await submitScore(s, true);
       if (tab === 'mondo') {
-        data = await fetchBoard(50);
+        data = await fetchBoard(50, kind);
         state = data ? 'ok' : 'error';
       } else {
         friends = await fetchFriends();
         state = friends ? 'ok' : 'error';
-        void this.game.refreshFriends();
       }
       if (this.panel === panel) this.renderPanel();
     };
-    const row = (e: LbEntry, extra = '') => {
-      const medal = ['🥇', '🥈', '🥉'][e.rank - 1] ?? `<b>${e.rank}</b>`;
+    const row = (e: LbEntry, v: number, pos: number) => {
+      const medal = ['🥇', '🥈', '🥉'][pos - 1] ?? `<b>${pos}</b>`;
       return `<div class="lb-row ${e.me ? 'me' : ''}"><span class="lb-pos">${medal}</span>${logoImg(e.logo, 34) || '<span class="logo-img empty"></span>'}
         <span class="lb-name"><b>${esc(e.nickname)}</b><small>${esc(e.title)}</small></span>
-        <span class="lb-fame">⭐ ${e.fame.toFixed(1)}</span>${extra}</div>`;
+        <span class="lb-fame">${fmt(kind, v)}</span></div>`;
     };
-    const loadingHtml = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
-    const errorHtml = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p><button class="btn full" data-a="reload">🔄 Riprova</button>`;
     panel = {
-      title: '🏆 Classifica',
+      title: '🏆 Classifiche',
       color: 'var(--orange)',
       render: () => {
-        const fame = totalFame(s).toFixed(1);
-        if (editing) {
-          return `<div class="card hero tint"><div class="emoji">🏆</div><div class="muted small">La tua fama</div><div class="big">⭐ ${fame}</div></div>
-            <p class="muted small">Scegli il nome con cui comparire in classifica e sulla mappa dei tuoi amici. Conta la fama totale della tua partita migliore su questo dispositivo.</p>
-            <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
-            <button class="btn good full" data-a="savename" style="margin-top:10px">✅ Salva il nome</button>`;
-        }
         const tabs = `<div class="tabs">${[['mondo', '🌍 Mondo'], ['amici', '👥 Amici']].map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
-        const me = `<div class="card row between"><span class="row">${logoImg(s.logo, 40)}<span><small class="muted">Tu sei</small><br><b>${esc(lbNickname())}</b> · ⭐ ${fame}</span></span>
-          <span class="row"><button class="btn sm sec" data-a="logo">🎨</button><button class="btn sm sec" data-a="edit">✏️</button></span></div>`;
+        const kinds = `<div class="lb-kinds">${KINDS.map(([k, i, n]) => `<button class="lb-kind ${kind === k ? 'on' : ''}" data-a="kind:${k}">${i} ${n}</button>`).join('')}</div>`;
         let list = '';
-        if (state === 'loading') list = loadingHtml;
+        if (state === 'loading') list = `<p class="center muted">⏳ Caricamento…<br><small>Il server a volte impiega fino a un minuto a svegliarsi.</small></p>`;
         else if (tab === 'mondo') {
-          if (state === 'error' || !data) list = errorHtml;
+          if (state === 'error' || !data) list = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p>`;
           else {
             const d = data as LbData;
-            list = d.entries.length ? d.entries.map((e) => row(e)).join('') : `<p class="center muted">Nessuno in classifica: sii il primo!</p>`;
-            if (d.me && !d.entries.some((e) => e.me)) list += `<div class="lb-gap">…</div>` + row({ ...d.me, me: true });
+            const val = (e: LbEntry) => e.value ?? (kind === 'money' ? e.money : e.fame);
+            list = d.entries.length ? d.entries.map((e) => row(e, val(e), e.rank)).join('') : `<p class="center muted">Nessuno in questa classifica: sii il primo!</p>`;
+            if (d.me && !d.entries.some((e) => e.me)) list += `<div class="lb-gap">…</div>` + row({ ...d.me, me: true }, val(d.me), d.me.rank);
             list = `<div class="muted small" style="margin-bottom:6px">${d.total} giocatori in classifica</div>${list}`;
           }
-        } else {
-          const code = friendCode();
-          const add = `<div class="card"><div class="row between"><span><small class="muted">Il tuo codice amico</small><br><b class="fr-code">${code}</b></span>
-              <span class="row"><button class="btn sm sec" data-a="copy">📋 Copia</button><button class="btn sm blue" data-a="share">📤 Invia</button></span></div>
-            <div class="row" style="margin-top:8px;gap:6px"><input class="lb-input fr-input" maxlength="7" placeholder="Codice di un amico" style="flex:1;font-size:16px;padding:9px 12px"><button class="btn sm good" data-a="addf">➕ Aggiungi</button></div>
-            <small class="muted">Le attività dei tuoi amici compaiono sulla tua mappa, nei posti liberi, con il loro logo.</small></div>`;
-          if (state === 'error' || !friends) list = add + errorHtml;
-          else {
-            const f = friends as { entries: FriendEntry[]; missing: string[] };
-            const others = f.entries.filter((e) => !e.me).length;
-            list = add + (others ? '' : `<p class="center muted">Non hai ancora amici in classifica: invia il tuo codice e aggiungi il loro!</p>`) +
-              f.entries.map((e) => row(e, e.me ? '' : `<button class="lb-x" data-a="rmf:${e.code}" aria-label="Togli">✕</button>`)).join('') +
-              f.missing.map((c) => `<div class="lb-row"><span class="lb-pos">❔</span><span class="lb-name"><b>${c}</b><small>Nessun giocatore con questo codice (ancora)</small></span><button class="lb-x" data-a="rmf:${c}">✕</button></div>`).join('');
-          }
+        } else if (state === 'error' || !friends) list = `<p class="center muted">📡 Classifica non raggiungibile. Controlla la connessione.</p>`;
+        else {
+          const f = friends as { entries: FriendEntry[]; missing: string[] };
+          const sorted = [...f.entries].sort((a, b) => friendValue(b, kind) - friendValue(a, kind));
+          list = (sorted.length > 1 ? '' : `<p class="center muted">Non hai ancora amici: aggiungili da Profilo → 👥 Amici.</p>`) +
+            sorted.map((e, i) => row(e, friendValue(e, kind), i + 1)).join('');
         }
-        return `${tabs}${me}${list}${state === 'loading' ? '' : '<button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>'}`;
+        return `${tabs}${kinds}${list}${state === 'loading' ? '' : '<button class="btn sec full" data-a="reload" style="margin-top:10px">🔄 Aggiorna</button>'}`;
       },
       actions: {
         tab: (k) => {
           tab = k as 'mondo' | 'amici';
           void load();
         },
-        savename: () => {
-          const v = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
-          if (!setLbNickname(v)) {
-            this.toast('✏️ Scrivi un nome');
-            return;
-          }
-          editing = false;
+        kind: (k) => {
+          kind = k as BoardKind;
           void load();
-        },
-        edit: () => (editing = true),
-        logo: () => {
-          this.close();
-          this.openLogoEditor();
         },
         reload: () => void load(),
-        copy: () => {
-          void navigator.clipboard?.writeText(friendCode()).then(() => this.toast('📋 Codice copiato', 'good'), () => this.toast(`Il tuo codice: ${friendCode()}`));
-        },
-        share: () => {
-          const text = `Giochiamo a Hustle Idle! Aggiungimi con il mio codice amico: ${friendCode()} 👉 https://alfa40.github.io/hustle-idle/`;
-          if (navigator.share) void navigator.share({ text }).catch(() => {});
-          else void navigator.clipboard?.writeText(text).then(() => this.toast('📋 Messaggio copiato', 'good'));
-        },
-        addf: () => {
-          const v = (this.modal?.querySelector('.fr-input') as HTMLInputElement | null)?.value ?? '';
-          const err = addFriend(v);
-          if (err) {
-            this.toast(err, 'bad');
-            return;
-          }
-          this.toast('👥 Amico aggiunto', 'good');
-          void load();
-        },
-        rmf: (c) => {
-          removeFriend(c);
-          void load();
-        },
       },
     };
     this.open(panel);
-    if (!editing) void load();
+    void load();
   }
 
   /** Attività di un amico sulla tua mappa: chi è, che attività ha, e il lotto (che puoi comunque comprare). */
@@ -1814,16 +2030,13 @@ export class UI {
       render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small></div></div>
         <div class="grid2"><div class="stat ${f.online ? 's-green' : ''}"><b>${f.online ? '🟢 Aperto' : '💤 Chiuso'}</b><span>${f.online ? 'sta giocando adesso' : 'non sta giocando'}</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 ${def.icon} ${def.name}</span></div></div>
         <p class="muted small">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora le vedi nella tua città: ${mine ? 'qui c\'è anche la tua attività.' : 'questo posto da te è libero e puoi comprarlo lo stesso: le attività degli amici restano accanto alla tua.'}</p>
-        <div class="btnrow">${mine ? '' : '<button class="btn sec" data-a="lot">🏷️ Vedi il posto</button>'}<button class="btn" data-a="board">👥 Classifica amici</button></div>`,
+        <div class="btnrow">${mine ? '' : '<button class="btn sec" data-a="lot">🏷️ Vedi il posto</button>'}<button class="btn" data-a="board">👥 I tuoi amici</button></div>`,
       actions: {
         lot: () => {
           this.close();
           this.openLot(lotId);
         },
-        board: () => {
-          this.close();
-          this.openLeaderboard('amici');
-        },
+        board: () => this.openFriends(),
       },
     });
   }

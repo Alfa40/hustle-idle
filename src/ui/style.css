@@ -262,6 +262,11 @@ body.job-on .hud-top { display: none; }
   box-shadow: inset 0 -4px 0 rgba(0,0,0,.12);
 }
 .sheet-head h2 { margin: 0; font-size: 21px; flex: 1; text-shadow: 0 2px 0 rgba(0,0,0,.15); }
+.sheet-head .back {
+  width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.25);
+  font-size: 26px; line-height: 1; color: #fff; font-weight: 800; flex: none; padding: 0 0 3px;
+}
+body.is-short .sheet-head .back { width: 34px; height: 34px; }
 .sheet-head .x {
   width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.25);
   font-size: 17px; color: #fff; font-weight: 700; flex: none;
@@ -767,12 +772,14 @@ body.is-short .sheet-head { padding: 8px 14px 7px; }
 body.is-short .sheet-head h2 { font-size: 18px; }
 body.is-short .sheet-head .x { width: 34px; height: 34px; }
 body.is-short .tabs { padding-top: 6px; }
-.sheet-body > .btnrow:last-child, .sheet-body > .btn.full:last-child {
+.sheet-body > .btnrow:last-child {
   /* arriva fino al bordo della finestra (copre anche il margine in fondo), i pulsanti restano sopra */
   position: sticky; bottom: calc(-24px - var(--sab)); z-index: 2; margin: 0 -16px calc(-24px - var(--sab));
   padding: 10px 16px calc(12px + var(--sab));
   background: var(--paper); box-shadow: 0 -10px 12px -6px rgba(58,47,85,.18);
 }
+/* un solo pulsante in fondo: resta visibile mentre si scorre, con il suo colore */
+.sheet-body > .btn.full:last-child { position: sticky; bottom: 6px; z-index: 2; }
 
 /* ---------- schermata del logo: schede Crea logo / Foto ---------- */
 .lg-layout { display: block; }
@@ -825,3 +832,32 @@ body.is-landscape.is-short .biz-tut .tut-body { font-size: 13px; }
 .upg-btns .btn.purple { flex: 0 0 auto; }
 .emp-btns { gap: 6px; flex-wrap: nowrap; }
 .emp-btns .btn { white-space: nowrap; }
+
+/* ---------- profilo: barra delle schermate, statistiche, amici, classifiche ---------- */
+.prof-hero .prof-name { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+.prof-hero .prof-name b { font-size: 18px; }
+.prof-hero .prof-name .btn { min-height: 32px; padding: 3px 9px; }
+.prof-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0 0 10px; }
+.prof-btn {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 7px;
+  border: none; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 #e2d8c4; font: inherit; color: var(--ink); min-width: 0;
+}
+.prof-btn .i { font-size: 24px; line-height: 1.1; }
+.prof-btn .l { font-size: 11px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.prof-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #e2d8c4; }
+.prof-btn .dot {
+  position: absolute; top: -4px; right: -2px; min-width: 20px; height: 20px; border-radius: 10px;
+  background: var(--red); border: 2px solid #fff; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center;
+}
+.st-row { padding: 4px 0; border-bottom: 1px dashed #eee3cf; gap: 10px; }
+.st-row:last-of-type { border-bottom: none; }
+.st-row b { text-align: right; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.st-chip { display: inline-block; background: #f5f1fb; border-radius: 10px; padding: 3px 9px; font-weight: 800; font-size: 13px; }
+.lb-kinds { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 10px; padding-bottom: 2px; touch-action: pan-x; }
+.lb-kind { flex: none; border: 2px solid #eadfca; background: #fff; border-radius: 12px; padding: 5px 10px; font: inherit; font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.lb-kind.on { background: var(--orange); border-color: var(--orange); color: #fff; }
+.lb-btn { width: 100%; border: none; font: inherit; color: inherit; text-align: left; }
+.lb-btn:active { transform: translateY(1px); }
+.lb-go { font-size: 22px; color: #b9b2cc; font-weight: 800; }
+.fr-drop { margin-top: 8px; }

@@ -11,7 +11,7 @@ import {
   CHAR_MODELS, employeeGainXp, employeeRate, isOpenHour, lostCustomer, pickProduct, recordSale, restock, totalDemand, upg,
 } from '../sim/economy';
 import { addFame, addXp, skillLevel } from '../sim/progress';
-import type { Business, Employee } from '../sim/state';
+import { playStats, type Business, type Employee } from '../sim/state';
 import { Character, CHAR_HEIGHT } from './character';
 import { arrow, boxProp, label, productObject, ring } from './props';
 import { GuideLine } from './guideline';
@@ -880,6 +880,7 @@ export class TruckInterior {
       if (manual && !this.sandbox) {
         addXp(s, 'clientela', 1);
         missionProgress(s, 'served');
+        playStats(s).served++;
       }
       if (c.lines.every((l) => l.done)) {
         this.served++;

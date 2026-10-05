@@ -68,6 +68,35 @@ export interface JobOffer {
   pay: number;
 }
 
+export interface PlayStats {
+  /** lavoretti completati (almeno una stella), di cui con 3 stelle, e per tipo */
+  jobs: number;
+  jobs3: number;
+  jobsByType: Partial<Record<JobType, number>>;
+  /** lavoretti falliti (tempo scaduto) */
+  jobsFailed: number;
+  /** clienti serviti di persona nelle attività e ordini a domicilio eseguiti */
+  served: number;
+  orders: number;
+  /** attività aperte e attività fallite (chiuse in perdita) */
+  bizOpened: number;
+  bizFailed: number;
+  missions: number;
+  /** secondi giocati (gioco aperto) */
+  playSec: number;
+  /** giorno in cui è cominciata la partita */
+  startDay: number;
+  /** il massimo guadagnato in un giorno */
+  bestDay: number;
+}
+
+export function playStats(s: GameState): PlayStats {
+  return (s.stats ??= {
+    jobs: 0, jobs3: 0, jobsByType: {}, jobsFailed: 0, served: 0, orders: 0, bizOpened: s.businesses.length, bizFailed: 0,
+    missions: 0, playSec: 0, startDay: day(s), bestDay: 0,
+  });
+}
+
 export interface Mission {
   id: string;
   text: string;
@@ -105,6 +134,8 @@ export interface GameState {
   jobSeq: number;
   missionsDay: number;
   missions: Mission[];
+  /** statistiche della partita (schermata Profilo → Statistiche) */
+  stats?: PlayStats;
   /** missioni della settimana e settimana (giorno / 7) in cui sono state create */
   weekly?: Mission[];
   weeklyWeek?: number;

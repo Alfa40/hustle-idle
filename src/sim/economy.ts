@@ -13,7 +13,7 @@ import { toast } from './bus';
 import { activeToday, effectMultiplier } from './effects';
 import { addFame, addMoney } from './progress';
 import {
-  day, emptyLedger, euro, hourOf, monthIndex, pick, rand, randInt,
+  day, emptyLedger, euro, hourOf, monthIndex, pick, playStats, rand, randInt,
   type Business, type Employee, type GameState,
 } from './state';
 
@@ -198,6 +198,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
     boughtFor: price,
     orders: [],
   };
+  playStats(s).bizOpened++;
   addMoney(s, -price);
   s.businesses.push(b);
   // una scorta iniziale per partire subito
