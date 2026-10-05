@@ -8,7 +8,7 @@ anche per ogni schermata nuova.
 
 ## Il LayoutManager (`src/ui/layout.ts`)
 
-`import { layout, fitRoom } from './ui/layout'`
+`import { layout, frameRoom } from './ui/layout'`
 
 - `layout.info`: `w`, `h`, `orientation` (`portrait`/`landscape`), `short`, `long`,
   `device` (`small` < 375 px di lato corto, `phone`, `tablet` ≥ 600 px), `scale`
@@ -17,10 +17,17 @@ anche per ogni schermata nuova.
   Chiama subito una volta, poi a ogni cambio: un aggiornamento immediato (la scena non si
   deforma) e uno a rotazione finita (debounce 140 ms). Restituisce la funzione per smettere:
   chiamarla quando la schermata si chiude.
-- `layout.freeRect([selettori])`: la parte di schermo non coperta dall'interfaccia indicata
-  (ogni elemento "mangia" il lato a cui è attaccato), meno la safe area.
-- `fitRoom(camera, free, metàLarghezza, distanzaMinima)`: inquadra una stanza 3D al centro della
-  zona libera senza deformarla (`setViewOffset` + distanza). Usata da cucina e case dei clienti.
+- `layout.freeRect([{ sel, dock }])`: la parte di schermo non coperta dall'interfaccia indicata,
+  meno la safe area. Ogni elemento toglie il lato `dock` (`top`, `left`, `right`, `bottom`); senza
+  `dock`, il lato che fa perdere meno spazio. Non scavalca mai l'interfaccia (solo se resta meno
+  del 25% dello schermo si accetta di coprire un po' la scena).
+- `frameRoom(camera, free, stanza, inclinazione)`: inquadra una stanza 3D al centro della zona
+  libera senza deformarla: misura gli angoli veri della stanza sullo schermo (prospettiva compresa),
+  corregge distanza e centratura (`setViewOffset`). Se la stanza intera verrebbe più bassa del 30%
+  della zona libera, la camera si avvicina solo quanto basta e segue il personaggio in orizzontale
+  (`follow`). Usata da cucina e case dei clienti.
+- `layout.panelDock`: lato che i riquadri informativi tolgono alla scena (`top` in verticale e sui
+  tablet, `left` sui telefoni in orizzontale). Da usare negli elenchi passati a `freeRect`.
 - Sul `<body>` mette le classi `is-portrait` / `is-landscape`, `dev-small` / `dev-phone` /
   `dev-tablet`, `is-short` (altezza < 480 px). Su `:root` mette `--u` (la scala).
 
@@ -44,7 +51,8 @@ anche per ogni schermata nuova.
      In orizzontale diventano un **pannello laterale a sinistra** (`min(360px, 40vw)`).
    - pulsante azione giallo in basso a destra; Sali/Scendi alla sua sinistra (orizzontale)
      o sopra a sinistra della colonna (verticale).
-   - la **scena 3D** va nella zona libera: per le stanze `layout.freeRect` + `fitRoom`;
+   - la **scena 3D** va nella zona libera: per le stanze `layout.freeRect` + `frameRoom` (camera ferma sulla stanza intera, oppure
+     che segue il personaggio se la stanza è troppo larga);
      la città resta centrata sul personaggio (in orizzontale si vede più città, mai deformata).
 5. **Finestre (`.sheet`)**: centrate, dimensione massima relativa allo schermo, scorrimento
    interno. Su schermi bassi (`is-short`) l'intestazione è compatta e **l'ultima riga di

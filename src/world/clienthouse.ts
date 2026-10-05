@@ -10,11 +10,11 @@ import { employeeGainXp } from '../sim/economy';
 import { label } from './props';
 import { Particles } from './particles';
 import { GuideLine } from './guideline';
-import { fitRoom, layout, type Occluder } from '../ui/layout';
+import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la casa del cliente: la stanza si inquadra nello spazio libero. */
 const HOUSE_UI = () =>
-  [{ sel: '.jobbar', dock: layout.portrait ? 'top' : 'left' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+  [{ sel: '.jobbar', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 import { updateCutWalls, type CutWall } from './viewcam';
 
 export const HOUSE_ASSETS = [
@@ -116,7 +116,7 @@ export class ClientHouse {
   private timeTotal: number;
   private ended = false;
   private camX = 0;
-  private view = { half: 4, d: 10, pitch: 1, z: 0.3 };
+  private view: { d: number; pitch: number; z: number; follow: { min: number; max: number } | null } = { d: 10, pitch: 1, z: 0.3, follow: null };
   private cleaning: boolean;
   private walls: CutWall[] = [];
   private fx = new Particles();
@@ -382,22 +382,16 @@ export class ClientHouse {
   private resize = () => {
     const free = layout.freeRect(HOUSE_UI());
     const tall = free.w < free.h;
-    const half = Math.min(this.width / 2 + 0.7, tall ? 4.4 : 7.5);
-    this.view = {
-      half,
-      d: fitRoom(this.camera, free, half, tall ? 9.5 : 11.5),
-      pitch: THREE.MathUtils.degToRad(tall ? 60 : 56),
-      z: tall ? 0.2 : 0.5,
-    };
+    const pitch = THREE.MathUtils.degToRad(tall ? 60 : 56);
+    const f = frameRoom(this.camera, free, { x0: LEFT, x1: LEFT + this.width, z0: BACK, z1: FRONT, wall: 2.4 }, pitch);
+    this.view = { d: f.d, pitch, z: f.z, follow: f.follow };
     this.placeCamera(true);
   };
   private offLayout: (() => void) | null = null;
 
   private placeCamera(snap = false) {
     const v = this.view;
-    const min = LEFT + v.half - 0.7;
-    const max = LEFT + this.width - v.half + 0.7;
-    const want = min >= max ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, min, max);
+    const want = !v.follow ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, v.follow.min, v.follow.max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
     this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
     updateCutWalls(this.walls, this.camera);

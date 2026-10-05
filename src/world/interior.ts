@@ -17,12 +17,12 @@ import { arrow, boxProp, label, productObject, ring } from './props';
 import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
-import { fitRoom, layout, type Occluder } from '../ui/layout';
+import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la cucina: la stanza si inquadra nello spazio che lascia libero. */
 const INTERIOR_UI = () => {
   // riquadri: in alto in verticale, pannello a sinistra in orizzontale; pulsanti sempre a destra
-  const side = layout.portrait ? 'top' : 'left';
+  const side = layout.panelDock;
   return [{ sel: '.guide', dock: side }, { sel: '.hand-badge', dock: side }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 };
 
@@ -687,7 +687,7 @@ export class TruckInterior {
   }
 
   /** metà della larghezza inquadrata e distanza della camera */
-  private view = { half: 4, d: 10, pitch: 1, z: 1.3 };
+  private view: { d: number; pitch: number; z: number; follow: { min: number; max: number } | null } = { d: 10, pitch: 1, z: 1.3, follow: null };
   private camX = 0;
 
   /**
@@ -698,14 +698,11 @@ export class TruckInterior {
     const free = layout.freeRect(INTERIOR_UI());
     this.freeKey = `${Math.round(free.x / 6)},${Math.round(free.y / 6)},${Math.round(free.w / 6)},${Math.round(free.h / 6)}`;
     const tall = free.w < free.h;
-    // si inquadra tutta la stanza se ci sta, altrimenti la camera segue il giocatore
-    const half = Math.min(this.width / 2 + 0.7, tall ? 4.6 : 7.5);
-    this.view = {
-      half,
-      d: fitRoom(this.camera, free, half, tall ? 9 : 11.5),
-      pitch: THREE.MathUtils.degToRad(tall ? 58 : 55),
-      z: tall ? 0.3 : 1,
-    };
+    const pitch = THREE.MathUtils.degToRad(tall ? 58 : 55);
+    // la stanza, il bancone e la fila dei clienti (nel locale grande anche la sala)
+    const box = { x0: LEFT, x1: LEFT + this.width, z0: BACK, z1: this.level >= 2 ? 6.6 : 3.3, wall: 2.4 };
+    const f = frameRoom(this.camera, free, box, pitch);
+    this.view = { d: f.d, pitch, z: f.z, follow: f.follow };
     this.placeCamera(true);
   };
   private freeKey = '';
@@ -720,9 +717,8 @@ export class TruckInterior {
 
   private placeCamera(snap = false) {
     const v = this.view;
-    const min = LEFT + v.half - 0.7;
-    const max = LEFT + this.width - v.half + 0.7;
-    const want = min >= max ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, min, max);
+    // stanza intera: camera ferma al centro; stanza troppo larga: segue il personaggio
+    const want = !v.follow ? this.center : THREE.MathUtils.clamp(this.player?.root.position.x ?? this.center, v.follow.min, v.follow.max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
     this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
     updateCutWalls(this.walls, this.camera);

@@ -149,6 +149,14 @@ class LayoutManager {
   }
 
   /**
+   * Da che lato i riquadri informativi (in alto a sinistra) tolgono spazio alla scena:
+   * in alto in verticale e sui tablet (c'è altezza), a sinistra sui telefoni in orizzontale.
+   */
+  get panelDock(): Dock {
+    return this.portrait || this.info.device === 'tablet' ? 'top' : 'left';
+  }
+
+  /**
    * Zona libera per la scena: lo schermo meno la safe area e meno gli elementi d'interfaccia indicati.
    * Ogni elemento toglie un lato: quello dichiarato (`dock`), oppure quello che fa perdere meno spazio.
    */
@@ -179,16 +187,16 @@ class LayoutManager {
         else x1 = Math.min(x1, r.left - 4);
       }
     }
-    // mai meno di metà schermo: meglio una scena un po' coperta che minuscola
-    if (x1 - x0 < w * 0.45) {
+    // solo se l'interfaccia lascia quasi niente (< 25%) si accetta di coprire un po' la scena
+    if (x1 - x0 < w * 0.25) {
       const c = (x0 + x1) / 2;
-      x0 = Math.max(0, c - w * 0.225);
-      x1 = Math.min(w, c + w * 0.225);
+      x0 = Math.max(0, c - w * 0.125);
+      x1 = Math.min(w, c + w * 0.125);
     }
-    if (y1 - y0 < h * 0.45) {
+    if (y1 - y0 < h * 0.25) {
       const c = (y0 + y1) / 2;
-      y0 = Math.max(0, c - h * 0.225);
-      y1 = Math.min(h, c + h * 0.225);
+      y0 = Math.max(0, c - h * 0.125);
+      y1 = Math.min(h, c + h * 0.125);
     }
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
@@ -196,24 +204,103 @@ class LayoutManager {
 
 export const layout = new LayoutManager();
 
+/** Stanza da inquadrare: pavimento da x0 a x1 e da z0 (fondo) a z1 (davanti), muro di fondo alto `wall`. */
+export interface RoomBox {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+  wall: number;
+}
+
+/** Come inquadrare la stanza: distanza, punto guardato e (se la stanza è troppo larga) limiti per seguire il personaggio. */
+export interface RoomFrame {
+  d: number;
+  z: number;
+  x: number;
+  /** null = stanza intera visibile; altrimenti la camera segue il personaggio tra min e max */
+  follow: { min: number; max: number } | null;
+}
+
 /**
- * Inquadra una stanza (cucina, casa del cliente) nella zona libera dello schermo, senza deformarla:
- * la camera si sposta (setViewOffset) e si allontana quanto serve perché la stanza ci stia.
- * Restituisce la distanza da usare.
+ * Inquadra una stanza 3D nella zona libera dello schermo, senza deformarla.
+ * Misura gli angoli VERI della stanza sullo schermo (la prospettiva allarga il davanti) e corregge
+ * distanza e centratura finché la stanza intera sta nella zona libera, centrata.
+ * Se così la stanza verrebbe troppo piccola (stanze lunghe in verticale), la camera inquadra
+ * tutta la profondità e segue il personaggio in orizzontale.
+ * La camera guarda dall'alto con inclinazione `pitch` (senza gli zoom/rotazioni del giocatore,
+ * che a ogni fotogramma si applicano sopra).
  */
-export function fitRoom(camera: THREE.PerspectiveCamera, free: Rect, halfWidth: number, minDist: number) {
+export function frameRoom(camera: THREE.PerspectiveCamera, free: Rect, box: RoomBox, pitch: number, minFill = 0.3): RoomFrame {
+  const place = (tg: THREE.Vector3, d: number) => {
+    camera.position.set(tg.x, tg.y + Math.sin(pitch) * d, tg.z + Math.cos(pitch) * d);
+    camera.lookAt(tg);
+  };
   const { w, h } = layout.info;
   camera.aspect = w / h;
   camera.fov = 50;
-  // offset: il centro della scena va al centro della zona libera
-  const dx = free.x + free.w / 2 - w / 2;
-  const dy = free.y + free.h / 2 - h / 2;
-  camera.setViewOffset(w, h, -dx, -dy, w, h);
+  camera.clearViewOffset();
   camera.updateProjectionMatrix();
-  const vfov = THREE.MathUtils.degToRad(camera.fov);
-  const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
-  // la stanza deve stare nella larghezza libera; la distanza minima scala con l'altezza libera
-  const byWidth = halfWidth / Math.tan(hfov / 2) / (free.w / w);
-  const byHeight = minDist / (free.h / h);
-  return Math.max(byWidth, byHeight);
+  const cz = (box.z0 + box.z1) / 2;
+  const t = new THREE.Vector3();
+  const v = new THREE.Vector3();
+  const corners = (xa: number, xb: number) => [
+    [xa, 0, box.z0], [xb, 0, box.z0], [xa, 0, box.z1], [xb, 0, box.z1], [xa, box.wall, box.z0], [xb, box.wall, box.z0],
+  ];
+  const bbox = (pts: number[][]) => {
+    camera.updateMatrixWorld();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y, z] of pts) {
+      v.set(x, y, z).project(camera);
+      const sx = (v.x * 0.5 + 0.5) * w;
+      const sy = (-v.y * 0.5 + 0.5) * h;
+      x0 = Math.min(x0, sx); x1 = Math.max(x1, sx); y0 = Math.min(y0, sy); y1 = Math.max(y1, sy);
+    }
+    return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  };
+  // la distanza si corregge in proporzione (la dimensione sullo schermo va circa come 1/d)
+  const fit = (pts: number[][], cx: number, needW: number, needH: number) => {
+    let d = 12;
+    for (let k = 0; k < 6; k++) {
+      place(t.set(cx, 0, cz), d);
+      const b = bbox(pts);
+      const s = Math.max(b.w / needW, b.h / needH);
+      if (!Number.isFinite(s) || s <= 0) break;
+      d *= s;
+      if (Math.abs(s - 1) < 0.01) break;
+    }
+    place(t.set(cx, 0, cz), d);
+    return d;
+  };
+  const M = 0.94;
+  const mid = (box.x0 + box.x1) / 2;
+  // 1) stanza intera
+  let d = fit(corners(box.x0, box.x1), mid, free.w * M, free.h * M);
+  let b = bbox(corners(box.x0, box.x1));
+  let frame: RoomFrame = { d, z: cz, x: mid, follow: null };
+  // 2) troppo piccola? tutta la profondità e si segue il personaggio in orizzontale
+  if (b.h < free.h * minFill) {
+    const narrow = corners(mid - 0.5, mid + 0.5);
+    // ci si avvicina solo quanto basta perché la stanza sia alta `minFill` della zona libera
+    d = Math.max(d * (b.h / (free.h * minFill)), fit(narrow, mid, Infinity, free.h * M));
+    place(t.set(mid, 0, cz), d);
+    // metri visibili in orizzontale a metà profondità
+    v.set(mid - 1, 0, cz).project(camera);
+    const a = v.x;
+    v.set(mid + 1, 0, cz).project(camera);
+    const ppm = ((v.x - a) * 0.5 * w) / 2;
+    const half = Math.max(0.5, free.w / 2 / ppm - 0.4);
+    const min = box.x0 + half;
+    const max = box.x1 - half;
+    frame = { d, z: cz, x: mid, follow: min < max ? { min, max } : null };
+    b = bbox(narrow);
+    b = { ...b, cx: b.cx };
+  }
+  // 3) centratura: la stanza (o il punto seguito) al centro della zona libera
+  place(t.set(mid, 0, cz), d);
+  const bb = frame.follow ? bbox(corners(mid - 0.01, mid + 0.01)) : bbox(corners(box.x0, box.x1));
+  camera.setViewOffset(w, h, Math.round(bb.cx - (free.x + free.w / 2)), Math.round(bb.cy - (free.y + free.h / 2)), w, h);
+  camera.updateProjectionMatrix();
+  return frame;
 }
+
