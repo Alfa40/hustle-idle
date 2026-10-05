@@ -1428,6 +1428,8 @@ export class UI {
     let draft: Logo = { ...s.logo };
     let mode: 'logo' | 'photo' = 'logo';
     let edit: PhotoEdit | null = null;
+    // schermata scelta nella barra in alto: crea il logo da zero, oppure foto
+    let tab: 'crea' | 'foto' = s.logo.photo ? 'foto' : 'crea';
     const read = (cls: string) => (this.modal?.querySelector(cls) as HTMLInputElement | null)?.value ?? '';
     const swatches = (key: string, cur: string) =>
       `<div class="lg-row">${LOGO_COLORS.map((c) => `<button class="lg-sw ${c === cur ? 'on' : ''}" style="background:${c}" data-a="${key}:${c}"></button>`).join('')}</div>`;
@@ -1440,6 +1442,7 @@ export class UI {
         // le foto del telefono sono enormi: si rimpiccioliscono una volta sola (il trascinamento resta fluido)
         edit = newPhotoEdit(shrinkImage(img, 1024));
         mode = 'photo';
+        tab = 'foto';
         if (this.panel === panel) this.renderPanel();
       };
       img.onerror = () => this.toast('Non riesco ad aprire questa foto', 'bad');
@@ -1454,16 +1457,17 @@ export class UI {
       if (f && this.panel === panel) startEdit(URL.createObjectURL(f), true);
     };
     const drawPreview = (body: HTMLElement) => {
-      const cv = body.querySelector('.ph-canvas') as HTMLCanvasElement | null;
-      if (!cv || !edit) return;
-      drawLogo(cv.getContext('2d')!, draft, cv.width, renderPhoto(edit, 320));
+      if (!edit) return;
+      const ph = renderPhoto(edit, 320);
+      // editor grande e anteprima piccola accanto al nome
+      for (const cv of body.querySelectorAll<HTMLCanvasElement>('.ph-canvas, .ph-mini')) drawLogo(cv.getContext('2d')!, draft, cv.width, ph);
     };
     const panel: Panel = {
       title: required ? '👋 Scegli nome e logo' : '🎨 Il tuo logo',
       color: 'var(--purple)',
       locked: required,
       after: (body) => {
-        if (mode !== 'photo' || !edit) return;
+        if (tab !== 'foto' || mode !== 'photo' || !edit) return;
         drawPreview(body);
         // cursori: anteprima dal vivo, senza ridisegnare il pannello
         body.querySelectorAll<HTMLInputElement>('.ph-sl input').forEach((inp) =>
@@ -1494,39 +1498,54 @@ export class UI {
         cv.addEventListener('pointercancel', up);
       },
       render: () => {
-        if (mode === 'photo' && edit) {
+        // barra in alto con le due schermate
+        const tabs = `<div class="tabs">${([['crea', '🎨 Crea logo'], ['foto', '📷 Foto']] as const)
+          .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        const shapes = `<div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${draft.shape === k ? 'on' : ''}" data-a="shape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>`;
+        const editing = tab === 'foto' && mode === 'photo' && !!edit;
+        // anteprima e nome: in verticale sopra, in orizzontale in una colonna a sinistra
+        const side = `<div class="lg-side">
+          ${required ? '<div class="card tint small">Prima di iniziare scegli il <b>tuo nome</b> e il <b>logo</b> delle tue attività: comparirà sulle insegne, in classifica e nella città dei tuoi amici. Potrai cambiarli dal 👤 Profilo.</div>' : ''}
+          <div class="lg-preview ${editing ? 'is-editing' : ''}">${editing ? '<canvas class="ph-mini" width="200" height="200"></canvas>' : `<img src="${logoUrl(draft, 200)}" width="120" height="120" alt="">`}<div><b>${esc(lbNickname() || 'Senza nome')}</b><small>${editing ? '✏️ Anteprima della foto' : draft.photo ? '📷 Logo con la tua foto' : '🎨 Logo disegnato'}</small></div></div>
+          <h4 class="lg-h">Il tuo nome</h4>
+          <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick"></div>`;
+        let main: string;
+        let foot: string;
+        if (tab === 'foto' && mode === 'photo' && edit) {
+          // ritocco della foto
           const e = edit;
-          return `<div class="ph-stage"><canvas class="ph-canvas" width="480" height="480"></canvas><small>👆 Trascina la foto per spostarla dentro la forma</small></div>
+          main = `<div class="ph-stage"><canvas class="ph-canvas" width="480" height="480"></canvas><small>👆 Trascina la foto per spostarla dentro la forma</small></div>
             ${slider('zoom', '🔍 Zoom', 100, 400, Math.round(e.zoom * 100))}
             ${slider('bright', '☀️ Luminosità', 40, 160, e.bright)}
             ${slider('contrast', '◐ Contrasto', 40, 160, e.contrast)}
             ${slider('sat', '🎨 Colori', 0, 200, e.sat)}
-            <div class="lg-row" style="margin-top:8px"><button class="btn sm sec" data-a="rot">↻ Ruota</button><button class="btn sm ${e.bw ? 'purple' : 'sec'}" data-a="bw">⚫ Bianco e nero</button><button class="btn sm sec" data-a="reset">↺ Ripristina</button></div>
-            <h4 class="lg-h">Forma</h4>
-            <div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${draft.shape === k ? 'on' : ''}" data-a="shape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>
-            <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-a="back">◀ Indietro</button><button class="btn good" data-a="usephoto">✅ Usa questa foto</button></div>`;
+            <div class="lg-row" style="margin-top:8px"><button class="btn sm sec" data-a="rot">↻ Ruota</button><button class="btn sm ${e.bw ? 'purple' : 'sec'}" data-a="bw">⚫ Bianco e nero</button><button class="btn sm sec" data-a="reset">↺ Ripristina</button><button class="btn sm sec" data-a="upload">📷 Un'altra foto</button></div>
+            <h4 class="lg-h">Forma</h4>${shapes}`;
+          foot = `<button class="btn sec" data-a="back">✕ Annulla</button><button class="btn good" data-a="usephoto">✅ Usa questa foto</button>`;
+        } else if (tab === 'foto') {
+          // scegliere una foto (o gestire quella già scelta)
+          main = draft.photo
+            ? `<div class="card center"><img class="lg-photo-big" src="${logoUrl(draft, 320)}" alt=""><p class="muted small">Il tuo logo ora usa questa foto. La vedono solo i tuoi amici: nella classifica mondiale compare il logo disegnato.</p>
+                <div class="lg-row" style="justify-content:center"><button class="btn sm purple" data-a="retouch">✏️ Ritocca</button><button class="btn sm sec" data-a="upload">📷 Cambia foto</button><button class="btn sm danger" data-a="nophoto">🗑️ Togli la foto</button></div></div>`
+            : `<div class="card center lg-pick"><div class="emoji">📷</div><b>Usa una tua foto come logo</b><p class="muted small">Scegli una foto dal telefono: potrai spostarla, ingrandirla, ruotarla e ritoccare luce e colori dentro la forma che preferisci.</p>
+                <button class="btn purple full" data-a="upload">📷 Scegli una foto</button><p class="muted small" style="margin:8px 0 0">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato (scheda 🎨 Crea logo).</p></div>`;
+          foot = `<button class="btn good" data-a="save">✅ Salva il logo</button>`;
+        } else {
+          // creare il logo da zero
+          main = `${draft.photo ? '<div class="card tint small row between"><span>📷 Il logo ora usa la tua foto: questo disegno si vede nella classifica mondiale.</span><button class="btn sm sec" data-a="nophoto">Usa il disegno</button></div>' : ''}
+            <h4 class="lg-h">Forma</h4>${shapes}
+            <h4 class="lg-h">Colore di sfondo</h4>${swatches('bg', draft.bg)}
+            <h4 class="lg-h">Simbolo</h4>
+            <div class="lg-row lg-syms">${LOGO_SYMBOLS.map((e) => `<button class="lg-sym ${draft.symbol === e ? 'on' : ''}" data-a="sym:${e}">${e}</button>`).join('')}</div>
+            <h4 class="lg-h">Iniziali (facoltative, max 3)</h4>
+            <input class="lb-input lg-text" maxlength="3" placeholder="es. LB" value="${esc(draft.text)}" data-c="text">
+            <h4 class="lg-h">Colore delle iniziali</h4>${swatches('fg', draft.fg)}`;
+          foot = `<button class="btn sec" data-a="rnd">🎲 A caso</button><button class="btn good" data-a="save">✅ Salva il logo</button>`;
         }
-        return `
-        ${required ? '<div class="card tint small">Prima di iniziare scegli il <b>tuo nome</b> e il <b>logo</b> delle tue attività: comparirà sulle insegne, in classifica e nella città dei tuoi amici. Potrai cambiarli quando vuoi dal 👤 Profilo.</div>' : ''}
-        <div class="lg-preview"><img src="${logoUrl(draft, 200)}" width="120" height="120" alt=""><div><b>${esc(lbNickname() || 'Senza nome')}</b><small>Il logo delle tue attività in questa partita: insegne, classifica e mappa dei tuoi amici.</small></div></div>
-        <h4 class="lg-h">Il tuo nome</h4>
-        <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick">
-        <h4 class="lg-h">📷 Una tua foto come logo</h4>
-        <div class="lg-row">${draft.photo
-          ? '<button class="btn sm purple" data-a="retouch">✏️ Ritocca la foto</button><button class="btn sm sec" data-a="upload">📷 Cambia</button><button class="btn sm sec" data-a="nophoto">🗑️ Togli</button>'
-          : '<button class="btn sm purple" data-a="upload">📷 Carica una foto</button>'}</div>
-        <small class="muted">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato.</small>
-        <h4 class="lg-h">Forma</h4>
-        <div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${draft.shape === k ? 'on' : ''}" data-a="shape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>
-        <h4 class="lg-h">Colore di sfondo</h4>${swatches('bg', draft.bg)}
-        <h4 class="lg-h">Simbolo${draft.photo ? ' (quando non c\'è la foto)' : ''}</h4>
-        <div class="lg-row lg-syms">${LOGO_SYMBOLS.map((e) => `<button class="lg-sym ${draft.symbol === e ? 'on' : ''}" data-a="sym:${e}">${e}</button>`).join('')}</div>
-        <h4 class="lg-h">Iniziali (facoltative, max 3)</h4>
-        <input class="lb-input lg-text" maxlength="3" placeholder="es. LB" value="${esc(draft.text)}" data-c="text">
-        <h4 class="lg-h">Colore delle iniziali</h4>${swatches('fg', draft.fg)}
-        <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-a="rnd">🎲 A caso</button><button class="btn good" data-a="save">✅ Salva il logo</button></div>`;
+        return `${tabs}<div class="lg-layout">${side}<div class="lg-main">${main}</div></div><div class="btnrow">${foot}</div>`;
       },
       actions: {
+        tab: (k) => (tab = k as 'crea' | 'foto'),
         shape: (k) => (draft.shape = k as Logo['shape']),
         bg: (c) => (draft.bg = c),
         fg: (c) => (draft.fg = c),
