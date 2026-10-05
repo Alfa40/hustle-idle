@@ -35,6 +35,7 @@ import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
 import { applyAccessories } from './world/style';
+import { JobTutorial } from './ui/jobtutorial';
 import { completeOrder, lotPrice, typesForLot } from './sim/economy';
 import { ZONES } from './config/map';
 import { SKILLS } from './config/skills';
@@ -185,6 +186,7 @@ export class Game {
     this.renderer.toneMappingExposure = 1.05;
     this.outline = new OutlineRenderer(this.renderer);
     this.input = new Input(canvas);
+    this.tutorial = new JobTutorial(this);
 
     this.scene.background = new THREE.Color(0x9fd3f0);
     this.scene.fog = new THREE.Fog(0x9fd3f0, 90, 290);
@@ -847,7 +849,10 @@ export class Game {
     this.state.jobs = this.state.jobs.filter((j) => j.id !== offerId);
   }
 
-  startJob(offer: JobOffer) {
+  /** tutorial contestuale dei lavoretti */
+  tutorial!: JobTutorial;
+
+  startJob(offer: JobOffer, tutorial = false) {
     if (this.run) return;
     // il cliente si fa da parte: la zona di lavoro resta libera
     const npc = this.npcs.get(offer.id);
@@ -866,6 +871,7 @@ export class Game {
       case 'lavaggio': this.run = carWashJob(this, lv, slot, title); break;
       case 'imbianchino': this.run = paintJob(this, lv, slot, title); break;
     }
+    if (tutorial && this.run) this.tutorial.start(offer.type, this.run);
     this.ui.jobBar(true);
   }
 
@@ -931,6 +937,7 @@ export class Game {
   /** stelle 0 = fallito */
   finishJob(stars: number) {
     const s = this.state;
+    this.tutorial.finish(stars);
     this.exitHouse();
     this.run?.dispose();
     this.run = null;
@@ -1445,6 +1452,7 @@ export class Game {
     const s = this.state;
     if (this.run) {
       this.run.update(dt);
+      this.tutorial.update();
       return;
     }
     this.nextJobSpawn -= dt;

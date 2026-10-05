@@ -116,6 +116,8 @@ export interface GameState {
   vehicles: VehicleId[];
   /** veicolo su cui si è ora (null = a piedi) */
   riding: VehicleId | null;
+  /** lavoretti di cui è stato completato il tutorial */
+  jobTutorials?: JobType[];
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
   lastRide?: VehicleId;
   orderSeq: number;

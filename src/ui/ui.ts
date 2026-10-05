@@ -288,7 +288,7 @@ export class UI {
     if (run) {
       const f = run.timeLeft / run.timeTotal;
       (this.jobEl.querySelector('#j-title') as HTMLElement).textContent = run.title;
-      (this.jobEl.querySelector('#j-time') as HTMLElement).textContent = `⏱ ${Math.ceil(run.timeLeft)}s`;
+      (this.jobEl.querySelector('#j-time') as HTMLElement).textContent = run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`;
       (this.jobEl.querySelector('#j-status') as HTMLElement).textContent = run.status;
       const fill = this.jobEl.querySelector('#j-fill') as HTMLElement;
       fill.style.width = `${f * 100}%`;
@@ -446,6 +446,8 @@ export class UI {
 
   openJobOffer(offer: JobOffer) {
     const def = JOBS[offer.type];
+    // la prima volta il tutorial è acceso; dopo si può riattivare
+    let tut = !this.game.tutorial.isDone(offer.type);
     // mini "video" della procedura: i passi si illuminano uno alla volta, con il gesto da fare
     let timer = 0;
     const GEST = { tap: ['👆', 'Tocca'], hold: ['✊', 'Tieni premuto'], walk: ['🚶', 'Vai'] } as const;
@@ -481,12 +483,15 @@ export class UI {
           <div class="stat s-purple"><b>Liv. ${offer.level}</b><span>📈 difficoltà</span></div>
           <div class="stat"><b>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</b><span>esperienza che guadagni</span></div>
         </div>
-        <p class="muted small center" style="margin:10px 0 0">Più sei veloce, più stelle prendi ⭐</p>
+        <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
+          <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>
+        <p class="muted small center" style="margin:10px 0 0">${tut ? 'Con il tutorial prendi sempre ⭐⭐⭐' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
+        tut: () => (tut = !tut),
         yes: () => {
           this.close();
-          this.game.startJob(offer);
+          this.game.startJob(offer, tut);
         },
         no: () => this.close(),
       },

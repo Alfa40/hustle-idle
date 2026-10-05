@@ -13,9 +13,29 @@ export interface JobRun {
   timeTotal: number;
   /** dove andare adesso (per freccette e mappa) */
   target?: THREE.Vector3;
+  /** tutorial in corso: il tempo è fermo */
+  frozen?: boolean;
+  /** cosa sta succedendo, per il tutorial contestuale */
+  guide?(): RunGuide | null;
   update(dt: number): void;
   onAction?(): void;
   dispose(): void;
+}
+
+/** Stato del lavoretto per il tutorial: fase, punto da raggiungere, se ci sei vicino. */
+export interface RunGuide {
+  phase: number;
+  phases: number;
+  phaseName: string;
+  phaseIcon: string;
+  /** punti ancora da fare in questa fase */
+  left: number;
+  task: Task | null;
+  near: boolean;
+  /** dentro la zona di lavoro (true se il lavoretto non ha una zona) */
+  inZone: boolean;
+  /** è già entrato almeno una volta nella zona */
+  arrived: boolean;
 }
 
 export function starsFor(timeLeft: number, total: number) {
@@ -31,6 +51,7 @@ abstract class BaseRun implements JobRun {
   timeLeft = 0;
   timeTotal = 0;
   target?: THREE.Vector3;
+  frozen = false;
   protected objs: THREE.Object3D[] = [];
   constructor(protected game: Game, protected level: number) {}
 
@@ -41,6 +62,8 @@ abstract class BaseRun implements JobRun {
   }
 
   protected tick(dt: number) {
+    // durante il tutorial il tempo non scorre
+    if (this.frozen) return true;
     this.timeLeft -= dt;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
@@ -271,6 +294,26 @@ export class PhasedRun extends BaseRun {
     return this.game.riding ? 3 : 1.6;
   }
 
+  private nearTask: Task | null = null;
+  private nearOk = false;
+
+  guide(): RunGuide | null {
+    const ph = this.phases[this.idx];
+    if (!ph) return null;
+    const p = this.game.player.root.position;
+    return {
+      phase: this.idx,
+      phases: this.phases.length,
+      phaseName: ph.name,
+      phaseIcon: ph.icon,
+      left: this.tasks.filter((t) => !t.done).length,
+      task: this.nearTask,
+      near: this.nearOk,
+      inZone: !this.zone || inZone(this.zone, p, 1.2),
+      arrived: !this.zone || this.wasInZone,
+    };
+  }
+
   update(dt: number) {
     if (!this.tick(dt)) return;
     const ph = this.phases[this.idx];
@@ -294,6 +337,8 @@ export class PhasedRun extends BaseRun {
       }
     }
     this.target = near?.pos;
+    this.nearTask = near;
+    this.nearOk = !!near && nd <= this.reach();
     const done = this.tasks.filter((t) => t.done).length;
     let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${this.tasks.length > 1 ? ` ${done}/${this.tasks.length}` : ''}`;
     // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla

@@ -679,3 +679,18 @@ body.guide-on .hud-top { display: none; }
 .hud-menu-btn .i { color: #fff; font-weight: 900; font-size: 24px; }
 .hud-row .btn:last-child { min-width: 132px; }
 @media (orientation: landscape) { .toasts { bottom: calc(var(--sab) + 132px); } }
+
+/* ---------- tutorial contestuale dei lavoretti ---------- */
+.tut-bubble {
+  position: fixed; z-index: 18; pointer-events: none; box-sizing: border-box;
+  background: #fff; border: 3px solid #8e5bd6; border-radius: 18px;
+  padding: 7px 11px 8px; box-shadow: 0 6px 16px rgba(0,0,0,.25); text-align: left; color: var(--ink);
+}
+.tut-head { font-size: 11px; font-weight: 800; color: #8e5bd6; text-transform: uppercase; letter-spacing: .03em; }
+.tut-body { font-size: 15px; font-weight: 600; line-height: 1.25; margin-top: 2px; }
+.tut-foot { font-size: 13px; font-weight: 700; color: var(--green-d); margin-top: 4px; }
+.tut-hand { position: fixed; z-index: 30; font-size: 40px; pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+.tut-hand.tap { animation: tut-tap .9s ease-in-out infinite; }
+.tut-hand.hold { animation: tut-hold 1.6s ease-in-out infinite; }
+@keyframes tut-tap { 0%, 100% { transform: translate(0, 0) scale(1); } 45% { transform: translate(-6px, -6px) scale(1.05); } 60% { transform: translate(0, 0) scale(.88); } }
+@keyframes tut-hold { 0% { transform: scale(1); } 15%, 85% { transform: scale(.86); } 100% { transform: scale(1); } }
