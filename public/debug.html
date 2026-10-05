@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hustle Idle · prova layout</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #2b2f3a; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+  header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; background: #1d2027; }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 6px 10px; background: #3d4352; color: #fff; cursor: pointer; }
+  button.on { background: #35c46a; }
+  main { flex: 1; display: grid; place-items: center; overflow: auto; padding: 16px; }
+  .phone { position: relative; border: 10px solid #111; border-radius: 34px; box-shadow: 0 10px 40px rgba(0,0,0,.5); background: #000; }
+  iframe { display: block; border: 0; border-radius: 24px; }
+  .notch { position: absolute; background: #111; border-radius: 0 0 14px 14px; z-index: 2; pointer-events: none; }
+  small { opacity: .7; }
+</style>
+</head>
+<body>
+<header>
+  <b>Prova layout</b>
+  <span id="presets"></span>
+  <button id="rot">🔄 Ruota</button>
+  <label><input type="checkbox" id="notch" checked> notch</label>
+  <small id="info"></small>
+</header>
+<main><div class="phone" id="phone"><div class="notch" id="nb"></div><iframe id="f"></iframe></div></main>
+<script>
+  // Simula telefoni e tablet: il gioco gira in un iframe delle misure scelte.
+  // ?safe= dice al LayoutManager di usare una safe area finta (notch / barra Home), che cambia lato quando si ruota.
+  const P = { 'Piccolo 360×640': [360, 640], 'iPhone 390×844': [390, 844], 'Grande 430×932': [430, 932], 'Tablet 768×1024': [768, 1024] };
+  let cur = 'iPhone 390×844', land = false;
+  const f = document.getElementById('f'), nb = document.getElementById('nb');
+  const box = document.getElementById('presets');
+  for (const k of Object.keys(P)) {
+    const b = document.createElement('button'); b.textContent = k; b.onclick = () => { cur = k; apply(); }; box.appendChild(b);
+  }
+  document.getElementById('rot').onclick = () => { land = !land; apply(true); };
+  document.getElementById('notch').onchange = () => apply();
+  function apply(keep) {
+    const [a, b] = P[cur]; const w = land ? b : a, h = land ? a : b;
+    const notch = document.getElementById('notch').checked && !cur.startsWith('Tablet');
+    const safe = !notch ? '0,0,0,0' : land ? '0,47,21,47' : '47,0,34,0';
+    for (const x of box.children) x.classList.toggle('on', x.textContent === cur);
+    // stessa partita dopo la rotazione: cambia solo la cornice (come un vero telefono che ruota)
+    f.style.width = w + 'px'; f.style.height = h + 'px';
+    const src = './?safe=' + safe;
+    if (!keep || !f.src.includes(src)) {
+      if (keep && f.contentWindow?.location) f.contentWindow.history.replaceState(null, '', src);
+      else f.src = src;
+    }
+    Object.assign(nb.style, notch ? (land ? { left: '0', top: '50%', width: '26px', height: '150px', transform: 'translateY(-50%)', borderRadius: '0 14px 14px 0' } : { left: '50%', top: '0', width: '150px', height: '26px', transform: 'translateX(-50%)', borderRadius: '0 0 14px 14px' }) : { width: '0', height: '0' });
+    document.getElementById('info').textContent = `${w}×${h} · ${land ? 'orizzontale' : 'verticale'} · safe ${safe}`;
+  }
+  apply();
+</script>
+</body>
+</html>

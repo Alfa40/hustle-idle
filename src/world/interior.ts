@@ -17,6 +17,14 @@ import { arrow, boxProp, label, productObject, ring } from './props';
 import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
+import { fitRoom, layout, type Occluder } from '../ui/layout';
+
+/** Interfaccia sopra la cucina: la stanza si inquadra nello spazio che lascia libero. */
+const INTERIOR_UI = () => {
+  // riquadri: in alto in verticale, pannello a sinistra in orizzontale; pulsanti sempre a destra
+  const side = layout.portrait ? 'top' : 'left';
+  return [{ sel: '.guide', dock: side }, { sel: '.hand-badge', dock: side }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+};
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',
@@ -655,8 +663,11 @@ export class TruckInterior {
     document.body.appendChild(this.handEl);
     this.handHtml = '';
     document.body.classList.add('guide-on');
+    // dopo che guida e riquadro "in mano" sono nella pagina (servono per la zona libera)
+    requestAnimationFrame(() => {
+      this.offLayout = layout.on(() => this.resize());
+    });
     this.resize();
-    window.addEventListener('resize', this.resize);
   }
 
   exit() {
@@ -667,7 +678,8 @@ export class TruckInterior {
     this.handEl = null;
     this.camera.clearViewOffset();
     document.body.classList.remove('guide-on');
-    window.removeEventListener('resize', this.resize);
+    this.offLayout?.();
+    this.offLayout = null;
     this.hand = [];
     this.renderHand();
     this.scene.remove(this.player.root);
@@ -678,27 +690,33 @@ export class TruckInterior {
   private view = { half: 4, d: 10, pitch: 1, z: 1.3 };
   private camX = 0;
 
+  /**
+   * Inquadratura della stanza nella zona libera dello schermo (LayoutManager): in verticale
+   * sotto i riquadri e a sinistra dei pulsanti, in orizzontale tra il pannello a sinistra e i pulsanti.
+   */
   private resize = () => {
-    const aspect = window.innerWidth / window.innerHeight;
-    this.camera.aspect = aspect;
-    this.camera.fov = 50;
+    const free = layout.freeRect(INTERIOR_UI());
+    this.freeKey = `${Math.round(free.x / 6)},${Math.round(free.y / 6)},${Math.round(free.w / 6)},${Math.round(free.h / 6)}`;
+    const tall = free.w < free.h;
     // si inquadra tutta la stanza se ci sta, altrimenti la camera segue il giocatore
-    const half = Math.min(this.width / 2 + 0.7, aspect < 1 ? 4.6 : 7.5);
-    const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(25)) * aspect);
+    const half = Math.min(this.width / 2 + 0.7, tall ? 4.6 : 7.5);
     this.view = {
       half,
-      d: Math.max(aspect < 1 ? 9 : 11.5, half / Math.tan(hfov / 2)),
-      pitch: THREE.MathUtils.degToRad(aspect < 1 ? 58 : 55),
-      z: aspect < 1 ? 0.3 : 1,
+      d: fitRoom(this.camera, free, half, tall ? 9 : 11.5),
+      pitch: THREE.MathUtils.degToRad(tall ? 58 : 55),
+      z: tall ? 0.3 : 1,
     };
-    // in verticale la stanza scende un po': sopra c'è spazio per la guida e il riquadro "in mano"
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    if (aspect < 1) this.camera.setViewOffset(W, H, 0, -Math.round(H * 0.07), W, H);
-    else this.camera.clearViewOffset();
-    this.camera.updateProjectionMatrix();
     this.placeCamera(true);
   };
+  private freeKey = '';
+  private offLayout: (() => void) | null = null;
+
+  /** I riquadri cambiano altezza (più righe, più prodotti in mano): se la zona libera cambia, si reinquadra. */
+  private refitIfNeeded() {
+    const free = layout.freeRect(INTERIOR_UI());
+    const k = `${Math.round(free.x / 6)},${Math.round(free.y / 6)},${Math.round(free.w / 6)},${Math.round(free.h / 6)}`;
+    if (k !== this.freeKey) this.resize();
+  }
 
   private placeCamera(snap = false) {
     const v = this.view;
@@ -949,6 +967,7 @@ export class TruckInterior {
       this.renderPass();
       this.updateGuide();
       this.updateHandBadge();
+      this.refitIfNeeded();
     }
     this.updateTags();
     // linea verso la prossima postazione (davanti al mobile, dove ci si ferma)

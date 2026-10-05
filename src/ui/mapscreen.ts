@@ -1,5 +1,6 @@
 import { CITY_MAP, TILE } from '../config/map';
 import type { Game, MapMarker, MarkerCat } from '../game';
+import { layout } from './layout';
 import { drawMap, type MapView, type PinHit } from './map';
 
 const CATS: { id: Exclude<MarkerCat, 'target'>; icon: string; name: string }[] = [
@@ -30,6 +31,7 @@ export interface MapScreenHooks {
  * pulsanti), si filtrano le icone per categoria e si cerca per nome.
  */
 export class MapScreen {
+  private offLayout: (() => void) | null = null;
   private el: HTMLDivElement | null = null;
   private cv!: HTMLCanvasElement;
   private g!: CanvasRenderingContext2D;
@@ -148,8 +150,7 @@ export class MapScreen {
     });
     el.querySelector('.ms-card')!.addEventListener('click', (e) => this.onCard(e));
     this.bindGestures();
-    window.addEventListener('resize', this.resize);
-    this.resize();
+    this.offLayout = layout.on(() => this.resize());
     this.markers = this.game.mapMarkers();
     if (focusId) {
       const m = this.markers.find((x) => x.id === focusId);
@@ -167,7 +168,8 @@ export class MapScreen {
   close() {
     if (!this.el) return;
     cancelAnimationFrame(this.raf);
-    window.removeEventListener('resize', this.resize);
+    this.offLayout?.();
+    this.offLayout = null;
     this.el.remove();
     this.el = null;
     this.game.paused = false;

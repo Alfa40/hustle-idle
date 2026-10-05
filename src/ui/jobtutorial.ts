@@ -162,9 +162,9 @@ export class JobTutorial {
     }
     const r = act.getBoundingClientRect();
     this.hand.style.display = '';
-    // in basso a sinistra del pulsante: la scritta resta leggibile
-    this.hand.style.left = `${r.left - 22}px`;
-    this.hand.style.top = `${r.top + r.height * 0.5}px`;
+    // sul bordo in basso a destra del pulsante: la scritta resta leggibile e non copre Sali/Scendi
+    this.hand.style.left = `${r.right - r.width * 0.32}px`;
+    this.hand.style.top = `${r.top + r.height * 0.6}px`;
     this.hand.className = `tut-hand ${gesture}`;
     this.hand.textContent = gesture === 'hold' ? '✊' : '👆';
   }

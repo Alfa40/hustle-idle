@@ -694,3 +694,66 @@ body.guide-on .hud-top { display: none; }
 .tut-hand.hold { animation: tut-hold 1.6s ease-in-out infinite; }
 @keyframes tut-tap { 0%, 100% { transform: translate(0, 0) scale(1); } 45% { transform: translate(-6px, -6px) scale(1.05); } 60% { transform: translate(0, 0) scale(.88); } }
 @keyframes tut-hold { 0% { transform: scale(1); } 15%, 85% { transform: scale(.86); } 100% { transform: scale(1); } }
+
+/* =====================================================================
+   SISTEMA DI LAYOUT (vedi LAYOUT.md) — misure in scala con --u (lato corto
+   dello schermo), pulsanti mai sotto 44 px, colonna di pulsanti a destra in
+   entrambi gli orientamenti, pannelli a sinistra in orizzontale.
+   Queste regole stanno in fondo e prevalgono su quelle vecchie in pixel.
+   ===================================================================== */
+:root {
+  --u: 1;
+  --btn: max(44px, calc(54px * var(--u)));
+  --act: max(82px, calc(96px * var(--u)));
+  --ride: max(52px, calc(62px * var(--u)));
+  --mm: max(84px, calc(104px * var(--u)));
+  /* larghezza della colonna dei pulsanti (1 o 2 colonne, la imposta il LayoutManager) */
+  --hud-w: var(--btn);
+  --ptr-r: calc(var(--sar) + var(--hud-w) + 14px);
+}
+body.is-landscape.is-short { --mm: max(72px, calc(84px * var(--u))); }
+
+/* pulsanti a destra: griglia (1 colonna, 2 in orizzontale se servono), dalla destra verso sinistra */
+.hbtn { width: var(--btn); height: var(--btn); border-radius: calc(var(--btn) * .3); }
+.hbtn .i { font-size: calc(var(--btn) * .41); }
+.hbtn .l { font-size: max(9px, calc(var(--btn) * .185)); }
+.hud-right, body.is-landscape .hud-right { flex-direction: column; align-items: flex-end; }
+.hud-btns, body.is-landscape .hud-btns {
+  display: grid; gap: 7px; direction: rtl;
+  grid-template-columns: repeat(var(--hud-cols, 1), var(--btn));
+}
+.hud-btns > * { direction: ltr; }
+.minimap, body.is-landscape .minimap { width: var(--mm); height: var(--mm); }
+.hud-drop, body.is-landscape .hud-drop { right: calc(var(--btn) + 10px); top: 0; grid-template-columns: repeat(2, var(--btn)); }
+body.is-landscape .hud-drop { grid-template-columns: repeat(3, var(--btn)); }
+.cam-grid, body.is-landscape .cam-grid { right: calc(var(--btn) + 10px); top: 0; }
+.hud-drop .cam-grid { right: 0; top: calc(var(--btn) + 10px); }
+
+/* pulsante azione e Sali/Scendi */
+.action { width: var(--act); height: var(--act); font-size: max(11px, calc(13px * var(--u))); }
+.action .ico { font-size: calc(var(--act) * .31); }
+.ride-btn { width: var(--ride); height: var(--ride); right: calc(var(--sar) + var(--hud-w) + 18px); bottom: calc(var(--sab) + var(--act) + 34px); }
+body.is-landscape .ride-btn { right: calc(var(--sar) + var(--act) + 26px); bottom: calc(var(--sab) + 26px); }
+
+/* riquadri in alto a sinistra: non arrivano mai sotto la colonna di destra */
+.jobbar, .guide, .hand-badge {
+  /* non arrivano sotto la minimappa né sotto la colonna dei pulsanti */
+  width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 18px); max-width: 460px;
+}
+/* orizzontale: pannello laterale a sinistra (la scena resta al centro) */
+body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge { width: min(360px, 40vw); }
+body.is-landscape .guide { max-height: calc(60vh - var(--sat)); overflow: hidden; }
+body.is-landscape.is-short .guide { font-size: 13px; padding: 6px 8px; }
+body.is-landscape.is-short .hb-slot { min-height: 20px; font-size: 12px; }
+
+/* finestre: in orizzontale basso intestazione compatta e pulsanti finali sempre visibili */
+body.is-short .sheet-head { padding: 8px 14px 7px; }
+body.is-short .sheet-head h2 { font-size: 18px; }
+body.is-short .sheet-head .x { width: 34px; height: 34px; }
+body.is-short .tabs { padding-top: 6px; }
+.sheet-body > .btnrow:last-child, .sheet-body > .btn.full:last-child {
+  /* arriva fino al bordo della finestra (copre anche il margine in fondo), i pulsanti restano sopra */
+  position: sticky; bottom: calc(-24px - var(--sab)); z-index: 2; margin: 0 -16px calc(-24px - var(--sab));
+  padding: 10px 16px calc(12px + var(--sab));
+  background: var(--paper); box-shadow: 0 -10px 12px -6px rgba(58,47,85,.18);
+}

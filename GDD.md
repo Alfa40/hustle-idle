@@ -27,6 +27,17 @@ Gioco idle/gestionale in terza persona con visuale isometrica. Il giocatore part
 | Lingua | Italiano (testi centralizzati in un file, così in futuro si possono tradurre) |
 | Scopo | Progetto personale. Se il gioco viene bene, si completa per la pubblicazione |
 
+## 2b. Verticale e orizzontale (LayoutManager)
+
+Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole complete sono in **LAYOUT.md** e valgono per ogni schermata nuova.
+- Un solo gestore (`src/ui/layout.ts`) conosce misure, orientamento, notch e barra Home (che cambiano lato ruotando) e avvisa tutte le schermate, con debounce
+- Interfaccia in scala con il lato corto dello schermo (pulsanti mai sotto 44 px): più grande sui tablet, compatta sui telefoni piccoli
+- Pulsanti sempre in colonna a destra (in orizzontale fino a 2 colonne); quelli che non ci stanno vanno da soli nel menu ☰
+- Riquadri in alto a sinistra in verticale, pannello laterale a sinistra in orizzontale; cucina e case dei clienti si inquadrano nello spazio libero, mai deformate
+- Finestre centrate con scorrimento interno; su schermi bassi intestazione compatta e pulsanti finali sempre visibili
+- Ruotare non chiude niente e non interrompe azioni, tutorial, veicolo, timer o guadagni
+- Pagina di prova `debug.html`: cornici 360×640, 390×844, 430×932, 768×1024, pulsante Ruota, notch simulato
+
 ## 3. Controlli e telecamera
 
 - **Visuale isometrica dall'alto** che segue il personaggio.

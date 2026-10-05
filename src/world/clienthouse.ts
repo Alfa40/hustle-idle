@@ -10,6 +10,11 @@ import { employeeGainXp } from '../sim/economy';
 import { label } from './props';
 import { Particles } from './particles';
 import { GuideLine } from './guideline';
+import { fitRoom, layout, type Occluder } from '../ui/layout';
+
+/** Interfaccia sopra la casa del cliente: la stanza si inquadra nello spazio libero. */
+const HOUSE_UI = () =>
+  [{ sel: '.jobbar', dock: layout.portrait ? 'top' : 'left' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 import { updateCutWalls, type CutWall } from './viewcam';
 
 export const HOUSE_ASSETS = [
@@ -356,33 +361,37 @@ export class ClientHouse {
     player.root.rotation.y = Math.PI;
     this.scene.add(player.root);
     this.resize();
-    window.addEventListener('resize', this.resize);
+    requestAnimationFrame(() => {
+      this.offLayout = layout.on(() => this.resize());
+    });
     toast(this.cleaning
       ? '🧰 Prendi l\'attrezzo giusto dal carrello e pulisci tutto!'
       : '📦 Imballa gli oggetti sparsi, poi porta tutto al furgone (tappeto verde)', 'info');
   }
 
   exit() {
-    window.removeEventListener('resize', this.resize);
+    this.offLayout?.();
+    this.offLayout = null;
+    this.camera.clearViewOffset();
     this.setToolSprite(null);
     this.player.hold();
     this.scene.remove(this.player.root);
   }
 
+  /** Inquadratura nella zona libera dello schermo (LayoutManager), come la cucina. */
   private resize = () => {
-    const aspect = window.innerWidth / window.innerHeight;
-    this.camera.aspect = aspect;
-    const half = Math.min(this.width / 2 + 0.7, aspect < 1 ? 4.4 : 7.5);
-    const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(25)) * aspect);
+    const free = layout.freeRect(HOUSE_UI());
+    const tall = free.w < free.h;
+    const half = Math.min(this.width / 2 + 0.7, tall ? 4.4 : 7.5);
     this.view = {
       half,
-      d: Math.max(aspect < 1 ? 9.5 : 11.5, half / Math.tan(hfov / 2)),
-      pitch: THREE.MathUtils.degToRad(aspect < 1 ? 60 : 56),
-      z: aspect < 1 ? 0.2 : 0.5,
+      d: fitRoom(this.camera, free, half, tall ? 9.5 : 11.5),
+      pitch: THREE.MathUtils.degToRad(tall ? 60 : 56),
+      z: tall ? 0.2 : 0.5,
     };
-    this.camera.updateProjectionMatrix();
     this.placeCamera(true);
   };
+  private offLayout: (() => void) | null = null;
 
   private placeCamera(snap = false) {
     const v = this.view;

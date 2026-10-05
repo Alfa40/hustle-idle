@@ -12,6 +12,7 @@ import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
 import { onSettings, settings, type HudKey } from '../settings';
+import { layout } from './layout';
 import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
@@ -211,6 +212,7 @@ export class UI {
     this.camEl = cam;
     this.layoutHud();
     onSettings(() => this.layoutHud());
+    layout.on(() => this.layoutHud(), false);
     // rotellina = zoom, Q/R = ruota (su PC)
     window.addEventListener('wheel', (e) => {
       if (this.panel || (e.target as HTMLElement).closest?.('.mapscreen,.modal')) return;
@@ -244,21 +246,46 @@ export class UI {
 
   private hudMenuEl!: HTMLElement;
 
-  /** Pulsanti a destra nell'ordine scelto; quelli "nel menu" vanno nella tendina ☰. */
+  /**
+   * Pulsanti a destra nell'ordine scelto; quelli "nel menu" vanno nella tendina ☰.
+   * Quanti ne stanno lo decide lo spazio (LayoutManager): la colonna va dalla minimappa al
+   * pulsante giallo; in orizzontale può diventare di 2 colonne. Quelli che non ci stanno
+   * finiscono da soli nel ☰ (dopo quelli scelti dal giocatore).
+   */
   private layoutHud() {
     const col = this.root.querySelector('.hud-right .hud-btns') as HTMLElement;
     const drop = this.hudMenuEl.querySelector('.hud-drop') as HTMLElement;
     const el = (k: HudKey): HTMLElement => (k === 'camera' ? this.camEl : (col.querySelector(`[data-h="${k}"]`) ?? drop.querySelector(`[data-h="${k}"]`)) as HTMLElement);
+    const info = layout.info;
+    const btn = Math.max(44, 54 * info.scale);
+    const act = Math.max(82, 96 * info.scale);
+    const step = btn + 7;
+    const mmVisible = settings.minimap && this.minimap.el.style.display !== 'none';
+    const mm = !mmVisible ? 0 : info.orientation === 'landscape' && info.h < 480 ? Math.max(72, 84 * info.scale) : Math.max(84, 104 * info.scale);
+    const top = Math.max(info.safe.top, info.orientation === 'landscape' ? 10 : 34) + (mm ? mm + 8 + 8 : 0);
+    const bottom = Math.max(info.safe.bottom, info.orientation === 'landscape' ? 10 : 12) + 22 + act + 14;
+    const rows = Math.max(1, Math.floor((info.h - top - bottom + 7) / step));
+    const wanted = settings.hudOrder.filter((k) => !settings.hudMenu.includes(k));
+    // in orizzontale, se una colonna non basta, se ne usano due
+    const cols = info.orientation === 'landscape' && wanted.length + (settings.hudMenu.length ? 1 : 0) > rows ? 2 : 1;
+    const cap = rows * cols;
+    const needMenu = settings.hudMenu.length > 0 || wanted.length > cap;
+    const shown = needMenu ? wanted.slice(0, cap - 1) : wanted;
     for (const k of settings.hudOrder) {
-      if (settings.hudMenu.includes(k)) drop.appendChild(el(k));
-      else col.appendChild(el(k));
+      if (shown.includes(k)) col.appendChild(el(k));
+      else drop.appendChild(el(k));
     }
     // il pulsante ☰ c'è solo se qualcosa è nel menu, sempre in fondo alla colonna
     col.appendChild(this.hudMenuEl);
-    this.hudMenuEl.style.display = settings.hudMenu.length ? '' : 'none';
+    this.hudMenuEl.style.display = needMenu ? '' : 'none';
     this.hudMenuEl.classList.remove('open');
-    this.camEl.classList.toggle('in-menu', settings.hudMenu.includes('camera'));
+    this.camEl.classList.toggle('in-menu', !shown.includes('camera'));
+    col.style.setProperty('--hud-cols', String(cols));
+    document.documentElement.style.setProperty('--hud-w', `${cols * btn + (cols - 1) * 7}px`);
+    this.hudShown = shown;
   }
+  /** pulsanti visibili nella colonna (gli altri sono nel ☰) */
+  private hudShown: HudKey[] = [];
 
   update(dt: number) {
     const s = this.s;
@@ -344,7 +371,7 @@ export class UI {
     this.missionDot.style.display = claimable ? '' : 'none';
     // se Missioni è nel menu, il "!" compare anche sul pulsante ☰
     const dot2 = this.root.querySelector('#h-dot2') as HTMLElement | null;
-    if (dot2) dot2.style.display = claimable && settings.hudMenu.includes('missions') ? '' : 'none';
+    if (dot2) dot2.style.display = claimable && !this.hudShown.includes('missions') ? '' : 'none';
   }
 
   toast(text: string, kind = 'info') {

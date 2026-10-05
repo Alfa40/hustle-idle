@@ -36,6 +36,7 @@ import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
 import { applyAccessories } from './world/style';
 import { JobTutorial } from './ui/jobtutorial';
+import { layout } from './ui/layout';
 import { completeOrder, lotPrice, typesForLot } from './sim/economy';
 import { ZONES } from './config/map';
 import { SKILLS } from './config/skills';
@@ -202,8 +203,8 @@ export class Game {
     this.sun.shadow.bias = -0.0015;
     this.scene.add(this.sun, this.sun.target);
 
-    window.addEventListener('resize', () => this.resize());
-    this.resize();
+    // dimensioni e rotazione: solo dal LayoutManager (vedi LAYOUT.md)
+    layout.on(() => this.resize());
   }
 
   /** Qualità grafica e ombre dalle impostazioni. */
@@ -469,8 +470,7 @@ export class Game {
   }
 
   resize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
+    const { w, h } = layout.info;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
