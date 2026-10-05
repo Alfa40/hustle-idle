@@ -139,14 +139,11 @@ export class Game {
   /** ordine di un'attività di servizio che il giocatore sta eseguendo */
   runOrder: { bizId: string; order: ServiceOrder } | null = null;
   private rideObj: THREE.Object3D | null = null;
-  moveTarget: THREE.Vector3 | null = null;
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
   private nextJobSpawn = 3;
   private saveTimer = 0;
   private clock = new THREE.Clock();
-  private raycaster = new THREE.Raycaster();
-  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   paused = false;
   /** rotazione, zoom e inclinazione della camera scelti dal giocatore */
   view = new ViewControl();
@@ -776,7 +773,6 @@ export class Game {
     this.view.reset();
     this.interior = new TruckInterior(this, biz);
     this.interior.enter(this.player);
-    this.moveTarget = null;
     this.ui.refresh();
   }
 
@@ -902,7 +898,6 @@ export class Game {
   /** Entra nella casa del cliente: il lavoro vero si fa lì dentro, in 3D. */
   private enterHouse(pid: ProductId, level: number, door: THREE.Vector3, run: VisitRun) {
     this.dismount();
-    this.moveTarget = null;
     this.houseDoor.copy(door);
     this.scene.remove(this.player.root);
     this.view.reset();
@@ -1157,7 +1152,6 @@ export class Game {
     const home = this.homeSlot;
     this.player.root.position.copy(this.frontOf(home, 0.8));
     this.player.root.rotation.y = DIR_ROT[home.dir];
-    this.moveTarget = null;
     this.snapCamera();
   }
 
@@ -1296,7 +1290,6 @@ export class Game {
     this.firstPerson = on;
     this.input.lookMode = on;
     this.input.cancel();
-    this.moveTarget = null;
     if (on) {
       // sguardo verso il primo punto da fare (o dove guarda il personaggio)
       const t = this.run?.target;
@@ -1409,35 +1402,20 @@ export class Game {
   }
 
   private updatePlayer(dt: number) {
+    // ci si muove solo col joystick (o la tastiera): toccare un punto dello schermo non fa niente
     const v = this.moveVector();
-    const tap = this.input.consumeTap();
-    if (tap) this.handleTap(tap.x, tap.y);
+    this.input.consumeTap();
     const p = this.player.root.position;
-    let mx = v.x;
-    let mz = v.y;
-    if (Math.hypot(mx, mz) > 0.05) {
-      this.moveTarget = null;
-    } else if (this.moveTarget) {
-      const dx = this.moveTarget.x - p.x;
-      const dz = this.moveTarget.z - p.z;
-      const d = Math.hypot(dx, dz);
-      if (d < 0.25) this.moveTarget = null;
-      else {
-        mx = dx / d;
-        mz = dz / d;
-      }
-    }
+    const mx = v.x;
+    const mz = v.y;
     const len = Math.hypot(mx, mz);
     if (len > 0.05) {
       const ride = this.state.riding ? VEHICLES[this.state.riding] : null;
       const speed = (ride ? ride.speed : WALK_SPEED) * Math.min(1, len);
-      const before = p.clone();
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
       this.city.collide(p, ride ? ride.radius : 0.38);
       this.traffic.pushOut(p, ride ? ride.radius : 0.38);
-      // bloccato contro un muro mentre va verso un punto: rinuncia
-      if (this.moveTarget && before.distanceTo(p) < speed * dt * 0.2) this.moveTarget = null;
       this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
       if (ride) this.player.play(riderPose(this.state.riding!).anim);
       else if (!this.prompt?.progress) this.player.play(len > 0.6 ? 'sprint' : 'walk', 0.15, len > 0.6 ? 0.85 : 1);
@@ -1448,18 +1426,7 @@ export class Game {
     this.state.player.z = p.z;
   }
 
-  private handleTap(x: number, y: number) {
-    const ndc = new THREE.Vector2((x / window.innerWidth) * 2 - 1, -(y / window.innerHeight) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
-    const hit = new THREE.Vector3();
-    if (this.raycaster.ray.intersectPlane(this.groundPlane, hit)) {
-      this.moveTarget = hit;
-      const r = ring(0xffffff, 0.5);
-      r.position.set(hit.x, 0.06, hit.z);
-      this.scene.add(r);
-      setTimeout(() => this.scene.remove(r), 400);
-    }
-  }
+
 
   private updateJobs(dt: number) {
     const s = this.state;
@@ -1499,7 +1466,6 @@ export class Game {
     }
     this.ui.setAction(best ? { label: best.label, icon: best.icon } : null);
     if (best && this.input.consumeAction()) {
-      this.moveTarget = null;
       best.action();
     }
   }

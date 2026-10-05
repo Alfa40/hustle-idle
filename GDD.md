@@ -41,7 +41,7 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 ## 3. Controlli e telecamera
 
 - **Visuale isometrica dall'alto** che segue il personaggio.
-- **Due modi di controllo, entrambi attivi:** joystick virtuale oppure tocco sul punto di destinazione (il personaggio ci va da solo).
+- **Movimento solo col joystick virtuale** (compare dove si appoggia il dito). Toccare un punto dello schermo non fa muovere il personaggio. Su PC: WASD o frecce.
 - Si interagisce avvicinandosi: NPC, porte degli edifici posseduti, postazioni dei mini-giochi.
 
 ## 4. Mappa

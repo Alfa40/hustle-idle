@@ -100,9 +100,7 @@ export class Input {
     }
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
-    if (!this.dragging && !this.lookMode && performance.now() - this.start.t < 350 && this.enabled) {
-      this.tap = { x: e.clientX, y: e.clientY };
-    }
+    // un tocco breve non fa più muovere il personaggio: si usa solo il joystick
     this.dragging = false;
     this.move.x = this.move.y = 0;
     this.stick.classList.remove('on');

@@ -1803,7 +1803,7 @@ export class UI {
         }
         return tabs + `
           <div class="card"><h3>🕹️ Comandi</h3><p class="muted small" style="margin:0">
-            Trascina il dito per muoverti (compare un joystick) oppure tocca un punto per andarci.
+            Trascina il dito sullo schermo per muoverti: compare un joystick.
             Avvicinati alle persone con il <b>!</b> per un lavoretto e usa il pulsante giallo in basso a destra.
             Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
