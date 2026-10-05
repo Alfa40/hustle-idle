@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { gltf, Instancer, placeMatrix, setInstanceVisible, type InstanceHandle } from '../assets';
-import { CITY_MAP, LOTS, TILE, zoneAt, type ZoneId } from '../config/map';
+import { CITY_MAP, LOTS, TILE, WS, zoneAt, type ZoneId } from '../config/map';
 
 export type Dir = 'N' | 'E' | 'S' | 'W';
 export const DIR_VEC: Record<Dir, [number, number]> = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
@@ -118,13 +118,14 @@ export class City {
         const paved = 'pMbBRVA'.includes(ch) || LOTS.some((l) => l.char === ch) || (ch === '.' && zone === 'centro');
         if (paved) inst.add('roads/tile-low.glb', placeMatrix(p.x, p.z, 0, TILE, 0.001));
 
-        const front = (d: number) => new THREE.Vector3(p.x + dx * d, 0, p.z + dz * d);
+        // distanze dal centro della tessera, in scala con il mondo
+        const front = (d: number) => new THREE.Vector3(p.x + dx * d * WS, 0, p.z + dz * d * WS);
         switch (ch) {
           case 'h':
           case 'H': {
             const path = rpick(HOUSES);
             const w = this.modelSize(path).x;
-            const sc = Math.min(3.6, 5.2 / w);
+            const sc = Math.min(3.6, 5.2 / w) * WS;
             this.placeBuilding(shadowInst, path, front(-0.7), rot, sc);
             const slot = { pos: front(2.1), dir, center: p.clone(), zone };
             if (ch === 'H') this.homes.push(slot);
@@ -134,17 +135,17 @@ export class City {
           case 'b':
           case 'R': {
             const path = rpick(SHOPS);
-            this.placeBuilding(shadowInst, path, front(-0.35), rot, 5.2);
+            this.placeBuilding(shadowInst, path, front(-0.35), rot, 5.2 * WS);
             const slot = { pos: front(2.6), dir, center: p.clone(), zone };
             if (ch === 'R') {
               this.restaurants.push(slot);
-              inst.add('commercial/detail-parasol-a.glb', placeMatrix(front(2.2).x + dz * 1.6, front(2.2).z - dx * 1.6, rot, 5));
-              inst.add('commercial/detail-parasol-a.glb', placeMatrix(front(2.2).x - dz * 1.6, front(2.2).z + dx * 1.6, rot, 5));
+              inst.add('commercial/detail-parasol-a.glb', placeMatrix(front(2.2).x + dz * 1.6 * WS, front(2.2).z - dx * 1.6 * WS, rot, 5 * WS));
+              inst.add('commercial/detail-parasol-a.glb', placeMatrix(front(2.2).x - dz * 1.6 * WS, front(2.2).z + dx * 1.6 * WS, rot, 5 * WS));
             } else this.shops.push(slot);
             break;
           }
           case 'B': {
-            this.placeBuilding(shadowInst, rpick(TALL), front(-0.2), rot, 4.1);
+            this.placeBuilding(shadowInst, rpick(TALL), front(-0.2), rot, 4.1 * WS);
             break;
           }
           case 't': {
@@ -152,15 +153,15 @@ export class City {
             for (let i = 0; i < n; i++) {
               const x = p.x + (rnd() - 0.5) * TILE * 0.75;
               const z = p.z + (rnd() - 0.5) * TILE * 0.75;
-              const s = 5 + rnd() * 2.5;
+              const s = (5 + rnd() * 2.5) * WS;
               this.tall.push(shadowInst.add(rpick(TREES), placeMatrix(x, z, rnd() * 6.28, s)));
-              this.colliders.push({ minX: x - 0.35, maxX: x + 0.35, minZ: z - 0.35, maxZ: z + 0.35 });
+              this.colliders.push({ minX: x - 0.35 * WS, maxX: x + 0.35 * WS, minZ: z - 0.35 * WS, maxZ: z + 0.35 * WS });
             }
             break;
           }
           case 'V':
           case 'A': {
-            this.placeBuilding(shadowInst, ch === 'V' ? 'commercial/building-c.glb' : 'commercial/building-l.glb', front(-0.35), rot, ch === 'V' ? 5.2 : 4.1);
+            this.placeBuilding(shadowInst, ch === 'V' ? 'commercial/building-c.glb' : 'commercial/building-l.glb', front(-0.35), rot, (ch === 'V' ? 5.2 : 4.1) * WS);
             const slot = { pos: front(2.6), dir, center: p.clone(), zone };
             if (ch === 'V') this.dealer = slot;
             else this.agency = slot;
@@ -171,14 +172,14 @@ export class City {
             break;
           }
           case 'p': {
-            if (rnd() < 0.5) inst.add('suburban/planter.glb', placeMatrix(p.x - dx * 2.2, p.z - dz * 2.2, rot, 4));
+            if (rnd() < 0.5) inst.add('suburban/planter.glb', placeMatrix(p.x - dx * 2.2 * WS, p.z - dz * 2.2 * WS, rot, 4 * WS));
             break;
           }
           default: {
             const lot = LOTS.find((l) => l.char === ch);
             if (!lot) break;
             if (lot.kind === 'shop') {
-              this.placeBuilding(shadowInst, rpick(SHOPS), front(-0.35), rot, 5.2);
+              this.placeBuilding(shadowInst, rpick(SHOPS), front(-0.35), rot, 5.2 * WS);
               this.lots.push({ id: lot.id, kind: 'shop', pos: front(2.6), dir, center: p.clone(), zone });
             } else this.lots.push({ id: lot.id, kind: 'truck', pos: front(1.2), dir, center: p.clone(), zone });
           }

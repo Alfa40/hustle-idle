@@ -46,6 +46,8 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 
 ## 4. Mappa
 
+- **Scala del mondo** (`WS` in src/config/map.ts, ora 1,35): case, negozi, strade, alberi, lampioni e distanze sono più grandi del 35% rispetto al personaggio, ai veicoli e agli oggetti dei lavoretti (che restano della loro misura): più spazio attorno a tutto. Le posizioni nei lavoretti si scrivono in "metri di tessera" e `frame()` le moltiplica per `WS`; la posizione salvata del giocatore si converte da sola se cambia la scala
+
 - **Una sola città** all'inizio, divisa in **zone** (per esempio periferia, residenziale, centro, zona commerciale).
 - **La posizione conta:** ogni lotto ha un moltiplicatore di **passaggio/domanda** e un **costo** (affitto o acquisto). In centro ci sono più clienti ma costa di più.
 - Le attività si aprono in **lotti disponibili**, distribuiti nelle varie zone.

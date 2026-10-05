@@ -3,6 +3,7 @@ import { model } from '../assets';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import { DIR_VEC, type Slot } from '../world/city';
+import { WS } from '../config/map';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
 import { bigPlanter, fencePillar, fenceSegment, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
@@ -156,7 +157,8 @@ export class PhasedRun extends BaseRun {
     this.title = title;
     this.phases = phases;
     this.zone = opts.zone ?? null;
-    this.timeTotal = this.timeLeft = opts.time * Math.max(0.75, 1 - level * 0.02);
+    // con la città più grande nella zona di lavoro si cammina un po' di più
+    this.timeTotal = this.timeLeft = opts.time * (opts.zone ? 1 + (WS - 1) * 0.5 : 1) * Math.max(0.75, 1 - level * 0.02);
     if (this.zone) {
       this.drawZone(this.zone);
       // niente palazzi o alberi davanti alla zona di lavoro
@@ -431,7 +433,8 @@ export class PhasedRun extends BaseRun {
 /** Sistema di riferimento davanti a un edificio: `f` verso la strada, `r` di lato. */
 function frame(slot: Slot) {
   const [dx, dz] = DIR_VEC[slot.dir];
-  return (base: THREE.Vector3, f: number, r: number) => new THREE.Vector3(base.x + dx * f + dz * r, 0, base.z + dz * f - dx * r);
+  // f e r sono in "metri di tessera": si allargano con la scala del mondo (WS)
+  return (base: THREE.Vector3, f: number, r: number) => new THREE.Vector3(base.x + (dx * f + dz * r) * WS, 0, base.z + (dz * f - dx * r) * WS);
 }
 
 /**
@@ -446,19 +449,19 @@ function frontEdge(game: Game, slot: Slot) {
     if (!inside) continue;
     for (const x of [b.minX, b.maxX]) for (const z of [b.minZ, b.maxZ]) best = Math.max(best, (x - slot.center.x) * dx + (z - slot.center.z) * dz);
   }
-  return Math.min(best, 2.2);
+  return Math.min(best / WS, 2.2);
 }
 
 /** Zona rettangolare davanti a un edificio: da `f0` a `f1` verso la strada, da -`r` a +`r` di lato. */
 function zoneFor(slot: Slot, base: THREE.Vector3, f0: number, f1: number, r: number): Zone {
   const [dx, dz] = DIR_VEC[slot.dir];
-  const fm = (f0 + f1) / 2;
+  const fm = ((f0 + f1) / 2) * WS;
   return {
     center: new THREE.Vector3(base.x + dx * fm, 0, base.z + dz * fm),
     dir: new THREE.Vector3(dx, 0, dz),
     side: new THREE.Vector3(dz, 0, -dx),
-    halfF: (f1 - f0) / 2,
-    halfR: r,
+    halfF: ((f1 - f0) / 2) * WS,
+    halfR: r * WS,
   };
 }
 
@@ -531,7 +534,7 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
 export function routeJob(game: Game, level: number, start: Slot, title: string, mode: 'package' | 'flyer') {
   const houses = [...game.deliveryHouses];
   const n = mode === 'package' ? Math.min(4, 2 + Math.floor(level / 3)) : Math.min(8, 4 + Math.floor(level / 2));
-  const sorted = houses.filter((h) => h.pos.distanceTo(start.pos) > (mode === 'package' ? 18 : 6)).sort((a, b) => a.pos.distanceTo(start.pos) - b.pos.distanceTo(start.pos));
+  const sorted = houses.filter((h) => h.pos.distanceTo(start.pos) > (mode === 'package' ? 18 : 6) * WS).sort((a, b) => a.pos.distanceTo(start.pos) - b.pos.distanceTo(start.pos));
   const pool = mode === 'package' ? sorted.slice(0, 14) : sorted.slice(0, n + 3);
   const stops: Slot[] = [];
   while (stops.length < n && pool.length) stops.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -768,7 +771,7 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
   };
   const bodies: THREE.Mesh[] = [];
   segs.forEach((sg, i) => {
-    const { obj, body } = fenceSegment(sg.len);
+    const { obj, body } = fenceSegment(sg.len * WS);
     run.prop(obj, sg.pos, sg.rot, 1);
     if (i < paintN) bodies.push(body);
   });

@@ -12,7 +12,12 @@
 //   V  concessionaria veicoli             A  agenzia affari
 //   altri caratteri: lotti in vendita (vedi LOTS)
 
-export const TILE = 6;
+/**
+ * Scala del mondo: case, strade, alberi e distanze sono più grandi di così rispetto
+ * al personaggio (che resta della sua misura), per avere più spazio attorno alle cose.
+ */
+export const WS = 1.35;
+export const TILE = 6 * WS;
 
 /**
  * Tipi di isolato:

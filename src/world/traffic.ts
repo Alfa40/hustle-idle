@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { model } from '../assets';
 import { Character } from './character';
 import type { City } from './city';
+import { WS } from '../config/map';
 
 const CAR_MODELS = ['cars/sedan.glb', 'cars/hatchback-sports.glb', 'cars/suv-luxury.glb', 'cars/van.glb', 'cars/delivery.glb'];
 export const TRAFFIC_ASSETS = CAR_MODELS;
 
 /** Distanza dal centro strada della corsia di destra e del marciapiede. */
-const LANE = 1.25;
-const WALK = 2.65;
+const LANE = 1.25 * WS;
+const WALK = 2.65 * WS;
 const STEP = 4; // gli incroci sono ogni 4 tessere
 
 interface Car {

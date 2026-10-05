@@ -6,6 +6,7 @@ import { PRODUCT_IDS, type ProductId } from '../config/products';
 import type { VehicleId } from '../config/vehicles';
 import { EVENT_BY_ID, type WeatherId } from '../config/events';
 import { productLevel } from '../config/recipes';
+import { WS } from '../config/map';
 import { BUSINESS_TYPES } from '../config/business';
 import { SKILL_IDS, type SkillId } from '../config/skills';
 
@@ -116,6 +117,8 @@ export interface GameState {
   vehicles: VehicleId[];
   /** veicolo su cui si è ora (null = a piedi) */
   riding: VehicleId | null;
+  /** scala del mondo con cui è stata salvata la posizione del giocatore */
+  ws?: number;
   /** lavoretti di cui è stato completato il tutorial */
   jobTutorials?: JobType[];
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
@@ -215,6 +218,12 @@ function parse(raw: string | null): GameState | null {
     }
     for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
     st.logo = safeLogo(s.logo) ?? randomLogo();
+    // città ingrandita: la posizione salvata si riporta nella nuova scala
+    if ((s.ws ?? 1) !== WS && Number.isFinite(st.player.x)) {
+      const k = WS / (s.ws ?? 1);
+      st.player = { x: st.player.x * k, z: st.player.z * k };
+    }
+    st.ws = WS;
     st.style = { ...newState().style, ...(s.style ?? {}) };
     st.houses ??= [];
     for (const h of st.houses) h.price ??= 12000;

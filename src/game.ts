@@ -4,7 +4,7 @@ import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
 import { BUSINESS, JOB, TIME } from './config/balance';
 import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
-import { LOTS } from './config/map';
+import { LOTS, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
 import { Input } from './input';
 import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settings';
@@ -301,7 +301,7 @@ export class Game {
     ['utilitaria', 'berlina'].forEach((v, i) => {
       const car = vehicleModel(v as VehicleId);
       const [dx, dz] = DIR_VEC[dealer.dir];
-      car.position.set(dealer.pos.x + dz * (i ? 2.4 : -2.4) + dx * 0.4, 0, dealer.pos.z + dx * (i ? 2.4 : -2.4) + dz * 0.4);
+      car.position.set(dealer.pos.x + dz * (i ? 2.4 : -2.4) * WS + dx * 0.4, 0, dealer.pos.z + dx * (i ? 2.4 : -2.4) * WS + dz * 0.4);
       car.rotation.y = DIR_ROT[dealer.dir] + (i ? 0.5 : -0.5);
       car.scale.multiplyScalar(0.85);
       this.scene.add(car);
@@ -646,7 +646,7 @@ export class Game {
     if (slot.kind === 'truck' && friends.length) {
       // furgoni affiancati lungo la strada: il tuo al centro, poi quelli degli amici con più fama
       // ben separati: tra un furgone e l'altro resta un passaggio
-      const offsets = biz ? [5.6, -5.6] : [0, 5.6, -5.6];
+      const offsets = (biz ? [5.6, -5.6] : [0, 5.6, -5.6]).map((o) => o * WS);
       friends.slice(0, offsets.length).forEach((f, i) => {
         const def = bizType(f.type);
         const van = this.buildVan(slot, f.friend.logo ?? null, `${f.friend.online ? '🟢' : '💤'} ${f.friend.nickname}`, !!f.friend.online, '#5b4bb7');
@@ -677,7 +677,7 @@ export class Game {
       });
     }
     if (!biz) {
-      const d = slot.kind === 'truck' ? 1.8 : 2.9;
+      const d = slot.kind === 'truck' ? 1.8 : 2.9 * WS;
       const sign = saleSign('€' + lot.price.toLocaleString('it-IT'));
       sign.position.set(dx * d + dz * 1.2, 0, dz * d + dx * 1.2);
       sign.rotation.y = DIR_ROT[slot.dir];
@@ -715,12 +715,12 @@ export class Game {
       const def = bizType(biz.type);
       const icons = biz.products.map((p) => PRODUCTS[p].icon).join('');
       const sign = label(`${def.icon} ${def.name} ${icons}`, { bg: def.color, scale: 0.6 });
-      sign.position.set(dx * 2.2, 4.2, dz * 2.2);
+      sign.position.set(dx * 2.2 * WS, 4.2 * WS, dz * 2.2 * WS);
       g.add(sign);
       // logo sospeso sopra l'insegna (se sopra ci sono i piani degli amici basta quello sulla facciata)
       if (!friends.length) {
         const lg = logoSprite(this.state.logo, 1.3);
-        lg.position.set(dx * 2.2, 5.3, dz * 2.2);
+        lg.position.set(dx * 2.2 * WS, 5.3 * WS, dz * 2.2 * WS);
         g.add(lg);
       }
       // marchio sulla facciata, sopra l'ingresso
@@ -731,7 +731,7 @@ export class Game {
       plate.rotation.y = DIR_ROT[slot.dir];
       g.add(plate);
       const mat = ring(new THREE.Color(def.color).getHex(), 1.1);
-      mat.position.set(dx * 2.8, 0.05, dz * 2.8);
+      mat.position.set(dx * 2.8 * WS, 0.05, dz * 2.8 * WS);
       g.add(mat);
       const service = def.kind === 'service';
       const game = this;
