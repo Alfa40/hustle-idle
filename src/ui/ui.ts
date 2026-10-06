@@ -126,8 +126,7 @@ export class UI {
     top.innerHTML = `
       <div class="pills">
         <div class="pill money" id="h-money">€0</div>
-        <button class="pill date" id="h-date" style="border:none"></button>
-        <div class="pill event" id="h-event" style="display:none"></div>
+        <button class="pill date" style="border:none"><span id="h-date"></span><small class="pill-event" id="h-event" style="display:none"></small></button>
         <div class="pill info" id="h-info" style="display:none"></div>
       </div>`;
     this.root.appendChild(top);
@@ -152,7 +151,8 @@ export class UI {
     this.dateEl = top.querySelector('#h-date')!;
     this.eventEl = top.querySelector('#h-event')!;
     this.infoEl = top.querySelector('#h-info')!;
-    this.dateEl.addEventListener('click', () => this.openCalendar());
+    // feste ed eventi: una riga piccola dentro la stessa etichetta della data (toccandola si apre il calendario)
+    (this.dateEl.parentElement as HTMLElement).addEventListener('click', () => this.openCalendar());
     this.missionDot = right.querySelector('#h-dot')!;
     right.querySelectorAll<HTMLButtonElement>('[data-h]').forEach((b) =>
       b.addEventListener('click', () => {

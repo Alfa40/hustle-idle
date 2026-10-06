@@ -89,7 +89,13 @@ b, h2, h3 { font-weight: 600; }
 }
 .pill.money.neg { color: var(--red-d); border-color: var(--red); }
 .pill.date { font-size: 13px; }
-.pill.event { font-size: 12px; background: var(--yellow); color: #5a3d00; }
+/* data e, sotto, la festa/evento del giorno in piccolo (niente riga in più nella colonna) */
+.pill.date { flex-direction: column; align-items: flex-start; gap: 0; border-radius: 16px; max-width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 18px); }
+body.is-landscape .pill.date { max-width: min(360px, 40vw); }
+.pill-event {
+  font-size: 11px; font-weight: 800; color: #9a6a00; line-height: 1.2; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .pill.info { font-size: 13px; background: var(--orange); color: #fff; }
 
 .hud-right {
