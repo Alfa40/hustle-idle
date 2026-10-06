@@ -3,6 +3,7 @@ import type { JobType } from '../config/jobs';
 import type { Game } from '../game';
 import type { JobRun } from '../minigames/jobs';
 import { toast } from '../sim/bus';
+import { padSide } from '../settings';
 
 /**
  * Tutorial contestuale dei lavoretti: la prima volta che fai un lavoretto (o quando lo scegli
@@ -134,7 +135,7 @@ export class JobTutorial {
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
-      foot = gesture === 'hold' ? '✊ <b>Tieni il dito</b> sull\'oggetto che lampeggia finché il cerchio è pieno' : '👆 <b>Tocca l\'oggetto</b> che lampeggia';
+      foot = gesture === 'hold' ? `✊ <b>Tieni premuto il quadrato giallo</b> ${padSide()} finché si riempie` : `👆 <b>Tocca il quadrato giallo</b> ${padSide()}`;
       anchor = g.task.pos;
     } else {
       body = tip;
@@ -172,7 +173,8 @@ export class JobTutorial {
  * lampeggia (la scritta dell'anello passa sopra, così la manina non la copre).
  */
 export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) {
-  const act = document.querySelector('.action') as HTMLElement | null;
+  // la manina indica il quadrato delle azioni (l'unico posto da toccare)
+  const act = document.querySelector('.act-pad.ready') as HTMLElement | null;
   const show = !!gesture && !!act && getComputedStyle(act).display !== 'none';
   document.body.classList.toggle('tut-pointing', show);
   if (!show) {

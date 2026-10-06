@@ -12,7 +12,12 @@ export interface Settings {
   hudOrder: HudKey[];
   /** pulsanti spostati nel menu a tendina ☰ */
   hudMenu: HudKey[];
+  /** joystick a destra e quadrato delle azioni in basso a sinistra (per i mancini) */
+  swapControls: boolean;
 }
+
+/** Da che parte sta il quadrato delle azioni (per i testi dei tutorial). */
+export const padSide = () => (settings.swapControls ? 'in basso a sinistra' : 'in basso a destra');
 
 export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'settings', 'camera'] as const;
 export type HudKey = (typeof HUD_KEYS)[number];
@@ -22,7 +27,7 @@ export const HUD_NAMES: Record<HudKey, string> = {
 
 const KEY = 'hustleidle.settings';
 
-const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false, hudOrder: [...HUD_KEYS], hudMenu: [] };
+const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false, hudOrder: [...HUD_KEYS], hudMenu: [], swapControls: false };
 
 export const settings: Settings = { ...DEFAULTS };
 

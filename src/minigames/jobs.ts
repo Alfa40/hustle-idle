@@ -820,22 +820,50 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
   // ---- cose in giardino (si coprono tutte): sempre qualcosa di diverso
   const kinds = [roundShrub, flowerBed, slide, patioSet, bigPlanter, flowerBed];
   const nItems = Math.min(4, 2 + Math.floor(level / 3));
-  const fMid = f0 + (FENCE - 0.5 - f0) * 0.5;
-  const spots = [at(slot.center, fMid, -1.85), at(slot.center, fMid, 1.85), at(slot.center, fMid, -1.0), at(slot.center, fMid, 1.0)];
+  // Le cose del giardino stanno in fila contro la casa: lungo il muretto, all'interno, resta sempre
+  // un corridoio libero (CORRIDOR metri) per dipingere ogni tratto, anche sui lati.
+  const CORRIDOR = 1.5;
+  const depthFree = (FENCE - f0) * WS - CORRIDOR; // profondità disponibile (m) davanti alla casa
+  const halfSpan = (SIDE * WS - CORRIDOR) * 0.98; // metà larghezza utile (m), lontano dai lati
   const pool = [...kinds].sort(() => Math.random() - 0.5);
-  // le cose del giardino si creano subito (la prima fase le deve già conoscere); in scena dopo
-  const items: { pos: THREE.Vector3; obj: THREE.Object3D; tarp: THREE.Object3D }[] = [];
-  for (let i = 0; i < nItems; i++) {
-    const kind = pool[i % pool.length];
+  type Placed = { obj: THREE.Object3D; w: number; d: number; turn: boolean; scale: number };
+  const placed: Placed[] = [];
+  let used = 0;
+  for (let i = 0; i < pool.length && placed.length < nItems; i++) {
+    const kind = pool[i];
     const obj = kind();
-    // le aiuole sono basse e si attraversano; cespugli, scivolo, tavolino e vasi no
-    obj.userData.solid = kind !== flowerBed;
-    obj.rotation.y = along;
-    obj.position.copy(spots[i]);
+    obj.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(obj);
+    let w = b.max.x - b.min.x;
+    let d = b.max.z - b.min.z;
+    // se è troppo profondo si gira di lato; se ancora non ci sta si rimpicciolisce un po'
+    const turn = d > depthFree && w < d;
+    if (turn) [w, d] = [d, w];
+    const scale = Math.min(1, depthFree / d);
+    if (scale < 0.7) continue;
+    w *= scale;
+    d *= scale;
+    if (used + w + (placed.length ? 0.3 : 0) > halfSpan * 2) continue;
+    used += w + (placed.length ? 0.3 : 0);
+    obj.userData.solid = kind !== flowerBed; // le aiuole sono basse e si attraversano
+    placed.push({ obj, w, d, turn, scale });
+  }
+  // in fila, centrata, appoggiata alla casa
+  let r0 = -used / 2;
+  const items: { pos: THREE.Vector3; obj: THREE.Object3D; tarp: THREE.Object3D }[] = [];
+  for (const it of placed) {
+    const rMid = (r0 + it.w / 2) / WS;
+    r0 += it.w + 0.3;
+    const fPos = f0 + (0.08 + it.d / 2) / WS;
+    const pos = at(slot.center, fPos, rMid);
+    const obj = it.obj;
+    obj.rotation.y = along + (it.turn ? Math.PI / 2 : 0);
+    obj.scale.multiplyScalar(it.scale);
+    obj.position.copy(pos);
     obj.updateMatrixWorld(true);
     const tarp = tarpFor(obj);
     tarp.visible = false;
-    items.push({ pos: spots[i], obj, tarp });
+    items.push({ pos, obj, tarp });
   }
   const cans = at(slot.center, FENCE - 0.55, 0);
   const phases: Phase[] = [
@@ -886,7 +914,8 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
     pl.userData.solid = true;
   }
   for (const it of items) {
-    run.prop(it.obj, it.pos, along, 1);
+    // la rotazione è già quella giusta (alcuni oggetti sono girati di lato per starci)
+    run.prop(it.obj, it.pos, it.obj.rotation.y, 1);
     run.prop(it.tarp, it.pos.clone(), 0, 1);
   }
   run.prop(paintKit(col), cans, along, 1);

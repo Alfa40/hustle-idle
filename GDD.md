@@ -399,6 +399,13 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **Oggetti solidi nei lavoretti** (`userData.solid`, `JobRun.collide`): auto, cespugli (anche tagliati), bidone, edicola e negozio dei pacchi, recinzione e pilastri, scivolo, tavolino, vasi grandi. Restano attraversabili quelli piccoli o bassi: foglie, cassette della posta, barattoli, cassetta degli attrezzi, spruzzino, avvolgitubo, secchio, aiuole. Ogni punto dei lavoretti resta raggiungibile a piedi (provati 838 punti)
 - Tutorial del lavapiatti: in cucina il fumetto segue le pile (prima restava fermo su "entra in cucina")
 
+### Comandi: joystick e quadrato delle azioni
+- **Joystick** solo nella metà sinistra dello schermo (compare dove appoggi il dito); **quadrato delle azioni** fisso in basso a destra: è l'unico posto da toccare per parlare, entrare e lavorare. Spento e trasparente (✋ Azione) quando non c'è niente da fare, giallo e pulsante con l'icona dell'azione e "Tocca"/"Tieni premuto" quando puoi; tenendo premuto si riempie di verde dal basso. Sali/Scendi sta accanto al quadrato
+- Opzioni → **🔁 Inverti joystick e azioni**: joystick a destra e quadrato in basso a sinistra
+- Restano: oggetto che pulsa, cerchio a terra dove stare, scritta in alto, cerchietto sopra la testa per "tieni premuto"
+- Benvenuto: una riga spiega joystick e quadrato; chiuso il benvenuto, per qualche secondo le due zone si illuminano ("🕹️ Trascina qui per muoverti" / "👆 Tocca qui"). I tutorial indicano il quadrato (manina e testi)
+- Imbianchino: le cose del giardino stanno in fila contro la casa (girate o un po' più piccole se serve), lungo il muretto resta sempre un corridoio libero di 1,5 m per dipingerlo dall'interno
+
 ### Strada e obiettivi
 - La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo

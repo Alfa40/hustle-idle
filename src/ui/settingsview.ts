@@ -1,7 +1,7 @@
 import { HUD_NAMES, setSetting, settings, SETTING_OPTIONS, type HudKey, type Settings } from '../settings';
 
 type Choice = 'quality' | 'camera';
-type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap' | 'battery';
+type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap' | 'battery' | 'swapControls';
 
 function segmented(key: Choice, label: string, hint: string) {
   const opts = SETTING_OPTIONS[key].map(
@@ -19,6 +19,7 @@ function toggle(key: Toggle, label: string, hint: string) {
 /** Controlli delle impostazioni: uguali nella schermata iniziale e in partita. */
 export function settingsHtml() {
   return [
+    toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: ti muovi toccando la parte sinistra dello schermo e il quadrato delle azioni è in basso a destra. Acceso: il contrario.'),
     toggle('battery', '🔋 Risparmio batteria', 'Il gioco disegna 30 immagini al secondo (15 quando non tocchi lo schermo) e con un po\' meno dettaglio: consuma circa la metà.'),
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),

@@ -865,3 +865,51 @@ body.is-landscape.is-short .biz-tut .tut-body { font-size: 13px; }
 .lb-btn:active { transform: translateY(1px); }
 .lb-go { font-size: 22px; color: #b9b2cc; font-weight: 800; }
 .fr-drop { margin-top: 8px; }
+
+/* ---------- quadrato delle azioni (sempre nello stesso posto) ---------- */
+/* le zone sull'oggetto, sul cerchio a terra e il cerchietto sopra la testa non si toccano più:
+   servono solo a posizionare la manina del tutorial e a mostrare l'avanzamento */
+.action, .act-ring { pointer-events: none; }
+.act-pad {
+  position: fixed; right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px); z-index: 20;
+  width: var(--act); height: var(--act); border-radius: 24px; padding: 0; overflow: hidden;
+  border: 3px solid rgba(255,255,255,.75); background: rgba(40,40,60,.28); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  touch-action: none; -webkit-tap-highlight-color: transparent; box-shadow: 0 4px 10px rgba(0,0,0,.18);
+  transition: background .15s, border-color .15s;
+}
+.act-pad .pi { position: relative; font-size: calc(var(--act) * .36); line-height: 1; opacity: .55; }
+.act-pad .pl { position: relative; font-size: max(11px, calc(12px * var(--u))); font-weight: 800; opacity: .7; }
+/* avanzamento (tieni premuto, o il lampo di un tocco): si riempie dal basso */
+.act-pad .pp { position: absolute; left: 0; right: 0; bottom: 0; height: var(--p, 0%); background: rgba(53,196,106,.85); }
+.act-pad.ready {
+  background: radial-gradient(circle at 35% 30%, #ffe066, var(--yellow) 65%); border-color: #fff; color: #5a3d00;
+  box-shadow: 0 5px 0 var(--yellow-d), 0 8px 16px rgba(0,0,0,.28); animation: pad-pulse 1s ease-in-out infinite;
+}
+.act-pad.ready .pi, .act-pad.ready .pl { opacity: 1; }
+@keyframes pad-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+body.act-pressed .act-pad.ready { transform: translateY(3px) scale(.97); animation: none; box-shadow: 0 2px 0 var(--yellow-d); }
+/* Sali/Scendi accanto al quadrato */
+.ride-btn { right: calc(var(--sar) + var(--act) + 26px); bottom: calc(var(--sab) + 22px); }
+/* invertito: quadrato in basso a sinistra (il joystick nasce a destra) */
+body.swap-controls .act-pad { right: auto; left: calc(var(--sal) + 14px); }
+body.swap-controls .ride-btn { right: auto; left: calc(var(--sal) + var(--act) + 26px); }
+
+/* ---------- prima volta: dove muoversi e dove toccare ---------- */
+.ctl-hint { position: fixed; inset: 0; z-index: 25; pointer-events: none; animation: ht-pop .3s ease-out; transition: opacity .35s; }
+.ctl-hint.out { opacity: 0; }
+.ctl-hint .ctl-move {
+  position: absolute; left: 0; top: 30%; bottom: 0; width: 50%; border: 3px dashed rgba(255,255,255,.85); border-radius: 0 28px 0 0;
+  background: rgba(45,156,219,.18); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,.5);
+}
+.ctl-hint .ctl-act {
+  position: absolute; right: calc(var(--sar) + 4px); bottom: calc(var(--sab) + var(--act) + 34px); max-width: 46vw; text-align: center;
+  background: #fff; color: var(--ink); border: 3px solid var(--yellow); border-radius: 16px; padding: 6px 10px; display: flex; flex-direction: column;
+}
+.ctl-hint .ctl-act::after { content: '⬇'; position: absolute; right: calc(var(--act) / 2 - 2px); bottom: -26px; font-size: 22px; color: #fff; text-shadow: 0 2px 3px rgba(0,0,0,.5); }
+.ctl-hint b { font-size: 18px; }
+.ctl-hint span { font-size: 13px; font-weight: 700; }
+body.swap-controls .ctl-hint .ctl-move { left: auto; right: 0; border-radius: 28px 0 0 0; }
+body.swap-controls .ctl-hint .ctl-act { right: auto; left: calc(var(--sal) + 4px); }
+body.swap-controls .ctl-hint .ctl-act::after { right: auto; left: calc(var(--act) / 2 - 2px); }

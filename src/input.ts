@@ -1,3 +1,4 @@
+import { settings } from './settings';
 /**
  * Controlli: joystick virtuale che compare dove si appoggia il dito,
  * tocco breve = vai lì, tastiera (WASD/frecce + E/spazio) su PC.
@@ -64,6 +65,9 @@ export class Input {
       return;
     }
     if (this.pointerId !== null) return;
+    // il joystick nasce solo nella sua metà dello schermo (l'altra ha il quadrato delle azioni)
+    const left = e.clientX < window.innerWidth / 2;
+    if (left === settings.swapControls) return;
     this.pointerId = e.pointerId;
     this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
     this.dragging = false;
