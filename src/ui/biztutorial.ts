@@ -3,7 +3,7 @@ import { bizType } from '../config/business';
 import type { StationDef, StationKind } from '../config/recipes';
 import type { Game } from '../game';
 import { placeTutHand } from './jobtutorial';
-import { padSide, settings } from '../settings';
+import { actSide, moveSide } from '../settings';
 
 /**
  * Tutorial contestuale della cucina: la prima volta che entri in un tipo di attività
@@ -120,13 +120,13 @@ export class KitchenTutorial {
           body = 'Un momento…';
       }
       if (t.status === 'wait') foot = '⏳ Aspetta qui vicino';
-      else if (!t.near) foot = `🚶 Trascina il dito nella metà ${settings.swapControls ? 'destra' : 'sinistra'} dello schermo per muoverti e segui l'<b>anello colorato</b>`;
+      else if (!t.near) foot = `🚶 Trascina il dito nella metà ${moveSide()} dello schermo per muoverti e segui l'<b>anello colorato</b>`;
       else if (t.status === 'work') {
         gesture = 'hold';
-        foot = `✊ <b>Tieni premuto il quadrato giallo</b> ${padSide()} finché si riempie`;
+        foot = `✊ <b>Tieni il dito sulla metà ${actSide()}</b> dello schermo finché il cerchio si riempie`;
       } else {
         gesture = 'tap';
-        foot = `👆 <b>Tocca il quadrato giallo</b> ${padSide()}`;
+        foot = `👆 <b>Tocca la metà ${actSide()}</b> dello schermo`;
       }
     } else if (t.stage === 'tips') {
       head = '🎉 Cliente servito!';

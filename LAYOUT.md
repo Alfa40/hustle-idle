@@ -49,8 +49,9 @@ anche per ogni schermata nuova.
      fumetto del tutorial), larghi al massimo fino alla colonna e alla minimappa
      (`100vw - … - max(var(--hud-w), var(--mm))`).
      In orizzontale diventano un **pannello laterale a sinistra** (`min(360px, 40vw)`).
-   - quadrato delle azioni (`.act-pad`, `--act`) fisso in basso a destra (a sinistra con
-     `body.swap-controls`), Sali/Scendi accanto; il joystick nasce solo nell'altra metà dello schermo.
+   - niente pulsante azione: metà destra dello schermo = azioni (toccare o tenere premuto, gestito da
+     `Input`), metà sinistra = joystick; invertite con `body.swap-controls` (`.act-zone` è la metà delle
+     azioni, invisibile, per la manina dei tutorial). Sali/Scendi nell'angolo in basso.
      Scritta dell'azione (`.act-label`) subito sotto il riquadro in alto a sinistra, cerchietto sopra la
      testa (`.act-ring`) per "tieni premuto"; `.action`/`.act-stand` non si toccano (servono alla manina).
    - anteprima delle migliorie (`.preview-bar`) in alto a sinistra, sopra il riquadro "in mano".

@@ -12,12 +12,13 @@ export interface Settings {
   hudOrder: HudKey[];
   /** pulsanti spostati nel menu a tendina ☰ */
   hudMenu: HudKey[];
-  /** joystick a destra e quadrato delle azioni in basso a sinistra (per i mancini) */
+  /** joystick a destra e azioni toccando a sinistra (per i mancini) */
   swapControls: boolean;
 }
 
-/** Da che parte sta il quadrato delle azioni (per i testi dei tutorial). */
-export const padSide = () => (settings.swapControls ? 'in basso a sinistra' : 'in basso a destra');
+/** Metà dello schermo delle azioni (per i testi dei tutorial): l'altra è del joystick. */
+export const actSide = () => (settings.swapControls ? 'sinistra' : 'destra');
+export const moveSide = () => (settings.swapControls ? 'destra' : 'sinistra');
 
 export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'settings', 'camera'] as const;
 export type HudKey = (typeof HUD_KEYS)[number];

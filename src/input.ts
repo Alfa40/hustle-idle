@@ -15,8 +15,20 @@ export class Input {
   look = { x: 0, y: 0 };
   private lookId: number | null = null;
   private lookLast = { x: 0, y: 0 };
-  actionPressed = false;
+  private pressed = false;
+  /** tocco nell'area delle azioni (o E/spazio), da consumare: chi lo imposta segna anche quando */
+  get actionPressed() {
+    return this.pressed;
+  }
+  set actionPressed(v: boolean) {
+    this.pressed = v;
+    if (v) this.pressedAt = performance.now();
+  }
   enabled = true;
+  /** il dito ha appena toccato l'area delle azioni (per il lampo del cerchio) */
+  onActionDown: (() => void) | null = null;
+  onActionUp: (() => void) | null = null;
+  private actionId: number | null = null;
 
   private keys = new Set<string>();
   private pointerId: number | null = null;
@@ -64,10 +76,18 @@ export class Input {
       this.lookLast = { x: e.clientX, y: e.clientY };
       return;
     }
-    if (this.pointerId !== null) return;
-    // il joystick nasce solo nella sua metà dello schermo (l'altra ha il quadrato delle azioni)
+    // metà dello schermo delle azioni (di solito la destra): toccare o tenere premuto fa l'azione
     const left = e.clientX < window.innerWidth / 2;
-    if (left === settings.swapControls) return;
+    if (left === settings.swapControls) {
+      if (this.actionId !== null) return;
+      this.actionId = e.pointerId;
+      this.actionPressed = true;
+      this.actionHeld = true;
+      this.onActionDown?.();
+      return;
+    }
+    // l'altra metà: il joystick
+    if (this.pointerId !== null) return;
     this.pointerId = e.pointerId;
     this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
     this.dragging = false;
@@ -98,6 +118,12 @@ export class Input {
   }
 
   private up(e: PointerEvent) {
+    if (e.pointerId === this.actionId) {
+      this.actionId = null;
+      this.actionHeld = false;
+      this.onActionUp?.();
+      return;
+    }
     if (e.pointerId === this.lookId) {
       this.lookId = null;
       return;
@@ -137,13 +163,21 @@ export class Input {
     return t;
   }
 
+  /** quando è stato toccato (ms): un tocco vale solo per un attimo, non resta "in sospeso" */
+  private pressedAt = 0;
+
   consumeAction() {
-    const a = this.actionPressed;
+    const a = this.actionPressed && performance.now() - this.pressedAt < 350;
     this.actionPressed = false;
     return a;
   }
 
   cancel() {
+    if (this.actionId !== null) {
+      this.actionId = null;
+      this.actionHeld = false;
+      this.onActionUp?.();
+    }
     this.pointerId = null;
     this.lookId = null;
     this.dragging = false;

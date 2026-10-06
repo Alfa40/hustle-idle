@@ -12,7 +12,7 @@ import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
-import { onSettings, padSide, settings, type HudKey } from '../settings';
+import { actSide, moveSide, onSettings, settings, type HudKey } from '../settings';
 import { layout } from './layout';
 import { PulseGlow } from '../world/pulse';
 import { MapScreen } from './mapscreen';
@@ -85,8 +85,6 @@ export class UI {
   private actionEl!: HTMLButtonElement;
   /** zona da toccare sul cerchio a terra dove stare */
   private standEl!: HTMLButtonElement;
-  /** quadrato delle azioni (l'unico posto da toccare per agire) */
-  private padEl!: HTMLButtonElement;
   /** cerchio semitrasparente sopra la testa: si riempie tenendo premuto (o in un lampo con un tocco) */
   private ringEl!: HTMLButtonElement;
   /** scritta dell'azione in alto, sotto il riquadro */
@@ -194,35 +192,18 @@ export class UI {
     const stand = document.createElement('button');
     stand.className = 'action act-stand';
     stand.setAttribute('aria-label', 'Azione');
-    // il quadrato delle azioni: sempre nello stesso posto (in basso a destra, o a sinistra se invertito)
-    const pad = document.createElement('button');
-    pad.className = 'act-pad';
-    pad.setAttribute('aria-label', 'Azione');
-    pad.innerHTML = '<i class="pp"></i><span class="pi">✋</span><span class="pl">Azione</span>';
+    // area delle azioni: la metà dello schermo senza joystick (non si vede: serve alla manina del tutorial)
+    const zone = document.createElement('div');
+    zone.className = 'act-zone';
     const inp = this.game.input;
-    for (const el of [pad]) {
-      el.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* puntatore già rilasciato */
-        }
-        inp.actionHeld = true;
-        inp.actionPressed = true;
-        document.body.classList.add('act-pressed');
-        // azione "tocca": il cerchio si riempie in un lampo, per far vedere che è partita
-        if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
-      });
-      const up = () => {
-        inp.actionHeld = false;
-        document.body.classList.remove('act-pressed');
-      };
-      el.addEventListener('pointerup', up);
-      el.addEventListener('pointercancel', up);
-    }
-    document.body.append(act, ring, stand, pad, lbl);
-    this.padEl = pad;
+    // tocco nell'area delle azioni (gestito da Input): con un'azione "tocca" il cerchio sopra la testa
+    // si riempie in un lampo, per far vedere che è partita
+    inp.onActionDown = () => {
+      document.body.classList.add('act-pressed');
+      if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
+    };
+    inp.onActionUp = () => document.body.classList.remove('act-pressed');
+    document.body.append(act, ring, stand, zone, lbl);
     const side = () => document.body.classList.toggle('swap-controls', settings.swapControls);
     side();
     onSettings(side);
@@ -408,15 +389,9 @@ export class UI {
       // le zone sull'oggetto e sul cerchio a terra servono solo a posizionare la manina del tutorial
       this.actionEl.classList.toggle('on', !!p);
       this.labelEl.classList.toggle('on', !!p);
-      this.padEl.classList.toggle('ready', !!p);
-      if (!p) {
-        (this.padEl.querySelector('.pi') as HTMLElement).textContent = '✋';
-        (this.padEl.querySelector('.pl') as HTMLElement).textContent = 'Azione';
-      }
+      document.body.classList.toggle('act-ready', !!p);
       if (p) {
         const hold = p.progress !== undefined;
-        (this.padEl.querySelector('.pi') as HTMLElement).textContent = p.icon;
-        (this.padEl.querySelector('.pl') as HTMLElement).textContent = hold ? 'Tieni premuto' : 'Tocca';
         // prima il gesto (tocca / tieni premuto), poi cosa fai
         this.labelEl.innerHTML = `${p.at ? `<span class="act-how">${hold ? '✊ Tieni premuto' : '👆 Tocca'}</span> ` : ''}${esc(p.icon)} ${esc(p.label.replace(/^Tieni premuto:\s*/, ''))}`;
       }
@@ -438,7 +413,6 @@ export class UI {
     // pieno solo mentre si tiene premuto o durante il lampo di un tocco
     const fill = hold ? p!.progress! : flash < 1.3 ? Math.min(1, flash) : 0;
     this.ringEl.style.setProperty('--p', `${Math.round(Math.min(1, fill) * 100)}%`);
-    this.padEl.style.setProperty('--p', `${Math.round(Math.min(1, fill) * 100)}%`);
 
     this.ringEl.classList.toggle('full', !hold && flash >= 1);
     if (p) this.placeAction(p, showRing);
@@ -2193,9 +2167,9 @@ export class UI {
         }
         return tabs + `
           <div class="card"><h3>🕹️ Comandi</h3><p class="muted small" style="margin:0">
-            Per muoverti trascina il dito nella metà ${settings.swapControls ? 'destra' : 'sinistra'} dello schermo: compare un joystick.
-            Quando sei sul cerchio a terra davanti a una persona o a un oggetto (l'oggetto pulsa), tocca il <b>quadrato giallo</b> ${padSide()}; se c'è scritto "Tieni premuto" tieni il dito sopra finché si riempie.
-            In ⚙️ Opzioni puoi invertire i lati (joystick a destra, quadrato a sinistra).
+            Per muoverti trascina il dito nella metà ${moveSide()} dello schermo: compare un joystick.
+            Quando sei sul cerchio a terra davanti a una persona o a un oggetto (l'oggetto pulsa), tocca la <b>metà ${actSide()}</b> dello schermo; se c'è scritto "Tieni premuto" tieni il dito lì finché il cerchio si riempie.
+            In ⚙️ Opzioni puoi invertire i lati.
             Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
       },
@@ -2271,7 +2245,7 @@ export class UI {
       render: () => `
         <div class="hero"><div class="emoji">💼</div><p style="margin:4px 0 12px">Hai <b class="money-t">${euro(this.s.money)}</b> in tasca e tanta voglia di fare!</p></div>
         <ul class="steps">
-          <li><div class="icon-bubble">🕹️</div><span>Per <b>muoverti</b> trascina il dito nella metà <b>${settings.swapControls ? 'destra' : 'sinistra'}</b> dello schermo. Per <b>parlare, entrare o lavorare</b> mettiti sul cerchio a terra e tocca il <b>quadrato giallo ${padSide()}</b> (si accende quando puoi). In ⚙️ Opzioni puoi invertire i lati.</span></li>
+          <li><div class="icon-bubble">🕹️</div><span>Per <b>muoverti</b> trascina il dito nella metà <b>${moveSide()}</b> dello schermo. Per <b>parlare, entrare o lavorare</b> mettiti sul cerchio a terra e tocca la metà <b>${actSide()}</b> (o tieni il dito lì se c'è scritto "Tieni premuto"). In ⚙️ Opzioni puoi invertire i lati.</span></li>
           <li><div class="icon-bubble">❗</div><span>Cerca le persone con il <b>!</b> giallo: offrono <b>lavoretti</b>. Le freccette ai bordi ti portano da loro.</span></li>
           <li><div class="icon-bubble">📋</div><span>Nella <b>bacheca</b> in piazza trovi le <b>missioni</b> del giorno.</span></li>
           <li><div class="icon-bubble">🚚</div><span>Con i risparmi compra un lotto <b>IN VENDITA</b> e apri il tuo <b>food truck</b>.</span></li>

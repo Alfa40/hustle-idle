@@ -3,7 +3,7 @@ import type { JobType } from '../config/jobs';
 import type { Game } from '../game';
 import type { JobRun } from '../minigames/jobs';
 import { toast } from '../sim/bus';
-import { padSide } from '../settings';
+import { actSide } from '../settings';
 
 /**
  * Tutorial contestuale dei lavoretti: la prima volta che fai un lavoretto (o quando lo scegli
@@ -135,7 +135,7 @@ export class JobTutorial {
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
-      foot = gesture === 'hold' ? `✊ <b>Tieni premuto il quadrato giallo</b> ${padSide()} finché si riempie` : `👆 <b>Tocca il quadrato giallo</b> ${padSide()}`;
+      foot = gesture === 'hold' ? `✊ <b>Tieni il dito sulla metà ${actSide()}</b> dello schermo finché il cerchio si riempie` : `👆 <b>Tocca la metà ${actSide()}</b> dello schermo`;
       anchor = g.task.pos;
     } else {
       body = tip;
@@ -173,9 +173,9 @@ export class JobTutorial {
  * lampeggia (la scritta dell'anello passa sopra, così la manina non la copre).
  */
 export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) {
-  // la manina indica il quadrato delle azioni (l'unico posto da toccare)
-  const act = document.querySelector('.act-pad.ready') as HTMLElement | null;
-  const show = !!gesture && !!act && getComputedStyle(act).display !== 'none';
+  // la manina indica l'area delle azioni (la metà dello schermo senza joystick), quando c'è un'azione
+  const act = document.querySelector('.act-zone') as HTMLElement | null;
+  const show = !!gesture && !!act && document.body.classList.contains('act-ready');
   document.body.classList.toggle('tut-pointing', show);
   if (!show) {
     hand.style.display = 'none';
@@ -185,8 +185,9 @@ export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) 
   const size = hand.offsetHeight || 70;
   hand.style.display = '';
   // la punta del dito (in alto, un po' a sinistra del disegno) sul centro dell'anello
+  // nella parte bassa dell'area, dove arriva il pollice
   hand.style.left = `${r.left + r.width / 2 - size * 0.42}px`;
-  hand.style.top = `${r.top + r.height / 2 - size * 0.06}px`;
+  hand.style.top = `${r.top + r.height * 0.72 - size * 0.06}px`;
   hand.className = `tut-hand ${gesture}`;
   hand.textContent = gesture === 'hold' ? '✊' : '👆';
 }
