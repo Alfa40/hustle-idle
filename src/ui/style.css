@@ -229,22 +229,25 @@ body.is-landscape .act-label { max-width: min(360px, 40vw); }
 /* striscia ad altezza fissa sotto i riquadri in alto (posizione dal LayoutManager, UI.placeTopStack):
    un messaggio alla volta, mai sopra il personaggio o gli obiettivi. Le stanze la tengono sempre libera. */
 .toasts {
-  position: fixed; left: var(--sal); top: var(--sat); height: 50px; z-index: 19; pointer-events: none;
+  position: fixed; left: var(--sal); top: var(--sat); height: 58px; z-index: 19; pointer-events: none;
   display: flex; flex-direction: column; justify-content: flex-start;
 }
 .toast {
-  /* colore pieno a sinistra (tipo di messaggio) + fondo leggermente colorato: si riconosce subito */
-  --tc: var(--blue); --tb: #eef6fd;
-  position: relative; background: var(--tb); color: var(--ink); padding: 5px 10px 5px 16px; border-radius: 12px;
-  font-size: 14px; font-weight: 800; line-height: 1.25; text-align: left; border: 2px solid var(--tc);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--tc) 45%, transparent), 0 5px 12px rgba(0,0,0,.2);
-  animation: tin .35s cubic-bezier(.2,1.5,.4,1); overflow: hidden; box-sizing: border-box;
+  /* colore pieno per tipo, testo bianco grande, bordo bianco: si vede subito anche sopra la città */
+  --tc: #2d8fd5; --td: #1f6fa8;
+  position: relative; background: var(--tc); color: #fff; padding: 6px 12px; border-radius: 14px;
+  font-size: 15px; font-weight: 800; line-height: 1.25; text-align: left; border: 3px solid #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.25);
+  box-shadow: 0 4px 0 var(--td), 0 6px 16px rgba(0,0,0,.3);
+  animation: tin .4s cubic-bezier(.2,1.6,.4,1), tglow 1.2s ease-out .4s; overflow: hidden; box-sizing: border-box;
 }
 .toast > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.toast::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 7px; background: var(--tc); }
-.toast.good { --tc: var(--green); --tb: #ecfaf1; }
-.toast.bad { --tc: var(--red); --tb: #fff0f2; color: var(--red-d); }
-.toast.money { --tc: #f0a500; --tb: #fff8de; color: var(--money); }
+.toast.good { --tc: #2fb35f; --td: #1f8a45; color: #fff; }
+/* (la classe generica .bad colora il testo di rosso: qui resta bianco) */
+.toast.bad { --tc: #e8475a; --td: #b62f40; color: #fff; }
+.toast.money { --tc: #f2a900; --td: #c98a00; color: #4a3200; text-shadow: none; }
+/* appena arriva: un alone che pulsa una volta */
+@keyframes tglow { 0% { box-shadow: 0 4px 0 var(--td), 0 0 0 0 color-mix(in srgb, var(--tc) 70%, transparent); } 100% { box-shadow: 0 4px 0 var(--td), 0 0 0 12px transparent; } }
 .toast.out { opacity: 0; transform: translateY(6px); transition: all .4s; }
 @keyframes tin { 0% { transform: translateX(-14px) scale(.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
