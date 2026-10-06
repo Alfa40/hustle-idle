@@ -93,6 +93,10 @@ export interface ActionPrompt {
   at?: THREE.Vector3;
   /** altezza (m) sopra i piedi del personaggio dove compare il cerchio (più in alto se ha un'etichetta sulla testa) */
   headY?: number;
+  /** oggetto che serve per l'azione: pulsa (il suo colore si accende e si spegne) */
+  obj?: THREE.Object3D;
+  /** punto a terra dove stare per l'azione (cerchio a terra): si può toccare anche lì */
+  stand?: THREE.Vector3;
 }
 
 interface JobNpc {

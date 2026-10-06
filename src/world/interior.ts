@@ -111,6 +111,8 @@ interface Station {
   tag?: THREE.Sprite;
   tagKey?: string;
   tagY: number;
+  /** mobile della postazione (pulsa quando è lì l'azione) */
+  obj?: THREE.Object3D;
 }
 
 /** Cosa sta facendo un cuoco: andare a una postazione e lavorarci. */
@@ -138,7 +140,7 @@ interface Worker {
 const barGeo = new THREE.PlaneGeometry(0.7, 0.1);
 const COLORS = { cook: 0xffc21a, ready: 0x35c46a, burnt: 0xff5d73 };
 
-type Prompt = { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null;
+type Prompt = { label: string; icon: string; progress?: number; at?: THREE.Vector3; stand?: THREE.Vector3 } | null;
 
 /**
  * Le fasi del lavoro, ognuna col suo colore: tappetino davanti alla postazione,
@@ -269,6 +271,7 @@ export class TruckInterior {
     const pro = upg(this.biz, 'attrezzatura');
     for (const d of kitchenLayout(t, this.level, upg(this.biz, 'fuochi'), upg(this.biz, 'banco'))) {
       const pos = new THREE.Vector3(d.x, 0, d.z);
+      let furn: THREE.Object3D | undefined;
       if (d.model) {
         const o = model(d.model, FURN);
         // i mobili del furniture kit hanno l'origine in un angolo; il gruppo li ruota sulla parete
@@ -289,9 +292,10 @@ export class TruckInterior {
           });
         }
         s.add(wrap);
+        furn = wrap;
       }
       const tall = d.model.includes('Fridge') || d.model.includes('bookcase');
-      const st: Station = { def: d, pos, slots: [], hold: 0, tagY: d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7 };
+      const st: Station = { def: d, pos, slots: [], hold: 0, tagY: d.kind === 'counter' || d.kind === 'pass' ? 1.55 : tall ? 2.5 : 1.7, obj: furn };
       const nSlots = d.kind === 'timed' ? (d.slots ?? 2) : 0;
       for (let i = 0; i < nSlots; i++) {
         const bar = new THREE.Mesh(barGeo, new THREE.MeshBasicMaterial({ color: 0x333333, depthTest: false }));
@@ -1464,7 +1468,9 @@ export class TruckInterior {
     const pr = this.interact(best, dt, input.actionHeld, pressed);
     // l'anello da toccare sta sul mobile della postazione
     const k = best.def.kind;
-    g.ui.setAction(pr && { ...pr, at: best.pos.clone().setY(k === 'counter' || k === 'pass' ? 1.15 : best.tagY > 2 ? 1.3 : 1.0), headY: this.hand.length ? 3.1 : 2.6 });
+    g.ui.setAction(pr && { ...pr, at: best.pos.clone().setY(k === 'counter' || k === 'pass' ? 1.15 : best.tagY > 2 ? 1.3 : 1.0), headY: this.hand.length ? 3.1 : 2.6, obj: best.obj,
+      // il tappetino colorato davanti alla postazione: si può toccare anche lì
+      stand: best.def.z > 1 ? new THREE.Vector3(best.pos.x, 0, FRONT - 0.1) : best.pos.clone().addScaledVector(this.front(best), 0.95) });
   }
 
   /** ultima volta (ms) che il giocatore ha lavorato a una postazione */

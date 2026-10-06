@@ -14,6 +14,7 @@ import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
 import { onSettings, settings, type HudKey } from '../settings';
 import { layout } from './layout';
+import { PulseGlow } from '../world/pulse';
 import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
@@ -82,6 +83,8 @@ export class UI {
   private missionDot!: HTMLElement;
   /** zona da toccare (invisibile) sull'oggetto */
   private actionEl!: HTMLButtonElement;
+  /** zona da toccare sul cerchio a terra dove stare */
+  private standEl!: HTMLButtonElement;
   /** cerchio semitrasparente sopra la testa: si riempie tenendo premuto (o in un lampo con un tocco) */
   private ringEl!: HTMLButtonElement;
   /** scritta dell'azione in alto, sotto il riquadro */
@@ -179,16 +182,18 @@ export class UI {
     const act = document.createElement('button');
     act.className = 'action';
     act.setAttribute('aria-label', 'Azione');
-    // cerchio leggero che lampeggia sull'oggetto + dito che mostra il gesto (tocca / tieni premuto)
-    act.innerHTML = '<i class="act-spot"></i><b class="act-finger"></b>';
     const ring = document.createElement('button');
     ring.className = 'act-ring';
     ring.setAttribute('aria-label', 'Azione');
     ring.innerHTML = '<i></i>';
     const lbl = document.createElement('div');
     lbl.className = 'act-label';
+    // seconda zona da toccare: il cerchio a terra dove stare
+    const stand = document.createElement('button');
+    stand.className = 'action act-stand';
+    stand.setAttribute('aria-label', 'Azione');
     const inp = this.game.input;
-    for (const el of [act, ring]) {
+    for (const el of [act, ring, stand]) {
       el.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         try {
@@ -209,8 +214,9 @@ export class UI {
       el.addEventListener('pointerup', up);
       el.addEventListener('pointercancel', up);
     }
-    document.body.append(act, ring, lbl);
+    document.body.append(act, ring, stand, lbl);
     this.actionEl = act;
+    this.standEl = stand;
     this.ringEl = ring;
     this.labelEl = lbl;
 
@@ -377,27 +383,27 @@ export class UI {
    * Azione disponibile: un anello che lampeggia sopra l'oggetto da usare, con la scritta sotto.
    * Si tocca (o si tiene premuto) l'oggetto stesso: niente pulsante fisso.
    */
+  /** l'oggetto dell'azione pulsa (al posto di cerchi sullo schermo) */
+  private pulse = new PulseGlow();
+
   setAction(p: ActionPrompt | null) {
     this.actionPrompt = p;
+    this.pulse.set(p?.obj);
+    this.pulse.update();
     const key = p ? p.icon + p.label : '';
     if (key !== this.lastAction) {
       const appeared = !this.lastAction && !!p;
       this.lastAction = key;
       this.actionEl.classList.toggle('on', !!p);
       this.labelEl.classList.toggle('on', !!p);
+      this.standEl.classList.toggle('on', !!p?.stand);
       if (p) {
         const hold = p.progress !== undefined;
         // prima il gesto (tocca / tieni premuto), poi cosa fai
         this.labelEl.innerHTML = `${p.at ? `<span class="act-how">${hold ? '✊ Tieni premuto' : '👆 Tocca'}</span> ` : ''}${esc(p.icon)} ${esc(p.label.replace(/^Tieni premuto:\s*/, ''))}`;
-        // senza un oggetto (solo un suggerimento) il cerchio non si disegna
-        this.actionEl.classList.toggle('spot', !!p.at);
-        (this.actionEl.querySelector('.act-finger') as HTMLElement).textContent = hold ? '✊' : '👆';
       }
-      // l'azione è appena diventata disponibile: il cerchio "salta fuori" (e il telefono vibra un attimo)
+      // l'azione è appena diventata disponibile: il telefono vibra un attimo
       if (appeared) {
-        this.actionEl.classList.remove('pop');
-        void this.actionEl.offsetWidth;
-        this.actionEl.classList.add('pop');
         try {
           navigator.vibrate?.(12);
         } catch {
@@ -442,6 +448,13 @@ export class UI {
     this.actionEl.style.setProperty('--hit', `${d}px`);
     this.actionEl.style.left = `${Math.round(THREE.MathUtils.clamp(o.x, safe.left + r, w - safe.right - r))}px`;
     this.actionEl.style.top = `${Math.round(THREE.MathUtils.clamp(o.y, safe.top + r, h - safe.bottom - r))}px`;
+    // cerchio a terra: anche lì si può toccare
+    if (p.stand) {
+      const st = toScreen(v.copy(p.stand).setY(0.1).project(cam));
+      this.standEl.style.setProperty('--hit', `${d}px`);
+      this.standEl.style.left = `${Math.round(THREE.MathUtils.clamp(st.x, safe.left + r, w - safe.right - r))}px`;
+      this.standEl.style.top = `${Math.round(THREE.MathUtils.clamp(st.y, safe.top + r, h - safe.bottom - r))}px`;
+    }
     // cerchio poco sopra la testa
     if (ring) {
       const head = toScreen(v.copy(g.player.root.position).setY(p.headY ?? 2.6).project(cam));

@@ -602,7 +602,7 @@ export class ClientHouse {
 
   // ---- pulizie ----
 
-  private cleanInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
+  private cleanInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3; obj?: THREE.Object3D } | null {
     const input = this.game.input;
     if (this.near(this.door, 0.8) && this.dirts.every((d) => d.done)) {
       if (input.consumeAction()) this.finish(this.stars());
@@ -667,12 +667,12 @@ export class ClientHouse {
     const dirtAt = best.pos.clone().setY(best.tool === 'spugna' ? 0.2 : best.tool === 'piumino' ? 1.3 : 1.5);
     if (best.tool === 'tergivetro') dirtAt.z -= 0.9;
     else if (best.tool === 'piumino') dirtAt.z -= 0.5;
-    return { label: 'Tieni premuto: pulisci', icon: TOOLS[best.tool].icon, progress: best.cut, at: dirtAt };
+    return { label: 'Tieni premuto: pulisci', icon: TOOLS[best.tool].icon, progress: best.cut, at: dirtAt, obj: best.tool === 'tergivetro' ? undefined : best.obj }; // il vetro appannato cambia trasparenza: niente bagliore
   }
 
   // ---- traslochi ----
 
-  private moveInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
+  private moveInteract(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3; obj?: THREE.Object3D } | null {
     const input = this.game.input;
     const c = this.carrying;
     // zona furgone all'ingresso
@@ -748,12 +748,12 @@ export class ClientHouse {
         this.player.play('interact-right', 0.1, 1.2);
         if (best.lift >= 1) pick(best);
       } else best.lift = Math.max(0, best.lift - dt);
-      return { label: `Tieni premuto: solleva ${best.name}`, icon: best.icon, progress: best.lift, at: best.pos.clone().setY(0.8) };
+      return { label: `Tieni premuto: solleva ${best.name}`, icon: best.icon, progress: best.lift, at: best.pos.clone().setY(0.8), obj: best.obj };
     }
     if (input.consumeAction()) {
       pick(best);
       this.player.once('pick-up', 'holding-both');
     }
-    return { label: `Prendi ${best.name}`, icon: best.icon, at: best.pos.clone().setY(0.6) };
+    return { label: `Prendi ${best.name}`, icon: best.icon, at: best.pos.clone().setY(0.6), obj: best.obj };
   }
 }

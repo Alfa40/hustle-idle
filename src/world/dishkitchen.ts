@@ -89,6 +89,11 @@ export class DishKitchen {
 
   // ---------------- costruzione ----------------
 
+  private lastFurn: THREE.Object3D | null = null;
+  /** lavello (i due mobili insieme) e scolapiatti: pulsano quando l'azione è lì */
+  private sinkObj = new THREE.Group();
+  private rackObj: THREE.Object3D | null = null;
+
   private furniture(path: string, x: number, z: number, rot = 0, scale = FURN) {
     const o = model(path, scale);
     o.rotation.y = rot;
@@ -96,6 +101,7 @@ export class DishKitchen {
     const c = box.getCenter(new THREE.Vector3());
     o.position.set(x - c.x, 0.05, z - c.z);
     this.scene.add(o);
+    this.lastFurn = o;
     const size = box.getSize(new THREE.Vector3());
     this.blocks.push({ minX: x - size.x / 2, maxX: x + size.x / 2, minZ: z - size.z / 2, maxZ: z + size.z / 2 });
     return size;
@@ -152,7 +158,10 @@ export class DishKitchen {
     this.furniture('furniture/kitchenFridge.glb', W - 0.5, 0.2, -Math.PI / 2);
     // lavello grande (a sinistra) con l'acqua
     this.furniture('furniture/kitchenSink.glb', this.sink.x - 0.55, this.sink.z);
+    const sinkA = this.lastFurn!;
     this.furniture('furniture/kitchenSink.glb', this.sink.x + 0.55, this.sink.z);
+    this.sinkObj.add(sinkA, this.lastFurn!);
+    s.add(this.sinkObj);
     this.water = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.55), new THREE.MeshLambertMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.75 }));
     this.water.rotation.x = -Math.PI / 2;
     this.water.position.set(this.sink.x, 1.0, this.sink.z + 0.05);
@@ -176,6 +185,7 @@ export class DishKitchen {
       rack.add(leg);
     }
     rack.position.copy(this.rack);
+    this.rackObj = rack;
     s.add(rack);
     this.blocks.push({ minX: this.rack.x - 0.8, maxX: this.rack.x + 0.8, minZ: this.rack.z - 0.3, maxZ: this.rack.z + 0.3 });
     // carrello con le pile di piatti sporchi (e qualche pentola)
@@ -359,7 +369,7 @@ export class DishKitchen {
     this.game.ui.setAction(pr && { ...pr, headY: this.heldSprite ? 3.0 : 2.6 });
   }
 
-  private interact(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3 } | null {
+  private interact(dt: number): { label: string; icon: string; progress?: number; at?: THREE.Vector3; obj?: THREE.Object3D; stand?: THREE.Vector3 } | null {
     const input = this.game.input;
     const st = this.step;
     if (!st) return null;
@@ -377,12 +387,13 @@ export class DishKitchen {
         if (Math.random() < dt * 14) this.fx.emit('bubble', this.sink.clone().setY(1.1).add(new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, 0)), 1);
         if (t.progress >= 1) this.next();
       }
-      return { label: `Tieni premuto: ${t.label}`, icon: t.icon, progress: t.progress ?? 0, at: this.sink.clone().setY(1.0) };
+      return { label: `Tieni premuto: ${t.label}`, icon: t.icon, progress: t.progress ?? 0, at: this.sink.clone().setY(1.0), obj: this.sinkObj, stand: t.pos };
     }
     if (input.consumeAction()) this.next();
     // anello sull'oggetto: la pila di piatti sul carrello o lo scolapiatti
     const at = this.idx % 3 === 0 ? this.stacks[st.stack].position.clone().setY(1.0) : this.rack.clone().setY(1.1);
-    return { label: t.label, icon: t.icon, at };
+    // l'anello verde a terra è il punto dove stare: si può toccare anche lì
+    return { label: t.label, icon: t.icon, at, obj: this.idx % 3 === 0 ? this.stacks[st.stack] : this.rackObj ?? undefined, stand: t.pos };
   }
 
   private next() {

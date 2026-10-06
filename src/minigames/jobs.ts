@@ -68,6 +68,18 @@ abstract class BaseRun implements JobRun {
   /** ingombro a terra degli oggetti solidi (calcolato una volta: non si spostano) */
   private solidBoxes = new Map<THREE.Object3D, THREE.Box3>();
 
+  protected solidBox(o: THREE.Object3D) {
+    let b = this.solidBoxes.get(o);
+    if (!b) {
+      o.updateMatrixWorld(true);
+      b = new THREE.Box3().setFromObject(o);
+      // un filo più stretto dell'oggetto: non ci si incastra sugli spigoli
+      b.expandByVector(new THREE.Vector3(-0.08, 0, -0.08));
+      this.solidBoxes.set(o, b);
+    }
+    return b;
+  }
+
   /**
    * Gli oggetti grandi (`userData.solid`: auto, tavoli, cespugli, muretti, edicola…) non si
    * attraversano: il personaggio viene spinto fuori. Quelli piccoli (foglie, cassette della
@@ -76,14 +88,7 @@ abstract class BaseRun implements JobRun {
   collide(p: THREE.Vector3, r = 0.35) {
     for (const o of this.objs) {
       if (!o.userData.solid || !o.visible || !o.parent) continue;
-      let b = this.solidBoxes.get(o);
-      if (!b) {
-        o.updateMatrixWorld(true);
-        b = new THREE.Box3().setFromObject(o);
-        // un filo più stretto dell'oggetto: non ci si incastra sugli spigoli
-        b.expandByVector(new THREE.Vector3(-0.08, 0, -0.08));
-        this.solidBoxes.set(o, b);
-      }
+      const b = this.solidBox(o);
       if (p.x < b.min.x - r || p.x > b.max.x + r || p.z < b.min.z - r || p.z > b.max.z + r) continue;
       const pushes = [b.min.x - r - p.x, b.max.x + r - p.x, b.min.z - r - p.z, b.max.z + r - p.z];
       const i = pushes.map(Math.abs).indexOf(Math.min(...pushes.map(Math.abs)));
@@ -157,6 +162,8 @@ export interface Task {
   progress?: number;
   /** dove mettere l'indicatore se sopra il punto coprirebbe un oggetto grande (edicola, negozio…) */
   markerAt?: THREE.Vector3;
+  /** oggetto da far pulsare quando sei vicino, se il punto non ha oggetti che si accendono (es. l'auto) */
+  obj?: THREE.Object3D;
 }
 
 export interface Phase {
@@ -286,16 +293,67 @@ export class PhasedRun extends BaseRun {
     this.glows.delete(t);
   }
 
+  /** cerchio a terra dove stare per il prossimo punto da fare */
+  private standRing: THREE.Mesh | null = null;
+  private standPt = new THREE.Vector3();
+
+  /**
+   * Punto dove stare: davanti all'oggetto, dalla parte del giocatore, appena fuori dal suo ingombro
+   * (per il bancone dell'edicola e del negozio è il punto stesso). Lì si disegna il cerchio a terra.
+   */
+  private placeStand(t: Task | null, p: THREE.Vector3) {
+    if (!this.standRing) {
+      this.standRing = this.add(ring(0xffd21a, 0.55)) as THREE.Mesh;
+      this.standRing.userData.noGlow = true;
+    }
+    const r = this.standRing;
+    r.visible = !!t;
+    if (!t) return;
+    const sp = this.standPt;
+    if (t.markerAt) sp.copy(t.pos);
+    else {
+      // quanto è grande l'oggetto (se è solido ci si ferma appena fuori)
+      let rad = 0.45;
+      for (const o of this.objs) {
+        if (!o.userData.solid || !o.visible || Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.1) continue;
+        const b = this.solidBox(o);
+        rad = Math.max(rad, Math.max(b.max.x - b.min.x, b.max.z - b.min.z) / 2);
+      }
+      const dx = p.x - t.pos.x;
+      const dz = p.z - t.pos.z;
+      const len = Math.hypot(dx, dz) || 1;
+      sp.set(t.pos.x + (dx / len) * (rad + 0.55), 0, t.pos.z + (dz / len) * (rad + 0.55));
+      // mai dentro un altro oggetto o un edificio
+      this.collide(sp, 0.3);
+      this.game.city.collide(sp, 0.3);
+    }
+    r.position.set(sp.x, 0.12, sp.z);
+    // vicino abbastanza: il cerchio diventa verde e pulsa
+    const mat = r.material as THREE.MeshBasicMaterial;
+    mat.color.setHex(this.nearOk ? 0x35c46a : 0xffd21a);
+    const k = this.nearOk ? 1 + 0.12 * Math.sin(performance.now() / 140) : 1;
+    r.scale.set(k, k, k);
+  }
+
+  /** Il punto non ha oggetti che si accendono da soli (es. i lati dell'auto): pulsa l'oggetto indicato. */
+  private ownGlow(t: Task) {
+    return this.glows.get(t)?.meshes.length ? undefined : t.obj;
+  }
+
   /** Luce che pulsa sugli oggetti ancora da usare (solo quelli attivi adesso). */
   private pulseGlows() {
     const pend = new Set(this.pending());
-    // colore più chiaro e vivo che pulsa
-    const k = 0.1 + 0.5 * (0.5 + 0.5 * Math.sin(performance.now() / 200));
+    // colore più chiaro e vivo che pulsa piano sugli oggetti ancora da usare; quello che puoi usare
+    // adesso (sei abbastanza vicino) pulsa forte e più in fretta: è lì che si tocca
+    const now = performance.now();
+    const soft = 0.05 + 0.3 * (0.5 + 0.5 * Math.sin(now / 260));
+    const strong = 0.2 + 0.75 * (0.5 + 0.5 * Math.sin(now / 140));
     for (const [t, g] of this.glows) {
       const on = pend.has(t) && !t.done;
+      const k = !on ? 0 : t === this.nearTask && this.nearOk ? strong : soft;
       for (const { m } of g.meshes) {
         const mats = Array.isArray(m.material) ? m.material : [m.material];
-        for (const mat of mats) (mat as THREE.MeshLambertMaterial).emissiveIntensity = on ? k : 0;
+        for (const mat of mats) (mat as THREE.MeshLambertMaterial).emissiveIntensity = k;
       }
     }
   }
@@ -389,6 +447,7 @@ export class PhasedRun extends BaseRun {
     this.target = near?.pos;
     this.nearTask = near;
     this.nearOk = !!near && nd <= this.reach();
+    this.placeStand(near, p);
     const done = this.tasks.filter((t) => t.done).length;
     let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${this.tasks.length > 1 ? ` ${done}/${this.tasks.length}` : ''}`;
     // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla
@@ -422,9 +481,9 @@ export class PhasedRun extends BaseRun {
         this.game.player.play('interact-right', 0.1, 1.6);
         if (near.progress >= 1) this.complete(near);
       } else if (this.game.player.currentName === 'interact-right') this.game.player.play('idle');
-      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at };
+      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at, obj: this.ownGlow(near), stand: this.standPt };
     } else {
-      this.game.prompt = { label: near.label, icon: near.icon, at };
+      this.game.prompt = { label: near.label, icon: near.icon, at, obj: this.ownGlow(near), stand: this.standPt };
     }
   }
 
@@ -676,12 +735,14 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
     }
     return run.prop(g, sides[i].clone().lerp(carPos, 0.62), i % 2 ? face + Math.PI / 2 : face, 1);
   };
+  // l'auto (senza bagliore proprio): pulsa lei quando sei vicino a un lato
+  let carObj: THREE.Object3D | undefined;
   const phases: Phase[] = [
     { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
     {
       name: 'Spruzza il sapone su tutta l\'auto', icon: '🫧',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[i]}`, icon: '🫧', fx: 'bubble' as const,
+        pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[i]}`, icon: '🫧', fx: 'bubble' as const, obj: carObj,
         onDone: () => { foams[i] = foamAt(i); },
       })),
     },
@@ -690,7 +751,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
       // giro dell'auto in ordine: si sciacqua tutto attorno
       name: 'Fai il giro e risciacqua', icon: '💦', ordered: true,
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[i]}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff,
+        pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[i]}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff, obj: carObj,
         onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
         onDone: () => {
           if (foams[i]) foams[i].visible = false;
@@ -702,7 +763,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
     {
       name: 'Asciuga tutta l\'auto', icon: '✨',
       tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[i]}`, icon: '✨', fx: 'spark' as const,
+        pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[i]}`, icon: '✨', fx: 'spark' as const, obj: carObj,
         onProgress: (p: number) => drops[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
         onDone: () => { if (drops[i]) drops[i].visible = false; },
       })),
@@ -714,6 +775,7 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
   const parked = run.prop(car, carPos, Math.atan2(dz, -dx), 1);
   parked.userData.noGlow = true;
   parked.userData.solid = true;
+  carObj = parked;
   run.prop(soapSprayer(), sprayer, face, 1);
   run.prop(hoseReel(), reel, face, 1);
   run.prop(ragBucket(), rags, face, 1);
