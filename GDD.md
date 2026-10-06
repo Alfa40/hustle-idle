@@ -408,7 +408,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Visuale sempre libera
 - Regola: nessun avviso, messaggio o fumetto copre il personaggio, il campo attorno e gli obiettivi
-- I messaggi (prima a metà schermo, fino a 4 insieme) ora sono uno alla volta, al massimo 2 righe, nella colonna in alto a sinistra sotto i riquadri del gioco e il tutorial; sotto c'è la scritta dell'azione
+- I messaggi (prima a metà schermo, fino a 4 insieme) ora sono uno alla volta, al massimo 2 righe, con una striscia colorata a sinistra e il fondo tinto per tipo (verde fatto, giallo soldi, rosso problema, blu informazione), nella colonna in alto a sinistra sotto i riquadri del gioco e il tutorial; sotto c'è la scritta dell'azione
 - In città la visuale mette il personaggio al centro della parte di schermo libera dai riquadri e dai pulsanti; nelle attività, nelle case dei clienti e nella cucina del lavapiatti la stanza si inquadra lasciando libera anche la striscia dei messaggi
 
 ### Strada e obiettivi

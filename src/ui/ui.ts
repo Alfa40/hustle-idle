@@ -492,7 +492,10 @@ export class UI {
   toast(text: string, kind = 'info') {
     const t = document.createElement('div');
     t.className = `toast ${kind}`;
-    t.textContent = text;
+    // il testo in un elemento a parte: le 2 righe si tagliano pulite (il bordo non mostra la terza)
+    const span = document.createElement('span');
+    span.textContent = text;
+    t.appendChild(span);
     this.toastsEl.replaceChildren(t);
     setTimeout(() => t.classList.add('out'), 2800);
     setTimeout(() => t.remove(), 3200);
