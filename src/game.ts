@@ -52,6 +52,8 @@ export interface Interactable {
   icon: string;
   action: () => void;
   enabled?: () => boolean;
+  /** oggetto che pulsa quando sei abbastanza vicino (es. la persona che offre un lavoretto) */
+  obj?: THREE.Object3D;
 }
 
 export type MarkerCat = 'jobs' | 'mine' | 'forsale' | 'places' | 'target';
@@ -904,6 +906,7 @@ export class Game {
       pos: slot.pos, radius: 1.9, label: def.name, icon: def.icon,
       action: () => this.ui.openJobOffer(offer),
       enabled: () => !this.run,
+      obj: char.root,
     });
     this.npcs.set(offer.id, { offer, char, marker, inter });
   }
@@ -1567,8 +1570,35 @@ export class Game {
     }
   }
 
+  /** cerchi a terra davanti a persone ed edifici vicini: dove stare per parlare o entrare */
+  private interRings: THREE.Mesh[] = [];
+
+  private updateInterRings(best: Interactable | null) {
+    const p = this.player.root.position;
+    const list = this.run ? [] : this.interactables
+      .filter((i) => (!i.enabled || i.enabled()) && Math.hypot(i.pos.x - p.x, i.pos.z - p.z) < 10)
+      .slice(0, 8);
+    const pulse = 1 + 0.12 * Math.sin(performance.now() / 140);
+    list.forEach((i, k) => {
+      let r = this.interRings[k];
+      if (!r) {
+        r = ring(0xffd21a, 0.7);
+        this.scene.add(r);
+        this.interRings.push(r);
+      }
+      r.visible = true;
+      // sopra il marciapiede (più alto della strada)
+      r.position.set(i.pos.x, 0.26, i.pos.z);
+      // quello che puoi usare adesso: verde e pulsa
+      (r.material as THREE.MeshBasicMaterial).color.setHex(i === best ? 0x35c46a : 0xffd21a);
+      r.scale.setScalar(i === best ? pulse : 1);
+    });
+    for (let k = list.length; k < this.interRings.length; k++) this.interRings[k].visible = false;
+  }
+
   private updateInteract() {
     if (this.run) {
+      this.updateInterRings(null);
       this.ui.setAction(this.prompt);
       if (this.prompt && this.input.consumeAction()) this.run.onAction?.();
       return;
@@ -1584,7 +1614,9 @@ export class Game {
         bd = d;
       }
     }
-    this.ui.setAction(best ? { label: best.label, icon: best.icon, at: best.pos.clone().setY(1.2) } : null);
+    this.updateInterRings(best);
+    // si tocca la persona/l'ingresso oppure il cerchio a terra
+    this.ui.setAction(best ? { label: best.label, icon: best.icon, at: best.pos.clone().setY(1.2), stand: best.pos, obj: best.obj } : null);
     if (best && this.input.consumeAction()) {
       best.action();
     }
