@@ -1225,8 +1225,8 @@ export class Game {
     }
     this.state.riding = id;
     this.state.lastRide = id;
+    // niente messaggio: salire e scendere si vede già dal personaggio sul veicolo
     this.applyRide();
-    toast(`${VEHICLES[id].icon} In sella: ${VEHICLES[id].name}`, 'info');
   }
 
   dismount() {
