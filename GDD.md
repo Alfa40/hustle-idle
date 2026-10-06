@@ -393,6 +393,11 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **🏆 Classifiche**: 🌍 Mondo o 👥 Amici, per ⭐ Fama, 💰 Soldi guadagnati, 🧰 Lavoretti, 🏢 Attività, 🍔 Clienti serviti
 - Server (`~/quartiere-ostile-3d-leaderboard/server.js`, solo chiavi `hustle:`): `stats` nel profilo del giocatore, classifiche `hustle:lb:money|jobs|biz|served` (`/leaderboard?game=hustle&kind=…`), richieste `hustle:req:<id>` (`POST /leaderboard/friend-request`, `GET /leaderboard/friend-requests`, `POST /leaderboard/friend-answer`)
 
+### Dove toccare e oggetti solidi
+- Sull'oggetto da usare c'è un **cerchio bianco leggero che pulsa** con un **dito** (👆 tocca, ✊ tieni premuto). Quando l'azione diventa disponibile il cerchio "salta fuori" e il telefono vibra un attimo; la scritta in alto comincia con il gesto ("👆 Tocca" / "✊ Tieni premuto"). Premendo, il cerchio diventa verde. Con il tutorial il dito piccolo sparisce (c'è la manina grande)
+- **Oggetti solidi nei lavoretti** (`userData.solid`, `JobRun.collide`): auto, cespugli (anche tagliati), bidone, edicola e negozio dei pacchi, recinzione e pilastri, scivolo, tavolino, vasi grandi. Restano attraversabili quelli piccoli o bassi: foglie, cassette della posta, barattoli, cassetta degli attrezzi, spruzzino, avvolgitubo, secchio, aiuole. Ogni punto dei lavoretti resta raggiungibile a piedi (provati 838 punti)
+- Tutorial del lavapiatti: in cucina il fumetto segue le pile (prima restava fermo su "entra in cucina")
+
 ### Strada e obiettivi
 - La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo

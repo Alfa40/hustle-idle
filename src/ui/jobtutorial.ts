@@ -114,7 +114,9 @@ export class JobTutorial {
       document.body.classList.remove('tut-pointing');
       return;
     }
-    const head = `<div class="tut-head">🎓 Fase ${g.phase + 1} di ${g.phases}${g.left > 1 ? ` · ${g.left} da fare` : ''}</div>`;
+    // lavapiatti: in cucina le "fasi" sono le pile di piatti
+    const word = g.phaseName.startsWith('Pila') ? 'Pila' : 'Fase';
+    const head = `<div class="tut-head">🎓 ${word} ${g.phase + 1} di ${g.phases}${g.left > 1 ? ` · ${g.left} da fare` : ''}</div>`;
     let body: string;
     let foot = '';
     let anchor: THREE.Vector3 | null = null;

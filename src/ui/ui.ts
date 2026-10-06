@@ -179,6 +179,8 @@ export class UI {
     const act = document.createElement('button');
     act.className = 'action';
     act.setAttribute('aria-label', 'Azione');
+    // cerchio leggero che lampeggia sull'oggetto + dito che mostra il gesto (tocca / tieni premuto)
+    act.innerHTML = '<i class="act-spot"></i><b class="act-finger"></b>';
     const ring = document.createElement('button');
     ring.className = 'act-ring';
     ring.setAttribute('aria-label', 'Azione');
@@ -379,10 +381,29 @@ export class UI {
     this.actionPrompt = p;
     const key = p ? p.icon + p.label : '';
     if (key !== this.lastAction) {
+      const appeared = !this.lastAction && !!p;
       this.lastAction = key;
       this.actionEl.classList.toggle('on', !!p);
       this.labelEl.classList.toggle('on', !!p);
-      if (p) this.labelEl.textContent = `${p.icon} ${p.label}`;
+      if (p) {
+        const hold = p.progress !== undefined;
+        // prima il gesto (tocca / tieni premuto), poi cosa fai
+        this.labelEl.innerHTML = `${p.at ? `<span class="act-how">${hold ? '✊ Tieni premuto' : '👆 Tocca'}</span> ` : ''}${esc(p.icon)} ${esc(p.label.replace(/^Tieni premuto:\s*/, ''))}`;
+        // senza un oggetto (solo un suggerimento) il cerchio non si disegna
+        this.actionEl.classList.toggle('spot', !!p.at);
+        (this.actionEl.querySelector('.act-finger') as HTMLElement).textContent = hold ? '✊' : '👆';
+      }
+      // l'azione è appena diventata disponibile: il cerchio "salta fuori" (e il telefono vibra un attimo)
+      if (appeared) {
+        this.actionEl.classList.remove('pop');
+        void this.actionEl.offsetWidth;
+        this.actionEl.classList.add('pop');
+        try {
+          navigator.vibrate?.(12);
+        } catch {
+          /* non supportato */
+        }
+      }
     }
     // cerchio: solo per le azioni da tenere premute (si riempie), o un lampo dopo un tocco
     const flash = (performance.now() - this.flashT) / 260;

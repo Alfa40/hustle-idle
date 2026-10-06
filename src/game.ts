@@ -1326,6 +1326,8 @@ export class Game {
         this.interior.update(dt);
       } else if (this.house) {
         this.house.update(dt);
+        // dentro la casa del cliente o la cucina il fumetto del tutorial segue le fasi di dentro
+        if (this.run) this.tutorial.update();
       } else {
         this.updatePlayer(dt);
         this.updateWaypoint();
@@ -1527,6 +1529,8 @@ export class Game {
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
       this.city.collide(p, ride ? ride.radius : 0.38);
+      // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
+      this.run?.collide?.(p, ride ? ride.radius : 0.35);
       this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
       if (ride) this.player.play(riderPose(this.state.riding!).anim);

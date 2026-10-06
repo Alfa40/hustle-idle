@@ -21,6 +21,8 @@ export interface JobRun {
   guide?(): RunGuide | null;
   update(dt: number): void;
   onAction?(): void;
+  /** spinge il personaggio fuori dagli oggetti grandi del lavoretto */
+  collide?(p: THREE.Vector3, r?: number): void;
   dispose(): void;
 }
 
@@ -61,6 +63,33 @@ abstract class BaseRun implements JobRun {
     this.game.scene.add(o);
     this.objs.push(o);
     return o;
+  }
+
+  /** ingombro a terra degli oggetti solidi (calcolato una volta: non si spostano) */
+  private solidBoxes = new Map<THREE.Object3D, THREE.Box3>();
+
+  /**
+   * Gli oggetti grandi (`userData.solid`: auto, tavoli, cespugli, muretti, edicola…) non si
+   * attraversano: il personaggio viene spinto fuori. Quelli piccoli (foglie, cassette della
+   * posta, barattoli…) restano attraversabili.
+   */
+  collide(p: THREE.Vector3, r = 0.35) {
+    for (const o of this.objs) {
+      if (!o.userData.solid || !o.visible || !o.parent) continue;
+      let b = this.solidBoxes.get(o);
+      if (!b) {
+        o.updateMatrixWorld(true);
+        b = new THREE.Box3().setFromObject(o);
+        // un filo più stretto dell'oggetto: non ci si incastra sugli spigoli
+        b.expandByVector(new THREE.Vector3(-0.08, 0, -0.08));
+        this.solidBoxes.set(o, b);
+      }
+      if (p.x < b.min.x - r || p.x > b.max.x + r || p.z < b.min.z - r || p.z > b.max.z + r) continue;
+      const pushes = [b.min.x - r - p.x, b.max.x + r - p.x, b.min.z - r - p.z, b.max.z + r - p.z];
+      const i = pushes.map(Math.abs).indexOf(Math.min(...pushes.map(Math.abs)));
+      if (i < 2) p.x += pushes[i];
+      else p.z += pushes[i];
+    }
   }
 
   protected tick(dt: number) {
@@ -502,7 +531,7 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
         },
         onDone: () => {
           bushes[i].visible = false;
-          run.prop(trimmedBush(), pos);
+          run.prop(trimmedBush(), pos).userData.solid = true;
           // le foglie tagliate cadono accanto
           const lp = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8));
           piles.push(lp);
@@ -529,8 +558,12 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
   run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, 3.1, 2.95), time: n * 5 + 16, keep: slot.center });
   const [gx, gz] = DIR_VEC[slot.dir];
   run.prop(toolbox(), box, Math.atan2(gx, gz), 1);
-  run.prop(wheelieBin(), bin, Math.atan2(gx, gz), 1);
-  for (const pos of spots) bushes.push(run.prop(bush(), pos));
+  run.prop(wheelieBin(), bin, Math.atan2(gx, gz), 1).userData.solid = true;
+  for (const pos of spots) {
+    const b = run.prop(bush(), pos);
+    b.userData.solid = true;
+    bushes.push(b);
+  }
   return run;
 }
 
@@ -591,7 +624,7 @@ export function routeJob(game: Game, level: number, start: Slot, title: string, 
     },
   ];
   const run = new PhasedRun(game, level, title, phases, { time: (dist / 5.2) * (flyer ? 1.35 : 1.45) + 6 + n * 2 });
-  run.prop(flyer ? newsstand() : parcelShop(), shopPos, face(start), 1);
+  run.prop(flyer ? newsstand() : parcelShop(), shopPos, face(start), 1).userData.solid = true;
   // cassette della posta: blu per i giornali, gialle per i pacchi
   for (const b of boxes) run.prop(postbox(flyer ? 0x2d6cdb : 0xffc21a), b.pos, face(b.s), 1);
   return run;
@@ -678,7 +711,9 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
   run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, Math.max(3.7, cf + 1.6), 3.2), time: 44, keep: slot.center });
   const car = model('cars/sedan.glb', 1);
   // l'auto è parcheggiata di traverso, parallela alla casa
-  run.prop(car, carPos, Math.atan2(dz, -dx), 1).userData.noGlow = true;
+  const parked = run.prop(car, carPos, Math.atan2(dz, -dx), 1);
+  parked.userData.noGlow = true;
+  parked.userData.solid = true;
   run.prop(soapSprayer(), sprayer, face, 1);
   run.prop(hoseReel(), reel, face, 1);
   run.prop(ragBucket(), rags, face, 1);
@@ -729,7 +764,10 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
   // le cose del giardino si creano subito (la prima fase le deve già conoscere); in scena dopo
   const items: { pos: THREE.Vector3; obj: THREE.Object3D; tarp: THREE.Object3D }[] = [];
   for (let i = 0; i < nItems; i++) {
-    const obj = pool[i % pool.length]();
+    const kind = pool[i % pool.length];
+    const obj = kind();
+    // le aiuole sono basse e si attraversano; cespugli, scivolo, tavolino e vasi no
+    obj.userData.solid = kind !== flowerBed;
     obj.rotation.y = along;
     obj.position.copy(spots[i]);
     obj.updateMatrixWorld(true);
@@ -776,11 +814,15 @@ export function paintJob(game: Game, level: number, slot: Slot, title: string) {
   const bodies: THREE.Mesh[] = [];
   segs.forEach((sg, i) => {
     const { obj, body } = fenceSegment(sg.len * WS);
-    run.prop(obj, sg.pos, sg.rot, 1);
+    run.prop(obj, sg.pos, sg.rot, 1).userData.solid = true;
     if (i < paintN) bodies.push(body);
   });
   // pilastri: agli angoli e ai lati del cancello
-  for (const r of [-SIDE, -0.55, 0.55, SIDE]) run.prop(fencePillar(), at(slot.center, FENCE, r), along, 1).userData.noGlow = true;
+  for (const r of [-SIDE, -0.55, 0.55, SIDE]) {
+    const pl = run.prop(fencePillar(), at(slot.center, FENCE, r), along, 1);
+    pl.userData.noGlow = true;
+    pl.userData.solid = true;
+  }
   for (const it of items) {
     run.prop(it.obj, it.pos, along, 1);
     run.prop(it.tarp, it.pos.clone(), 0, 1);
