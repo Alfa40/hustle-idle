@@ -225,24 +225,24 @@ body.is-landscape .act-label { max-width: min(360px, 40vw); }
   border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.25);
 }
 
-/* ---------- toast ---------- */
+/* ---------- messaggi ---------- */
+/* striscia ad altezza fissa sotto i riquadri in alto (posizione dal LayoutManager, UI.placeTopStack):
+   un messaggio alla volta, mai sopra il personaggio o gli obiettivi. Le stanze la tengono sempre libera. */
 .toasts {
-  /* sopra i pulsanti Sali/Scendi e azione: i messaggi non li coprono */
-  position: fixed; bottom: calc(var(--sab) + 212px); left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; z-index: 19;
-  width: min(86vw, 420px);
+  position: fixed; left: var(--sal); top: var(--sat); height: 50px; z-index: 19; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: flex-start;
 }
-@media (orientation: landscape) { .toasts { bottom: auto; top: calc(var(--sat) + 8px); width: min(44vw, 420px); } }
 .toast {
-  background: #fff; color: var(--ink); padding: 8px 16px; border-radius: 16px; font-size: 15px; font-weight: 600;
-  animation: tin .3s cubic-bezier(.2,1.6,.4,1); box-shadow: 0 3px 0 rgba(58,47,85,.18), 0 6px 14px rgba(0,0,0,.15);
-  text-align: center; border: 3px solid var(--blue);
+  background: #fff; color: var(--ink); padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; line-height: 1.25;
+  animation: tin .25s ease-out; box-shadow: 0 3px 8px rgba(0,0,0,.18); border: 3px solid var(--blue); text-align: left;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; box-sizing: border-box;
+  max-height: calc(2.5em + 14px);
 }
 .toast.good { border-color: var(--green); }
 .toast.bad { border-color: var(--red); color: var(--red-d); }
 .toast.money { border-color: var(--yellow); color: var(--money); }
 .toast.out { opacity: 0; transform: translateY(6px); transition: all .4s; }
-@keyframes tin { from { transform: scale(.6); opacity: 0; } }
+@keyframes tin { from { transform: translateY(-6px); opacity: 0; } }
 
 /* ---------- pannelli ---------- */
 .modal {
@@ -699,7 +699,7 @@ body.guide-on .hud-top { display: none; }
 .hud-row.in-menu .hud-name { color: var(--purple-d); }
 .hud-menu-btn .i { color: #fff; font-weight: 900; font-size: 24px; }
 .hud-row .btn:last-child { min-width: 132px; }
-@media (orientation: landscape) { .toasts { bottom: calc(var(--sab) + 132px); } }
+
 
 /* ---------- tutorial contestuale dei lavoretti ---------- */
 .tut-bubble {
@@ -761,12 +761,12 @@ body.is-landscape .hud-drop { grid-template-columns: repeat(3, var(--btn)); }
 .ride-btn { width: var(--ride); height: var(--ride); right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px); }
 
 /* riquadri in alto a sinistra: non arrivano mai sotto la colonna di destra */
-.jobbar, .guide, .hand-badge, .preview-bar {
+.jobbar, .guide, .hand-badge, .preview-bar, .toasts {
   /* non arrivano sotto la minimappa né sotto la colonna dei pulsanti */
   width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 18px); max-width: 460px;
 }
 /* orizzontale: pannello laterale a sinistra (la scena resta al centro) */
-body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge, body.is-landscape .preview-bar { width: min(360px, 40vw); }
+body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge, body.is-landscape .preview-bar, body.is-landscape .toasts { width: min(360px, 40vw); }
 body.is-landscape .guide { max-height: calc(60vh - var(--sat)); overflow: hidden; }
 body.is-landscape.is-short .guide { font-size: 13px; padding: 6px 8px; }
 body.is-landscape.is-short .hb-slot { min-height: 20px; font-size: 12px; }

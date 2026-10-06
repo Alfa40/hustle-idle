@@ -316,6 +316,7 @@ export class UI {
   private hudShown: HudKey[] = [];
 
   update(dt: number) {
+    this.placeTopStack();
     const s = this.s;
     const m = euro(s.money);
     if (this.moneyEl.textContent !== m) {
@@ -457,23 +458,9 @@ export class UI {
       this.ringEl.style.left = `${Math.round(THREE.MathUtils.clamp(head.x, safe.left + rr, w - safe.right - rr))}px`;
       this.ringEl.style.top = `${Math.round(THREE.MathUtils.clamp(head.y - rr * 0.6, safe.top + rr, h - safe.bottom - rr))}px`;
     }
-    // scritta: subito sotto il riquadro più in basso tra quelli in alto a sinistra
-    let top = safe.top;
-    let left = safe.left + 10;
-    // (con il tutorial la scritta va sotto il suo fumetto, che resta fermo subito sotto il riquadro)
-    for (const sel of ['.hud-top .pills', '.jobbar.on', '.preview-bar', '.hand-badge', '.tut-bubble']) {
-      for (const el of document.querySelectorAll<HTMLElement>(sel)) {
-        if (getComputedStyle(el).display === 'none') continue;
-        const b = el.getBoundingClientRect();
-        if (b.height < 2 || b.top > h / 2) continue;
-        if (b.bottom > top) {
-          top = b.bottom;
-          left = b.left;
-        }
-      }
-    }
-    this.labelEl.style.left = `${Math.round(left)}px`;
-    this.labelEl.style.top = `${Math.round(top + 6)}px`;
+    // scritta: subito sotto i riquadri in alto (e sotto il messaggio, se c'è): mai sulla scena
+    this.labelEl.style.left = `${Math.round(this.stackLeft)}px`;
+    this.labelEl.style.top = `${Math.round(this.stackBottom + 6)}px`;
   }
 
   jobBar(on: boolean) {
@@ -498,14 +485,47 @@ export class UI {
     if (dot2) dot2.style.display = (claimable && !this.hudShown.includes('missions')) || (req && !this.hudShown.includes('profile')) ? '' : 'none';
   }
 
+  /**
+   * Messaggi: uno alla volta (il nuovo sostituisce il vecchio), nella striscia fissa sotto i riquadri
+   * in alto. Mai in mezzo allo schermo: non coprono il personaggio né gli obiettivi.
+   */
   toast(text: string, kind = 'info') {
     const t = document.createElement('div');
     t.className = `toast ${kind}`;
     t.textContent = text;
-    this.toastsEl.appendChild(t);
-    while (this.toastsEl.children.length > 4) this.toastsEl.firstChild!.remove();
-    setTimeout(() => t.classList.add('out'), 2600);
-    setTimeout(() => t.remove(), 3100);
+    this.toastsEl.replaceChildren(t);
+    setTimeout(() => t.classList.add('out'), 2800);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  /** dove finiscono i riquadri in alto a sinistra (lì sotto: messaggi, poi la scritta dell'azione) */
+  private stackBottom = 0;
+  private stackLeft = 0;
+
+  /**
+   * Colonna in alto a sinistra (in orizzontale: pannello a sinistra): riquadri del gioco, poi la
+   * striscia dei messaggi (altezza fissa: le stanze la tengono sempre libera), poi la scritta dell'azione.
+   */
+  private placeTopStack() {
+    const { h, safe } = layout.info;
+    let top = safe.top;
+    let left = safe.left;
+    for (const sel of ['.hud-top .pills', '.jobbar.on', '.preview-bar', '.hand-badge', '.tut-bubble']) {
+      for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+        if (getComputedStyle(el).display === 'none') continue;
+        const b = el.getBoundingClientRect();
+        if (b.height < 2 || b.top > h / 2) continue;
+        if (b.bottom > top) {
+          top = b.bottom;
+          left = b.left;
+        }
+      }
+    }
+    this.toastsEl.style.top = `${Math.round(top + 6)}px`;
+    this.toastsEl.style.left = `${Math.round(left)}px`;
+    this.stackLeft = left;
+    // la scritta dell'azione va sotto il messaggio (se c'è), altrimenti subito sotto i riquadri
+    this.stackBottom = this.toastsEl.children.length ? this.toastsEl.getBoundingClientRect().bottom - 6 : top;
   }
 
   // ---------------- pannelli ----------------

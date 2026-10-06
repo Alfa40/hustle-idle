@@ -1631,6 +1631,36 @@ export class Game {
     const p = this.player.root.position;
     this.camTarget.lerp(p, Math.min(1, dt * 6));
     this.placeCamera();
+    this.centerInFreeArea(dt);
+  }
+
+  /** spostamento (px) del centro della visuale: il personaggio sta al centro della zona libera */
+  private camOff = { x: 0, y: 0, tx: 0, ty: 0, t: 1 };
+
+  /**
+   * Il personaggio (e ciò che ha attorno) sta al centro della parte di schermo libera dai riquadri
+   * in alto (lavoretto, tutorial, messaggi) e dalla colonna dei pulsanti: nessun riquadro lo copre.
+   */
+  private centerInFreeArea(dt: number) {
+    const o = this.camOff;
+    o.t += dt;
+    if (o.t > 0.25) {
+      o.t = 0;
+      const dock = layout.panelDock;
+      const free = layout.freeRect([
+        { sel: '.hud-top .pills', dock }, { sel: '.jobbar.on', dock }, { sel: '.tut-bubble', dock }, { sel: '.toasts', dock },
+        { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' },
+      ]);
+      const { w, h } = layout.info;
+      o.tx = free.x + free.w / 2 - w / 2;
+      o.ty = free.y + free.h / 2 - h / 2;
+    }
+    const k = Math.min(1, dt * 4);
+    o.x += (o.tx - o.x) * k;
+    o.y += (o.ty - o.y) * k;
+    const { w, h } = layout.info;
+    if (Math.abs(o.x) < 0.5 && Math.abs(o.y) < 0.5) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(w, h, -o.x, -o.y, w, h);
   }
 
   snapCamera() {

@@ -406,6 +406,11 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Benvenuto: una riga spiega le due metà; chiuso il benvenuto, per qualche secondo le due metà si illuminano ("🕹️ Trascina qui per muoverti" / "👆 Tocca qui per parlare, entrare e lavorare"). Nei tutorial la manina tocca la metà delle azioni
 - Imbianchino: le cose del giardino stanno in fila contro la casa (girate o un po' più piccole se serve), lungo il muretto resta sempre un corridoio libero di 1,5 m per dipingerlo dall'interno
 
+### Visuale sempre libera
+- Regola: nessun avviso, messaggio o fumetto copre il personaggio, il campo attorno e gli obiettivi
+- I messaggi (prima a metà schermo, fino a 4 insieme) ora sono uno alla volta, al massimo 2 righe, nella colonna in alto a sinistra sotto i riquadri del gioco e il tutorial; sotto c'è la scritta dell'azione
+- In città la visuale mette il personaggio al centro della parte di schermo libera dai riquadri e dai pulsanti; nelle attività, nelle case dei clienti e nella cucina del lavapiatti la stanza si inquadra lasciando libera anche la striscia dei messaggi
+
 ### Strada e obiettivi
 - La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo

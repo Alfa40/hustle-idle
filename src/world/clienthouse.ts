@@ -14,7 +14,7 @@ import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la casa del cliente: la stanza si inquadra nello spazio libero. */
 const HOUSE_UI = () =>
-  [{ sel: '.jobbar', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+  [{ sel: '.jobbar', dock: layout.panelDock }, { sel: '.tut-bubble', dock: layout.panelDock }, { sel: '.toasts', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 import { updateCutWalls, type CutWall } from './viewcam';
 
 export const HOUSE_ASSETS = [

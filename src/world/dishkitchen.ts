@@ -13,7 +13,7 @@ import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la cucina: la stanza si inquadra nello spazio libero. */
 const KITCHEN_UI = () =>
-  [{ sel: '.jobbar', dock: layout.panelDock }, { sel: '.tut-bubble', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+  [{ sel: '.jobbar', dock: layout.panelDock }, { sel: '.tut-bubble', dock: layout.panelDock }, { sel: '.toasts', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 
 export const KITCHEN_ASSETS = ['furniture/kitchenSink.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenFridge.glb', 'furniture/kitchenCabinet.glb', 'furniture/kitchenCabinetDrawer.glb'];
 

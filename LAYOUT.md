@@ -55,6 +55,10 @@ anche per ogni schermata nuova.
      Scritta dell'azione (`.act-label`) subito sotto il riquadro in alto a sinistra, cerchietto sopra la
      testa (`.act-ring`) per "tieni premuto"; `.action`/`.act-stand` non si toccano (servono alla manina).
    - anteprima delle migliorie (`.preview-bar`) in alto a sinistra, sopra il riquadro "in mano".
+   - **niente sopra la scena**: messaggi (`.toasts`, uno alla volta, 2 righe al massimo) e scritta dell'azione
+     stanno nella colonna in alto a sinistra sotto i riquadri (`UI.placeTopStack`); in città la camera sposta il
+     centro della visuale nella zona libera (`Game.centerInFreeArea`, `setViewOffset`), nelle stanze la
+     striscia dei messaggi è tra gli occluder di `freeRect`.
    - la **scena 3D** va nella zona libera: per le stanze `layout.freeRect` + `frameRoom` (camera ferma sulla stanza intera, oppure
      che segue il personaggio se la stanza è troppo larga);
      la città resta centrata sul personaggio (in orizzontale si vede più città, mai deformata).
