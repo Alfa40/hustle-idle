@@ -6,9 +6,9 @@ import { DIR_VEC, type Slot } from '../world/city';
 import { WS } from '../config/map';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
-import type { Arena } from './arena';
+import type { Arena, FenceSide } from './arena';
 import { TREE_MODELS } from '../world/city';
-import { bigPlanter, fencePillar, fenceSegment, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
+import { bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
 export interface JobRun {
   title: string;
@@ -563,6 +563,80 @@ const WHITE = new THREE.Color(0xffffff);
 const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
 
 /**
+ * Imbianchino come minigioco (scena separata, prima persona): il muretto è sul confine del lotto.
+ * Quanto se ne dipinge dipende dal livello: al Liv. 1 solo il davanti, poi anche un lato, tutti e due,
+ * e infine anche il retro. Anche le cose da coprire con i teloni aumentano col livello.
+ * Fasi: copri tutto → prendi la vernice → dipingi ogni tratto → togli i teloni.
+ */
+export function paintArenaJob(game: Game, level: number, arena: Arena, title: string) {
+  const colors = [0xff8a3d, 0x2d9cdb, 0x35c46a, 0x8e5bd6, 0xffc21a, 0xe84393];
+  const col = colors[Math.floor(Math.random() * colors.length)];
+  const sides: FenceSide[] = level < 2.5 ? ['front'] : level < 4 ? ['front', 'left'] : level < 5.5 ? ['front', 'left', 'right'] : ['front', 'left', 'right', 'back'];
+  const toPaint = arena.fence.filter((f) => sides.includes(f.side));
+  // il colore resta anche quando l'oggetto smette di pulsare: si colora sempre il materiale originale
+  const mats = toPaint.map((f) => f.body.material as THREE.MeshLambertMaterial);
+  const cans = arena.entry.clone().add(new THREE.Vector3(2.2, 0, -0.6));
+  // cose del giardino da coprire: lontane dal muretto (resta un corridoio libero per dipingere)
+  const nItems = Math.min(10, 2 + Math.floor(level));
+  const kinds = [roundShrub, flowerBed, slide, patioSet, bigPlanter];
+  const spots = arena.scatter(nItems, 2.4, 1.6, [cans, arena.entry]);
+  const items = spots.map((pos) => {
+    const k = kinds[Math.floor(Math.random() * kinds.length)];
+    const obj = k();
+    obj.userData.solid = k !== flowerBed;
+    obj.rotation.y = Math.random() * Math.PI * 2;
+    obj.position.copy(pos);
+    obj.updateMatrixWorld(true);
+    const tarp = tarpFor(obj);
+    tarp.visible = false;
+    return { pos, obj, tarp };
+  });
+  const dropTarp = (t: THREE.Object3D) => {
+    t.visible = true;
+    const start = performance.now();
+    const anim = () => {
+      const k = Math.min(1, (performance.now() - start) / 350);
+      t.position.y = 1.2 * (1 - k) * (1 - k);
+      t.scale.y = 0.4 + 0.6 * k;
+      if (k < 1) requestAnimationFrame(anim);
+    };
+    anim();
+  };
+  const gray = new THREE.Color(0x9e9e9e);
+  const paint = new THREE.Color(col);
+  const phases: Phase[] = [
+    {
+      name: 'Copri il giardino con i teloni', icon: '🛡️',
+      tasks: () => items.map((it) => ({ pos: it.pos, kind: 'tap' as const, label: 'Copri con il telone', icon: '🛡️', onDone: () => dropTarp(it.tarp) })),
+    },
+    { name: 'Prendi la vernice', icon: '🪣', tasks: () => [{ pos: cans, kind: 'tap', label: 'Prendi la vernice', icon: '🪣', onDone: () => hold(game, cylProp(0.16, 0.25, col)) }] },
+    {
+      name: 'Dipingi ogni tratto del muretto', icon: '🖌️',
+      tasks: () => toPaint.map((f, i) => ({
+        pos: f.inner, kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️', fx: 'paint' as const, fxColor: col, obj: f.obj,
+        onProgress: (p: number) => {
+          mats[i].color.lerpColors(gray, paint, p);
+          // anche il materiale "acceso" mentre pulsa
+          const cur = f.body.material as THREE.MeshLambertMaterial;
+          if (cur !== mats[i]) cur.color.copy(mats[i].color);
+        },
+      })),
+    },
+    {
+      name: 'Togli i teloni', icon: '🧹',
+      tasks: () => items.map((it) => ({ pos: it.pos, kind: 'tap' as const, label: 'Togli il telone', icon: '🧹', onDone: () => { it.tarp.visible = false; hold(game); } })),
+    },
+  ];
+  const run = new PhasedRun(game, level, title, phases, { time: toPaint.length * 5 + nItems * 7 + 30 });
+  for (const it of items) {
+    run.prop(it.obj, it.pos, it.obj.rotation.y, 1);
+    run.prop(it.tarp, it.pos.clone(), 0, 1);
+  }
+  run.prop(paintKit(col), cans, 0, 1);
+  return run;
+}
+
+/**
  * Giardinaggio come minigioco (scena separata, prima persona): un giardino grande attorno alla casa,
  * cespugli e ostacoli in numero e posizioni sempre diversi. Fasi: tosasiepi → taglia ogni cespuglio →
  * raccogli le foglie → svuota il sacco nel bidone.
@@ -783,146 +857,6 @@ export function carWashJob(game: Game, level: number, slot: Slot, title: string)
   run.prop(soapSprayer(), sprayer, face, 1);
   run.prop(hoseReel(), reel, face, 1);
   run.prop(ragBucket(), rags, face, 1);
-  return run;
-}
-
-/**
- * Imbianchino: il muretto è la recinzione del giardino davanti alla casa (lì c'è spazio:
- * dietro la casa arriva quasi al confine). Nel giardino ci sono cespugli, aiuole, giochi,
- * tavolino… Prima si copre tutto con teloni su misura, poi si prende la vernice, si dipinge
- * ogni tratto del muretto e alla fine si tolgono i teloni.
- */
-export function paintJob(game: Game, level: number, slot: Slot, title: string) {
-  const at = frame(slot);
-  const f0 = Math.max(1.15, frontEdge(game, slot) + 0.15);
-  const FENCE = 2.85; // confine del lotto, verso il marciapiede
-  const SIDE = 2.85;
-  const colors = [0xff8a3d, 0x2d9cdb, 0x35c46a, 0x8e5bd6, 0xffc21a, 0xe84393];
-  const col = colors[Math.floor(Math.random() * colors.length)];
-  const [dx, dz] = DIR_VEC[slot.dir];
-  const along = Math.atan2(dx, dz); // ruota un oggetto "di fronte alla strada"
-  let run: PhasedRun;
-  // ---- recinzione: davanti (con il cancello in mezzo) e sui due lati
-  const segs: { pos: THREE.Vector3; rot: number; len: number; inner: THREE.Vector3 }[] = [];
-  for (const sgn of [-1, 1]) {
-    for (const r of [0.55 + 0.6, 0.55 + 1.75]) {
-      // davanti: due tratti per parte, tra il cancello (|r| < 0.55) e l'angolo
-      segs.push({ pos: at(slot.center, FENCE, sgn * r), rot: along, len: 1.12, inner: at(slot.center, FENCE - 0.75, sgn * r) });
-    }
-  }
-  const sideLen = FENCE - f0;
-  const sideSegs = sideLen > 1.3 ? 2 : 1;
-  for (const sgn of [-1, 1]) {
-    for (let k = 0; k < sideSegs; k++) {
-      const f = f0 + (sideLen * (k + 0.5)) / sideSegs;
-      segs.push({ pos: at(slot.center, f, sgn * SIDE), rot: along + Math.PI / 2, len: sideLen / sideSegs - 0.05, inner: at(slot.center, f, sgn * (SIDE - 0.75)) });
-    }
-  }
-  // tratti da dipingere: il davanti sempre, i lati dai livelli più alti
-  const paintN = Math.min(segs.length, 4 + Math.floor(level / 2) * 2);
-  const toPaint = segs.slice(0, paintN);
-  // ---- cose in giardino (si coprono tutte): sempre qualcosa di diverso
-  const kinds = [roundShrub, flowerBed, slide, patioSet, bigPlanter, flowerBed];
-  const nItems = Math.min(4, 2 + Math.floor(level / 3));
-  // Le cose del giardino stanno in fila contro la casa: lungo il muretto, all'interno, resta sempre
-  // un corridoio libero (CORRIDOR metri) per dipingere ogni tratto, anche sui lati.
-  const CORRIDOR = 1.5;
-  const depthFree = (FENCE - f0) * WS - CORRIDOR; // profondità disponibile (m) davanti alla casa
-  const halfSpan = (SIDE * WS - CORRIDOR) * 0.98; // metà larghezza utile (m), lontano dai lati
-  const pool = [...kinds].sort(() => Math.random() - 0.5);
-  type Placed = { obj: THREE.Object3D; w: number; d: number; turn: boolean; scale: number };
-  const placed: Placed[] = [];
-  let used = 0;
-  for (let i = 0; i < pool.length && placed.length < nItems; i++) {
-    const kind = pool[i];
-    const obj = kind();
-    obj.updateMatrixWorld(true);
-    const b = new THREE.Box3().setFromObject(obj);
-    let w = b.max.x - b.min.x;
-    let d = b.max.z - b.min.z;
-    // se è troppo profondo si gira di lato; se ancora non ci sta si rimpicciolisce un po'
-    const turn = d > depthFree && w < d;
-    if (turn) [w, d] = [d, w];
-    const scale = Math.min(1, depthFree / d);
-    if (scale < 0.7) continue;
-    w *= scale;
-    d *= scale;
-    if (used + w + (placed.length ? 0.3 : 0) > halfSpan * 2) continue;
-    used += w + (placed.length ? 0.3 : 0);
-    obj.userData.solid = kind !== flowerBed; // le aiuole sono basse e si attraversano
-    placed.push({ obj, w, d, turn, scale });
-  }
-  // in fila, centrata, appoggiata alla casa
-  let r0 = -used / 2;
-  const items: { pos: THREE.Vector3; obj: THREE.Object3D; tarp: THREE.Object3D }[] = [];
-  for (const it of placed) {
-    const rMid = (r0 + it.w / 2) / WS;
-    r0 += it.w + 0.3;
-    const fPos = f0 + (0.08 + it.d / 2) / WS;
-    const pos = at(slot.center, fPos, rMid);
-    const obj = it.obj;
-    obj.rotation.y = along + (it.turn ? Math.PI / 2 : 0);
-    obj.scale.multiplyScalar(it.scale);
-    obj.position.copy(pos);
-    obj.updateMatrixWorld(true);
-    const tarp = tarpFor(obj);
-    tarp.visible = false;
-    items.push({ pos, obj, tarp });
-  }
-  const cans = at(slot.center, FENCE - 0.55, 0);
-  const phases: Phase[] = [
-    {
-      name: 'Copri il giardino con i teloni', icon: '🛡️',
-      tasks: () => items.map((it) => ({
-        pos: it.pos, kind: 'tap' as const, label: 'Copri con il telone', icon: '🛡️',
-        onDone: () => dropTarp(it.tarp),
-      })),
-    },
-    { name: 'Prendi la vernice', icon: '🪣', tasks: () => [{ pos: cans, kind: 'tap', label: 'Prendi la vernice', icon: '🪣', onDone: () => hold(game, cylProp(0.16, 0.25, col)) }] },
-    {
-      name: 'Dipingi ogni tratto del muretto', icon: '🖌️',
-      tasks: () => toPaint.map((sg, i) => ({
-        pos: sg.inner, kind: 'hold' as const, sec: 1.3 / (1 + 0.04 * level), label: 'Dipingi', icon: '🖌️', fx: 'paint' as const, fxColor: col,
-        onProgress: (p: number) => (bodies[i].material as THREE.MeshLambertMaterial).color.lerpColors(new THREE.Color(0x9e9e9e), new THREE.Color(col), p),
-      })),
-    },
-    {
-      name: 'Togli i teloni', icon: '🧹',
-      tasks: () => items.map((it) => ({ pos: it.pos, kind: 'tap' as const, label: 'Togli il telone', icon: '🧹', onDone: () => { it.tarp.visible = false; hold(game); } })),
-    },
-  ];
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, FENCE + 0.35, SIDE + 0.25), time: paintN * 4 + nItems * 6 + 18, keep: slot.center });
-  // il telone cala dall'alto sull'oggetto
-  const dropTarp = (t: THREE.Object3D) => {
-    t.visible = true;
-    const start = performance.now();
-    const y0 = 1.2;
-    const anim = () => {
-      const k = Math.min(1, (performance.now() - start) / 350);
-      t.position.y = y0 * (1 - k) * (1 - k);
-      t.scale.y = 0.4 + 0.6 * k;
-      if (k < 1) requestAnimationFrame(anim);
-    };
-    anim();
-  };
-  const bodies: THREE.Mesh[] = [];
-  segs.forEach((sg, i) => {
-    const { obj, body } = fenceSegment(sg.len * WS);
-    run.prop(obj, sg.pos, sg.rot, 1).userData.solid = true;
-    if (i < paintN) bodies.push(body);
-  });
-  // pilastri: agli angoli e ai lati del cancello
-  for (const r of [-SIDE, -0.55, 0.55, SIDE]) {
-    const pl = run.prop(fencePillar(), at(slot.center, FENCE, r), along, 1);
-    pl.userData.noGlow = true;
-    pl.userData.solid = true;
-  }
-  for (const it of items) {
-    // la rotazione è già quella giusta (alcuni oggetti sono girati di lato per starci)
-    run.prop(it.obj, it.pos, it.obj.rotation.y, 1);
-    run.prop(it.tarp, it.pos.clone(), 0, 1);
-  }
-  run.prop(paintKit(col), cans, along, 1);
   return run;
 }
 

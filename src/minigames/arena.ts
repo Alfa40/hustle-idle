@@ -23,6 +23,8 @@ const LOT_D = 22;
 /** misure della casa (x, z) */
 const HOUSE_W = 8;
 
+export type FenceSide = 'front' | 'left' | 'right' | 'back';
+
 export interface ArenaOpts {
   /** tratti del muretto lungo il confine, uno per lato (davanti diviso dal cancello) */
   fence?: boolean;
@@ -41,7 +43,7 @@ export class Arena {
   /** porta di casa: il vialetto dal cancello alla porta resta libero */
   door: THREE.Vector3;
   /** tratti del muretto (per l'imbianchino): centro, rotazione, lunghezza, punto all'interno */
-  fence: { pos: THREE.Vector3; rot: number; len: number; inner: THREE.Vector3; obj: THREE.Object3D; body: THREE.Mesh }[] = [];
+  fence: { side: FenceSide; pos: THREE.Vector3; rot: number; len: number; inner: THREE.Vector3; obj: THREE.Object3D; body: THREE.Mesh }[] = [];
 
   constructor(opts: ArenaOpts = {}) {
     const O = ARENA_ORIGIN;
@@ -115,12 +117,12 @@ export class Arena {
     const hw = LOT_W / 2;
     const hd = LOT_D / 2;
     const gate = 1.2; // metà larghezza del cancello
-    const add = (x: number, z: number, rot: number, len: number, inX: number, inZ: number) => {
+    const add = (side: FenceSide, x: number, z: number, rot: number, len: number, inX: number, inZ: number) => {
       const { obj, body } = fenceSegment(len);
       obj.position.set(x, 0, z);
       obj.rotation.y = rot;
       this.group.add(obj);
-      this.fence.push({ pos: new THREE.Vector3(x, 0, z), rot, len, inner: new THREE.Vector3(x + inX, 0, z + inZ), obj, body });
+      this.fence.push({ side, pos: new THREE.Vector3(x, 0, z), rot, len, inner: new THREE.Vector3(x + inX, 0, z + inZ), obj, body });
     };
     // tratti di circa 3 m: davanti (due parti, il cancello in mezzo), dietro e sui lati
     const split = (a: number, b: number, fn: (mid: number, len: number) => void) => {
@@ -128,11 +130,11 @@ export class Arena {
       const l = (b - a) / n;
       for (let i = 0; i < n; i++) fn(a + l * (i + 0.5), l - 0.06);
     };
-    split(O.x - hw, O.x - gate, (m, l) => add(m, O.z + hd, 0, l, 0, -0.8));
-    split(O.x + gate, O.x + hw, (m, l) => add(m, O.z + hd, 0, l, 0, -0.8));
-    split(O.x - hw, O.x + hw, (m, l) => add(m, O.z - hd, 0, l, 0, 0.8));
-    split(O.z - hd, O.z + hd, (m, l) => add(O.x - hw, m, Math.PI / 2, l, 0.8, 0));
-    split(O.z - hd, O.z + hd, (m, l) => add(O.x + hw, m, Math.PI / 2, l, -0.8, 0));
+    split(O.x - hw, O.x - gate, (m, l) => add('front', m, O.z + hd, 0, l, 0, -0.8));
+    split(O.x + gate, O.x + hw, (m, l) => add('front', m, O.z + hd, 0, l, 0, -0.8));
+    split(O.z - hd, O.z + hd, (m, l) => add('left', O.x - hw, m, Math.PI / 2, l, 0.8, 0));
+    split(O.z - hd, O.z + hd, (m, l) => add('right', O.x + hw, m, Math.PI / 2, l, -0.8, 0));
+    split(O.x - hw, O.x + hw, (m, l) => add('back', m, O.z - hd, 0, l, 0, 0.8));
     for (const [x, z] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd], [-gate, hd], [gate, hd]]) {
       const p = fencePillar();
       p.position.set(O.x + x, 0, O.z + z);
