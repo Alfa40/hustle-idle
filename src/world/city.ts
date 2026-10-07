@@ -40,6 +40,7 @@ const TALL = ['commercial/building-l.glb', 'commercial/building-skyscraper-a.glb
 const TREES = ['suburban/tree-large.glb', 'suburban/tree-small.glb'];
 
 export const TREE_MODELS = TREES;
+export const HOUSE_MODELS = HOUSES;
 export const BUILDING_MODELS = [...HOUSES, ...SHOPS, ...TALL];
 
 export const CITY_ASSETS = [

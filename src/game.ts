@@ -30,7 +30,8 @@ import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
 import { hasInterior } from './config/recipes';
-import { carWashJob, gardenJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashJob, gardenArenaJob, paintJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { Arena } from './minigames/arena';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
@@ -935,7 +936,7 @@ export class Game {
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     switch (offer.type) {
-      case 'giardino': this.run = gardenJob(this, lv, slot, title); break;
+      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena(), title); break;
       case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
       case 'volantini': this.run = routeJob(this, lv, slot, title, 'flyer'); break;
       case 'piatti': {
@@ -949,6 +950,44 @@ export class Game {
     }
     if (tutorial && this.run) this.tutorial.start(offer.type, this.run);
     this.ui.jobBar(true);
+  }
+
+  /** minigioco in corso in una scena separata (lontano dalla città) e dove tornare dopo */
+  arena: Arena | null = null;
+  private arenaBack: { pos: THREE.Vector3; rot: number } | null = null;
+
+  /**
+   * Si entra nella scena del minigioco: lotto grande con casa e giardino, prima persona.
+   * La città resta lontana (non si vede); a fine lavoretto si torna dove si era.
+   */
+  private enterArena(opts?: ConstructorParameters<typeof Arena>[0]) {
+    const a = new Arena(opts);
+    this.arenaBack = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y };
+    this.dismount();
+    this.arena = a;
+    this.scene.add(a.group);
+    this.player.root.position.copy(a.entry);
+    this.player.root.rotation.y = Math.PI;
+    this.camTarget.copy(a.entry);
+    document.body.classList.add('in-arena');
+    return a;
+  }
+
+  private exitArena() {
+    const a = this.arena;
+    if (!a) return;
+    this.arena = null;
+    this.scene.remove(a.group);
+    this.setFirstPerson(false);
+    document.body.classList.remove('in-arena');
+    const b = this.arenaBack;
+    this.arenaBack = null;
+    if (b) {
+      this.player.root.position.copy(b.pos);
+      this.player.root.rotation.y = b.rot;
+    }
+    this.camBlend = null;
+    this.snapCamera();
   }
 
   /** Il titolare esegue di persona un ordine della sua impresa di servizi. */
@@ -1038,6 +1077,7 @@ export class Game {
     this.tutorial.finish(stars);
     this.exitHouse();
     this.run?.dispose();
+    this.exitArena();
     this.run = null;
     this.prompt = null;
     this.ui.jobBar(false);
@@ -1377,7 +1417,7 @@ export class Game {
   // ---------------- prima persona ----------------
 
   /**
-   * Prima persona automatica durante i lavoretti in città (ora disattivata: vedi FP_JOBS).
+   * Prima persona nei minigiochi dei lavoretti (scena separata, vedi Arena).
    * In giro per la città, nelle attività e nelle case dei clienti si resta in terza persona.
    */
   firstPerson = false;
@@ -1397,11 +1437,9 @@ export class Game {
     return this.interior?.camera ?? this.house?.camera ?? this.camera;
   }
 
-  /** Prima persona nei lavoretti: disattivata (troppo difficile da telefono), il codice resta per il futuro. */
-  static readonly FP_JOBS = false;
-
+  /** Prima persona: nei minigiochi dei lavoretti (scena separata). In città e negli edifici terza persona. */
   private wantFirstPerson() {
-    return Game.FP_JOBS && !!(this.run && this.runOffer) && !this.interior && !this.house;
+    return !!this.arena && !!this.run && !this.interior && !this.house;
   }
 
   setFirstPerson(on: boolean) {
@@ -1477,7 +1515,7 @@ export class Game {
     // occhi sopra la testa e un po' indietro: più spazio tra la vista e gli oggetti vicini
     // se dietro la testa c'è un muro la camera si avvicina (mai dentro gli edifici)
     let back = 0.35;
-    const inWall = (x: number, z: number) => this.city.colliders.some((c) => x > c.minX - 0.15 && x < c.maxX + 0.15 && z > c.minZ - 0.15 && z < c.maxZ + 0.15);
+    const inWall = (x: number, z: number) => this.arena ? this.arena.blocked(x, z) : this.city.colliders.some((c) => x > c.minX - 0.15 && x < c.maxX + 0.15 && z > c.minZ - 0.15 && z < c.maxZ + 0.15);
     while (back > 0 && inWall(p.x - Math.sin(this.fpYaw) * back, p.z + Math.cos(this.fpYaw) * back)) back -= 0.1;
     back = Math.max(0, back);
     // se il muro impedisce di arretrare, la camera sale: la distanza dagli oggetti resta ampia
@@ -1505,6 +1543,8 @@ export class Game {
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);
     this.sun.position.copy(p).addScaledVector(this.sunDir, 36);
+    // anche in prima persona il centro della vista sta nella zona libera dai riquadri
+    this.centerInFreeArea(dt);
   }
 
   /** Passaggio morbido della camera dopo un cambio di visuale. */
@@ -1538,6 +1578,8 @@ export class Game {
       this.city.collide(p, ride ? ride.radius : 0.38);
       // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
       this.run?.collide?.(p, ride ? ride.radius : 0.35);
+      // nel minigioco: dentro il lotto, fuori dalla casa
+      this.arena?.collide(p, 0.35);
       this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
       if (ride) this.player.play(riderPose(this.state.riding!).anim);
@@ -1716,7 +1758,9 @@ export class Game {
     cam.updateMatrixWorld();
     const p = this.player.root.position;
     const targets: THREE.Vector3[] = [];
-    if (this.firstPerson) {
+    if (this.arena) {
+      // minigioco: niente palazzi da nascondere; gli oggetti del lavoro devono restare pieni
+    } else if (this.firstPerson) {
       const t = this.run?.target;
       if (t) targets.push(new THREE.Vector3(t.x, 0.5, t.z));
     } else {

@@ -452,7 +452,11 @@ export class UI {
       this.standEl.style.top = `${Math.round(THREE.MathUtils.clamp(st.y, safe.top + r, h - safe.bottom - r))}px`;
     }
     // cerchio poco sopra la testa
-    if (ring) {
+    if (ring && g.firstPerson) {
+      // prima persona: la testa non si vede, il cerchio sta al centro della vista (sotto il mirino)
+      this.ringEl.style.left = `${Math.round(w / 2 + (cam.view?.offsetX ? -cam.view.offsetX : 0))}px`;
+      this.ringEl.style.top = `${Math.round(h * 0.58 + (cam.view?.offsetY ? -cam.view.offsetY : 0))}px`;
+    } else if (ring) {
       const head = toScreen(v.copy(g.player.root.position).setY(p.headY ?? 2.6).project(cam));
       const rr = this.ringEl.offsetWidth / 2 || 42;
       this.ringEl.style.left = `${Math.round(THREE.MathUtils.clamp(head.x, safe.left + rr, w - safe.right - rr))}px`;

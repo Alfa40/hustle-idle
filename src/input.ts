@@ -70,17 +70,24 @@ export class Input {
 
   private down(e: PointerEvent) {
     if (!this.enabled) return;
-    if (this.lookMode && e.clientX > window.innerWidth / 2) {
-      if (this.lookId !== null) return;
-      this.lookId = e.pointerId;
-      this.lookLast = { x: e.clientX, y: e.clientY };
-      return;
-    }
     // metà dello schermo delle azioni (di solito la destra): toccare o tenere premuto fa l'azione
     const left = e.clientX < window.innerWidth / 2;
     if (left === settings.swapControls) {
       if (this.actionId !== null) return;
       this.actionId = e.pointerId;
+      if (this.lookMode) {
+        // prima persona: trascinando si gira lo sguardo; un tocco breve o il dito fermo fanno l'azione
+        this.actStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+        this.lookLast = { x: e.clientX, y: e.clientY };
+        this.actLook = false;
+        this.actHoldTimer = window.setTimeout(() => {
+          if (this.actionId === e.pointerId && !this.actLook) {
+            this.actionHeld = true;
+            this.onActionDown?.();
+          }
+        }, 220);
+        return;
+      }
       this.actionPressed = true;
       this.actionHeld = true;
       this.onActionDown?.();
@@ -93,7 +100,24 @@ export class Input {
     this.dragging = false;
   }
 
+  /** prima persona: inizio del tocco nella metà delle azioni, e se è diventato un "guardarsi attorno" */
+  private actStart = { x: 0, y: 0, t: 0 };
+  private actLook = false;
+  private actHoldTimer = 0;
+
   private moveEv(e: PointerEvent) {
+    if (e.pointerId === this.actionId && this.lookMode) {
+      if (!this.actLook && Math.hypot(e.clientX - this.actStart.x, e.clientY - this.actStart.y) > 12 && !this.actionHeld) {
+        this.actLook = true;
+        clearTimeout(this.actHoldTimer);
+      }
+      if (this.actLook) {
+        this.look.x += e.clientX - this.lookLast.x;
+        this.look.y += e.clientY - this.lookLast.y;
+      }
+      this.lookLast = { x: e.clientX, y: e.clientY };
+      return;
+    }
     if (e.pointerId === this.lookId) {
       this.look.x += e.clientX - this.lookLast.x;
       this.look.y += e.clientY - this.lookLast.y;
@@ -120,6 +144,12 @@ export class Input {
   private up(e: PointerEvent) {
     if (e.pointerId === this.actionId) {
       this.actionId = null;
+      clearTimeout(this.actHoldTimer);
+      // prima persona: un tocco breve senza trascinare è un'azione "tocca"
+      if (this.lookMode && !this.actLook && !this.actionHeld && performance.now() - this.actStart.t < 400) {
+        this.actionPressed = true;
+        this.onActionDown?.();
+      }
       this.actionHeld = false;
       this.onActionUp?.();
       return;

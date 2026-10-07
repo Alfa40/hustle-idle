@@ -412,6 +412,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Feste ed eventi del giorno: non più un'etichetta a parte sotto la data, ma una riga piccola dentro l'etichetta della data (toccandola si apre il calendario)
 - In città la visuale mette il personaggio al centro della parte di schermo libera dai riquadri e dai pulsanti; nelle attività, nelle case dei clienti e nella cucina del lavapiatti la stanza si inquadra lasciando libera anche la striscia dei messaggi
 
+### Lavoretti come minigiochi (in corso)
+- I lavoretti diventano minigiochi in una **scena separata** dalla città, giocati **in prima persona** (`src/minigames/arena.ts`): accettato il lavoretto si entra nella scena, a fine lavoro (o rinunciando) si torna in città dove si era. La scena sta lontanissima dalla città (la nebbia la nasconde): si riusano personaggio, luci, cielo e tutta la logica dei lavoretti (fasi, tutorial, oggetti solidi e che pulsano, cerchio a terra). Niente minimappa né freccette nella scena
+- Comandi in prima persona: metà sinistra joystick (avanti = dove guardi), metà destra **trascinare = guardarsi attorno**, tocco breve = azione "tocca", dito fermo = "tieni premuto"; se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto. Il cerchietto che si riempie sta al centro della vista
+- **Giardinaggio** (fatto): lotto 26×22 m con la casa del cliente un po' indietro, giardino davanti, dietro e ai lati, vialetto dal cancello alla porta, muretto sul confine, strada e vicinato fuori. Cespugli da tagliare 5–14 (con il livello) e 3–6 ostacoli (alberelli, vasi, tavolino, aiuole, siepi) in posizioni sempre diverse
+- Da fare: imbianchino, lavaggio auto, consegne, giornali (il lavapiatti ha già la sua cucina)
+
 ### Strada e obiettivi
 - La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo

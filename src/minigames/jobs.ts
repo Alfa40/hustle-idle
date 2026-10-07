@@ -6,6 +6,8 @@ import { DIR_VEC, type Slot } from '../world/city';
 import { WS } from '../config/map';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
+import type { Arena } from './arena';
+import { TREE_MODELS } from '../world/city';
 import { bigPlanter, fencePillar, fenceSegment, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
 export interface JobRun {
@@ -560,21 +562,21 @@ function zoneFor(slot: Slot, base: THREE.Vector3, f0: number, f1: number, r: num
 const WHITE = new THREE.Color(0xffffff);
 const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
 
-/** Giardinaggio: attrezzi → taglia i cespugli → raccogli le foglie → svuota nel bidone. */
-export function gardenJob(game: Game, level: number, slot: Slot, title: string) {
-  const at = frame(slot);
-  const f0 = frontEdge(game, slot) + 0.3;
-  const n = Math.min(8, 3 + Math.floor(level / 2));
-  const spots: THREE.Vector3[] = [];
-  for (let i = 0; i < 60 && spots.length < n; i++) {
-    const v = at(slot.center, f0 + 0.3 + Math.random() * Math.max(0.2, 2.8 - f0 - 0.3), (Math.random() - 0.5) * 3.8);
-    if (spots.every((s) => s.distanceTo(v) > 1.15) && v.distanceTo(slot.pos) > 1) spots.push(v);
-  }
+/**
+ * Giardinaggio come minigioco (scena separata, prima persona): un giardino grande attorno alla casa,
+ * cespugli e ostacoli in numero e posizioni sempre diversi. Fasi: tosasiepi → taglia ogni cespuglio →
+ * raccogli le foglie → svuota il sacco nel bidone.
+ */
+export function gardenArenaJob(game: Game, level: number, arena: Arena, title: string) {
+  const n = Math.min(14, 5 + Math.round(level));
+  const box = arena.entry.clone().add(new THREE.Vector3(-2.2, 0, -0.6));
+  const bin = new THREE.Vector3(arena.house.minX - 1.1, 0, arena.house.maxZ - 0.8);
+  // ostacoli del giardino: alberelli, vasi grandi, tavolino (solidi) e aiuole (basse, si attraversano)
+  const deco = arena.scatter(3 + Math.floor(Math.random() * 4), 2.6, 1.2, [box, bin, arena.entry]);
+  const spots = arena.scatter(n, 1.9, 1.0, [box, bin, arena.entry, ...deco]);
   let run: PhasedRun;
   const bushes: THREE.Object3D[] = [];
   const piles: THREE.Vector3[] = [];
-  const box = at(slot.center, 2.7, 2.6);
-  const bin = at(slot.center, 2.7, -2.6);
   const phases: Phase[] = [
     {
       name: 'Prendi il tosasiepi', icon: '🧰',
@@ -586,15 +588,14 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
         pos, kind: 'hold' as const, sec: 1.1 / (1 + 0.04 * level), label: 'Taglia', icon: '✂️', fx: 'leaf' as const,
         onProgress: (p: number) => {
           bushes[i].rotation.y += 0.3;
-          bushes[i].scale.setScalar(1 - p * 0.35);
+          bushes[i].scale.setScalar(1.2 * (1 - p * 0.35));
         },
         onDone: () => {
           bushes[i].visible = false;
-          run.prop(trimmedBush(), pos).userData.solid = true;
-          // le foglie tagliate cadono accanto
-          const lp = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0, (Math.random() - 0.5) * 0.8));
+          run.prop(trimmedBush(), pos, 0, 1.2).userData.solid = true;
+          const lp = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, 0.9));
           piles.push(lp);
-          run.prop(leafPile(), lp).name = 'pile' + (piles.length - 1);
+          run.prop(leafPile(), lp, 0, 1.2).name = 'pile' + (piles.length - 1);
         },
       })),
     },
@@ -609,19 +610,22 @@ export function gardenJob(game: Game, level: number, slot: Slot, title: string) 
         },
       })),
     },
-    {
-      name: 'Svuota il sacco nel bidone', icon: '🗑️',
-      tasks: () => [{ pos: bin, kind: 'tap', label: 'Svuota nel bidone', icon: '🗑️', onDone: () => hold(game) }],
-    },
+    { name: 'Svuota il sacco nel bidone', icon: '🗑️', tasks: () => [{ pos: bin, kind: 'tap', label: 'Svuota nel bidone', icon: '🗑️', onDone: () => hold(game) }] },
   ];
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, 3.1, 2.95), time: n * 5 + 16, keep: slot.center });
-  const [gx, gz] = DIR_VEC[slot.dir];
-  run.prop(toolbox(), box, Math.atan2(gx, gz), 1);
-  run.prop(wheelieBin(), bin, Math.atan2(gx, gz), 1).userData.solid = true;
+  run = new PhasedRun(game, level, title, phases, { time: n * 6 + 30 });
+  run.prop(toolbox(), box, 0, 1);
+  run.prop(wheelieBin(), bin, 0, 1).userData.solid = true;
   for (const pos of spots) {
-    const b = run.prop(bush(), pos);
+    const b = run.prop(bush(), pos, Math.random() * 6, 1.2);
     b.userData.solid = true;
     bushes.push(b);
+  }
+  const kinds = [() => model(TREE_MODELS[1], 2.2), bigPlanter, patioSet, flowerBed, roundShrub];
+  for (const pos of deco) {
+    const k = kinds[Math.floor(Math.random() * kinds.length)];
+    const o = run.prop(k(), pos, Math.random() * Math.PI * 2, 1);
+    o.userData.noGlow = true;
+    o.userData.solid = k !== flowerBed;
   }
   return run;
 }

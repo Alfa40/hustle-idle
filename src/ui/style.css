@@ -905,3 +905,7 @@ body.swap-controls .ride-btn { right: auto; left: calc(var(--sal) + 14px); }
 .ctl-hint span { font-size: 13px; font-weight: 700; }
 body.swap-controls .ctl-hint .ctl-move { left: auto; right: 0; border-radius: 28px 0 0 0; }
 body.swap-controls .ctl-hint .ctl-act { right: auto; left: 0; border-radius: 0 28px 0 0; }
+
+/* ---------- minigioco (scena separata in prima persona) ---------- */
+/* la città non c'è: niente minimappa né freccette verso i lavoretti */
+body.in-arena .hud-right .minimap, body.in-arena .edge-ptr { display: none !important; }
