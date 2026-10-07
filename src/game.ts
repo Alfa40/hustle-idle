@@ -1432,6 +1432,11 @@ export class Game {
   /** passaggio morbido tra terza e prima persona */
   private camBlend: { pos: THREE.Vector3; quat: THREE.Quaternion; t: number } | null = null;
 
+  /** In prima persona: nei minigiochi all'aperto o nella cucina del lavapiatti. */
+  get viewFirstPerson() {
+    return this.firstPerson || !!(this.house && 'firstPerson' in this.house && this.house.firstPerson);
+  }
+
   /** Camera della scena attiva (città, attività o casa del cliente). */
   get activeCamera() {
     return this.interior?.camera ?? this.house?.camera ?? this.camera;

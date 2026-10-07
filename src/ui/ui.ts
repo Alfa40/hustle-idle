@@ -353,7 +353,7 @@ export class UI {
 
     this.minimap.el.style.display = settings.minimap ? '' : 'none';
     if (settings.minimap) this.minimap.update(dt);
-    this.camEl.style.display = this.game.firstPerson ? 'none' : '';
+    this.camEl.style.display = this.game.viewFirstPerson ? 'none' : '';
     this.camEl.classList.toggle('changed', this.game.view.changed);
     const r = s.riding;
     const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.lastRide && s.vehicles.includes(s.lastRide) ? s.lastRide : s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
@@ -452,7 +452,7 @@ export class UI {
       this.standEl.style.top = `${Math.round(THREE.MathUtils.clamp(st.y, safe.top + r, h - safe.bottom - r))}px`;
     }
     // cerchio poco sopra la testa
-    if (ring && g.firstPerson) {
+    if (ring && g.viewFirstPerson) {
       // prima persona: la testa non si vede, il cerchio sta al centro della vista (sotto il mirino)
       this.ringEl.style.left = `${Math.round(w / 2 + (cam.view?.offsetX ? -cam.view.offsetX : 0))}px`;
       this.ringEl.style.top = `${Math.round(h * 0.58 + (cam.view?.offsetY ? -cam.view.offsetY : 0))}px`;

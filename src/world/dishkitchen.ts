@@ -80,7 +80,8 @@ export class DishKitchen {
         { stack: i, task: { pos: this.rack.clone().add(new THREE.Vector3(0, 0, 0.95)), kind: 'tap', label: 'Appoggia sullo scolapiatti', icon: '✨' } },
       );
     }
-    this.timeTotal = this.timeLeft = (n * 10 + 8) * Math.max(0.75, 1 - level * 0.02);
+    // in prima persona ci si gira e ci si avvicina: un po' più di tempo
+    this.timeTotal = this.timeLeft = (n * 12 + 10) * Math.max(0.75, 1 - level * 0.02);
   }
 
   private stackPos(i: number) {
@@ -142,13 +143,24 @@ export class DishKitchen {
     tiles.position.set(W / 2, 1.35, BACK + 0.01);
     s.add(tiles);
     for (const x of [LEFT, LEFT + W]) {
-      const side = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.2, FRONT - BACK), wallMat);
-      side.position.set(x, 0.6, (BACK + FRONT) / 2);
+      // pareti piene: in prima persona la cucina è una stanza chiusa
+      const side = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.4, FRONT - BACK), wallMat);
+      side.position.set(x, 1.2, (BACK + FRONT) / 2);
       s.add(side);
       this.walls.push({ obj: side, at: side.position.clone(), out: new THREE.Vector3(x === LEFT ? -1 : 1, 0, 0) });
     }
-    const front = new THREE.Mesh(new THREE.BoxGeometry(W - 1.8, 0.5, 0.15), wallMat);
-    front.position.set(1.8 + (W - 1.8) / 2, 0.25, FRONT);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(W - 1.8, 2.4, 0.15), wallMat);
+    front.position.set(1.8 + (W - 1.8) / 2, 1.2, FRONT);
+    // soffitto con due lampade
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, FRONT - BACK), new THREE.MeshLambertMaterial({ color: 0xf2efe8 }));
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.set(W / 2, 2.4, (BACK + FRONT) / 2);
+    s.add(ceil);
+    for (const lx of [W * 0.3, W * 0.7]) {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.3), new THREE.MeshBasicMaterial({ color: 0xfff6d8 }));
+      lamp.position.set(lx, 2.37, (BACK + FRONT) / 2);
+      s.add(lamp);
+    }
     s.add(front);
     this.walls.push({ obj: front, at: front.position.clone(), out: new THREE.Vector3(0, 0, 1) });
     // cucina del ristorante: fornelli e frigo spenti lungo la parete di fondo
@@ -239,11 +251,25 @@ export class DishKitchen {
 
   // ---------------- entrata/uscita ----------------
 
+  /** prima persona: si gioca con gli occhi del personaggio */
+  readonly firstPerson = true;
+  private yaw = 0;
+  private pitch = -0.3;
+  private lookIdle = 99;
+  private bob = 0;
+
   enter(player: Character) {
     this.player = player;
     player.root.position.copy(this.door).add(new THREE.Vector3(0.6, 0, -0.5));
     player.root.rotation.y = Math.PI;
     this.scene.add(player.root);
+    // prima persona: niente corpo, sguardo verso il carrello dei piatti, trascinare a destra gira lo sguardo
+    player.body.visible = false;
+    this.game.input.lookMode = true;
+    this.game.input.cancel();
+    this.yaw = Math.atan2(this.trolley.x - player.root.position.x, -(this.trolley.z - player.root.position.z));
+    this.camera.fov = 72;
+    this.camera.near = 0.15;
     this.resize();
     requestAnimationFrame(() => {
       this.offLayout = layout.on(() => this.resize());
@@ -252,6 +278,8 @@ export class DishKitchen {
   }
 
   exit() {
+    this.player.body.visible = true;
+    this.game.input.lookMode = false;
     this.offLayout?.();
     this.offLayout = null;
     this.camera.clearViewOffset();
@@ -261,6 +289,15 @@ export class DishKitchen {
   }
 
   private resize = () => {
+    if (this.firstPerson) {
+      // in prima persona la vista occupa tutto lo schermo; il centro sta nella zona libera dai riquadri
+      const free = layout.freeRect(KITCHEN_UI());
+      const { w, h } = layout.info;
+      this.camera.aspect = w / h;
+      this.camera.setViewOffset(w, h, -(free.x + free.w / 2 - w / 2), -(free.y + free.h / 2 - h / 2), w, h);
+      this.camera.updateProjectionMatrix();
+      return;
+    }
     const free = layout.freeRect(KITCHEN_UI());
     const tall = free.w < free.h;
     const pitch = THREE.MathUtils.degToRad(tall ? 60 : 56);
@@ -269,12 +306,65 @@ export class DishKitchen {
     this.placeCamera(true);
   };
 
-  private placeCamera(snap = false) {
+  private placeCamera(snap = false, dt = 0) {
+    if (this.firstPerson) {
+      this.placeEyes(dt);
+      return;
+    }
     const v = this.view;
     const want = !v.follow ? W / 2 : THREE.MathUtils.clamp(this.player?.root.position.x ?? W / 2, v.follow.min, v.follow.max);
     this.camX = snap ? want : this.camX + (want - this.camX) * 0.08;
     this.game.view.place(this.camera, new THREE.Vector3(this.camX, 0, v.z), v.d, v.pitch, this.player?.root.position);
     updateCutWalls(this.walls, this.camera);
+  }
+
+  /**
+   * Occhi del personaggio: sguardo col dito nella metà destra; se non lo tocchi, la testa si gira
+   * da sola verso il prossimo punto (carrello, lavello, scolapiatti). Leggero ondeggiare camminando.
+   */
+  private placeEyes(dt: number) {
+    const input = this.game.input;
+    const l = input.consumeLook();
+    if (l.x || l.y) this.lookIdle = 0;
+    else this.lookIdle += dt;
+    this.yaw += l.x * 0.005;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * 0.004, -1.0, 0.35);
+    const p = this.player.root.position;
+    // si guarda l'oggetto da usare (pila di piatti, lavello, scolapiatti), non il punto a terra
+    const st = this.step;
+    const t = !st ? null : this.idx % 3 === 0 ? this.stacks[st.stack].position : this.idx % 3 === 1 ? this.sink : this.rack;
+    if (t && this.lookIdle > 1.2) {
+      const d = Math.hypot(t.x - p.x, t.z - p.z);
+      let dy = Math.atan2(t.x - p.x, -(t.z - p.z)) - this.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      const k = Math.min(1, dt * 2.2);
+      if (d > 0.3) this.yaw += dy * k;
+      const wantPitch = THREE.MathUtils.clamp(-Math.atan2(0.6, Math.max(d, 0.5) + 0.3), -0.75, -0.1);
+      this.pitch += (wantPitch - this.pitch) * k;
+    }
+    const moving = Math.hypot(input.vector.x, input.vector.y) > 0.1;
+    this.bob += moving ? dt * 9 : 0;
+    const bob = moving ? Math.sin(this.bob) * 0.03 : 0;
+    // occhi un po' indietro rispetto alla testa, ma mai dentro un muro
+    let back = 0.3;
+    while (back > 0 && (Math.abs(p.x - Math.sin(this.yaw) * back - W / 2) > W / 2 - 0.2 || p.z + Math.cos(this.yaw) * back > FRONT - 0.15 || p.z + Math.cos(this.yaw) * back < BACK + 0.15)) back -= 0.05;
+    this.camera.position.set(p.x - Math.sin(this.yaw) * Math.max(0, back), 1.6 + bob, p.z + Math.cos(this.yaw) * Math.max(0, back));
+    this.camera.rotation.set(this.pitch, -this.yaw, 0, 'YXZ');
+    this.player.root.rotation.y = Math.PI - this.yaw;
+    this.player.body.visible = false;
+    if (this.player.held) this.player.held.visible = false;
+    if (this.heldSprite) this.heldSprite.visible = false;
+    // scritte nella cucina: più piccole, e sparite quando sono troppo vicine agli occhi
+    const wp = new THREE.Vector3();
+    this.scene.traverse((o) => {
+      const sp = o as THREE.Sprite;
+      if (!sp.isSprite) return;
+      sp.userData.baseScale ??= sp.scale.clone();
+      sp.scale.copy(sp.userData.baseScale).multiplyScalar(0.5);
+      sp.getWorldPosition(wp);
+      sp.material.transparent = true;
+      sp.material.opacity = wp.distanceTo(this.camera.position) < 1.6 ? 0 : 1;
+    });
   }
 
   // ---------------- gioco ----------------
@@ -343,7 +433,11 @@ export class DishKitchen {
     // movimento (solo joystick)
     const input = this.game.input;
     input.consumeTap();
-    const v = this.game.moveVector();
+    // joystick in prima persona: "su" = avanti, dove guardi
+    const iv = input.vector;
+    const cy = Math.cos(this.yaw);
+    const sy = Math.sin(this.yaw);
+    const v = { x: cy * iv.x - sy * iv.y, y: sy * iv.x + cy * iv.y };
     const p = this.player.root.position;
     const len = Math.hypot(v.x, v.y);
     if (len > 0.05) {
@@ -358,10 +452,10 @@ export class DishKitchen {
     this.ringObj.visible = this.arrowObj.visible = !!target;
     if (target) {
       this.ringObj.position.copy(target).setY(0.08);
-      this.arrowObj.position.set(target.x, 2.2 + Math.sin(performance.now() / 220) * 0.12, target.z - 0.9);
+      this.arrowObj.position.set(target.x, 1.85 + Math.sin(performance.now() / 220) * 0.12, target.z - 0.9);
     }
     this.line.update(dt, p, target, 0.6);
-    this.placeCamera();
+    this.placeCamera(false, dt);
     this.fx.update(dt);
     // acqua del lavello che si muove un po'
     this.water.position.y = 1.0 + Math.sin(performance.now() / 300) * 0.01;
