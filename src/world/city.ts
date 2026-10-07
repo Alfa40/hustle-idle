@@ -17,6 +17,8 @@ export interface Slot {
   dir: Dir;
   center: THREE.Vector3;
   zone: ZoneId;
+  /** modello della casa (per i minigiochi: la stessa casa vista in città) */
+  house?: string;
 }
 
 export interface LotSlot extends Slot {
@@ -66,6 +68,8 @@ export class City {
   dealer!: Slot;
   agency!: Slot;
   roadTiles: THREE.Vector3[] = [];
+  /** tutto quello che è stato piazzato (modello e matrice): i minigiochi ricostruiscono il quartiere */
+  placed: { path: string; m: THREE.Matrix4 }[] = [];
   /** edifici e alberi: si nascondono quando coprono una zona di lavoro */
   private tall: InstanceHandle[] = [];
   /** posizione delle lampade dei lampioni (per le luci notturne) */
@@ -194,8 +198,8 @@ export class City {
   }
 
   private build() {
-    const inst = new Instancer();
-    const shadowInst = new Instancer();
+    const inst = new Instancer(this.placed);
+    const shadowInst = new Instancer(this.placed);
 
     // prato sotto tutto
     // il prato e il paesaggio attorno sono in world/scenery.ts
@@ -224,7 +228,7 @@ export class City {
             const w = this.modelSize(path).x;
             const sc = Math.min(3.6, 5.2 / w) * WS;
             this.placeBuilding(shadowInst, path, front(-0.7), rot, sc);
-            const slot = { pos: front(2.1), dir, center: p.clone(), zone };
+            const slot = { pos: front(2.1), dir, center: p.clone(), zone, house: path };
             if (ch === 'H') this.homes.push(slot);
             else this.gardens.push(slot);
             break;

@@ -13,6 +13,13 @@
   scritta dell'azione. La camera inquadra il personaggio al centro della zona libera (città:
   `Game.centerInFreeArea`; stanze: `layout.freeRect` con tutti questi elementi tra gli occluder).
   Ogni nuovo elemento va aggiunto lì, mai a metà schermo.
+- **Spazio giusto per la quantità di lavoro**: in ogni lavoretto, minigioco o attività lo spazio cresce
+  insieme alle cose da fare (livello, ampliamenti). Sempre abbastanza per muoversi, mai così tanto che
+  spostarsi diventa lungo: al livello 1 spazio piccolo e poche cose, poi entrambi salgono gradualmente
+  (es. lotto dei minigiochi `lotSize()` in src/minigames/arena.ts).
+- **Minigiochi nello stesso posto**: la scena di un lavoretto è separata dalla città, ma fuori dal lotto deve
+  esserci il vero quartiere attorno al posto dove il lavoretto è stato accettato (stessa casa, stesse vie,
+  case, palazzi, parchi): per il giocatore è lo stesso posto.
 - **Scala del mondo**: le misure della città passano da `WS` (src/config/map.ts). Edifici, strade e distanze dalle tessere si moltiplicano per `WS`; personaggi, veicoli e oggetti di scena no. Nei lavoretti usare `frame()`/`zoneFor()` (già in scala).
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push

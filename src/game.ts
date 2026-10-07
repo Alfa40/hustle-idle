@@ -936,7 +936,7 @@ export class Game {
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     switch (offer.type) {
-      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena(), title); break;
+      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena({ level: lv, slot, placed: this.city.placed }), title); break;
       case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
       case 'volantini': this.run = routeJob(this, lv, slot, title, 'flyer'); break;
       case 'piatti': {
@@ -946,7 +946,7 @@ export class Game {
         break;
       }
       case 'lavaggio': this.run = carWashJob(this, lv, slot, title); break;
-      case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena(), title); break;
+      case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena({ level: lv, slot, placed: this.city.placed }), title); break;
     }
     if (tutorial && this.run) this.tutorial.start(offer.type, this.run);
     this.ui.jobBar(true);

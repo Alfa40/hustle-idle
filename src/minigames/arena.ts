@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { gltf, model } from '../assets';
-import { HOUSE_MODELS, TREE_MODELS } from '../world/city';
+import { gltf, Instancer, model } from '../assets';
+import { TILE } from '../config/map';
+import { DIR_ROT, DIR_VEC, HOUSE_MODELS, TREE_MODELS, type Slot } from '../world/city';
 import { fencePillar, fenceSegment } from '../world/jobprops';
 
 /**
@@ -17,17 +18,27 @@ export interface Box {
   maxZ: number;
 }
 
-/** Lotto: larghezza (x) e profondità (z) in metri; la casa sta un po' indietro rispetto al centro. */
-const LOT_W = 26;
-const LOT_D = 22;
-/** misure della casa (x, z) */
-const HOUSE_W = 8;
+/**
+ * Grandezza del lotto secondo la difficoltà: piccolo all'inizio (poche cose da fare, ci si sposta poco),
+ * più grande salendo di livello insieme alla quantità di lavoro. Liv. 1: 16×13,5 m (meno di metà del
+ * lotto grande), Liv. 6: 23×19,5 m, massimo 28×24 m.
+ */
+export function lotSize(level: number) {
+  const k = Math.max(0, level - 1);
+  return { w: Math.min(28, 16 + 1.4 * k), d: Math.min(24, 13.5 + 1.2 * k) };
+}
 
 export type FenceSide = 'front' | 'left' | 'right' | 'back';
 
 export interface ArenaOpts {
   /** tratti del muretto lungo il confine, uno per lato (davanti diviso dal cancello) */
   fence?: boolean;
+  /** difficoltà del lavoretto: decide la grandezza del lotto (vedi lotSize) */
+  level?: number;
+  /** casa della città dove si è accettato il lavoretto, e tutto ciò che la città ha piazzato:
+   *  fuori dal lotto si ricostruisce il quartiere vero (stessa casa, stesse vie e palazzi) */
+  slot?: Slot;
+  placed?: { path: string; m: THREE.Matrix4 }[];
 }
 
 export class Arena {
@@ -48,6 +59,11 @@ export class Arena {
   constructor(opts: ArenaOpts = {}) {
     const O = ARENA_ORIGIN;
     const g = this.group;
+    const { w: LOT_W, d: LOT_D } = lotSize(opts.level ?? 1);
+    this.lotW = LOT_W;
+    this.lotD = LOT_D;
+    // la casa in proporzione al lotto: resta giardino davanti, dietro e ai lati
+    const HOUSE_W = Math.min(8, LOT_W * 0.38);
     this.bounds = { minX: O.x - LOT_W / 2 + 0.45, maxX: O.x + LOT_W / 2 - 0.45, minZ: O.z - LOT_D / 2 + 0.45, maxZ: O.z + LOT_D / 2 - 0.45 };
     // prato tutto attorno e prato del giardino (un po' più vivo)
     // prato fino all'orizzonte (la nebbia lo sfuma): niente bordo scuro in lontananza
@@ -61,22 +77,23 @@ export class Arena {
     lawn.position.set(O.x, 0, O.z);
     lawn.receiveShadow = true;
     g.add(lawn);
-    // strada e marciapiede davanti al lotto
+    const real = !!(opts.slot && opts.placed);
+    // strada e marciapiede davanti al lotto (solo se non c'è il quartiere vero)
     const road = new THREE.Mesh(new THREE.PlaneGeometry(900, 8), new THREE.MeshLambertMaterial({ color: 0x4e5566 }));
     road.rotation.x = -Math.PI / 2;
     road.position.set(O.x, 0.005, O.z + LOT_D / 2 + 6.5);
-    g.add(road);
+    if (!real) g.add(road);
     const walk = new THREE.Mesh(new THREE.PlaneGeometry(900, 2.4), new THREE.MeshLambertMaterial({ color: 0xb8bfd6 }));
     walk.rotation.x = -Math.PI / 2;
     walk.position.set(O.x, 0.01, O.z + LOT_D / 2 + 1.3);
-    g.add(walk);
+    if (!real) g.add(walk);
 
     // casa del cliente, un po' indietro: davanti il giardino più grande, ma c'è spazio anche dietro e ai lati
-    const path = HOUSE_MODELS[Math.floor(Math.random() * HOUSE_MODELS.length)];
+    const path = opts.slot?.house ?? HOUSE_MODELS[Math.floor(Math.random() * HOUSE_MODELS.length)];
     const size = new THREE.Box3().setFromObject(gltf(path).scene).getSize(new THREE.Vector3());
     const sc = HOUSE_W / size.x;
     const house = model(path, sc);
-    const hz = O.z - 3.2;
+    const hz = O.z - LOT_D * 0.15;
     house.position.set(O.x, 0, hz);
     house.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true;
@@ -96,7 +113,11 @@ export class Arena {
     // muretto sul confine (con il cancello davanti), pilastri agli angoli
     if (opts.fence !== false) this.buildFence();
 
-    // vicinato fuori dal lotto: case e alberi, solo per l'atmosfera
+    if (real) {
+      this.buildNeighborhood(opts.slot!, opts.placed!);
+      return;
+    }
+    // senza la città: un vicinato generico (case e alberi)
     for (const sx of [-1, 1]) {
       const p2 = HOUSE_MODELS[Math.floor(Math.random() * HOUSE_MODELS.length)];
       const s2 = new THREE.Box3().setFromObject(gltf(p2).scene).getSize(new THREE.Vector3());
@@ -112,10 +133,63 @@ export class Arena {
     }
   }
 
+  private lotW = 0;
+  private lotD = 0;
+
+  /**
+   * Il quartiere vero attorno alla casa del lavoretto: ogni casa, palazzo, albero, strada e lampione
+   * della città entro 90 m, girato in modo che la casa guardi il cancello. Il lotto del minigioco è più
+   * grande della tessera vera, quindi tutto ciò che sta attorno si allontana quanto serve e le strade
+   * e i marciapiedi accanto al lotto si allungano: nessun buco e niente che entra nel giardino.
+   */
+  private buildNeighborhood(slot: Slot, placed: { path: string; m: THREE.Matrix4 }[]) {
+    const O = ARENA_ORIGIN;
+    const T = TILE;
+    const [dx, dz] = DIR_VEC[slot.dir];
+    const c = slot.center;
+    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -DIR_ROT[slot.dir]);
+    // dentro la tessera si allarga, fuori si sposta: continuo e senza buchi
+    const stretch = (u: number, half: number, nh: number) => (Math.abs(u) <= half ? (u * nh) / half : u + Math.sign(u) * (nh - half));
+    const inst = new Instancer();
+    const flat = new Instancer();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    for (const it of placed) {
+      const ox = it.m.elements[12] - c.x;
+      const oz = it.m.elements[14] - c.z;
+      // coordinate rispetto alla casa: f verso la strada, r di lato
+      const f = ox * dx + oz * dz;
+      const r = ox * dz - oz * dx;
+      if (Math.hypot(f, r) > 90) continue;
+      // la tessera del lotto (casa vera, pavimento): nel minigioco c'è già il giardino
+      if (Math.abs(r) < T / 2 - 0.01 && Math.abs(f) < T / 2 - 0.01) continue;
+      it.m.decompose(p, q, s);
+      const rq = turn.clone().multiply(q);
+      const at = new THREE.Vector3(O.x + stretch(r, T / 2, this.lotW / 2), p.y, O.z + stretch(f, T / 2, this.lotD / 2));
+      const isFlat = it.path.startsWith('roads/') && !it.path.includes('light');
+      if (!isFlat) {
+        // un lampione davanti al cancello si sposta di lato (non copre l'ingresso né la vista)
+        if (it.path.includes('light') && Math.abs(at.x - O.x) < 2.5 && at.z > O.z) at.x = O.x + (at.x >= O.x ? 3 : -3);
+        inst.add(it.path, new THREE.Matrix4().compose(at, rq, s));
+        continue;
+      }
+      // strade e marciapiedi nella fascia del lotto si allungano fino a toccare quelli vicini
+      const sx = Math.abs(r) <= T / 2 ? this.lotW / T : 1;
+      const sz = Math.abs(f) <= T / 2 ? this.lotD / T : 1;
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(), rq, s);
+      m.premultiply(new THREE.Matrix4().makeScale(sx, 1, sz));
+      m.setPosition(at);
+      flat.add(it.path, m);
+    }
+    inst.build(this.group, { castShadow: true });
+    flat.build(this.group);
+  }
+
   private buildFence() {
     const O = ARENA_ORIGIN;
-    const hw = LOT_W / 2;
-    const hd = LOT_D / 2;
+    const hw = this.lotW / 2;
+    const hd = this.lotD / 2;
     const gate = 1.2; // metà larghezza del cancello
     const add = (side: FenceSide, x: number, z: number, rot: number, len: number, inX: number, inZ: number) => {
       const { obj, body } = fenceSegment(len);

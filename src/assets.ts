@@ -107,7 +107,10 @@ export function setInstanceVisible(h: InstanceHandle, visible: boolean) {
 export class Instancer {
   private items = new Map<string, THREE.Matrix4[]>();
   private handles: InstanceHandle[] = [];
+  /** `log`: se c'è, ogni copia aggiunta viene annotata (modello e posizione) */
+  constructor(private log?: { path: string; m: THREE.Matrix4 }[]) {}
   add(path: string, matrix: THREE.Matrix4) {
+    this.log?.push({ path, m: matrix.clone() });
     const cx = Math.floor(matrix.elements[12] / CHUNK);
     const cz = Math.floor(matrix.elements[14] / CHUNK);
     const key = `${path}|${cx},${cz}`;

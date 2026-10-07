@@ -646,7 +646,8 @@ export function gardenArenaJob(game: Game, level: number, arena: Arena, title: s
   const box = arena.entry.clone().add(new THREE.Vector3(-2.2, 0, -0.6));
   const bin = new THREE.Vector3(arena.house.minX - 1.1, 0, arena.house.maxZ - 0.8);
   // ostacoli del giardino: alberelli, vasi grandi, tavolino (solidi) e aiuole (basse, si attraversano)
-  const deco = arena.scatter(3 + Math.floor(Math.random() * 4), 2.6, 1.2, [box, bin, arena.entry]);
+  // anche gli ostacoli crescono col livello (giardino piccolo all'inizio)
+  const deco = arena.scatter(Math.min(6, 2 + Math.floor(level / 2)), 2.6, 1.2, [box, bin, arena.entry]);
   const spots = arena.scatter(n, 1.9, 1.0, [box, bin, arena.entry, ...deco]);
   let run: PhasedRun;
   const bushes: THREE.Object3D[] = [];
@@ -694,7 +695,8 @@ export function gardenArenaJob(game: Game, level: number, arena: Arena, title: s
     b.userData.solid = true;
     bushes.push(b);
   }
-  const kinds = [() => model(TREE_MODELS[1], 2.2), bigPlanter, patioSet, flowerBed, roundShrub];
+  // niente siepi tonde tra gli ostacoli: si confonderebbero con i cespugli da tagliare
+  const kinds = [() => model(TREE_MODELS[1], 2.2), bigPlanter, patioSet, flowerBed];
   for (const pos of deco) {
     const k = kinds[Math.floor(Math.random() * kinds.length)];
     const o = run.prop(k(), pos, Math.random() * Math.PI * 2, 1);
