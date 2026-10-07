@@ -1580,20 +1580,25 @@ export class Game {
       const speed = (ride ? ride.speed : WALK_SPEED) * Math.min(1, len);
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
-      this.city.collide(p, ride ? ride.radius : 0.38);
+      // nel minigioco valgono solo i suoi ostacoli: quelli della città (confini compresi) lo
+      // spingerebbero via, contro il muretto in fondo
+      if (!this.arena) this.city.collide(p, ride ? ride.radius : 0.38);
       // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
       this.run?.collide?.(p, ride ? ride.radius : 0.35);
       // nel minigioco: dentro il lotto, fuori dalla casa
       this.arena?.collide(p, 0.35);
-      this.traffic.pushOut(p, ride ? ride.radius : 0.38);
+      if (!this.arena) this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
       if (ride) this.player.play(riderPose(this.state.riding!).anim);
       else if (!this.prompt?.progress) this.player.play(len > 0.6 ? 'sprint' : 'walk', 0.15, len > 0.6 ? 0.85 : 1);
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'sprint') {
       this.player.play('idle');
     }
-    this.state.player.x = p.x;
-    this.state.player.z = p.z;
+    // nel minigioco si salva il posto in città dove si era (non quello nella scena separata)
+    if (!this.arena) {
+      this.state.player.x = p.x;
+      this.state.player.z = p.z;
+    }
   }
 
 

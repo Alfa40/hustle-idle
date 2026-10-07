@@ -328,7 +328,8 @@ export class PhasedRun extends BaseRun {
       sp.set(t.pos.x + (dx / len) * (rad + 0.55), 0, t.pos.z + (dz / len) * (rad + 0.55));
       // mai dentro un altro oggetto o un edificio
       this.collide(sp, 0.3);
-      this.game.city.collide(sp, 0.3);
+      if (this.game.arena) this.game.arena.collide(sp, 0.3);
+      else this.game.city.collide(sp, 0.3);
     }
     r.position.set(sp.x, 0.12, sp.z);
     // vicino abbastanza: il cerchio diventa verde e pulsa
