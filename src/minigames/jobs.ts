@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { model } from '../assets';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
-import { DIR_VEC, type Slot } from '../world/city';
+import type { Slot } from '../world/city';
 import { WS } from '../config/map';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
 import type { Arena, FenceSide } from './arena';
+import { routeStops, type Street, type StreetHouse } from './street';
 import { TREE_MODELS } from '../world/city';
 import { bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
@@ -524,12 +525,6 @@ export class PhasedRun extends BaseRun {
 
 // ---------------- i lavoretti ----------------
 
-/** Sistema di riferimento davanti a un edificio: `f` verso la strada, `r` di lato. */
-function frame(slot: Slot) {
-  const [dx, dz] = DIR_VEC[slot.dir];
-  // f e r sono in "metri di tessera": si allargano con la scala del mondo (WS)
-  return (base: THREE.Vector3, f: number, r: number) => new THREE.Vector3(base.x + (dx * f + dz * r) * WS, 0, base.z + (dz * f - dx * r) * WS);
-}
 
 const WHITE = new THREE.Color(0xffffff);
 const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
@@ -770,22 +765,17 @@ export function gardenArenaJob(game: Game, level: number, arena: Arena, title: s
   return run;
 }
 
-/** Consegne e volantini: ritira in negozio → consegna agli indirizzi (in qualsiasi ordine) → torna per la ricevuta. */
-export function routeJob(game: Game, level: number, start: Slot, title: string, mode: 'package' | 'flyer') {
-  const houses = [...game.deliveryHouses];
-  const n = mode === 'package' ? Math.min(4, 2 + Math.floor(level / 3)) : Math.min(8, 4 + Math.floor(level / 2));
-  const sorted = houses.filter((h) => h.pos.distanceTo(start.pos) > (mode === 'package' ? 18 : 6) * WS).sort((a, b) => a.pos.distanceTo(start.pos) - b.pos.distanceTo(start.pos));
-  const pool = mode === 'package' ? sorted.slice(0, 14) : sorted.slice(0, n + 3);
-  const stops: Slot[] = [];
-  while (stops.length < n && pool.length) stops.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
-  let dist = 0;
-  let from = start.pos;
-  for (const s of stops) {
-    dist += Math.abs(s.pos.x - from.x) + Math.abs(s.pos.z - from.z);
-    from = s.pos;
-  }
-  dist += Math.abs(start.pos.x - from.x) + Math.abs(start.pos.z - from.z);
+/**
+ * Consegne e giornali come minigioco (scena separata, prima persona): una via del quartiere con le
+ * case sui due lati. Ritira all'inizio della via (negozio dei pacchi o edicola) → consegna a ogni
+ * cassetta segnata, in qualsiasi ordine → torna per la ricevuta. Più consegne = via più lunga.
+ */
+export function routeStreetJob(game: Game, level: number, street: Street, title: string, mode: 'package' | 'flyer') {
   const flyer = mode === 'flyer';
+  const n = routeStops(level, mode);
+  const pool = [...street.houses];
+  const stops: StreetHouse[] = [];
+  while (stops.length < n && pool.length) stops.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   const box = () => {
     const b = model('furniture/cardboardBoxClosed.glb', 2.2);
     b.position.x = -0.23;
@@ -802,34 +792,28 @@ export function routeJob(game: Game, level: number, start: Slot, title: string, 
     }
     return g;
   };
-  const face = (s: Slot) => Math.atan2(DIR_VEC[s.dir][0], DIR_VEC[s.dir][1]);
-  const at = frame(start);
-  // il punto di ritiro è una vera attività sul marciapiede, accanto a chi ti dà il lavoro
-  const shopPos = at(start.pos, 0.15, 1.9);
-  const counter = at(start.pos, 1.15, 1.9);
-  // l'indicatore del ritiro sta accanto al chiosco (sopra coprirebbe l'insegna)
-  const counterMark = at(start.pos, 1.0, 0.1);
-  // la cassetta di ogni indirizzo sta accanto al vialetto, verso la strada
-  const boxes = stops.map((s) => ({ s, pos: frame(s)(s.pos, 0.55, 1.05) }));
-  const front = (b: { s: Slot; pos: THREE.Vector3 }) => frame(b.s)(b.pos, 0.55, 0);
+  const counter = street.counter;
+  const counterMark = street.counter.clone().add(new THREE.Vector3(1.6, 0, 0));
   const phases: Phase[] = [
     {
-      name: flyer ? 'Prendi i giornali all\'edicola' : 'Ritira i pacchi al negozio', icon: flyer ? '📰' : '📦',
+      name: flyer ? "Prendi i giornali all'edicola" : 'Ritira i pacchi al negozio', icon: flyer ? '📰' : '📦',
       tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', onDone: () => hold(game, flyer ? papers() : box()) }],
     },
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
-      tasks: () => boxes.map((b) => ({ pos: front(b), kind: 'tap' as const, label: flyer ? 'Imbuca il giornale' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
+      tasks: () => stops.map((h) => ({ pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: flyer ? 'Imbuca il giornale' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
     },
     {
-      name: flyer ? 'Torna all\'edicola per la ricevuta' : 'Torna al negozio per la ricevuta', icon: '🧾',
+      name: flyer ? "Torna all'edicola per la ricevuta" : 'Torna al negozio per la ricevuta', icon: '🧾',
       tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', onDone: () => hold(game) }],
     },
   ];
-  const run = new PhasedRun(game, level, title, phases, { time: (dist / 5.2) * (flyer ? 1.35 : 1.45) + 6 + n * 2 });
-  run.prop(flyer ? newsstand() : parcelShop(), shopPos, face(start), 1).userData.solid = true;
-  // cassette della posta: blu per i giornali, gialle per i pacchi
-  for (const b of boxes) run.prop(postbox(flyer ? 0x2d6cdb : 0xffc21a), b.pos, face(b.s), 1);
+  // tempo: andata e ritorno lungo la via fino all'ultima casa, più un attimo per ogni cassetta
+  const far = Math.max(...stops.map((h) => h.x)) - counter.x;
+  const run = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * 3 + 12 });
+  run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1).userData.noGlow = true;
+  // cassette della posta: blu per i giornali, gialle per i pacchi (solo agli indirizzi da servire)
+  for (const h of stops) run.prop(postbox(flyer ? 0x2d6cdb : 0xffc21a), h.box, h.rot, 1);
   return run;
 }
 

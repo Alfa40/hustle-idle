@@ -30,8 +30,9 @@ import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
 import { hasInterior } from './config/recipes';
-import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeStreetJob, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
+import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
@@ -936,32 +937,31 @@ export class Game {
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     switch (offer.type) {
-      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena({ level: lv, slot, placed: this.city.placed }), title); break;
-      case 'consegna': this.run = routeJob(this, lv, slot, title, 'package'); break;
-      case 'volantini': this.run = routeJob(this, lv, slot, title, 'flyer'); break;
+      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title); break;
+      case 'consegna': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package'); break;
+      case 'volantini': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer'); break;
       case 'piatti': {
         // si va al ristorante (chiuso) e si lavora nella sua cucina
         const run: VisitRun = new VisitRun(this, lv, slot, title, () => this.enterKitchen(lv, slot.pos, run), 'al ristorante', 'Entra in cucina');
         this.run = run;
         break;
       }
-      case 'lavaggio': this.run = carWashArenaJob(this, lv, this.enterArena({ size: carWashLot(lv), slot, placed: this.city.placed }), title); break;
-      case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena({ level: lv, slot, placed: this.city.placed }), title); break;
+      case 'lavaggio': this.run = carWashArenaJob(this, lv, this.enterArena(new Arena({ size: carWashLot(lv), slot, placed: this.city.placed })), title); break;
+      case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title); break;
     }
     if (tutorial && this.run) this.tutorial.start(offer.type, this.run);
     this.ui.jobBar(true);
   }
 
   /** minigioco in corso in una scena separata (lontano dalla città) e dove tornare dopo */
-  arena: Arena | null = null;
+  arena: Arena | Street | null = null;
   private arenaBack: { pos: THREE.Vector3; rot: number } | null = null;
 
   /**
    * Si entra nella scena del minigioco: lotto grande con casa e giardino, prima persona.
    * La città resta lontana (non si vede); a fine lavoretto si torna dove si era.
    */
-  private enterArena(opts?: ConstructorParameters<typeof Arena>[0]) {
-    const a = new Arena(opts);
+  private enterArena<A extends Arena | Street>(a: A): A {
     this.arenaBack = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y };
     this.dismount();
     this.arena = a;
