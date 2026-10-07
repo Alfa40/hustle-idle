@@ -299,6 +299,8 @@ export class PhasedRun extends BaseRun {
   /** cerchio a terra dove stare per il prossimo punto da fare */
   private standRing: THREE.Mesh | null = null;
   private standPt = new THREE.Vector3();
+  /** punto dove stare scelto per ogni oggetto: non si sposta più */
+  private stands = new Map<Task, THREE.Vector3>();
 
   /**
    * Punto dove stare: davanti all'oggetto, dalla parte del giocatore, appena fuori dal suo ingombro
@@ -313,7 +315,10 @@ export class PhasedRun extends BaseRun {
     r.visible = !!t;
     if (!t) return;
     const sp = this.standPt;
-    if (t.markerAt) sp.copy(t.pos);
+    // il punto si decide una volta sola per ogni oggetto (dal lato da cui arrivi) e poi resta fermo
+    const fixed = this.stands.get(t);
+    if (fixed) sp.copy(fixed);
+    else if (t.markerAt) sp.copy(t.pos);
     else {
       // quanto è grande l'oggetto (se è solido ci si ferma appena fuori)
       let rad = 0.45;
@@ -331,6 +336,7 @@ export class PhasedRun extends BaseRun {
       if (this.game.arena) this.game.arena.collide(sp, 0.3);
       else this.game.city.collide(sp, 0.3);
     }
+    if (!fixed) this.stands.set(t, sp.clone());
     r.position.set(sp.x, 0.12, sp.z);
     // vicino abbastanza: il cerchio diventa verde e pulsa
     const mat = r.material as THREE.MeshBasicMaterial;
