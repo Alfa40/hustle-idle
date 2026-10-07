@@ -35,6 +35,8 @@ export interface ArenaOpts {
   fence?: boolean;
   /** difficoltà del lavoretto: decide la grandezza del lotto (vedi lotSize) */
   level?: number;
+  /** grandezza del lotto decisa dal lavoretto (es. quante auto da lavare), al posto di lotSize */
+  size?: { w: number; d: number };
   /** casa della città dove si è accettato il lavoretto, e tutto ciò che la città ha piazzato:
    *  fuori dal lotto si ricostruisce il quartiere vero (stessa casa, stesse vie e palazzi) */
   slot?: Slot;
@@ -59,7 +61,7 @@ export class Arena {
   constructor(opts: ArenaOpts = {}) {
     const O = ARENA_ORIGIN;
     const g = this.group;
-    const { w: LOT_W, d: LOT_D } = lotSize(opts.level ?? 1);
+    const { w: LOT_W, d: LOT_D } = opts.size ?? lotSize(opts.level ?? 1);
     this.lotW = LOT_W;
     this.lotD = LOT_D;
     // la casa in proporzione al lotto: resta giardino davanti, dietro e ai lati

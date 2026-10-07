@@ -30,7 +30,7 @@ import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
 import { hasInterior } from './config/recipes';
-import { carWashJob, gardenArenaJob, paintArenaJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeJob, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
@@ -945,7 +945,7 @@ export class Game {
         this.run = run;
         break;
       }
-      case 'lavaggio': this.run = carWashJob(this, lv, slot, title); break;
+      case 'lavaggio': this.run = carWashArenaJob(this, lv, this.enterArena({ size: carWashLot(lv), slot, placed: this.city.placed }), title); break;
       case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena({ level: lv, slot, placed: this.city.placed }), title); break;
     }
     if (tutorial && this.run) this.tutorial.start(offer.type, this.run);

@@ -531,36 +531,100 @@ function frame(slot: Slot) {
   return (base: THREE.Vector3, f: number, r: number) => new THREE.Vector3(base.x + (dx * f + dz * r) * WS, 0, base.z + (dz * f - dx * r) * WS);
 }
 
-/**
- * Distanza (verso la strada) del fronte dell'edificio di questa tessera:
- * il cortile di lavoro inizia lì, così nessun punto finisce sotto al tetto.
- */
-function frontEdge(game: Game, slot: Slot) {
-  const [dx, dz] = DIR_VEC[slot.dir];
-  let best = 0.6;
-  for (const b of game.city.colliders) {
-    const inside = slot.center.x > b.minX - 0.5 && slot.center.x < b.maxX + 0.5 && slot.center.z > b.minZ - 0.5 && slot.center.z < b.maxZ + 0.5;
-    if (!inside) continue;
-    for (const x of [b.minX, b.maxX]) for (const z of [b.minZ, b.maxZ]) best = Math.max(best, (x - slot.center.x) * dx + (z - slot.center.z) * dz);
-  }
-  return Math.min(best / WS, 2.2);
-}
-
-/** Zona rettangolare davanti a un edificio: da `f0` a `f1` verso la strada, da -`r` a +`r` di lato. */
-function zoneFor(slot: Slot, base: THREE.Vector3, f0: number, f1: number, r: number): Zone {
-  const [dx, dz] = DIR_VEC[slot.dir];
-  const fm = ((f0 + f1) / 2) * WS;
-  return {
-    center: new THREE.Vector3(base.x + dx * fm, 0, base.z + dz * fm),
-    dir: new THREE.Vector3(dx, 0, dz),
-    side: new THREE.Vector3(dz, 0, -dx),
-    halfF: ((f1 - f0) / 2) * WS,
-    halfR: r * WS,
-  };
-}
-
 const WHITE = new THREE.Color(0xffffff);
 const hold = (game: Game, obj?: THREE.Object3D) => game.player.hold(obj);
+
+/** Lavaggio auto come minigioco: quante auto secondo il livello (1, poi 2, poi 3). */
+export function carWashCars(level: number) {
+  return level < 3.5 ? 1 : level < 6 ? 2 : 3;
+}
+
+/** Lotto per il lavaggio: largo quanto serve per le auto parcheggiate davanti alla casa, mai di più. */
+export function carWashLot(level: number) {
+  return { w: carWashCars(level) === 3 ? 25 : 14, d: 15 };
+}
+
+/**
+ * Lavaggio auto come minigioco (scena separata, prima persona): le auto sono parcheggiate nel cortile
+ * davanti alla casa, ai lati del vialetto. Fasi: spruzzino → sapone su ogni lato di ogni auto →
+ * canna dell'acqua e giro di risciacquo → straccio e asciugatura.
+ */
+export function carWashArenaJob(game: Game, level: number, arena: Arena, title: string) {
+  const n = carWashCars(level);
+  const E = arena.entry;
+  const zc = arena.house.maxZ + 2.7;
+  const xs = [-3.7, 3.7, -9.6].slice(0, n);
+  const models = ['cars/sedan.glb', 'cars/hatchback-sports.glb', 'cars/suv-luxury.glb'];
+  const cars = xs.map((x) => new THREE.Vector3(E.x + x, 0, zc));
+  // i 4 lati di ogni auto nell'ordine del giro: muso, lato strada, coda, lato casa
+  const sidesOf = (c: THREE.Vector3) => [c.clone().add(new THREE.Vector3(2.15, 0, 0)), c.clone().add(new THREE.Vector3(0, 0, 1.0)), c.clone().add(new THREE.Vector3(-2.15, 0, 0)), c.clone().add(new THREE.Vector3(0, 0, -1.0))];
+  const all = cars.flatMap((c, ci) => sidesOf(c).map((pos, i) => ({ pos, i, ci, car: c })));
+  const sideNames = ['il muso', 'il lato strada', 'la coda', 'il lato casa'];
+  const onSide = ['sul muso', 'sul lato strada', 'sulla coda', 'sul lato casa'];
+  const who = (ci: number) => (n > 1 ? ` (auto ${ci + 1})` : '');
+  // attrezzi ai lati della casa (fuori dal giro delle auto e dal vialetto)
+  const sprayer = new THREE.Vector3(arena.house.minX - 1.3, 0, arena.house.maxZ - 0.6);
+  const rags = new THREE.Vector3(arena.house.minX - 1.3, 0, arena.house.maxZ - 2.0);
+  const reel = new THREE.Vector3(arena.house.maxX + 1.3, 0, arena.house.maxZ - 0.6);
+  let run: PhasedRun;
+  const carObjs: THREE.Object3D[] = [];
+  const foams: THREE.Object3D[] = [];
+  const drops: THREE.Object3D[] = [];
+  const sp = 1 + 0.04 * level;
+  // schiuma o gocce su un lato dell'auto (tra il punto e il centro dell'auto)
+  const blob = (k: number, s: { pos: THREE.Vector3; i: number; car: THREE.Vector3 }, color: number, r0: number, r1: number) => {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.9 });
+    for (let j = 0; j < k; j++) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r0 + Math.random() * r1, 8, 6), mat);
+      m.position.set((Math.random() - 0.5) * (s.i % 2 ? 1.6 : 0.7), 0.45 + Math.random() * 0.7, (Math.random() - 0.5) * (s.i % 2 ? 0.4 : 1.2));
+      g.add(m);
+    }
+    return run.prop(g, s.pos.clone().lerp(s.car, 0.62), s.i % 2 ? 0 : Math.PI / 2, 1);
+  };
+  const phases: Phase[] = [
+    { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
+    {
+      name: n > 1 ? 'Spruzza il sapone su tutte le auto' : "Spruzza il sapone su tutta l'auto", icon: '🫧',
+      tasks: () => all.map((s, k) => ({
+        pos: s.pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[s.i]}${who(s.ci)}`, icon: '🫧', fx: 'bubble' as const, obj: carObjs[s.ci],
+        onDone: () => { foams[k] = blob(12, s, 0xffffff, 0.14, 0.1); },
+      })),
+    },
+    { name: "Prendi la canna dell'acqua", icon: '🚿', tasks: () => [{ pos: reel, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.05, 0.6, 0x43a047)) }] },
+    {
+      name: 'Fai il giro e risciacqua', icon: '💦', ordered: true,
+      tasks: () => all.map((s, k) => ({
+        pos: s.pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[s.i]}${who(s.ci)}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff, obj: carObjs[s.ci],
+        onProgress: (p: number) => foams[k]?.scale.setScalar(Math.max(0.05, 1 - p)),
+        onDone: () => {
+          if (foams[k]) foams[k].visible = false;
+          drops[k] = blob(10, s, 0x8fd3ff, 0.045, 0);
+        },
+      })),
+    },
+    { name: 'Prendi lo straccio', icon: '🧽', tasks: () => [{ pos: rags, kind: 'tap', label: 'Prendi lo straccio', icon: '🧽', onDone: () => hold(game, boxProp(0.25, 0.06, 0.3, 0xffc21a)) }] },
+    {
+      name: n > 1 ? 'Asciuga tutte le auto' : "Asciuga tutta l'auto", icon: '✨',
+      tasks: () => all.map((s, k) => ({
+        pos: s.pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[s.i]}${who(s.ci)}`, icon: '✨', fx: 'spark' as const, obj: carObjs[s.ci],
+        onProgress: (p: number) => drops[k]?.scale.setScalar(Math.max(0.05, 1 - p)),
+        onDone: () => { if (drops[k]) drops[k].visible = false; },
+      })),
+    },
+  ];
+  run = new PhasedRun(game, level, title, phases, { time: 24 + n * 42 });
+  cars.forEach((c, ci) => {
+    const car = run.prop(model(models[ci % models.length], 1), c, Math.PI / 2, 1);
+    car.userData.noGlow = true;
+    car.userData.solid = true;
+    carObjs.push(car);
+  });
+  run.prop(soapSprayer(), sprayer, Math.PI / 2, 1);
+  run.prop(hoseReel(), reel, -Math.PI / 2, 1);
+  run.prop(ragBucket(), rags, Math.PI / 2, 1);
+  return run;
+}
 
 /**
  * Imbianchino come minigioco (scena separata, prima persona): il muretto è sul confine del lotto.
@@ -769,98 +833,6 @@ export function routeJob(game: Game, level: number, start: Slot, title: string, 
   return run;
 }
 
-/**
- * Lavaggio auto: prendi lo spruzzino e spruzza il sapone su tutta l'auto (4 lati) →
- * prendi la canna e fai il giro dell'auto sciacquandola (in ordine, tutto attorno) →
- * prendi lo straccio e asciuga ogni lato finché brilla.
- */
-export function carWashJob(game: Game, level: number, slot: Slot, title: string) {
-  const at = frame(slot);
-  const f0 = frontEdge(game, slot) + 0.3;
-  const cf = Math.max(2.05, f0 + 0.95);
-  const carPos = at(slot.center, cf, 0);
-  // i 4 lati, nell'ordine del giro: muso, lato strada, coda, lato casa
-  const sides = [at(slot.center, cf, 2.15), at(slot.center, cf + 1.0, 0), at(slot.center, cf, -2.15), at(slot.center, cf - 1.0, 0)];
-  const sideNames = ['il muso', 'il lato strada', 'la coda', 'il lato casa'];
-  const onSide = ['sul muso', 'sul lato strada', 'sulla coda', 'sul lato casa'];
-  const sprayer = at(slot.center, 3.35, 2.8);
-  const reel = at(slot.center, 3.35, -2.8);
-  const rags = at(slot.center, 3.35, 1.6);
-  const [dx, dz] = DIR_VEC[slot.dir];
-  const face = Math.atan2(dx, dz);
-  let run: PhasedRun;
-  const foams: THREE.Object3D[] = [];
-  const drops: THREE.Object3D[] = [];
-  const sp = 1 + 0.04 * level;
-  // schiuma che copre un lato dell'auto (tra il punto e il centro dell'auto)
-  const foamAt = (i: number) => {
-    const f = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 });
-    const mid = sides[i].clone().lerp(carPos, 0.62);
-    for (let k = 0; k < 12; k++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.14 + Math.random() * 0.1, 8, 6), mat);
-      m.position.set((Math.random() - 0.5) * (i % 2 ? 1.6 : 0.7), 0.45 + Math.random() * 0.7, (Math.random() - 0.5) * (i % 2 ? 0.4 : 1.2));
-      f.add(m);
-    }
-    return run.prop(f, mid, i % 2 ? face + Math.PI / 2 : face, 1);
-  };
-  // gocce d'acqua dopo il risciacquo (spariscono asciugando)
-  const dropsAt = (i: number) => {
-    const g = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ color: 0x8fd3ff, transparent: true, opacity: 0.8 });
-    for (let k = 0; k < 10; k++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), mat);
-      m.position.set((Math.random() - 0.5) * (i % 2 ? 1.6 : 0.7), 0.5 + Math.random() * 0.6, (Math.random() - 0.5) * (i % 2 ? 0.4 : 1.2));
-      g.add(m);
-    }
-    return run.prop(g, sides[i].clone().lerp(carPos, 0.62), i % 2 ? face + Math.PI / 2 : face, 1);
-  };
-  // l'auto (senza bagliore proprio): pulsa lei quando sei vicino a un lato
-  let carObj: THREE.Object3D | undefined;
-  const phases: Phase[] = [
-    { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
-    {
-      name: 'Spruzza il sapone su tutta l\'auto', icon: '🫧',
-      tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[i]}`, icon: '🫧', fx: 'bubble' as const, obj: carObj,
-        onDone: () => { foams[i] = foamAt(i); },
-      })),
-    },
-    { name: 'Prendi la canna dell\'acqua', icon: '🚿', tasks: () => [{ pos: reel, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.05, 0.6, 0x43a047)) }] },
-    {
-      // giro dell'auto in ordine: si sciacqua tutto attorno
-      name: 'Fai il giro e risciacqua', icon: '💦', ordered: true,
-      tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[i]}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff, obj: carObj,
-        onProgress: (p: number) => foams[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
-        onDone: () => {
-          if (foams[i]) foams[i].visible = false;
-          drops[i] = dropsAt(i);
-        },
-      })),
-    },
-    { name: 'Prendi lo straccio', icon: '🧽', tasks: () => [{ pos: rags, kind: 'tap', label: 'Prendi lo straccio', icon: '🧽', onDone: () => hold(game, boxProp(0.25, 0.06, 0.3, 0xffc21a)) }] },
-    {
-      name: 'Asciuga tutta l\'auto', icon: '✨',
-      tasks: () => sides.map((pos, i) => ({
-        pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[i]}`, icon: '✨', fx: 'spark' as const, obj: carObj,
-        onProgress: (p: number) => drops[i]?.scale.setScalar(Math.max(0.05, 1 - p)),
-        onDone: () => { if (drops[i]) drops[i].visible = false; },
-      })),
-    },
-  ];
-  run = new PhasedRun(game, level, title, phases, { zone: zoneFor(slot, slot.center, f0 - 0.2, Math.max(3.7, cf + 1.6), 3.2), time: 44, keep: slot.center });
-  const car = model('cars/sedan.glb', 1);
-  // l'auto è parcheggiata di traverso, parallela alla casa
-  const parked = run.prop(car, carPos, Math.atan2(dz, -dx), 1);
-  parked.userData.noGlow = true;
-  parked.userData.solid = true;
-  carObj = parked;
-  run.prop(soapSprayer(), sprayer, face, 1);
-  run.prop(hoseReel(), reel, face, 1);
-  run.prop(ragBucket(), rags, face, 1);
-  return run;
-}
 
 // ---------------- ordini delle imprese di servizi ----------------
 
