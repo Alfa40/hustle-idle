@@ -449,7 +449,9 @@ export class DishKitchen {
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'holding-both') this.player.play('idle');
     // obiettivo: anello, freccia e linea
     const target = st?.task.pos ?? null;
-    this.ringObj.visible = this.arrowObj.visible = !!target;
+    this.arrowObj.visible = !!target;
+    // cerchio a terra solo per le azioni veloci (prendi, appoggia), non per lavare (tieni premuto)
+    this.ringObj.visible = !!target && st?.task.kind === 'tap';
     if (target) {
       this.ringObj.position.copy(target).setY(0.08);
       this.arrowObj.position.set(target.x, 1.85 + Math.sin(performance.now() / 220) * 0.12, target.z - 0.9);

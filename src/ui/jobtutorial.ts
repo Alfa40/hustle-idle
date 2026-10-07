@@ -31,11 +31,11 @@ const TIPS: Record<JobType, string[] | null> = {
   ],
   lavaggio: [
     'Prendi lo <b>spruzzino del sapone</b> (la tanica rosa)',
-    '<b>Spruzza il sapone</b> su tutti e 4 i lati dell\'auto',
+    'Sull\'auto ci sono <b>macchie di sporco</b>: insaponale tutte (anche sul muso, sulla coda e sul tetto: girale attorno)',
     'Prendi la <b>canna dell\'acqua</b> dall\'avvolgitubo verde',
-    'Fai il <b>giro dell\'auto</b> e sciacquala tutta, un lato dopo l\'altro',
+    '<b>Sciacqua</b> via la schiuma da ogni punto',
     'Prendi lo <b>straccio</b> dal secchio blu',
-    '<b>Asciuga</b> tutti e 4 i lati finché l\'auto brilla',
+    '<b>Asciuga</b> le gocce finché l\'auto brilla',
   ],
   imbianchino: [
     'Prima proteggi il giardino: copri ogni cosa (cespugli, aiuole, giochi…) con un <b>telone</b>',
@@ -131,6 +131,11 @@ export class JobTutorial {
     } else if (g.task && !g.near) {
       body = tip;
       foot = '🚶 Avvicinati all\'oggetto che si illumina';
+      anchor = g.task.pos;
+    } else if (g.task?.aim) {
+      // punti da toccare direttamente sull'oggetto (macchie sull'auto)
+      body = tip;
+      foot = '👆 <b>Tocca col dito le macchie</b> sull\'auto e tienilo lì (puoi anche passarci sopra) finché spariscono';
       anchor = g.task.pos;
     } else if (g.task) {
       body = tip;

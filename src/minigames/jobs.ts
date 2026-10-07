@@ -7,6 +7,7 @@ import { WS } from '../config/map';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
 import type { Arena, FenceSide } from './arena';
+import { layout } from '../ui/layout';
 import { routeStops, type Street, type StreetHouse } from './street';
 import { TREE_MODELS } from '../world/city';
 import { bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
@@ -167,6 +168,11 @@ export interface Task {
   markerAt?: THREE.Vector3;
   /** oggetto da far pulsare quando sei vicino, se il punto non ha oggetti che si accendono (es. l'auto) */
   obj?: THREE.Object3D;
+  /**
+   * Si fa toccando direttamente questo punto sull'oggetto (es. una macchia sull'auto): tenendo il
+   * dito sopra (o passandoci sopra) avanza. `pos` è il punto vero, anche in alto.
+   */
+  aim?: THREE.Object3D;
 }
 
 export interface Phase {
@@ -312,8 +318,9 @@ export class PhasedRun extends BaseRun {
       this.standRing.userData.noGlow = true;
     }
     const r = this.standRing;
-    r.visible = !!t;
-    if (!t) return;
+    // il cerchio a terra serve solo per le azioni veloci ("tocca"): per quelle da tenere premute no
+    r.visible = !!t && t.kind === 'tap';
+    if (!t || t.kind !== 'tap') return;
     const sp = this.standPt;
     // il punto si decide una volta sola per ogni oggetto (dal lato da cui arrivi) e poi resta fermo
     const fixed = this.stands.get(t);
@@ -380,6 +387,7 @@ export class PhasedRun extends BaseRun {
     this.tasks = this.phases[this.idx].tasks();
     for (const t of this.tasks) {
       this.addGlow(t);
+      if (t.aim) continue; // i punti sull'oggetto si vedono già (macchie): niente indicatori sopra
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 });
       // l'indicatore sta sopra l'oggetto più alto lì vicino (mai sovrapposto a cassette, giochi…)
       const mp = t.markerAt ?? t.pos;
@@ -426,7 +434,8 @@ export class PhasedRun extends BaseRun {
       phaseIcon: ph.icon,
       left: this.tasks.filter((t) => !t.done).length,
       task: this.nearTask,
-      near: this.nearOk,
+      // i punti da toccare sull'oggetto si raggiungono anche da più lontano (basta vederli)
+      near: this.nearTask?.aim ? Math.hypot(this.nearTask.pos.x - p.x, this.nearTask.pos.z - p.z) < 4.5 : this.nearOk,
       inZone: !this.zone || inZone(this.zone, p, 1.2),
       arrived: !this.zone || this.wasInZone,
     };
@@ -469,6 +478,12 @@ export class PhasedRun extends BaseRun {
       this.wasInZone = true;
     }
     this.status = status + (this.heldIcon && this.game.player.held ? ` · in mano ${this.heldIcon}` : '');
+    const aimed = pend.filter((t) => t.aim);
+    if (aimed.length) {
+      this.updateAim(dt, aimed, near);
+      return;
+    }
+    this.game.input.onActionClaim = null;
     if (!near || nd > this.reach()) {
       this.game.prompt = null;
       if (this.game.player.currentName === 'interact-right' && !this.game.input.actionHeld) this.game.player.play('idle');
@@ -509,6 +524,43 @@ export class PhasedRun extends BaseRun {
   /** icona di ciò che si tiene in mano (in prima persona l'oggetto non si vede) */
   private heldIcon = '';
 
+  private ray = new THREE.Raycaster();
+
+  /** Il punto da toccare sotto il dito (entro 5 m), se c'è. */
+  private aimHit(x: number, y: number, list: Task[]) {
+    const cam = this.game.activeCamera;
+    const { w, h } = layout.info;
+    this.ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), cam);
+    this.ray.far = 5;
+    const hits = this.ray.intersectObjects(list.map((t) => t.aim!), false);
+    return hits.length ? list.find((t) => t.aim === hits[0].object) ?? null : null;
+  }
+
+  /**
+   * Punti da toccare sull'oggetto: il dito nella metà delle azioni, se è su un punto, lo lavora
+   * (tenendolo fermo o passandoci sopra); altrove gira lo sguardo come sempre.
+   */
+  private updateAim(dt: number, list: Task[], near: Task | null) {
+    const inp = this.game.input;
+    const p = this.game.player.root.position;
+    inp.onActionClaim = (x, y) => !!this.aimHit(x, y, list);
+    const close = near && Math.hypot(near.pos.x - p.x, near.pos.z - p.z) < 4.5;
+    const hit = inp.actionHeld && inp.actionPos ? this.aimHit(inp.actionPos.x, inp.actionPos.y, list) : null;
+    if (hit) {
+      hit.progress = (hit.progress ?? 0) + dt / (hit.sec ?? 0.6);
+      this.fxT -= dt;
+      if (hit.fx && this.fxT <= 0) {
+        this.fxT = 0.08;
+        this.game.fx.emit(hit.fx, hit.pos.clone(), 2, hit.fxColor);
+      }
+      hit.onProgress?.(Math.min(1, hit.progress));
+      this.game.player.play('interact-right', 0.1, 1.6);
+      if (hit.progress >= 1) this.complete(hit);
+    } else if (this.game.player.currentName === 'interact-right' && !inp.actionHeld) this.game.player.play('idle');
+    const t = hit ?? near;
+    this.game.prompt = close && t ? { label: t.label, icon: t.icon, progress: hit?.progress ?? 0, at: t.pos.clone(), obj: t.obj } : null;
+  }
+
   private complete(t: Task) {
     t.done = true;
     this.removeGlow(t);
@@ -522,6 +574,7 @@ export class PhasedRun extends BaseRun {
   }
 
   dispose() {
+    this.game.input.onActionClaim = null;
     for (const m of this.markers.values()) this.game.scene.remove(m);
     for (const t of [...this.glows.keys()]) this.removeGlow(t);
     if (this.zone) this.game.city.restoreView();
@@ -548,8 +601,9 @@ export function carWashLot(level: number) {
 
 /**
  * Lavaggio auto come minigioco (scena separata, prima persona): le auto sono parcheggiate nel cortile
- * davanti alla casa, ai lati del vialetto. Fasi: spruzzino → sapone su ogni lato di ogni auto →
- * canna dell'acqua e giro di risciacquo → straccio e asciugatura.
+ * davanti alla casa, ai lati del vialetto. Sull'auto ci sono macchie di sporco in punti sempre diversi
+ * (fianchi, muso, coda, tetto): si toccano direttamente col dito sull'auto. Fasi: spruzzino →
+ * insapona ogni macchia → canna dell'acqua → sciacqua → straccio → asciuga.
  */
 export function carWashArenaJob(game: Game, level: number, arena: Arena, title: string) {
   const n = carWashCars(level);
@@ -558,69 +612,105 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
   const xs = [-3.7, 3.7, -9.6].slice(0, n);
   const models = ['cars/sedan.glb', 'cars/hatchback-sports.glb', 'cars/suv-luxury.glb'];
   const cars = xs.map((x) => new THREE.Vector3(E.x + x, 0, zc));
-  // i 4 lati di ogni auto nell'ordine del giro: muso, lato strada, coda, lato casa
-  const sidesOf = (c: THREE.Vector3) => [c.clone().add(new THREE.Vector3(2.15, 0, 0)), c.clone().add(new THREE.Vector3(0, 0, 1.0)), c.clone().add(new THREE.Vector3(-2.15, 0, 0)), c.clone().add(new THREE.Vector3(0, 0, -1.0))];
-  const all = cars.flatMap((c, ci) => sidesOf(c).map((pos, i) => ({ pos, i, ci, car: c })));
-  const sideNames = ['il muso', 'il lato strada', 'la coda', 'il lato casa'];
-  const onSide = ['sul muso', 'sul lato strada', 'sulla coda', 'sul lato casa'];
-  const who = (ci: number) => (n > 1 ? ` (auto ${ci + 1})` : '');
-  // attrezzi ai lati della casa (fuori dal giro delle auto e dal vialetto)
   const sprayer = new THREE.Vector3(arena.house.minX - 1.3, 0, arena.house.maxZ - 0.6);
   const rags = new THREE.Vector3(arena.house.minX - 1.3, 0, arena.house.maxZ - 2.0);
   const reel = new THREE.Vector3(arena.house.maxX + 1.3, 0, arena.house.maxZ - 0.6);
+  const sp = 1 + 0.04 * level;
+  const perCar = Math.min(10, 5 + Math.floor(level / 2));
   let run: PhasedRun;
   const carObjs: THREE.Object3D[] = [];
-  const foams: THREE.Object3D[] = [];
-  const drops: THREE.Object3D[] = [];
-  const sp = 1 + 0.04 * level;
-  // schiuma o gocce su un lato dell'auto (tra il punto e il centro dell'auto)
-  const blob = (k: number, s: { pos: THREE.Vector3; i: number; car: THREE.Vector3 }, color: number, r0: number, r1: number) => {
+  // macchie: punto sulla carrozzeria, verso fuori, e cosa si vede (sporco → schiuma → gocce → niente)
+  type Spot = { pos: THREE.Vector3; normal: THREE.Vector3; car: number; aim: THREE.Mesh; dirt: THREE.Object3D; foam?: THREE.Object3D; drops?: THREE.Object3D };
+  const spots: Spot[] = [];
+  const decal = (color: number, r: number, k: number, spread: number) => {
     const g = new THREE.Group();
-    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.9 });
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.92 });
     for (let j = 0; j < k; j++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r0 + Math.random() * r1, 8, 6), mat);
-      m.position.set((Math.random() - 0.5) * (s.i % 2 ? 1.6 : 0.7), 0.45 + Math.random() * 0.7, (Math.random() - 0.5) * (s.i % 2 ? 0.4 : 1.2));
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r * (0.6 + Math.random() * 0.6), 8, 6), mat);
+      m.scale.z = 0.35;
+      m.position.set((Math.random() - 0.5) * spread, (Math.random() - 0.5) * spread, 0);
       g.add(m);
     }
-    return run.prop(g, s.pos.clone().lerp(s.car, 0.62), s.i % 2 ? 0 : Math.PI / 2, 1);
+    return g;
   };
+  const place = (o: THREE.Object3D, s: Spot) => {
+    const out = run.prop(o, s.pos.clone().addScaledVector(s.normal, 0.02), 0, 1);
+    out.lookAt(s.pos.clone().addScaledVector(s.normal, 1));
+    out.userData.noGlow = true;
+    return out;
+  };
+  const stage = (verb: string, icon: string, fx: ParticleKind, color: number | undefined, sec: number, done: (s: Spot) => void) =>
+    () => spots.map((s) => ({
+      pos: s.pos, kind: 'hold' as const, sec, label: `${verb}${n > 1 ? ` (auto ${s.car + 1})` : ''}`, icon, fx, fxColor: color, aim: s.aim, obj: carObjs[s.car],
+      onDone: () => done(s),
+    }));
   const phases: Phase[] = [
     { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
     {
-      name: n > 1 ? 'Spruzza il sapone su tutte le auto' : "Spruzza il sapone su tutta l'auto", icon: '🫧',
-      tasks: () => all.map((s, k) => ({
-        pos: s.pos, kind: 'hold' as const, sec: 1.1 / sp, label: `Spruzza ${onSide[s.i]}${who(s.ci)}`, icon: '🫧', fx: 'bubble' as const, obj: carObjs[s.ci],
-        onDone: () => { foams[k] = blob(12, s, 0xffffff, 0.14, 0.1); },
-      })),
+      name: n > 1 ? 'Insapona le macchie sulle auto' : "Insapona le macchie sull'auto", icon: '🫧',
+      tasks: stage('Insapona la macchia', '🫧', 'bubble', undefined, 0.55 / sp, (s) => {
+        s.dirt.visible = false;
+        s.foam = place(decal(0xffffff, 0.12, 7, 0.32), s);
+      }),
     },
     { name: "Prendi la canna dell'acqua", icon: '🚿', tasks: () => [{ pos: reel, kind: 'tap', label: 'Prendi la canna', icon: '🚿', onDone: () => hold(game, cylProp(0.05, 0.6, 0x43a047)) }] },
     {
-      name: 'Fai il giro e risciacqua', icon: '💦', ordered: true,
-      tasks: () => all.map((s, k) => ({
-        pos: s.pos, kind: 'hold' as const, sec: 1 / sp, label: `Risciacqua ${sideNames[s.i]}${who(s.ci)}`, icon: '💦', fx: 'bubble' as const, fxColor: 0x6ec6ff, obj: carObjs[s.ci],
-        onProgress: (p: number) => foams[k]?.scale.setScalar(Math.max(0.05, 1 - p)),
-        onDone: () => {
-          if (foams[k]) foams[k].visible = false;
-          drops[k] = blob(10, s, 0x8fd3ff, 0.045, 0);
-        },
-      })),
+      name: 'Sciacqua via la schiuma', icon: '💦',
+      tasks: stage('Sciacqua', '💦', 'bubble', 0x6ec6ff, 0.5 / sp, (s) => {
+        if (s.foam) s.foam.visible = false;
+        s.drops = place(decal(0x8fd3ff, 0.05, 6, 0.3), s);
+      }),
     },
     { name: 'Prendi lo straccio', icon: '🧽', tasks: () => [{ pos: rags, kind: 'tap', label: 'Prendi lo straccio', icon: '🧽', onDone: () => hold(game, boxProp(0.25, 0.06, 0.3, 0xffc21a)) }] },
     {
-      name: n > 1 ? 'Asciuga tutte le auto' : "Asciuga tutta l'auto", icon: '✨',
-      tasks: () => all.map((s, k) => ({
-        pos: s.pos, kind: 'hold' as const, sec: 0.9 / sp, label: `Asciuga ${sideNames[s.i]}${who(s.ci)}`, icon: '✨', fx: 'spark' as const, obj: carObjs[s.ci],
-        onProgress: (p: number) => drops[k]?.scale.setScalar(Math.max(0.05, 1 - p)),
-        onDone: () => { if (drops[k]) drops[k].visible = false; },
-      })),
+      name: n > 1 ? 'Asciuga le auto' : "Asciuga l'auto", icon: '✨',
+      tasks: stage('Asciuga', '✨', 'spark', undefined, 0.45 / sp, (s) => {
+        if (s.drops) s.drops.visible = false;
+      }),
     },
   ];
-  run = new PhasedRun(game, level, title, phases, { time: 24 + n * 42 });
+  run = new PhasedRun(game, level, title, phases, { time: 24 + n * (18 + perCar * 4) });
   cars.forEach((c, ci) => {
     const car = run.prop(model(models[ci % models.length], 1), c, Math.PI / 2, 1);
     car.userData.noGlow = true;
     car.userData.solid = true;
     carObjs.push(car);
+    car.updateMatrixWorld(true);
+    const b = new THREE.Box3().setFromObject(car);
+    const sz = b.getSize(new THREE.Vector3());
+    // macchie sparse sulla carrozzeria: fianchi, muso, coda e tetto
+    for (let k = 0, tries = 0; k < perCar && tries < 200; k++, tries++) {
+      const r = Math.random();
+      const pos = new THREE.Vector3();
+      const nrm = new THREE.Vector3();
+      const yy = b.min.y + sz.y * (0.3 + Math.random() * 0.35);
+      if (r < 0.36 || r >= 0.9) {
+        // fianchi (più spesso quello verso la strada e quello verso la casa)
+        const sd = r < 0.18 || r >= 0.95 ? 1 : -1;
+        pos.set(b.min.x + sz.x * (0.15 + Math.random() * 0.7), yy, sd > 0 ? b.max.z : b.min.z);
+        nrm.set(0, 0, sd);
+      } else if (r < 0.5) {
+        pos.set(b.max.x, yy, b.min.z + sz.z * (0.25 + Math.random() * 0.5));
+        nrm.set(1, 0, 0);
+      } else if (r < 0.64) {
+        pos.set(b.min.x, yy, b.min.z + sz.z * (0.25 + Math.random() * 0.5));
+        nrm.set(-1, 0, 0);
+      } else {
+        // sopra: cofano e tetto
+        pos.set(b.min.x + sz.x * (0.2 + Math.random() * 0.6), b.max.y - 0.05, b.min.z + sz.z * (0.3 + Math.random() * 0.4));
+        nrm.set(0, 1, 0);
+      }
+      if (spots.some((s) => s.pos.distanceTo(pos) < 0.5)) {
+        k--;
+        continue;
+      }
+      // zona da toccare (invisibile, un po' più grande della macchia)
+      const aim = new THREE.Mesh(new THREE.SphereGeometry(0.36, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+      run.prop(aim, pos, 0, 1).userData.noGlow = true;
+      const s: Spot = { pos, normal: nrm, car: ci, aim, dirt: new THREE.Group() };
+      s.dirt = place(decal(0x6d4c2f, 0.11, 6, 0.3), s);
+      spots.push(s);
+    }
   });
   run.prop(soapSprayer(), sprayer, Math.PI / 2, 1);
   run.prop(hoseReel(), reel, -Math.PI / 2, 1);

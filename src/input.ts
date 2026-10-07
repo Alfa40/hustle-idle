@@ -27,6 +27,14 @@ export class Input {
   enabled = true;
   /** il dito ha appena toccato l'area delle azioni (per il lampo del cerchio) */
   onActionDown: (() => void) | null = null;
+  /**
+   * Prima persona: il dito tocca qualcosa da "strofinare" (es. l'auto da lavare)? Se sì il tocco
+   * non gira lo sguardo: tenendo il dito e trascinando si lavora su quello che c'è sotto.
+   */
+  onActionClaim: ((x: number, y: number) => boolean) | null = null;
+  /** dove sta il dito nella metà delle azioni (pixel), null se non c'è */
+  actionPos: { x: number; y: number } | null = null;
+  private actClaimed = false;
   onActionUp: (() => void) | null = null;
   private actionId: number | null = null;
 
@@ -70,11 +78,24 @@ export class Input {
 
   private down(e: PointerEvent) {
     if (!this.enabled) return;
+    // il dito tocca direttamente l'oggetto da lavorare (es. una macchia sull'auto), in qualsiasi
+    // punto dello schermo: si lavora subito, e trascinare non gira lo sguardo né muove
+    if (this.lookMode && this.actionId === null && this.onActionClaim?.(e.clientX, e.clientY)) {
+      this.actionId = e.pointerId;
+      this.actionPos = { x: e.clientX, y: e.clientY };
+      this.actClaimed = true;
+      this.actLook = false;
+      this.actionHeld = true;
+      this.onActionDown?.();
+      return;
+    }
     // metà dello schermo delle azioni (di solito la destra): toccare o tenere premuto fa l'azione
     const left = e.clientX < window.innerWidth / 2;
     if (left === settings.swapControls) {
       if (this.actionId !== null) return;
       this.actionId = e.pointerId;
+      this.actionPos = { x: e.clientX, y: e.clientY };
+      this.actClaimed = false;
       if (this.lookMode) {
         // prima persona: trascinando si gira lo sguardo; un tocco breve o il dito fermo fanno l'azione
         this.actStart = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -106,6 +127,8 @@ export class Input {
   private actHoldTimer = 0;
 
   private moveEv(e: PointerEvent) {
+    if (e.pointerId === this.actionId) this.actionPos = { x: e.clientX, y: e.clientY };
+    if (e.pointerId === this.actionId && this.actClaimed) return;
     if (e.pointerId === this.actionId && this.lookMode) {
       if (!this.actLook && Math.hypot(e.clientX - this.actStart.x, e.clientY - this.actStart.y) > 12 && !this.actionHeld) {
         this.actLook = true;
@@ -144,9 +167,10 @@ export class Input {
   private up(e: PointerEvent) {
     if (e.pointerId === this.actionId) {
       this.actionId = null;
+      this.actionPos = null;
       clearTimeout(this.actHoldTimer);
       // prima persona: un tocco breve senza trascinare è un'azione "tocca"
-      if (this.lookMode && !this.actLook && !this.actionHeld && performance.now() - this.actStart.t < 400) {
+      if (this.lookMode && !this.actClaimed && !this.actLook && !this.actionHeld && performance.now() - this.actStart.t < 400) {
         this.actionPressed = true;
         this.onActionDown?.();
       }
