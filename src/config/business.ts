@@ -109,11 +109,11 @@ export const BUSINESS_TYPES = {
     stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
   },
   artigianato: {
-    name: 'Laboratorio artigiano', icon: '🎨', desc: 'Pochi clienti ma pezzi di valore.',
-    kind: 'shop', lot: 'shop', setupCost: 3500, products: ['vasi', 'sedie', 'gioielli'],
-    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Artigiano', cassa: 'Commesso' }, skills: ['artigianato', 'clientela'],
-    rateMul: 0.3, wall: 0x6d9dc5, color: '#3d7ab8',
-    stations: { stock: '🪵 Materiali', work: '🔨 Banco da lavoro', counter: '🛍️ Vetrina' },
+    name: 'Negozio di ceramiche', icon: '🏺', desc: 'Vasi, ciotole e tazze fatti a mano: pochi clienti ma pezzi di valore. In più gli ordini speciali da modellare tu al tornio.',
+    kind: 'shop', lot: 'shop', setupCost: 3500, products: ['vasi', 'ciotole', 'tazze'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Ceramista', cassa: 'Commesso' }, skills: ['artigianato', 'clientela'],
+    rateMul: 0.3, wall: 0xd99a6c, color: '#c0603a',
+    stations: { stock: '🟤 Argilla', work: '🏺 Tornio', counter: '🛍️ Vetrina' },
   },
   pulizie: {
     name: 'Impresa di pulizie', icon: '🧽', desc: 'Servizi a domicilio: esegui gli ordini nelle case.',

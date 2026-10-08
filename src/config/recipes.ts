@@ -108,7 +108,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
   },
   artigianato: {
     width: [7.5, 10, 12.5],
-    wall: 0x6d9dc5,
+    wall: 0xd99a6c,
     floor: 0xe9e4da,
     stations: [
       { id: 'argilla', kind: 'source', name: 'Argilla', icon: '🟤', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: -2.6, z: BACK_Z, level: 0 },
@@ -118,18 +118,16 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
       { id: 'cestino', kind: 'bin', name: 'Cestino', icon: '🗑️', verb: 'Butta', model: 'furniture/kitchenSink.glb', x: 2.6, z: BACK_Z, level: 0 },
       { id: 'vetrina', kind: 'counter', name: 'Vetrina', icon: '🛍️', verb: 'Vendi', model: '', x: 0, z: COUNTER_Z, level: 0 },
       { id: 'passe', kind: 'pass', name: 'Ripiano pronti', icon: '🧺', verb: 'Prendi', model: '', x: 2.2, z: COUNTER_Z, level: 0 },
-      // ampliamento 1: falegnameria
-      { id: 'legno', kind: 'source', name: 'Legno', icon: '🪵', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: 4.2, z: BACK_Z, level: 1 },
-      { id: 'sega', kind: 'hold', name: 'Sega', icon: '🪚', verb: 'Taglia', model: 'furniture/desk.glb', x: 3.4, z: ISLAND_Z, level: 1, sec: 1.6 },
+      // ampliamento 1: smaltatura (ciotole)
+      { id: 'smalto', kind: 'hold', name: 'Smaltatura', icon: '🫙', verb: 'Smalta', model: 'furniture/desk.glb', x: 3.4, z: ISLAND_Z, level: 1, sec: 1.6 },
       ...common(1),
-      // ampliamento 2: oreficeria
-      { id: 'metalli', kind: 'source', name: 'Metalli', icon: '🪙', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: 5.6, z: BACK_Z, level: 2 },
-      { id: 'orafo', kind: 'hold', name: 'Banco orafo', icon: '💍', verb: 'Lavora', model: 'furniture/desk.glb', x: 5, z: ISLAND_Z, level: 2, sec: 2 },
+      // ampliamento 2: banco dei decori (tazze)
+      { id: 'decoro', kind: 'hold', name: 'Banco decori', icon: '🖌️', verb: 'Decora', model: 'furniture/desk.glb', x: 5, z: ISLAND_Z, level: 2, sec: 1.8 },
     ],
     recipes: {
       vasi: { steps: ['argilla', 'tornio', 'fornace', 'pittura'], level: 0 },
-      sedie: { steps: ['legno', 'sega', 'pittura'], level: 1 },
-      gioielli: { steps: ['metalli', 'orafo', 'fornace'], level: 2 },
+      ciotole: { steps: ['argilla', 'tornio', 'smalto', 'fornace'], level: 1 },
+      tazze: { steps: ['argilla', 'tornio', 'decoro', 'fornace'], level: 2 },
     },
     extra: { fuochi: 'fornace', banco: 'pittura' },
   },

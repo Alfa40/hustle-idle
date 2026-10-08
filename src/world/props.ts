@@ -1,5 +1,6 @@
 import { gltf, model } from '../assets';
 import * as THREE from 'three';
+import { ceramicProduct } from './ceramics';
 
 function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas');
@@ -197,6 +198,8 @@ const sizeCache = new Map<string, number>();
  * I prodotti senza modello (es. gioielli) sono costruiti con forme semplici.
  */
 export function productObject(modelPath: string | undefined, size: number): THREE.Object3D {
+  // ceramiche fatte a mano (negozio di ceramiche)
+  if (modelPath?.startsWith('proc:')) return ceramicProduct(modelPath.slice(5), size);
   if (!modelPath) {
     const g = new THREE.Group();
     const gold = new THREE.MeshLambertMaterial({ color: 0xffc21a, emissive: 0x553300 });

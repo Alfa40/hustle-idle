@@ -89,7 +89,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 - Panificio/pasticceria
 - Impresa di pulizie
 - Ditta traslochi
-- Laboratorio di artigianato
+- Negozio di ceramiche (ex laboratorio di artigianato)
 
 Altre attività verranno aggiunte in futuro.
 
@@ -140,7 +140,7 @@ clienti/ora = base_prodotto
 |---|---|
 | Cucina | food truck, panificio, lavapiatti o aiuto cuoco |
 | Manualità/Edilizia | giardinaggio, traslochi, lavoretti di riparazione |
-| Artigianato | laboratorio, lavoretti artigianali |
+| Artigianato | negozio di ceramiche (anche gli ordini speciali), lavoretti artigianali |
 | Clientela | cassa, servizio, vendita |
 | Logistica | consegne, traslochi |
 | Gestione/Business | gestione delle attività, contratti, vendite di attività |
@@ -433,6 +433,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Missioni settimanali più difficili e meno ricche per unità: 30–40 lavoretti, 3 stelle in 15–20, 3 lavoretti di ogni tipo, 120–180 clienti, guadagna ~€3.000 (premio 20%)
 - Personale delle attività diviso per mansione: un titoletto per reparto (cuochi, cassieri, poi magazzinieri e camerieri, infine il manager) con quanti sono; se manca qualcuno in un reparto che serve compare "Nessuno: serve almeno un dipendente qui". Anche i candidati del giorno sono divisi per mansione. Le mansioni che all'attività non servono non si vedono proprio (né reparto, né candidati, né spiegazione): magazziniere solo dal 1° ampliamento, cameriere solo dal 2° (quando c'è la sala); le attività senza locale mostrano solo i loro reparti e il manager
 - **Fuori dalle attività** (mentre ci si lavora dentro): come nei lavoretti, attorno al locale c'è il quartiere vero attorno al suo lotto (stesse vie, case, palazzi, parchi, alberi e lampioni della città), girato in modo che la strada sia davanti al bancone, da dove arrivano i clienti; cielo e nebbia seguono l'ora del giorno come in città (`buildSurroundings` in src/world/surroundings.ts, usato anche dai minigiochi). Food truck: si lavora dentro il furgone parcheggiato nel parco (prato, selciato davanti per la fila, ruote e cabina di guida visibili). Negozi: la stanza è dentro il palazzo (muri e tetto con condizionatori dietro e ai lati, tende colorate ai lati della vetrina), marciapiede davanti. Lo spazio davanti è più profondo solo col secondo ampliamento (la sala con i tavoli)
+- **Negozio di ceramiche** (prima "Laboratorio artigiano", stesso tipo `artigianato`): funziona come prima (bancone, postazioni, clienti, dipendenti). Prodotti: 🏺 Vasi decorati (argilla → tornio → fornace → pittura), 🥣 Ciotole smaltate dal 1° ampliamento (… → smaltatura → fornace), ☕ Tazze dipinte dal 2° (… → banco decori → fornace). Ceramiche disegnate nel gioco (`world/ceramics.ts`, modelli `proc:`). Le partite vecchie si convertono da sole: sedie → ciotole, gioielli → tazze (con le scorte)
+- **Ordini speciali** (scheda ✨ Ordini speciali nella gestione del negozio di ceramiche, `sim/specials.ts`): ogni giorno 3 vasi su commissione ben pagati (forma, smalto, ricompensa, difficoltà, tempo); le forme difficili (vaso slanciato, bottiglia) compaiono salendo di livello in artigianato. Li fa **solo il giocatore**, mai i dipendenti. "Realizza" apre il laboratorio del negozio in prima persona (`world/pottery.ts`), con gli stessi comandi dei lavoretti: prendi l'argilla → mettila sul tornio → **modella**: l'argilla gira e tenendo il dito su un punto del vaso lì si stringe (più piano vicino alla forma giusta, le fasce già a posto accanto quasi non si toccano); in alto a destra, al posto della minimappa, c'è la **foto del vaso richiesto** con la sagoma attuale tratteggiata sopra e la percentuale di somiglianza; "✅ Fatto" dal 70% (da solo al 96%), "♻️" per reimpastare → prendi il vaso → **essiccatoio** (5 s) → banco pittura → **dipingi** tenendo il dito sul vaso (si colora dove passi) → **incarta** (tieni premuto al banco dell'incarto) → lascia il pacco sul **ripiano delle consegne**. Stelle: somiglianza alla foto (3 stelle dal 92%) e tempo. Ricompensa nell'incasso del negozio, esperienza e fama di artigianato
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

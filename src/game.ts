@@ -30,10 +30,13 @@ import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
 import { hasInterior } from './config/recipes';
-import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeStreetJob, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeStreetJob, IndoorRun, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
 import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
+import { PotteryStudio } from './world/pottery';
+import { VASES } from './world/ceramics';
+import { completeSpecial } from './sim/specials';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
@@ -44,7 +47,7 @@ import { layout } from './ui/layout';
 import { completeOrder, lotPrice, typesForLot } from './sim/economy';
 import { ZONES } from './config/map';
 import { SKILLS } from './config/skills';
-import type { Business, ServiceOrder } from './sim/state';
+import type { Business, ServiceOrder, SpecialOrder } from './sim/state';
 import type { UI } from './ui/ui';
 
 export interface Interactable {
@@ -147,7 +150,7 @@ export class Game {
   interior: TruckInterior | null = null;
   /** casa del cliente in cui si sta facendo un servizio (pulizie, trasloco) */
   /** scena al chiuso di un lavoro: casa del cliente o cucina del ristorante */
-  house: ClientHouse | DishKitchen | null = null;
+  house: ClientHouse | DishKitchen | PotteryStudio | null = null;
   private houseDoor = new THREE.Vector3();
   playerMarker?: THREE.Sprite;
 
@@ -158,6 +161,8 @@ export class Game {
   runOffer: JobOffer | null = null;
   /** ordine di un'attività di servizio che il giocatore sta eseguendo */
   runOrder: { bizId: string; order: ServiceOrder } | null = null;
+  /** ordine speciale del negozio di ceramiche in corso */
+  runSpecial: { bizId: string; order: SpecialOrder } | null = null;
   private rideObj: THREE.Object3D | null = null;
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
@@ -242,7 +247,7 @@ export class Game {
     const chars = [PLAYER_MODEL, ...CHAR_MODELS].map(charPath);
     const assets = [
       ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...KITCHEN_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
-      'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model ? [p.model] : [])),
+      'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model && !p.model.startsWith('proc:') ? [p.model] : [])),
       'furniture/cardboardBoxClosed.glb',
     ];
     await preload([...new Set(assets)], onProgress);
@@ -1035,6 +1040,55 @@ export class Game {
     run.target = undefined;
   }
 
+  /**
+   * Ordine speciale del negozio di ceramiche: si entra nel laboratorio del negozio e il vaso si fa
+   * a mano, in prima persona (world/pottery.ts). Solo il giocatore: i dipendenti non lo toccano.
+   */
+  startSpecial(biz: Business, order: SpecialOrder) {
+    if (this.run) {
+      toast('Finisci prima il lavoro in corso', 'bad');
+      return;
+    }
+    if (order.done) return;
+    this.ui.close();
+    while (this.ui.isOpen) this.ui.close();
+    if (this.interior) this.exitTruck();
+    this.dismount();
+    this.houseDoor.copy(this.player.root.position);
+    this.scene.remove(this.player.root);
+    this.view.reset();
+    const run = new IndoorRun(this, `${VASES[order.shape].icon} ${VASES[order.shape].name}`);
+    this.run = run;
+    this.runSpecial = { bizId: biz.id, order };
+    const k = new PotteryStudio(this, order, {
+      status: (left, total, text) => {
+        run.timeLeft = left;
+        run.timeTotal = total;
+        run.status = text;
+      },
+      done: (stars) => this.finishJob(stars),
+      frozen: () => false,
+    });
+    this.house = k;
+    k.enter(this.player);
+    run.indoorGuide = () => k.guide();
+    this.ui.jobBar(true);
+  }
+
+  private finishSpecial(stars: number) {
+    const s = this.state;
+    const { bizId, order } = this.runSpecial!;
+    this.runSpecial = null;
+    this.player.hold();
+    this.player.play('idle');
+    const biz = s.businesses.find((b) => b.id === bizId);
+    if (!biz) return;
+    const o = biz.specials?.find((x) => x.id === order.id) ?? order;
+    const { pay, xp } = completeSpecial(s, biz, o, stars);
+    this.ui.openSpecialResult(biz, o, stars, pay, xp);
+    this.save();
+  }
+
   /** Lavapiatti: la cucina del ristorante chiuso. */
   private enterKitchen(level: number, door: THREE.Vector3, run: VisitRun) {
     this.dismount();
@@ -1086,6 +1140,10 @@ export class Game {
     this.ui.jobBar(false);
     if (this.runOrder) {
       this.finishOrder(stars);
+      return;
+    }
+    if (this.runSpecial) {
+      this.finishSpecial(stars);
       return;
     }
     const offer = this.runOffer!;

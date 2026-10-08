@@ -982,6 +982,27 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
 }
 
 
+// ---------------- lavori dentro una scena a parte (ordini speciali) ----------------
+
+/**
+ * Lavoro che si fa tutto in una scena separata (es. ordine speciale del negozio di ceramiche):
+ * tempo e stato li aggiorna la scena; qui c'è solo ciò che serve alla barra del lavoro.
+ */
+export class IndoorRun extends BaseRun {
+  indoorGuide: (() => RunGuide | null) | null = null;
+
+  constructor(game: Game, title: string) {
+    super(game, 1);
+    this.title = title;
+  }
+
+  update() {}
+
+  guide(): RunGuide | null {
+    return this.indoorGuide?.() ?? null;
+  }
+}
+
 // ---------------- ordini delle imprese di servizi ----------------
 
 /**

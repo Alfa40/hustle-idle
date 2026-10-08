@@ -3,6 +3,7 @@ import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
 import type { JobType } from '../config/jobs';
 import { PRODUCT_IDS, type ProductId } from '../config/products';
+import type { VaseShape } from '../world/ceramics';
 import type { VehicleId } from '../config/vehicles';
 import { EVENT_BY_ID, type WeatherId } from '../config/events';
 import { productLevel } from '../config/recipes';
@@ -48,6 +49,19 @@ export interface Business {
   boughtFor: number;
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
+  /** negozio di ceramiche: ordini speciali del giorno (vasi da modellare a mano) */
+  specials?: SpecialOrder[];
+  specialsDay?: number;
+}
+
+/** Ordine speciale del negozio di ceramiche: un vaso su commissione, fatto solo dal giocatore. */
+export interface SpecialOrder {
+  id: number;
+  shape: VaseShape;
+  glaze: number;
+  /** ricompensa con 2 stelle (con 3 stelle di più, con 1 di meno) */
+  reward: number;
+  done?: boolean;
 }
 
 export interface ServiceOrder {
@@ -272,7 +286,25 @@ function parse(raw: string | null): GameState | null {
     st.houses ??= [];
     for (const h of st.houses) h.price ??= 12000;
     if (!st.houses.some((h) => h.i === st.homeIdx)) st.homeIdx = -1;
+    // il laboratorio artigiano è diventato il negozio di ceramiche: sedie → ciotole, gioielli → tazze
+    const RENAMED: Record<string, ProductId> = { sedie: 'ciotole', gioielli: 'tazze' };
+    const ren = (p: string) => (RENAMED[p] ?? p) as ProductId;
+    for (const [o, n] of Object.entries(RENAMED)) {
+      const dr = st.demandRand as Record<string, number>;
+      if (o in dr) {
+        dr[n] = dr[o];
+        delete dr[o];
+      }
+    }
     for (const b of st.businesses) {
+      b.products = [...new Set(b.products.map(ren))];
+      const stock = b.stock as Record<string, number>;
+      for (const [o, n] of Object.entries(RENAMED)) {
+        if (o in stock) {
+          stock[n] = (stock[n] ?? 0) + stock[o];
+          delete stock[o];
+        }
+      }
       b.orders ??= [];
       // prodotti che ora richiedono un ampliamento: tolti dalla vendita
       const lvl = b.upgrades.ampliamento ?? 0;

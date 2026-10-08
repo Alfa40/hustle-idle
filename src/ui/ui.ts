@@ -19,6 +19,8 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
+import { specialOrders, specialTime } from '../sim/specials';
+import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
   autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fameMultiplier, fire, hasManager,
@@ -30,7 +32,7 @@ import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, M
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, playStats, wipeSave, yearOf,
-  type Business, type Employee, type JobOffer, type Mission, type ServiceOrder,
+  type Business, type Employee, type JobOffer, type Mission, type ServiceOrder, type SpecialOrder,
 } from '../sim/state';
 
 
@@ -971,7 +973,10 @@ export class UI {
     let cur = tab ?? (service ? 'ordini' : 'panoramica');
     const tabs = [
       ...(service ? [['ordini', '📋 Ordini']] : []),
-      ['panoramica', '📊 Panoramica'], ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
+      ['panoramica', '📊 Panoramica'],
+      // negozio di ceramiche: vasi su commissione da fare a mano
+      ...(b().type === 'artigianato' ? [['speciali', '✨ Ordini speciali']] : []),
+      ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
       ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ['personale', '👥 Personale'], ['migliorie', '⬆️ Migliorie'],
     ];
     this.open({
@@ -1018,6 +1023,10 @@ export class UI {
         },
         previewUpg: (id) => this.previewUpgrade(b(), id as UpgradeId),
         previewHire: (id) => this.previewHire(b(), +id),
+        special: (id) => {
+          const o = specialOrders(s, b()).find((x) => x.id === +id);
+          if (o) this.game.startSpecial(b(), o);
+        },
         exec: (id) => {
           const o = b().orders.find((x) => x.id === +id);
           if (!o) return;
@@ -1035,6 +1044,20 @@ export class UI {
     const service = type.kind === 'service';
     const lot = lotDef(b.lotId);
     const unit = service ? 'ordini' : 'clienti';
+    if (tab === 'speciali') {
+      const list = specialOrders(s, b);
+      const cards = list.map((o) => {
+        const v = VASES[o.shape];
+        const glaze = GLAZES.find((g) => g.color === o.glaze)?.name ?? '';
+        const dots = [1, 2, 3, 4].map((i) => `<i class="${i <= v.diff ? 'on' : ''}"></i>`).join('');
+        return `<div class="card special ${o.done ? 'done' : ''}"><div class="sp-pic">${vaseSvg(v.profile, o.glaze, { w: 64, h: 74 })}</div>
+          <div class="sp-info"><b>${v.name}</b><div class="muted small">Smalto ${glaze} · ⏱ ${specialTime(o)} s</div>
+            <div class="small sp-diff">Difficoltà <span class="dots">${dots}</span></div>
+            <div class="sp-pay"><b class="money-t">${euro(o.reward)}</b> <span class="muted small">(⭐⭐⭐ ${euro(Math.round(o.reward * 1.35))})</span></div></div>
+          ${o.done ? '<span class="tag g">✅ Consegnato</span>' : `<button class="btn sm good" data-a="special:${o.id}">🏺 Realizza</button>`}</div>`;
+      }).join('');
+      return `<div class="card tint small">✨ <b>Ordini speciali</b>: vasi su commissione, ben pagati. Li fai solo tu, a mano: prendi l'argilla, modellala al tornio tenendo il dito dove stringere finché somiglia alla foto, falla essiccare, dipingila, incartala e lasciala sul ripiano delle consegne. I dipendenti non li fanno. Nuovi ordini ogni giorno.</div>${cards}`;
+    }
     if (tab === 'ordini') {
       if (isAutonomous(b)) {
         return `<div class="card center"><div class="hero"><div class="emoji">✅</div></div><p>I tuoi dipendenti eseguono gli ordini da soli.</p>
@@ -1249,6 +1272,23 @@ export class UI {
       render: () => `<div class="stars">${st}</div><p class="center muted" style="margin-top:0">${pr.icon} ${pr.name} · ${bizType(biz.type).name}</p>
         ${stars ? `<div class="grid2"><div class="stat s-green"><b class="money-t">+${euro(earned)}</b><span>💰 incasso</span></div>
           <div class="stat s-purple"><b>+${xp} XP</b><span>esperienza</span></div></div>` : '<p class="center">Il cliente non è soddisfatto: ordine perso.</p>'}
+        <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
+      actions: { ok: () => this.close() },
+    });
+  }
+
+  openSpecialResult(biz: Business, o: SpecialOrder, stars: number, pay: number, xp: number) {
+    const v = VASES[o.shape];
+    const st = [1, 2, 3].map((i) => `<span class="${i <= stars ? '' : 'off'}">⭐</span>`).join('');
+    this.open({
+      title: stars ? '🎉 Vaso consegnato!' : '😓 Ordine fallito',
+      small: true,
+      color: stars ? 'var(--green)' : 'var(--red)',
+      render: () => `<div class="stars">${st}</div><div class="center">${vaseSvg(v.profile, o.glaze, { w: 70, h: 80 })}</div>
+        <p class="center muted" style="margin-top:4px">${v.name} · ${bizType(biz.type).name}</p>
+        ${stars ? `<div class="grid2"><div class="stat s-green"><b class="money-t">+${euro(pay)}</b><span>💰 ricompensa</span></div>
+          <div class="stat s-purple"><b>+${xp} XP</b><span>🎨 artigianato</span></div></div>
+          <p class="center muted small">${stars === 3 ? 'Forma perfetta e consegna veloce!' : 'Per 3 stelle: forma più vicina alla foto e meno tempo.'}</p>` : '<p class="center">Il cliente non ha avuto il suo vaso: ordine perso.</p>'}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
     });

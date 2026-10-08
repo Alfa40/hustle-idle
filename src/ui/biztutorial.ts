@@ -7,7 +7,7 @@ import { actSide, moveSide } from '../settings';
 
 /**
  * Tutorial contestuale della cucina: la prima volta che entri in un tipo di attività
- * (food truck, panificio, laboratorio) un fumetto ti guida nel primo ordine, postazione
+ * (food truck, panificio, negozio di ceramiche) un fumetto ti guida nel primo ordine, postazione
  * per postazione, poi spiega ripiano, calore e dipendenti. Il tempo è fermo ed è solo
  * una prova; visto una volta, non si ripropone per le altre attività dello stesso tipo.
  */

@@ -3,8 +3,8 @@ export type ProductId =
   | 'panini' | 'hotdog' | 'tacos' | 'gelati'
   // panificio
   | 'pane' | 'cornetti' | 'pizza' | 'torte'
-  // laboratorio artigiano
-  | 'vasi' | 'sedie' | 'gioielli'
+  // negozio di ceramiche
+  | 'vasi' | 'ciotole' | 'tazze'
   // impresa di pulizie (servizi)
   | 'pulizia_casa' | 'pulizia_uffici' | 'vetri'
   // ditta traslochi (servizi)
@@ -59,17 +59,17 @@ export const PRODUCTS: Record<ProductId, Product> = {
     name: 'Torte', icon: '🎂', model: 'food/cake.glb', cost: 5, price: 22, baseDemand: 0.45,
     season: [0.9, 1, 1, 1.1, 1.2, 1.1, 0.9, 0.8, 1, 1, 1.1, 1.5],
   },
-  // ---- laboratorio artigiano ----
+  // ---- negozio di ceramiche (modelli fatti a mano: 'proc:…', vedi world/ceramics.ts) ----
   vasi: {
-    name: 'Vasi decorati', icon: '🏺', model: 'furniture/pottedPlant.glb', cost: 6, price: 32, baseDemand: 0.25,
+    name: 'Vasi decorati', icon: '🏺', model: 'proc:vaso', cost: 6, price: 32, baseDemand: 0.25,
     season: [0.8, 0.8, 1.1, 1.3, 1.3, 1, 0.9, 0.8, 1, 1, 1, 1.2],
   },
-  sedie: {
-    name: 'Sedie su misura', icon: '🪑', model: 'furniture/chair.glb', cost: 25, price: 120, baseDemand: 0.1, season: FLAT,
+  ciotole: {
+    name: 'Ciotole smaltate', icon: '🥣', model: 'proc:ciotola', cost: 8, price: 42, baseDemand: 0.18, season: FLAT,
   },
-  gioielli: {
-    name: 'Gioielli', icon: '💍', cost: 15, price: 85, baseDemand: 0.12,
-    season: [0.9, 1.3, 1, 1, 1.1, 1, 0.9, 0.9, 1, 1, 1.1, 1.8],
+  tazze: {
+    name: 'Tazze dipinte', icon: '☕', model: 'proc:tazza', cost: 10, price: 58, baseDemand: 0.15,
+    season: [1.2, 1.1, 1, 0.9, 0.9, 0.8, 0.8, 0.8, 1, 1.1, 1.2, 1.6],
   },
   // ---- impresa di pulizie ----
   pulizia_casa: {

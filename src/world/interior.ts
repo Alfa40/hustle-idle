@@ -159,18 +159,18 @@ const PHASE: Record<StationDef['kind'], { name: string; color: number; css: stri
 const SINGULAR: Partial<Record<ProductId, [string, boolean]>> = {
   panini: ['Panino', false], hotdog: ['Hot dog', false], tacos: ['Taco', false], gelati: ['Gelato', false],
   pane: ['Pane', false], cornetti: ['Cornetto', false], pizza: ['Pizza', true], torte: ['Torta', true],
-  vasi: ['Vaso', false], sedie: ['Sedia', true], gioielli: ['Gioiello', false],
+  vasi: ['Vaso', false], ciotole: ['Ciotola', true], tazze: ['Tazza', true],
 };
 /** Cosa è diventato il prodotto dopo una postazione (maschile) e cosa si fa alla prossima. */
 const DONE: Record<string, string> = {
   piastra: 'cucinato', forno: 'sfornato', fornace: 'cotto', banco: 'assemblato', tagliere: 'tagliato', imballo: 'imballato',
   impastatrice: 'impastato', tavolo: 'formato', farcitura: 'farcito', decorazione: 'decorato',
-  tornio: 'modellato', pittura: 'dipinto', sega: 'tagliato', orafo: 'lavorato',
+  tornio: 'modellato', pittura: 'dipinto', smalto: 'smaltato', decoro: 'decorato',
 };
 const TODO: Record<string, string> = {
   piastra: 'cucinare', forno: 'infornare', fornace: 'cuocere in fornace', banco: 'assemblare', tagliere: 'tagliare', imballo: 'imballare',
   impastatrice: 'impastare', tavolo: 'formare', farcitura: 'farcire', decorazione: 'decorare',
-  tornio: 'modellare', pittura: 'dipingere', sega: 'tagliare', orafo: 'lavorare',
+  tornio: 'modellare', pittura: 'dipingere', smalto: 'smaltare', decoro: 'decorare',
 };
 /** Esperienza nel campo → quanti prodotti si portano insieme (1 all'inizio, fino a 4). */
 export const HAND_LEVELS = [1, 3, 6, 10];
