@@ -21,7 +21,7 @@ const TIPS: Record<JobType, string[] | null> = {
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
-    'Porta un pacco a ogni <b>cassetta gialla</b> lungo la via: l\'ordine lo scegli tu',
+    'Porta un pacco fino alla <b>porta di casa</b> di ogni indirizzo (lo <b>zerbino giallo</b> in fondo al vialetto): l\'ordine lo scegli tu',
     'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [

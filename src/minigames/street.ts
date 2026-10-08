@@ -27,6 +27,8 @@ export interface StreetHouse {
   stand: THREE.Vector3;
   /** rotazione della cassetta (verso la strada) */
   rot: number;
+  /** davanti alla porta di casa (dove si lasciano i pacchi) */
+  door: THREE.Vector3;
 }
 
 export class Street {
@@ -86,8 +88,13 @@ export class Street {
           const bz = S.z + side * (ROAD + WALK + 0.35);
           this.houses.push({
             side, x, box: new THREE.Vector3(bx, 0, bz), stand: new THREE.Vector3(bx, 0, S.z + side * (ROAD + WALK - 0.55)),
-            rot: side < 0 ? 0 : Math.PI,
+            rot: side < 0 ? 0 : Math.PI, door: new THREE.Vector3(x, 0, S.z + side * (FRONT - 0.7)),
           });
+          // vialetto dal marciapiede alla porta
+          const path = new THREE.Mesh(new THREE.PlaneGeometry(1.4, FRONT - ROAD - WALK), new THREE.MeshLambertMaterial({ color: 0xd7c9a8 }));
+          path.rotation.x = -Math.PI / 2;
+          path.position.set(x, 0.012, S.z + side * (ROAD + WALK + (FRONT - ROAD - WALK) / 2));
+          g.add(path);
         }
         // alberi tra una casa e l'altra
         if (k % 2 === 0) inst.add(TREE_MODELS[(hi + k) & 1], placeMatrix(x + GAP / 2 - 0.5, S.z + side * (FRONT + 1), Math.random() * 6, 3.4));

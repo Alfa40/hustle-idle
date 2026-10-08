@@ -919,7 +919,10 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
-      tasks: () => stops.map((h) => ({ pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: flyer ? 'Imbuca il giornale' : 'Consegna il pacco', icon: flyer ? '📬' : '📦' })),
+      // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
+      tasks: () => stops.map((h) => (flyer
+        ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬' }
+        : { pos: h.door, kind: 'tap' as const, label: 'Lascia il pacco alla porta', icon: '📦', onDone: () => { run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), h.door.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true; } })),
     },
     {
       name: flyer ? "Torna all'edicola per la ricevuta" : 'Torna al negozio per la ricevuta', icon: '🧾',
@@ -927,11 +930,18 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
   ];
   // tempo: andata e ritorno lungo la via fino all'ultima casa, più un attimo per ogni cassetta
+  // (per i pacchi anche il vialetto fino alla porta e ritorno)
   const far = Math.max(...stops.map((h) => h.x)) - counter.x;
-  const run = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * 3 + 12 });
+  const run: PhasedRun = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * (flyer ? 3 : 6) + 12 });
   run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1).userData.noGlow = true;
-  // cassette della posta: blu per i giornali, gialle per i pacchi (solo agli indirizzi da servire)
-  for (const h of stops) run.prop(postbox(flyer ? 0x2d6cdb : 0xffc21a), h.box, h.rot, 1);
+  // giornali: cassette blu agli indirizzi da servire; pacchi: zerbino davanti alla porta
+  for (const h of stops) {
+    if (flyer) run.prop(postbox(0x2d6cdb), h.box, h.rot, 1);
+    else {
+      const mat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.04, 0.7), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
+      run.prop(mat, h.door.clone().setY(0.02), 0, 1);
+    }
+  }
   return run;
 }
 
