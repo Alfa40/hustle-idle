@@ -49,9 +49,10 @@ anche per ogni schermata nuova.
      fumetto del tutorial), larghi al massimo fino alla colonna e alla minimappa
      (`100vw - … - max(var(--hud-w), var(--mm))`).
      In orizzontale diventano un **pannello laterale a sinistra** (`min(360px, 40vw)`).
-   - prima persona (lavoretti): `.fp-pad` in basso, quadrato joystick a sinistra e quadrato sguardo a
-     destra (`Input.fpZones`, lato = min(40% largh., 30% alt., 230 px), sopra la safe area; in orizzontale
+   - prima persona (lavoretti): rettangoli invisibili in basso, joystick a sinistra e sguardo a destra
+     (`Input.fpZones`: metà larghezza per parte, alti 36% dello schermo, 55% in orizzontale; in orizzontale
      lo sguardo sta a sinistra della colonna dei pulsanti); il resto dello schermo è per le azioni.
+     Sali/Scendi sta sopra il rettangolo dello sguardo.
    - niente pulsante azione: metà destra dello schermo = azioni (toccare o tenere premuto, gestito da
      `Input`), metà sinistra = joystick; invertite con `body.swap-controls` (`.act-zone` è la metà delle
      azioni, invisibile, per la manina dei tutorial). Sali/Scendi nell'angolo in basso.

@@ -32,14 +32,16 @@ export class Input {
     const h = window.innerHeight;
     const css = getComputedStyle(document.documentElement);
     const v = (n: string) => parseFloat(css.getPropertyValue(n)) || 0;
-    const side = Math.round(Math.min(w * 0.4, h * 0.3, 230));
-    const bottom = h - v('--sab') - 14 - side;
+    // rettangoli grandi in basso (invisibili): metà larghezza per parte, alti un terzo dello schermo
     const landscape = w > h;
     // in orizzontale lo sguardo sta a sinistra della colonna dei pulsanti
-    const rightEdge = w - v('--sar') - 14 - (landscape ? v('--hud-w') + 8 : 0);
-    const leftEdge = v('--sal') + 14;
-    const a = { x: leftEdge, y: bottom, w: side, h: side };
-    const b = { x: rightEdge - side, y: bottom, w: side, h: side };
+    const rightEdge = w - v('--sar') - (landscape ? v('--hud-w') + 12 : 0);
+    const leftEdge = v('--sal');
+    const rw = Math.round(Math.min((rightEdge - leftEdge) / 2 - 6, landscape ? w * 0.34 : w * 0.5));
+    const rh = Math.round(Math.min(h * (landscape ? 0.55 : 0.36), 340));
+    const bottom = h - v('--sab') - rh;
+    const a = { x: leftEdge, y: bottom, w: rw, h: rh };
+    const b = { x: rightEdge - rw, y: bottom, w: rw, h: rh };
     return settings.swapControls ? { move: b, look: a } : { move: a, look: b };
   }
 
@@ -122,9 +124,12 @@ export class Input {
     });
     // nessun dito sullo schermo: tutto si ferma (anche se il browser ha perso un pointerup)
     // (un attimo dopo: il pointerup normale, se arriva, ha la precedenza e fa il suo lavoro, es. il tocco)
+    // se nel frattempo arriva un tocco nuovo (es. azione subito dopo essersi mossi) non si tocca niente
     window.addEventListener('touchend', (e) => {
       if (e.touches.length !== 0) return;
+      const at = performance.now();
       setTimeout(() => {
+        if (this.lastDown > at) return;
         this.releaseStick();
         this.releaseAction();
         this.lookId = null;
@@ -144,8 +149,12 @@ export class Input {
     });
   }
 
+  /** ultimo pointerdown (ms) */
+  private lastDown = 0;
+
   private down(e: PointerEvent) {
     if (!this.enabled) return;
+    this.lastDown = performance.now();
     if (this.fp) {
       this.downFirstPerson(e);
       return;
@@ -178,7 +187,8 @@ export class Input {
   private downFirstPerson(e: PointerEvent) {
     const z = this.fpZones();
     // il dito tocca l'oggetto da lavorare (es. una macchia sull'auto): si lavora lì
-    if (!this.inside(z.move, e.clientX, e.clientY) && !this.inside(z.look, e.clientX, e.clientY) && this.onActionClaim?.(e.clientX, e.clientY)) {
+    // (anche se la macchia è nella parte bassa dello schermo: toccare il punto preciso vince)
+    if (this.onActionClaim?.(e.clientX, e.clientY)) {
       if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };

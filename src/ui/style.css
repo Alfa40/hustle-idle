@@ -217,6 +217,8 @@ body.job-on .hud-top { display: none; }
 }
 .act-label.on { display: block; }
 body.act-pressed .act-label { background: #fff6cf; }
+/* prima persona: la scritta si riempie di verde mentre si tiene premuto (al posto del cerchio) */
+.act-label.filling { background: linear-gradient(90deg, #b9f0cc var(--p, 0%), #fff var(--p, 0%)); }
 body.is-landscape .act-label { max-width: min(360px, 40vw); }
 
 /* ---------- joystick ---------- */
@@ -916,7 +918,8 @@ body.in-arena .hud-right .minimap, body.in-arena .edge-ptr { display: none !impo
   position: fixed; z-index: 3; display: none; pointer-events: none; box-sizing: border-box;
   border: 2px dashed rgba(255,255,255,.55); border-radius: 22px; background: rgba(30,30,50,.12);
 }
-body.fp-controls .fp-pad { display: flex; align-items: flex-end; justify-content: center; }
+/* i rettangoli non si vedono: servono solo a smistare il tocco */
+body.fp-controls .fp-pad { display: none; }
 .fp-pad span {
   margin-bottom: 8px; font-size: 18px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); opacity: .8;
   display: flex; align-items: center; gap: 4px;
@@ -924,3 +927,7 @@ body.fp-controls .fp-pad { display: flex; align-items: flex-end; justify-content
 .fp-pad span b { font-size: 12px; font-weight: 800; }
 /* in prima persona la zona delle azioni (per la manina del tutorial) è il centro dello schermo */
 body.fp-controls .act-zone { left: 18%; right: 18%; top: 32%; bottom: 34%; }
+
+/* prima persona: Sali/Scendi sopra il rettangolo dello sguardo (non lo copre) */
+body.fp-controls .ride-btn { bottom: calc(var(--sab) + 38vh); }
+body.fp-controls.is-landscape .ride-btn { bottom: calc(var(--sab) + 57vh); }

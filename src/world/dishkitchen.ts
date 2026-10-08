@@ -8,7 +8,7 @@ import type { Character } from './character';
 import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { arrow, label, plateStack, ring } from './props';
-import { updateCutWalls, type CutWall } from './viewcam';
+import { firstPersonFov, updateCutWalls, type CutWall } from './viewcam';
 import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la cucina: la stanza si inquadra nello spazio libero. */
@@ -268,7 +268,6 @@ export class DishKitchen {
     this.game.input.lookMode = true;
     this.game.input.cancel();
     this.yaw = Math.atan2(this.trolley.x - player.root.position.x, -(this.trolley.z - player.root.position.z));
-    this.camera.fov = 72;
     this.camera.near = 0.15;
     this.resize();
     requestAnimationFrame(() => {
@@ -294,6 +293,7 @@ export class DishKitchen {
       const free = layout.freeRect(KITCHEN_UI());
       const { w, h } = layout.info;
       this.camera.aspect = w / h;
+      this.camera.fov = firstPersonFov(w / h);
       this.camera.setViewOffset(w, h, -(free.x + free.w / 2 - w / 2), -(free.y + free.h / 2 - h / 2), w, h);
       this.camera.updateProjectionMatrix();
       return;
@@ -454,7 +454,8 @@ export class DishKitchen {
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'holding-both') this.player.play('idle');
     // obiettivo: anello, freccia e linea
     const target = st?.task.pos ?? null;
-    this.arrowObj.visible = !!target;
+    // in prima persona niente freccia sopra il punto: l'oggetto da usare pulsa già
+    this.arrowObj.visible = !!target && !this.firstPerson;
     // cerchio a terra solo per le azioni veloci (prendi, appoggia), non per lavare (tieni premuto)
     this.ringObj.visible = !!target && st?.task.kind === 'tap';
     if (target) {

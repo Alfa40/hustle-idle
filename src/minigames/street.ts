@@ -48,7 +48,8 @@ export class Street {
     const S = STREET_ORIGIN;
     const g = this.group;
     // case per lato: abbastanza per le consegne, con un po' di scelta
-    const perSide = Math.max(2, Math.ceil(stops / 2) + 1);
+    // case per lato: gli indirizzi sono distanti tra loro (circa due case), quindi ne servono di più
+    const perSide = Math.max(3, Math.ceil(stops * 1.6) + 1);
     const len = perSide * GAP;
     this.bounds = { minX: S.x - 15, maxX: S.x + len - 2, minZ: S.z - FRONT + 0.4, maxZ: S.z + FRONT - 0.4 };
 

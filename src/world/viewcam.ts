@@ -62,6 +62,16 @@ export class ViewControl {
   }
 }
 
+/**
+ * Campo visivo in prima persona: largo almeno ~60° anche col telefono in verticale (prima era
+ * stretto, tutto sembrava enorme), senza deformare troppo. Restituisce il campo verticale in gradi.
+ */
+export function firstPersonFov(aspect: number) {
+  const wantH = THREE.MathUtils.degToRad(80);
+  const v = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(wantH / 2) / Math.max(0.3, aspect)));
+  return THREE.MathUtils.clamp(v, 62, 100);
+}
+
 /** Parete che sparisce quando la camera la guarda da fuori (così si vede dentro la stanza). */
 export interface CutWall {
   obj: THREE.Object3D;

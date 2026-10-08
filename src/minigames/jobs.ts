@@ -175,6 +175,8 @@ export interface Task {
    * dito sopra (o passandoci sopra) avanza. `pos` è il punto vero, anche in alto.
    */
   aim?: THREE.Object3D;
+  /** si fa solo a piedi (es. imbucare il giornale, lasciare il pacco): sul veicolo bisogna scendere */
+  onFoot?: boolean;
 }
 
 export interface Phase {
@@ -487,6 +489,11 @@ export class PhasedRun extends BaseRun {
       return;
     }
     this.game.input.onActionClaim = null;
+    // consegne: col veicolo ci si avvicina, ma per consegnare bisogna scendere
+    if (near && near.onFoot && this.game.riding && nd <= this.reach()) {
+      this.game.prompt = { label: 'Scendi dal veicolo per consegnare', icon: '🛵' };
+      return;
+    }
     if (!near || nd > this.reach()) {
       this.game.prompt = null;
       if (this.game.player.currentName === 'interact-right' && !this.game.input.actionHeld) this.game.player.play('idle');
@@ -518,7 +525,7 @@ export class PhasedRun extends BaseRun {
   onAction() {
     const p = this.game.player.root.position;
     const t = this.pending().find((x) => x.kind === 'tap' && Math.hypot(x.pos.x - p.x, x.pos.z - p.z) < this.reach());
-    if (!t) return;
+    if (!t || (t.onFoot && this.game.riding)) return;
     if (!this.game.riding) this.game.player.once('interact-right');
     this.complete(t);
   }
@@ -891,9 +898,16 @@ export function gardenArenaJob(game: Game, level: number, arena: Arena, title: s
 export function routeStreetJob(game: Game, level: number, street: Street, title: string, mode: 'package' | 'flyer') {
   const flyer = mode === 'flyer';
   const n = routeStops(level, mode);
+  // indirizzi distanti tra loro (mai una cassetta dopo l'altra): almeno ~2 case di distanza
   const pool = [...street.houses];
   const stops: StreetHouse[] = [];
-  while (stops.length < n && pool.length) stops.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  for (let minGap = 14; stops.length < n && minGap > 4; minGap -= 3) {
+    for (const h of [...pool].sort(() => Math.random() - 0.5)) {
+      if (stops.length >= n) break;
+      if (stops.includes(h) || stops.some((o) => Math.abs(o.x - h.x) < minGap)) continue;
+      stops.push(h);
+    }
+  }
   const box = () => {
     const b = model('furniture/cardboardBoxClosed.glb', 2.2);
     b.position.x = -0.23;
@@ -921,8 +935,8 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
-        ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬' }
-        : { pos: h.door, kind: 'tap' as const, label: 'Lascia il pacco alla porta', icon: '📦', onDone: () => { run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), h.door.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true; } })),
+        ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬', onFoot: true }
+        : { pos: h.door, kind: 'tap' as const, label: 'Lascia il pacco alla porta', icon: '📦', onFoot: true, onDone: () => { run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), h.door.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true; } })),
     },
     {
       name: flyer ? "Torna all'edicola per la ricevuta" : 'Torna al negozio per la ricevuta', icon: '🧾',

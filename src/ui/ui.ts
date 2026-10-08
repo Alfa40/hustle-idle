@@ -356,7 +356,8 @@ export class UI {
     this.camEl.style.display = this.game.viewFirstPerson ? 'none' : '';
     this.camEl.classList.toggle('changed', this.game.view.changed);
     const r = s.riding;
-    const rideTxt = !s.vehicles.length || this.game.interior || this.game.house ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.lastRide && s.vehicles.includes(s.lastRide) ? s.lastRide : s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
+    // nei minigiochi il veicolo c'è solo nella via delle consegne
+    const rideTxt = !s.vehicles.length || this.game.interior || this.game.house || (this.game.arena && !('houses' in this.game.arena)) ? '' : r ? `<span class="i">🚶</span><span class="l">Scendi</span>` : `<span class="i">${VEHICLES[s.lastRide && s.vehicles.includes(s.lastRide) ? s.lastRide : s.vehicles[s.vehicles.length - 1]].icon}</span><span class="l">Sali</span>`;
     if (this.rideEl.dataset.k !== rideTxt) {
       this.rideEl.dataset.k = rideTxt;
       this.rideEl.innerHTML = rideTxt;
@@ -409,11 +410,15 @@ export class UI {
     const flash = (performance.now() - this.flashT) / 260;
     const hold = !!p && p.progress !== undefined;
     // il lampo resta anche se l'azione è appena finita (l'oggetto preso non ha più un'azione)
-    const showRing = hold || flash < 1.3;
+    // in prima persona niente cerchio in mezzo alla vista: l'avanzamento riempie la scritta in alto
+    const fp = this.game.viewFirstPerson;
+    const showRing = !fp && (hold || flash < 1.3);
     this.ringEl.classList.toggle('on', showRing);
     // pieno solo mentre si tiene premuto o durante il lampo di un tocco
     const fill = hold ? p!.progress! : flash < 1.3 ? Math.min(1, flash) : 0;
     this.ringEl.style.setProperty('--p', `${Math.round(Math.min(1, fill) * 100)}%`);
+    this.labelEl.style.setProperty('--p', `${Math.round(Math.min(1, fill) * 100)}%`);
+    this.labelEl.classList.toggle('filling', fp && fill > 0);
 
     this.ringEl.classList.toggle('full', !hold && flash >= 1);
     if (p) this.placeAction(p, showRing);

@@ -24,7 +24,7 @@ import { Traffic, TRAFFIC_ASSETS } from './world/traffic';
 import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
-import { ViewControl } from './world/viewcam';
+import { firstPersonFov, ViewControl } from './world/viewcam';
 import { RouteLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
@@ -963,7 +963,8 @@ export class Game {
    */
   private enterArena<A extends Arena | Street>(a: A): A {
     this.arenaBack = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y };
-    this.dismount();
+    // nella via delle consegne si può andare in veicolo (ma per consegnare si scende)
+    if (!(a instanceof Street)) this.dismount();
     this.arena = a;
     this.scene.add(a.group);
     this.player.root.position.copy(a.entry);
@@ -1380,7 +1381,9 @@ export class Game {
         this.updateWaypoint();
         this.updateJobs(dt);
         const goal = this.run?.target ?? (this.waypoint ? new THREE.Vector3(this.waypoint.x, 0, this.waypoint.z) : null);
-        this.guide.update(dt, goal ? this.city.route(this.player.root.position, goal) : null, this.run ? 1 : 3, this.firstPerson ? 1.6 : 0.45);
+        // nella via delle consegne la linea va dritta alla prossima cassetta/porta; in città segue le strade
+        const route = !goal ? null : this.arena instanceof Street ? [this.player.root.position.clone(), goal.clone()] : this.arena ? null : this.city.route(this.player.root.position, goal);
+        this.guide.update(dt, route, this.run ? 1 : 3, this.firstPerson ? 1.6 : 0.45);
         this.updateInteract();
         const fp = this.wantFirstPerson();
         if (fp !== this.firstPerson) this.setFirstPerson(fp);
@@ -1467,8 +1470,8 @@ export class Game {
     if (this.rideObj) this.rideObj.visible = !on;
     if (this.playerMarker) this.playerMarker.visible = !on;
     // in prima persona non si disegna ciò che è attaccato agli occhi
-    this.camera.near = on ? 0.3 : 0.5;
-    this.camera.fov = on ? 72 : 35;
+    this.camera.near = on ? 0.2 : 0.5;
+    this.camera.fov = on ? firstPersonFov(this.camera.aspect) : 35;
     this.camera.updateProjectionMatrix();
     if (!on) {
       for (const sp of this.fpSprites) {
@@ -1529,6 +1532,12 @@ export class Game {
     this.fpBob += moving ? dt * 9 : 0;
     const bob = moving ? Math.sin(this.fpBob) * 0.035 : 0;
     const cam = this.camera;
+    // campo visivo largo (anche ruotando il telefono)
+    const fov = firstPersonFov(cam.aspect);
+    if (Math.abs(cam.fov - fov) > 0.5) {
+      cam.fov = fov;
+      cam.updateProjectionMatrix();
+    }
     // occhi sopra la testa e un po' indietro: più spazio tra la vista e gli oggetti vicini
     // se dietro la testa c'è un muro la camera si avvicina (mai dentro gli edifici)
     let back = 0.35;
@@ -1542,6 +1551,7 @@ export class Game {
     this.player.root.rotation.y = Math.PI - this.fpYaw;
     this.player.body.visible = false;
     if (this.player.held) this.player.held.visible = false;
+    if (this.rideObj) this.rideObj.visible = false;
     // etichette: più piccole e nascoste se troppo vicine agli occhi
     if (++this.fpScan % 45 === 1) {
       this.fpSprites = [];
