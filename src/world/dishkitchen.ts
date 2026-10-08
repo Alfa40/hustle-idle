@@ -325,7 +325,9 @@ export class DishKitchen {
   private placeEyes(dt: number) {
     const input = this.game.input;
     const l = input.consumeLook();
-    if (l.x || l.y) this.lookIdle = 0;
+    // la testa si gira da sola verso l'obiettivo solo dopo 3 s fermo, senza toccare niente
+    const busy = l.x || l.y || Math.hypot(input.vector.x, input.vector.y) > 0.05 || input.actionHeld;
+    if (busy) this.lookIdle = 0;
     else this.lookIdle += dt;
     this.yaw += l.x * 0.005;
     this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * 0.004, -1.0, 0.35);
@@ -333,7 +335,7 @@ export class DishKitchen {
     // si guarda l'oggetto da usare (pila di piatti, lavello, scolapiatti), non il punto a terra
     const st = this.step;
     const t = !st ? null : this.idx % 3 === 0 ? this.stacks[st.stack].position : this.idx % 3 === 1 ? this.sink : this.rack;
-    if (t && this.lookIdle > 1.2) {
+    if (t && this.lookIdle > 3) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       let dy = Math.atan2(t.x - p.x, -(t.z - p.z)) - this.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));

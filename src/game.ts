@@ -1495,14 +1495,16 @@ export class Game {
 
   private updateFirstPerson(dt: number) {
     const l = this.input.consumeLook();
-    if (l.x || l.y) this.fpIdle = 0;
+    // la testa si gira da sola verso l'obiettivo solo dopo 3 s fermo, senza toccare niente
+    const busy = l.x || l.y || Math.hypot(this.input.vector.x, this.input.vector.y) > 0.05 || this.input.actionHeld;
+    if (busy) this.fpIdle = 0;
     else this.fpIdle += dt;
     this.fpYaw += l.x * 0.005;
     this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * 0.004, -1.0, 0.35);
     const p = this.player.root.position;
     // se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto da fare
     const t = this.run?.target;
-    if (t && this.fpIdle > 1.2) {
+    if (t && this.fpIdle > 3) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       const wantYaw = Math.atan2(t.x - p.x, -(t.z - p.z));
       let dy = wantYaw - this.fpYaw;

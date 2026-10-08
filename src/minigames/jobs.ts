@@ -620,7 +620,7 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
   let run: PhasedRun;
   const carObjs: THREE.Object3D[] = [];
   // macchie: punto sulla carrozzeria, verso fuori, e cosa si vede (sporco → schiuma → gocce → niente)
-  type Spot = { pos: THREE.Vector3; normal: THREE.Vector3; car: number; aim: THREE.Mesh; dirt: THREE.Object3D; foam?: THREE.Object3D; drops?: THREE.Object3D };
+  type Spot = { pos: THREE.Vector3; normal: THREE.Vector3; car: number; aim: THREE.Mesh; dirt: THREE.Object3D; foam?: THREE.Object3D; drops?: THREE.Object3D; arc?: THREE.Mesh };
   const spots: Spot[] = [];
   const decal = (color: number, r: number, k: number, spread: number) => {
     const g = new THREE.Group();
@@ -634,15 +634,32 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
     return g;
   };
   const place = (o: THREE.Object3D, s: Spot) => {
+    // niente bagliore su macchie, schiuma e anello (prima di aggiungerli alla scena)
+    o.userData.noGlow = true;
     const out = run.prop(o, s.pos.clone().addScaledVector(s.normal, 0.02), 0, 1);
     out.lookAt(s.pos.clone().addScaledVector(s.normal, 1));
-    out.userData.noGlow = true;
     return out;
+  };
+  // macchia lavorata a metà: un anello giallo attorno mostra quanto manca (la macchia resta finché non è finita)
+  const arcMat = new THREE.MeshBasicMaterial({ color: 0xffd21a, side: THREE.DoubleSide, depthTest: false, transparent: true });
+  const showArc = (s: Spot, p: number) => {
+    if (s.arc) s.arc.geometry.dispose();
+    else {
+      s.arc = new THREE.Mesh(new THREE.RingGeometry(0.24, 0.31, 28), arcMat);
+      s.arc.renderOrder = 6;
+      place(s.arc, s);
+    }
+    s.arc.geometry = new THREE.RingGeometry(0.24, 0.31, 28, 1, Math.PI / 2, -Math.PI * 2 * Math.min(1, p));
+    s.arc.visible = p > 0 && p < 1;
   };
   const stage = (verb: string, icon: string, fx: ParticleKind, color: number | undefined, sec: number, done: (s: Spot) => void) =>
     () => spots.map((s) => ({
       pos: s.pos, kind: 'hold' as const, sec, label: `${verb}${n > 1 ? ` (auto ${s.car + 1})` : ''}`, icon, fx, fxColor: color, aim: s.aim, obj: carObjs[s.car],
-      onDone: () => done(s),
+      onProgress: (p: number) => showArc(s, p),
+      onDone: () => {
+        if (s.arc) s.arc.visible = false;
+        done(s);
+      },
     }));
   const phases: Phase[] = [
     { name: 'Prendi lo spruzzino del sapone', icon: '🧴', tasks: () => [{ pos: sprayer, kind: 'tap', label: 'Prendi lo spruzzino', icon: '🧴', onDone: () => hold(game, cylProp(0.12, 0.35, 0xff6fae)) }] },
@@ -706,7 +723,8 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
       }
       // zona da toccare (invisibile, un po' più grande della macchia)
       const aim = new THREE.Mesh(new THREE.SphereGeometry(0.36, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
-      run.prop(aim, pos, 0, 1).userData.noGlow = true;
+      aim.userData.noGlow = true;
+      run.prop(aim, pos, 0, 1);
       const s: Spot = { pos, normal: nrm, car: ci, aim, dirt: new THREE.Group() };
       s.dirt = place(decal(0x6d4c2f, 0.11, 6, 0.3), s);
       spots.push(s);
