@@ -500,7 +500,9 @@ export class PotteryStudio {
     const sy = Math.sin(this.yaw);
     const v = { x: cy * iv.x - sy * iv.y, y: sy * iv.x + cy * iv.y };
     const p = this.player.root.position;
-    if (Math.hypot(v.x, v.y) > 0.05) {
+    // al tornio la visuale è bloccata sul vaso: niente camminare
+    const locked = st?.kind === 'shape' && !!this.vase;
+    if (!locked && Math.hypot(v.x, v.y) > 0.05) {
       p.x += v.x * 3.6 * dt;
       p.z += v.y * 3.6 * dt;
       this.collide(p);
@@ -509,7 +511,8 @@ export class PotteryStudio {
     this.spin += dt * 7;
     this.disc.rotation.y = this.spin;
     if (this.vase && this.idx <= 3) this.vase.rotation.y = this.spin;
-    this.placeEyes(dt);
+    if (locked) this.placeShapeCam(dt);
+    else this.placeEyes(dt);
     this.fx.update(dt);
     // essiccatoio: 5 s
     if (st?.kind === 'dry') {
@@ -606,11 +609,61 @@ export class PotteryStudio {
     ui.setAction({ label: st.label, icon: st.icon, at, obj, stand: st.stand });
   }
 
+  private lockT = 0;
+  private camFrom: { pos: THREE.Vector3; quat: THREE.Quaternion } | null = null;
+
+  /**
+   * Al tornio: la visuale si blocca e il vaso riempie la zona libera dello schermo (grande e al
+   * centro, visto un po' dall'alto per vedere la bocca), così si vede bene dove stringere.
+   * Si arriva con un passaggio morbido dalla vista di prima; sguardo e joystick non la spostano.
+   */
+  private placeShapeCam(dt: number) {
+    const input = this.game.input;
+    input.consumeLook();
+    const cam = this.camera;
+    if (this.lockT === 0) this.camFrom = { pos: cam.position.clone(), quat: cam.quaternion.clone() };
+    this.lockT = Math.min(1, this.lockT + dt / 0.45);
+    const free = layout.freeRect(STUDIO_UI());
+    const { w, h } = layout.info;
+    const vf = THREE.MathUtils.degToRad(cam.fov);
+    const hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
+    // il vaso (con un po' di margine) occupa ~78% dell'altezza libera e ~80% della larghezza libera
+    const dH = (VASE_H + 0.12) / (0.78 * (free.h / h) * 2 * Math.tan(vf / 2));
+    const dW = (LUMP_R * 2 + 0.08) / (0.8 * (free.w / w) * 2 * Math.tan(hf / 2));
+    const d = Math.max(dH, dW, 0.45);
+    const c = this.vase!.position.clone().setY(this.vase!.position.y + VASE_H / 2);
+    // dalla parte dove sta il giocatore (davanti al tornio), un po' più in alto
+    const dir = new THREE.Vector3(this.player.root.position.x - c.x, 0, this.player.root.position.z - c.z);
+    if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
+    dir.normalize();
+    const tilt = 0.32;
+    const want = c.clone().addScaledVector(dir, d * Math.cos(tilt)).setY(c.y + d * Math.sin(tilt));
+    const look = new THREE.Matrix4().lookAt(want, c, new THREE.Vector3(0, 1, 0));
+    const wantQ = new THREE.Quaternion().setFromRotationMatrix(look);
+    const k = THREE.MathUtils.smoothstep(this.lockT, 0, 1);
+    if (this.camFrom && k < 1) {
+      cam.position.lerpVectors(this.camFrom.pos, want, k);
+      cam.quaternion.slerpQuaternions(this.camFrom.quat, wantQ, k);
+    } else {
+      cam.position.copy(want);
+      cam.quaternion.copy(wantQ);
+    }
+    // a lavoro finito si riparte guardando il vaso
+    this.yaw = Math.atan2(c.x - this.player.root.position.x, -(c.z - this.player.root.position.z));
+    this.pitch = -0.55;
+    this.player.body.visible = false;
+    this.scene.traverse((o) => {
+      const sp = o as THREE.Sprite;
+      if (sp.isSprite) sp.material.opacity = 0;
+    });
+  }
+
   /**
    * Occhi del personaggio, come negli altri lavoretti in prima persona: la visuale col dito, e
    * dopo 3 s fermo la testa si gira da sola verso ciò che serve (se non si vede già).
    */
   private placeEyes(dt: number) {
+    this.lockT = 0;
     const input = this.game.input;
     const l = input.consumeLook();
     const busy = l.x || l.y || Math.hypot(input.vector.x, input.vector.y) > 0.05 || input.actionHeld || input.actionPos;
