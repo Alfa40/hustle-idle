@@ -2348,6 +2348,7 @@ export class UI {
         <ul class="steps">
           <li><div class="icon-bubble">🕹️</div><span>Per <b>muoverti</b> trascina il dito nella metà <b>${moveSide()}</b> dello schermo. Per <b>parlare, entrare o lavorare</b> mettiti sul cerchio a terra e tocca la metà <b>${actSide()}</b> (o tieni il dito lì se c'è scritto "Tieni premuto"). In ⚙️ Opzioni puoi invertire i lati.</span></li>
           <li><div class="icon-bubble">❗</div><span>Cerca le persone con il <b>!</b> giallo: offrono <b>lavoretti</b>. Le freccette ai bordi ti portano da loro.</span></li>
+          <li><div class="icon-bubble">🎮</div><span>I <b>lavoretti</b> si giocano in prima persona: riquadro in basso a <b>${moveSide()}</b> per camminare, trascina il dito sul resto dello schermo per guardarti attorno e <b>tocca l'oggetto che pulsa</b> per lavorare (tieni il dito sopra se c'è scritto "Tieni premuto").</span></li>
           <li><div class="icon-bubble">📋</div><span>Nella <b>bacheca</b> in piazza trovi le <b>missioni</b> del giorno.</span></li>
           <li><div class="icon-bubble">🚚</div><span>Con i risparmi compra un lotto <b>IN VENDITA</b> e apri il tuo <b>food truck</b>.</span></li>
           <li><div class="icon-bubble">👥</div><span>Assumi <b>dipendenti</b> e un <b>manager</b> per farlo lavorare da solo.</span></li>
