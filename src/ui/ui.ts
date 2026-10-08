@@ -203,6 +203,8 @@ export class UI {
       if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
     };
     inp.onActionUp = () => document.body.classList.remove('act-pressed');
+    // il dito fermo vale "tieni premuto" solo se adesso c'è un'azione da tenere premuta
+    inp.holdAvailable = () => !!this.actionPrompt && this.actionPrompt.progress !== undefined;
     document.body.append(act, ring, stand, zone, lbl);
     const side = () => document.body.classList.toggle('swap-controls', settings.swapControls);
     side();

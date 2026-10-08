@@ -1493,18 +1493,28 @@ export class Game {
     return { x: c * v.x - sn * v.y, y: sn * v.x + c * v.y };
   }
 
+  /** Il punto si vede sullo schermo (non troppo ai bordi)? */
+  onScreen(t: THREE.Vector3, cam: THREE.Camera = this.activeCamera) {
+    cam.updateMatrixWorld();
+    const v = new THREE.Vector3(t.x, 0.6, t.z).project(cam);
+    return v.z < 1 && Math.abs(v.x) < 0.75 && v.y > -0.85 && v.y < 0.6;
+  }
+
   private updateFirstPerson(dt: number) {
     const l = this.input.consumeLook();
     // la testa si gira da sola verso l'obiettivo solo dopo 3 s fermo, senza toccare niente
-    const busy = l.x || l.y || Math.hypot(this.input.vector.x, this.input.vector.y) > 0.05 || this.input.actionHeld;
+    const busy = l.x || l.y || Math.hypot(this.input.vector.x, this.input.vector.y) > 0.05 || this.input.actionHeld || this.input.actionPos;
     if (busy) this.fpIdle = 0;
     else this.fpIdle += dt;
-    this.fpYaw += l.x * 0.005;
-    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * 0.004, -1.0, 0.35);
+    // sensibilità in base allo schermo: trascinare per tutta la larghezza = mezzo giro
+    const { w, h } = layout.info;
+    this.fpYaw += l.x * (Math.PI / Math.max(320, w));
+    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * ((Math.PI * 0.55) / Math.max(480, h)), -1.0, 0.35);
     const p = this.player.root.position;
-    // se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto da fare
+    // se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto da fare,
+    // ma solo se l'obiettivo non si vede già sullo schermo
     const t = this.run?.target;
-    if (t && this.fpIdle > 3) {
+    if (t && this.fpIdle > 3 && !this.onScreen(t)) {
       const d = Math.hypot(t.x - p.x, t.z - p.z);
       const wantYaw = Math.atan2(t.x - p.x, -(t.z - p.z));
       let dy = wantYaw - this.fpYaw;

@@ -32,6 +32,8 @@ export class Input {
    * non gira lo sguardo: tenendo il dito e trascinando si lavora su quello che c'è sotto.
    */
   onActionClaim: ((x: number, y: number) => boolean) | null = null;
+  /** prima persona: c'è un'azione da "tenere premuto" adesso? (se no, il dito fermo non fa niente) */
+  holdAvailable: (() => boolean) | null = null;
   /** dove sta il dito nella metà delle azioni (pixel), null se non c'è */
   actionPos: { x: number; y: number } | null = null;
   private actClaimed = false;
@@ -70,6 +72,24 @@ export class Input {
       this.keys.delete(e.code);
       if (e.code === 'KeyE' || e.code === 'Space') this.actionHeld = false;
     });
+    // nessun dito sullo schermo: tutto si ferma (anche se il browser ha perso un pointerup)
+    // (un attimo dopo: il pointerup normale, se arriva, ha la precedenza e fa il suo lavoro, es. il tocco)
+    window.addEventListener('touchend', (e) => {
+      if (e.touches.length !== 0) return;
+      setTimeout(() => {
+        this.releaseStick();
+        this.releaseAction();
+        this.lookId = null;
+      }, 80);
+    }, { passive: true });
+    window.addEventListener('touchcancel', () => {
+      this.releaseStick();
+      this.releaseAction();
+      this.lookId = null;
+    }, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.cancel();
+    });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.actionHeld = false;
@@ -80,7 +100,9 @@ export class Input {
     if (!this.enabled) return;
     // il dito tocca direttamente l'oggetto da lavorare (es. una macchia sull'auto), in qualsiasi
     // punto dello schermo: si lavora subito, e trascinare non gira lo sguardo né muove
-    if (this.lookMode && this.actionId === null && this.onActionClaim?.(e.clientX, e.clientY)) {
+    if (this.lookMode && this.onActionClaim?.(e.clientX, e.clientY)) {
+      // un dito rimasto "appeso" (pointerup perso) non blocca il nuovo tocco
+      if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = true;
@@ -92,7 +114,8 @@ export class Input {
     // metà dello schermo delle azioni (di solito la destra): toccare o tenere premuto fa l'azione
     const left = e.clientX < window.innerWidth / 2;
     if (left === settings.swapControls) {
-      if (this.actionId !== null) return;
+      // un dito rimasto "appeso" (pointerup perso) lascia il posto al nuovo tocco
+      if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = false;
@@ -101,8 +124,9 @@ export class Input {
         this.actStart = { x: e.clientX, y: e.clientY, t: performance.now() };
         this.lookLast = { x: e.clientX, y: e.clientY };
         this.actLook = false;
+        // il dito fermo diventa "tieni premuto" solo se c'è un'azione da tenere premuta adesso
         this.actHoldTimer = window.setTimeout(() => {
-          if (this.actionId === e.pointerId && !this.actLook) {
+          if (this.actionId === e.pointerId && !this.actLook && (this.holdAvailable?.() ?? true)) {
             this.actionHeld = true;
             this.onActionDown?.();
           }
@@ -114,8 +138,8 @@ export class Input {
       this.onActionDown?.();
       return;
     }
-    // l'altra metà: il joystick
-    if (this.pointerId !== null) return;
+    // l'altra metà: il joystick (un nuovo tocco prende il posto di uno rimasto bloccato)
+    if (this.pointerId !== null) this.releaseStick();
     this.pointerId = e.pointerId;
     this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
     this.dragging = false;
@@ -130,9 +154,17 @@ export class Input {
     if (e.pointerId === this.actionId) this.actionPos = { x: e.clientX, y: e.clientY };
     if (e.pointerId === this.actionId && this.actClaimed) return;
     if (e.pointerId === this.actionId && this.lookMode) {
-      if (!this.actLook && Math.hypot(e.clientX - this.actStart.x, e.clientY - this.actStart.y) > 12 && !this.actionHeld) {
+      // basta spostare un po' il dito per guardarsi attorno, anche dopo averlo tenuto fermo
+      // (se stava "tenendo premuto" un'azione, la si lascia: muovere vince)
+      const moved = Math.hypot(e.clientX - this.actStart.x, e.clientY - this.actStart.y);
+      if (!this.actLook && moved > (this.actionHeld ? 18 : 8)) {
         this.actLook = true;
         clearTimeout(this.actHoldTimer);
+        if (this.actionHeld) {
+          this.actionHeld = false;
+          this.onActionUp?.();
+        }
+        this.lookLast = { x: e.clientX, y: e.clientY };
       }
       if (this.actLook) {
         this.look.x += e.clientX - this.lookLast.x;
@@ -183,12 +215,28 @@ export class Input {
       return;
     }
     if (e.pointerId !== this.pointerId) return;
+    this.releaseStick();
+  }
+
+  private releaseStick() {
     this.pointerId = null;
     // un tocco breve non fa più muovere il personaggio: si usa solo il joystick
     this.dragging = false;
     this.move.x = this.move.y = 0;
     this.stick.classList.remove('on');
     this.knob.style.transform = '';
+  }
+
+  private releaseAction() {
+    this.actionId = null;
+    this.actionPos = null;
+    clearTimeout(this.actHoldTimer);
+    this.actLook = false;
+    this.actClaimed = false;
+    if (this.actionHeld) {
+      this.actionHeld = false;
+      this.onActionUp?.();
+    }
   }
 
   /** Movimento combinato tastiera + joystick. */
