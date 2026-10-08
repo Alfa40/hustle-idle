@@ -44,6 +44,8 @@ export interface RunGuide {
   inZone: boolean;
   /** è già entrato almeno una volta nella zona */
   arrived: boolean;
+  /** punti ancora da toccare direttamente sull'oggetto (macchie sull'auto) */
+  aims?: THREE.Vector3[];
 }
 
 export function starsFor(timeLeft: number, total: number) {
@@ -438,6 +440,7 @@ export class PhasedRun extends BaseRun {
       near: this.nearTask?.aim ? Math.hypot(this.nearTask.pos.x - p.x, this.nearTask.pos.z - p.z) < 4.5 : this.nearOk,
       inZone: !this.zone || inZone(this.zone, p, 1.2),
       arrived: !this.zone || this.wasInZone,
+      aims: this.tasks.filter((t) => t.aim && !t.done).map((t) => t.pos),
     };
   }
 

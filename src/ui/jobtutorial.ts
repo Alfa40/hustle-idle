@@ -3,7 +3,7 @@ import type { JobType } from '../config/jobs';
 import type { Game } from '../game';
 import type { JobRun } from '../minigames/jobs';
 import { toast } from '../sim/bus';
-import { actSide } from '../settings';
+import { actSide, moveSide } from '../settings';
 
 /**
  * Tutorial contestuale dei lavoretti: la prima volta che fai un lavoretto (o quando lo scegli
@@ -21,21 +21,21 @@ const TIPS: Record<JobType, string[] | null> = {
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
-    'Porta un pacco a ogni <b>cassetta gialla</b>: segui le frecce, l\'ordine lo scegli tu. Con un veicolo fai prima!',
+    'Porta un pacco a ogni <b>cassetta gialla</b> lungo la via: l\'ordine lo scegli tu',
     'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [
     'Prendi i <b>giornali</b> all\'<b>edicola</b> (il chiosco verde)',
-    'Imbuca un giornale in ogni <b>cassetta blu</b> segnata: sono vicine, corri!',
+    'Imbuca un giornale in ogni <b>cassetta blu</b> lungo la via: sono vicine, corri!',
     'Torna all\'edicola per la <b>ricevuta</b>',
   ],
   lavaggio: [
     'Prendi lo <b>spruzzino del sapone</b> (la tanica rosa)',
-    'Sull\'auto ci sono <b>macchie di sporco</b>: insaponale tutte (anche sul muso, sulla coda e sul tetto: girale attorno)',
+    'Sull\'auto ci sono <b>macchie di sporco</b> marroni: insaponale tutte (anche sul muso, sulla coda e sul tetto: girale attorno)',
     'Prendi la <b>canna dell\'acqua</b> dall\'avvolgitubo verde',
-    '<b>Sciacqua</b> via la schiuma da ogni punto',
+    '<b>Sciacqua</b> via la schiuma bianca da ogni punto',
     'Prendi lo <b>straccio</b> dal secchio blu',
-    '<b>Asciuga</b> le gocce finché l\'auto brilla',
+    '<b>Asciuga</b> le gocce azzurre finché l\'auto brilla',
   ],
   imbianchino: [
     'Prima proteggi il giardino: copri ogni cosa (cespugli, aiuole, giochi…) con un <b>telone</b>',
@@ -122,6 +122,7 @@ export class JobTutorial {
     let foot = '';
     let anchor: THREE.Vector3 | null = null;
     let gesture: 'tap' | 'hold' | null = null;
+    let aimAt: THREE.Vector3 | null = null;
     const tips = TIPS[this.type];
     const tip = tips?.[g.phase] ?? (g.task ? PIATTI[g.task.label] ?? g.task.label : g.phaseName);
     if (!g.arrived) {
@@ -130,13 +131,15 @@ export class JobTutorial {
       body = '⚠️ Sei uscito dalla zona di lavoro: <b>torna dentro i coni</b>';
     } else if (g.task && !g.near) {
       body = tip;
-      foot = '🚶 Avvicinati all\'oggetto che si illumina';
+      foot = `🚶 Avvicinati all'oggetto che si illumina: trascina il dito a ${moveSide()} per camminare, a ${actSide()} per <b>guardarti attorno</b>. Se resti fermo 3 secondi lo sguardo va da solo verso l'obiettivo`;
       anchor = g.task.pos;
     } else if (g.task?.aim) {
       // punti da toccare direttamente sull'oggetto (macchie sull'auto)
       body = tip;
-      foot = '👆 <b>Tocca col dito le macchie</b> sull\'auto e tienilo lì (puoi anche passarci sopra) finché spariscono';
+      const what = g.phase === 1 ? 'sulla macchia' : g.phase === 3 ? 'sulla schiuma' : 'sulle gocce';
+      foot = `👆 <b>Tieni il dito ${what}</b> sull'auto finché sparisce. Se lo togli prima, l'<b>anello giallo</b> ti mostra dove finire`;
       anchor = g.task.pos;
+      aimAt = this.visibleAim(g.aims ?? []);
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
@@ -152,7 +155,44 @@ export class JobTutorial {
     }
     this.bubble.style.display = '';
     this.place(anchor);
-    this.placeHand(gesture);
+    // punto da toccare sull'oggetto: la manina tiene premuto proprio lì
+    if (aimAt) this.placeHandAt(aimAt);
+    else if (g.task?.aim) this.hand.style.display = 'none';
+    else this.placeHand(gesture);
+  }
+
+  /** Il punto da toccare più al centro dello schermo tra quelli che si vedono (per la manina). */
+  private visibleAim(list: THREE.Vector3[]) {
+    const cam = this.game.activeCamera;
+    cam.updateMatrixWorld();
+    let best: THREE.Vector3 | null = null;
+    let bd = Infinity;
+    for (const p of list) {
+      const v = p.clone().project(cam);
+      if (v.z > 1 || Math.abs(v.x) > 0.85 || v.y > 0.4 || v.y < -0.9) continue;
+      const d = Math.hypot(v.x, v.y + 0.3);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  private placeHandAt(p: THREE.Vector3) {
+    const cam = this.game.activeCamera;
+    cam.updateMatrixWorld();
+    const v = p.clone().project(cam);
+    const size = this.hand.offsetHeight || 70;
+    if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) {
+      this.hand.style.display = 'none';
+      return;
+    }
+    this.hand.style.display = '';
+    this.hand.className = 'tut-hand hold';
+    this.hand.textContent = '👆';
+    this.hand.style.left = `${((v.x + 1) / 2) * innerWidth - size * 0.42}px`;
+    this.hand.style.top = `${((1 - v.y) / 2) * innerHeight - size * 0.06}px`;
   }
 
   /** Il fumetto sta subito sotto il riquadro del lavoretto (in alto a sinistra), largo uguale. */
