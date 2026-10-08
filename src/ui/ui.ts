@@ -1128,7 +1128,10 @@ export class UI {
     }
     if (tab === 'personale') {
       // dipendenti divisi per mansione: prima i reparti che servono, poi quelli in più, infine il manager
-      const order: Role[] = [...(type.roles as Role[]), ...(hasInterior(b.type) ? EXTRA_ROLES.map((x) => x.role) : []), 'manager'];
+      // i ruoli in più (magazziniere, cameriere) solo quando l'attività ha l'ampliamento che li rende utili:
+      // le mansioni che non servono non si vedono proprio (né il reparto, né i candidati, né la spiegazione)
+      const extras = hasInterior(b.type) ? EXTRA_ROLES.filter((x) => upg(b, 'ampliamento') >= x.level || b.staff.some((e) => e.role === x.role)) : [];
+      const order: Role[] = [...(type.roles as Role[]), ...extras.map((x) => x.role), 'manager'];
       const needed = new Set<Role>([...(type.roles as Role[]), 'manager']);
       const group = (list: Employee[], card: (e: Employee) => string, empty: (r: Role) => string) =>
         order
@@ -1145,13 +1148,12 @@ export class UI {
         (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
       );
       const cands = group(
-        s.candidates.filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role) ||
-          (hasInterior(b.type) && EXTRA_ROLES.some((x) => x.role === e.role))),
+        s.candidates.filter((e) => order.includes(e.role)),
         (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
-        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${EXTRA_ROLES.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>${upg(b, 'ampliamento') < x.level ? ` (dall'ampliamento ${x.level})` : ''}: ${x.desc}`).join('<br>')}</div>` : ''}
+        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
         <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40</button>`;
     }

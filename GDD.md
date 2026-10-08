@@ -431,7 +431,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo
 - Prodotti delle attività: si vedono solo quelli già disponibili; quelli che servono un ampliamento compaiono quando lo compri
 - Missioni settimanali più difficili e meno ricche per unità: 30–40 lavoretti, 3 stelle in 15–20, 3 lavoretti di ogni tipo, 120–180 clienti, guadagna ~€3.000 (premio 20%)
-- Personale delle attività diviso per mansione: un titoletto per reparto (cuochi, cassieri, poi magazzinieri e camerieri, infine il manager) con quanti sono; se manca qualcuno in un reparto che serve compare "Nessuno: serve almeno un dipendente qui". Anche i candidati del giorno sono divisi per mansione
+- Personale delle attività diviso per mansione: un titoletto per reparto (cuochi, cassieri, poi magazzinieri e camerieri, infine il manager) con quanti sono; se manca qualcuno in un reparto che serve compare "Nessuno: serve almeno un dipendente qui". Anche i candidati del giorno sono divisi per mansione. Le mansioni che all'attività non servono non si vedono proprio (né reparto, né candidati, né spiegazione): magazziniere solo dal 1° ampliamento, cameriere solo dal 2° (quando c'è la sala); le attività senza locale mostrano solo i loro reparti e il manager
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti
