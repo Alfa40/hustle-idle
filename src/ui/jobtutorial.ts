@@ -3,7 +3,7 @@ import type { JobType } from '../config/jobs';
 import type { Game } from '../game';
 import type { JobRun } from '../minigames/jobs';
 import { toast } from '../sim/bus';
-import { actSide, moveSide } from '../settings';
+import { moveSide } from '../settings';
 
 /**
  * Tutorial contestuale dei lavoretti: la prima volta che fai un lavoretto (o quando lo scegli
@@ -131,7 +131,7 @@ export class JobTutorial {
       body = '⚠️ Sei uscito dalla zona di lavoro: <b>torna dentro i coni</b>';
     } else if (g.task && !g.near) {
       body = tip;
-      foot = `🚶 Avvicinati all'oggetto che si illumina: usa il quadrato 🕹️ in basso a ${moveSide()} per <b>camminare</b> e quello 👀 in basso a ${actSide()} per <b>guardarti attorno</b>. Se resti fermo 3 secondi lo sguardo va da solo verso l'obiettivo`;
+      foot = `🚶 Avvicinati all'oggetto che si illumina: usa il riquadro 🕹️ in basso a ${moveSide()} per <b>camminare</b> e trascina il dito sul resto dello schermo per <b>guardarti attorno</b>. Se resti fermo 3 secondi lo sguardo va da solo verso l'obiettivo`;
       anchor = g.task.pos;
     } else if (g.task?.aim) {
       // punti da toccare direttamente sull'oggetto (macchie sull'auto)
@@ -143,7 +143,7 @@ export class JobTutorial {
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
-      foot = gesture === 'hold' ? '✊ <b>Tieni il dito al centro dello schermo</b> finché il cerchio si riempie' : '👆 <b>Tocca il centro dello schermo</b>';
+      foot = gesture === 'hold' ? '✊ <b>Tieni il dito sull\'oggetto che pulsa</b> finché la scritta in alto si riempie' : '👆 <b>Tocca l\'oggetto che pulsa</b>';
       anchor = g.task.pos;
     } else {
       body = tip;
@@ -219,7 +219,9 @@ export class JobTutorial {
  */
 export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) {
   // la manina indica l'area delle azioni (la metà dello schermo senza joystick), quando c'è un'azione
-  const act = document.querySelector('.act-zone') as HTMLElement | null;
+  // in prima persona si tocca l'oggetto stesso: la manina va sulla sua zona da toccare
+  const fp = document.body.classList.contains('fp-controls');
+  const act = document.querySelector(fp ? '.action:not(.act-stand)' : '.act-zone') as HTMLElement | null;
   const show = !!gesture && !!act && document.body.classList.contains('act-ready');
   document.body.classList.toggle('tut-pointing', show);
   if (!show) {
@@ -228,6 +230,14 @@ export function placeTutHand(hand: HTMLElement, gesture: 'tap' | 'hold' | null) 
   }
   const r = act!.getBoundingClientRect();
   const size = hand.offsetHeight || 70;
+  if (fp) {
+    hand.style.display = '';
+    hand.style.left = `${r.left + r.width / 2 - size * 0.42}px`;
+    hand.style.top = `${r.top + r.height / 2 - size * 0.06}px`;
+    hand.className = `tut-hand ${gesture}`;
+    hand.textContent = gesture === 'hold' ? '✊' : '👆';
+    return;
+  }
   hand.style.display = '';
   // la punta del dito (in alto, un po' a sinistra del disegno) sul centro dell'anello
   // nella parte bassa dell'area, dove arriva il pollice

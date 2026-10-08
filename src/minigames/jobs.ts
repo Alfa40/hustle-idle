@@ -357,6 +357,12 @@ export class PhasedRun extends BaseRun {
   }
 
   /** Il punto non ha oggetti che si accendono da soli (es. i lati dell'auto): pulsa l'oggetto indicato. */
+  /** Le parti da toccare per fare il punto: quelle che pulsano, o l'oggetto del punto. */
+  private hitObjs(t: Task) {
+    const g = this.glows.get(t);
+    return g?.meshes.length ? g.meshes.map((x) => x.m) : t.obj ? [t.obj] : [];
+  }
+
   private ownGlow(t: Task) {
     return this.glows.get(t)?.meshes.length ? undefined : t.obj;
   }
@@ -516,9 +522,9 @@ export class PhasedRun extends BaseRun {
         this.game.player.play('interact-right', 0.1, 1.6);
         if (near.progress >= 1) this.complete(near);
       } else if (this.game.player.currentName === 'interact-right') this.game.player.play('idle');
-      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at, obj: this.ownGlow(near), stand: this.standPt };
+      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitObjs(near) };
     } else {
-      this.game.prompt = { label: near.label, icon: near.icon, at, obj: this.ownGlow(near), stand: this.standPt };
+      this.game.prompt = { label: near.label, icon: near.icon, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitObjs(near) };
     }
   }
 
@@ -697,6 +703,7 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
     },
   ];
   run = new PhasedRun(game, level, title, phases, { time: 24 + n * (18 + perCar * 4) });
+  const ray = new THREE.Raycaster();
   cars.forEach((c, ci) => {
     const car = run.prop(model(models[ci % models.length], 1), c, Math.PI / 2, 1);
     car.userData.noGlow = true;
@@ -727,6 +734,18 @@ export function carWashArenaJob(game: Game, level: number, arena: Arena, title: 
         pos.set(b.min.x + sz.x * (0.2 + Math.random() * 0.6), b.max.y - 0.05, b.min.z + sz.z * (0.3 + Math.random() * 0.4));
         nrm.set(0, 1, 0);
       }
+      // la macchia va sulla carrozzeria vera (non sul riquadro attorno all'auto): un raggio da fuori
+      // verso l'auto trova la superficie; se non la trova (o è troppo storta) si sceglie un altro punto
+      ray.set(pos.clone().addScaledVector(nrm, 1.5), nrm.clone().negate());
+      ray.far = 1.5 + Math.max(sz.x, sz.z) / 2;
+      const hit = ray.intersectObject(car, true)[0];
+      const fn = hit?.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : null;
+      if (!hit || !fn || fn.dot(nrm) < 0.35 || hit.point.y < b.min.y + 0.25) {
+        k--;
+        continue;
+      }
+      pos.copy(hit.point);
+      nrm.copy(fn);
       if (spots.some((s) => s.pos.distanceTo(pos) < 0.5)) {
         k--;
         continue;
@@ -926,10 +945,12 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   };
   const counter = street.counter;
   const counterMark = street.counter.clone().add(new THREE.Vector3(1.6, 0, 0));
+  // il negozio / l'edicola: si tocca lui per ritirare e per firmare
+  let shopObj: THREE.Object3D | undefined;
   const phases: Phase[] = [
     {
       name: flyer ? "Prendi i giornali all'edicola" : 'Ritira i pacchi al negozio', icon: flyer ? '📰' : '📦',
-      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', onDone: () => hold(game, flyer ? papers() : box()) }],
+      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', get obj() { return shopObj; }, onDone: () => hold(game, flyer ? papers() : box()) }],
     },
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
@@ -940,14 +961,15 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
     {
       name: flyer ? "Torna all'edicola per la ricevuta" : 'Torna al negozio per la ricevuta', icon: '🧾',
-      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', onDone: () => hold(game) }],
+      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: 'Firma la ricevuta', icon: '🧾', get obj() { return shopObj; }, onDone: () => hold(game) }],
     },
   ];
   // tempo: andata e ritorno lungo la via fino all'ultima casa, più un attimo per ogni cassetta
   // (per i pacchi anche il vialetto fino alla porta e ritorno)
   const far = Math.max(...stops.map((h) => h.x)) - counter.x;
   const run: PhasedRun = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * (flyer ? 3 : 6) + 12 });
-  run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1).userData.noGlow = true;
+  shopObj = run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1);
+  shopObj.userData.noGlow = true;
   // giornali: cassette blu agli indirizzi da servire; pacchi: zerbino davanti alla porta
   for (const h of stops) {
     if (flyer) run.prop(postbox(0x2d6cdb), h.box, h.rot, 1);

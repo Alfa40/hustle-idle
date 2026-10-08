@@ -99,8 +99,10 @@ export interface ActionPrompt {
   headY?: number;
   /** oggetto che serve per l'azione: pulsa (il suo colore si accende e si spegne) */
   obj?: THREE.Object3D;
-  /** punto a terra dove stare per l'azione (cerchio a terra): si può toccare anche lì */
+  /** punto a terra dove stare per l'azione (cerchio a terra) */
   stand?: THREE.Vector3;
+  /** prima persona: le parti da toccare per l'azione (di solito quelle che pulsano); senza, vale `obj` */
+  hit?: THREE.Object3D[];
 }
 
 interface JobNpc {

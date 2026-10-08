@@ -75,9 +75,13 @@ export class Input {
    * non gira lo sguardo: tenendo il dito e trascinando si lavora su quello che c'è sotto.
    */
   onActionClaim: ((x: number, y: number) => boolean) | null = null;
+  /** Prima persona: il dito è sull'oggetto dell'azione (quello che pulsa)? Allora vince l'azione, non lo sguardo. */
+  onTargetHit: ((x: number, y: number) => boolean) | null = null;
   /** dove sta il dito nella metà delle azioni (pixel), null se non c'è */
   actionPos: { x: number; y: number } | null = null;
   private actClaimed = false;
+  /** l'azione in corso è partita toccando l'oggetto (prima persona) */
+  private onTarget = false;
   onActionUp: (() => void) | null = null;
   private actionId: number | null = null;
 
@@ -183,17 +187,34 @@ export class Input {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
   }
 
-  /** Prima persona: quadrato del joystick, quadrato dello sguardo, il resto è per le azioni. */
+  /**
+   * Prima persona: le azioni si fanno toccando l'oggetto (quello che pulsa), ovunque sia sullo schermo;
+   * altrimenti il rettangolo in basso è il joystick e tutto il resto gira la visuale.
+   */
   private downFirstPerson(e: PointerEvent) {
     const z = this.fpZones();
-    // il dito tocca l'oggetto da lavorare (es. una macchia sull'auto): si lavora lì
+    // il dito tocca il punto da lavorare (es. una macchia sull'auto): si lavora lì
     // (anche se la macchia è nella parte bassa dello schermo: toccare il punto preciso vince)
-    if (this.onActionClaim?.(e.clientX, e.clientY)) {
+    const claim = this.onActionClaim;
+    const onSpot = claim?.(e.clientX, e.clientY);
+    if (onSpot) {
       if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = true;
       this.actionHeld = true;
+      this.onActionDown?.();
+      return;
+    }
+    // il dito è sull'oggetto da usare (ovunque, anche sul joystick: l'oggetto da toccare vince sempre): tocco = azione "tocca", dito tenuto = "tieni premuto"
+    if (!claim && this.onTargetHit?.(e.clientX, e.clientY)) {
+      if (this.actionId !== null) this.releaseAction();
+      this.actionId = e.pointerId;
+      this.actionPos = { x: e.clientX, y: e.clientY };
+      this.actClaimed = true;
+      this.actionPressed = true;
+      this.actionHeld = true;
+      this.onTarget = true;
       this.onActionDown?.();
       return;
     }
@@ -204,24 +225,15 @@ export class Input {
       this.dragging = false;
       return;
     }
-    if (this.inside(z.look, e.clientX, e.clientY)) {
-      this.lookId = e.pointerId;
-      this.lookLast = { x: e.clientX, y: e.clientY };
-      return;
-    }
-    // centro e parte alta: tocco = azione "tocca", dito tenuto = "tieni premuto"
-    if (this.actionId !== null) this.releaseAction();
-    this.actionId = e.pointerId;
-    this.actionPos = { x: e.clientX, y: e.clientY };
-    this.actClaimed = true;
-    this.actionPressed = true;
-    this.actionHeld = true;
-    this.onActionDown?.();
+    // tutto il resto dello schermo (anche la parte alta): si gira la visuale
+    this.lookId = e.pointerId;
+    this.lookLast = { x: e.clientX, y: e.clientY };
   }
-
 
   private moveEv(e: PointerEvent) {
     if (e.pointerId === this.actionId) this.actionPos = { x: e.clientX, y: e.clientY };
+    // tenere premuto sull'oggetto: se il dito scivola fuori l'azione si ferma, se torna sopra riprende
+    if (e.pointerId === this.actionId && this.onTarget) this.actionHeld = !!this.onTargetHit?.(e.clientX, e.clientY);
     if (e.pointerId === this.actionId && this.actClaimed) return;
     if (e.pointerId === this.lookId) {
       this.look.x += e.clientX - this.lookLast.x;
@@ -248,6 +260,7 @@ export class Input {
 
   private up(e: PointerEvent) {
     if (e.pointerId === this.actionId) {
+      this.onTarget = false;
       this.actionId = null;
       this.actionPos = null;
       this.actionHeld = false;
@@ -272,6 +285,7 @@ export class Input {
   }
 
   private releaseAction() {
+    this.onTarget = false;
     this.actionId = null;
     this.actionPos = null;
     this.actClaimed = false;

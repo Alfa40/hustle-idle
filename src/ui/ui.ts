@@ -203,6 +203,8 @@ export class UI {
       if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
     };
     inp.onActionUp = () => document.body.classList.remove('act-pressed');
+    // prima persona: toccare l'oggetto dell'azione fa l'azione, altrove si gira la visuale
+    inp.onTargetHit = (x, y) => this.actionHit(x, y);
     document.body.append(act, ring, stand, zone, lbl);
     const side = () => document.body.classList.toggle('swap-controls', settings.swapControls);
     side();
@@ -422,6 +424,32 @@ export class UI {
 
     this.ringEl.classList.toggle('full', !hold && flash >= 1);
     if (p) this.placeAction(p, showRing);
+  }
+
+  private hitNdc = new THREE.Vector2();
+  private hitRay = new THREE.Raycaster();
+  /**
+   * Prima persona: il dito (x, y) è sull'oggetto dell'azione (quello che pulsa)? Conta solo l'oggetto
+   * stesso, con un piccolo margine per il dito: il vuoto attorno e il cerchio a terra no.
+   */
+  actionHit(x: number, y: number) {
+    const p = this.actionPrompt;
+    if (!p || !p.at) return false;
+    const list = p.hit?.length ? p.hit : p.obj ? [p.obj] : [];
+    if (!list.length) return false;
+    const cam = this.game.activeCamera;
+    cam.updateMatrixWorld();
+    const { w, h } = layout.info;
+    this.hitRay.far = 8;
+    // il dito sopra l'oggetto vero (non il suo riquadro): il punto toccato o poco attorno (la punta del dito)
+    const hits = (px: number, py: number) => {
+      this.hitRay.setFromCamera(this.hitNdc.set((px / w) * 2 - 1, -(py / h) * 2 + 1), cam);
+      return this.hitRay.intersectObjects(list, true).length > 0;
+    };
+    if (hits(x, y)) return true;
+    const r = 14;
+    for (let i = 0; i < 8; i++) if (hits(x + Math.cos((i * Math.PI) / 4) * r, y + Math.sin((i * Math.PI) / 4) * r)) return true;
+    return false;
   }
 
   private actionV = new THREE.Vector3();
@@ -2202,7 +2230,7 @@ export class UI {
             Per muoverti trascina il dito nella metà ${moveSide()} dello schermo: compare un joystick.
             Quando sei sul cerchio a terra davanti a una persona o a un oggetto (l'oggetto pulsa), tocca la <b>metà ${actSide()}</b> dello schermo; se c'è scritto "Tieni premuto" tieni il dito lì finché il cerchio si riempie.
             In ⚙️ Opzioni puoi invertire i lati.
-            Nei lavoretti (in prima persona): quadrato 🕹️ in basso a ${moveSide()} per camminare, quadrato 👀 in basso a ${actSide()} per guardarti attorno, e tocca o tieni premuto al centro dello schermo per le azioni.
+            Nei lavoretti (in prima persona): riquadro 🕹️ in basso a ${moveSide()} per camminare, trascina il dito sul resto dello schermo per guardarti attorno, e tocca o tieni premuto l'oggetto che pulsa per le azioni.
             Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
       },
