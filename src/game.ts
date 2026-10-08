@@ -1724,7 +1724,7 @@ export class Game {
       o.t = 0;
       const dock = layout.panelDock;
       const free = layout.freeRect([
-        { sel: '.hud-top .pills', dock }, { sel: '.jobbar.on', dock }, { sel: '.tut-bubble', dock }, { sel: '.toasts', dock },
+        { sel: '.hud-top .pills', dock }, { sel: '.jobbar.on', dock }, { sel: '.tut-bubble', dock },
         { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' },
       ]);
       const { w, h } = layout.info;

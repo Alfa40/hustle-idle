@@ -22,7 +22,7 @@ import { KitchenTutorial, type TutStep } from '../ui/biztutorial';
 
 /** Interfaccia sopra la cucina: il riquadro "in mano" (toglie il lato che fa perdere meno spazio) e i pulsanti a destra. */
 const INTERIOR_UI = () =>
-  [{ sel: '.preview-bar', dock: 'top' }, { sel: '.hand-badge' }, { sel: '.biz-tut' }, { sel: '.toasts', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
+  [{ sel: '.preview-bar', dock: 'top' }, { sel: '.hand-badge' }, { sel: '.biz-tut' }, { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' }] as Occluder[];
 
 export const INTERIOR_ASSETS = [
   'furniture/kitchenFridge.glb', 'furniture/kitchenStove.glb', 'furniture/kitchenCabinet.glb',

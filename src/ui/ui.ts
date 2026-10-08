@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType, type UpgradeId } from '../config/business';
+import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -523,8 +523,8 @@ export class UI {
   }
 
   /**
-   * Messaggi: uno alla volta (il nuovo sostituisce il vecchio), nella striscia fissa sotto i riquadri
-   * in alto. Mai in mezzo allo schermo: non coprono il personaggio né gli obiettivi.
+   * Messaggi a comparsa rapida: uno alla volta (il nuovo sostituisce il vecchio), al centro dello
+   * schermo, un po' sopra la metà (sopra il personaggio, sotto i riquadri in alto). Durano poco.
    */
   toast(text: string, kind = 'info') {
     const t = document.createElement('div');
@@ -561,11 +561,34 @@ export class UI {
         }
       }
     }
-    this.toastsEl.style.top = `${Math.round(top + 6)}px`;
-    this.toastsEl.style.left = `${Math.round(left)}px`;
+    // messaggi rapidi: al centro dello schermo, un po' sopra la metà e comunque sotto i riquadri in alto;
+    // non vanno mai sopra la colonna dei pulsanti a destra né (in orizzontale) sopra il pannello a sinistra
+    const { w } = layout.info;
+    const y = Math.round(Math.max(top + 10, h * 0.3));
+    const band = (b: DOMRect) => b.height > 2 && b.top < y + 64 && b.bottom > y;
+    let lo = safe.left;
+    let hi = w - safe.right;
+    for (const el of document.querySelectorAll<HTMLElement>('.hud-right .hud-btns, .hud-right .minimap')) {
+      const b = el.getBoundingClientRect();
+      if (band(b)) hi = Math.min(hi, b.left - 8);
+    }
+    if (document.body.classList.contains('is-landscape')) {
+      for (const sel of ['.hud-top .pills', '.jobbar.on', '.preview-bar', '.hand-badge', '.tut-bubble', '.act-label.on']) {
+        for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+          const b = el.getBoundingClientRect();
+          if (getComputedStyle(el).display !== 'none' && band(b)) lo = Math.max(lo, b.right + 8);
+        }
+      }
+    }
+    // al centro dello schermo se c'è posto, altrimenti al centro dello spazio libero
+    const cx = Math.min(Math.max(w / 2, lo + 60), hi - 60);
+    const half = Math.max(80, Math.min(cx - lo, hi - cx));
+    this.toastsEl.style.left = `${Math.round(cx)}px`;
+    this.toastsEl.style.top = `${y}px`;
+    this.toastsEl.style.maxWidth = `${Math.round(Math.min(420, half * 2))}px`;
     this.stackLeft = left;
-    // la scritta dell'azione va sotto il messaggio (se c'è), altrimenti subito sotto i riquadri
-    this.stackBottom = this.toastsEl.children.length ? this.toastsEl.getBoundingClientRect().bottom - 6 : top;
+    // la scritta dell'azione va subito sotto i riquadri
+    this.stackBottom = top;
   }
 
   // ---------------- pannelli ----------------
@@ -1104,14 +1127,29 @@ export class UI {
           .join('');
     }
     if (tab === 'personale') {
-      const staff = b.staff.length
-        ? b.staff.map((e) => this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`)).join('')
-        : '<p class="muted small">Nessun dipendente.</p>';
-      const cands = s.candidates
-        .filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role) ||
-          (hasInterior(b.type) && EXTRA_ROLES.some((x) => x.role === e.role)))
-        .map((e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`))
-        .join('');
+      // dipendenti divisi per mansione: prima i reparti che servono, poi quelli in più, infine il manager
+      const order: Role[] = [...(type.roles as Role[]), ...(hasInterior(b.type) ? EXTRA_ROLES.map((x) => x.role) : []), 'manager'];
+      const needed = new Set<Role>([...(type.roles as Role[]), 'manager']);
+      const group = (list: Employee[], card: (e: Employee) => string, empty: (r: Role) => string) =>
+        order
+          .map((r) => {
+            const es = list.filter((e) => e.role === r);
+            const none = empty(r);
+            if (!es.length && !none) return '';
+            return `<div class="role-group"><h4 class="role-title">${ROLES[r].icon} ${roleName(b.type, r)}${es.length ? ` <span class="tag">${es.length}</span>` : ''}</h4>${es.length ? es.map(card).join('') : none}</div>`;
+          })
+          .join('');
+      const staff = group(
+        b.staff,
+        (e) => this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`),
+        (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
+      );
+      const cands = group(
+        s.candidates.filter((e) => e.role === 'manager' || (type.roles as string[]).includes(e.role) ||
+          (hasInterior(b.type) && EXTRA_ROLES.some((x) => x.role === e.role))),
+        (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
+        () => '',
+      ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
         <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${EXTRA_ROLES.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>${upg(b, 'ampliamento') < x.level ? ` (dall'ampliamento ${x.level})` : ''}: ${x.desc}`).join('<br>')}</div>` : ''}
         <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}

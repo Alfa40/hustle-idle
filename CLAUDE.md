@@ -9,8 +9,9 @@
 - **Mai coprire la visuale**: nessun riquadro, messaggio, avviso o fumetto deve stare sopra il personaggio,
   il campo da gioco attorno a lui e soprattutto gli obiettivi di un lavoretto o di un'attività. Tutto ciò che è
   testo va nella colonna in alto a sinistra (in orizzontale: pannello a sinistra), uno sotto l'altro:
-  riquadri del gioco → fumetto del tutorial → striscia dei messaggi (`.toasts`, uno alla volta, max 2 righe) →
-  scritta dell'azione. La camera inquadra il personaggio al centro della zona libera (città:
+  riquadri del gioco → fumetto del tutorial → scritta dell'azione. Unica eccezione: i messaggi a comparsa
+  rapida (`.toasts`, uno alla volta, max 2 righe, pochi secondi) stanno al centro dello schermo, un po' sopra la
+  metà (sopra il personaggio), mai sopra la colonna dei pulsanti. La camera inquadra il personaggio al centro della zona libera (città:
   `Game.centerInFreeArea`; stanze: `layout.freeRect` con tutti questi elementi tra gli occluder).
   Ogni nuovo elemento va aggiunto lì, mai a metà schermo.
 - **Spazio giusto per la quantità di lavoro**: in ogni lavoretto, minigioco o attività lo spazio cresce

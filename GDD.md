@@ -407,10 +407,10 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Imbianchino: le cose del giardino stanno in fila contro la casa (girate o un po' più piccole se serve), lungo il muretto resta sempre un corridoio libero di 1,5 m per dipingerlo dall'interno
 
 ### Visuale sempre libera
-- Regola: nessun avviso, messaggio o fumetto copre il personaggio, il campo attorno e gli obiettivi
-- I messaggi (prima a metà schermo, fino a 4 insieme) ora sono uno alla volta, al massimo 2 righe, a colori pieni con testo bianco grande, bordo bianco e un alone quando arrivano (verde fatto, giallo soldi, rosso problema, blu informazione), nella colonna in alto a sinistra sotto i riquadri del gioco e il tutorial; sotto c'è la scritta dell'azione
+- Regola: nessun riquadro fisso, avviso o fumetto copre il personaggio, il campo attorno e gli obiettivi (i messaggi a comparsa rapida stanno al centro, sopra il personaggio, e spariscono in fretta)
+- I messaggi (prima a metà schermo, fino a 4 insieme) ora sono uno alla volta, al massimo 2 righe, a colori pieni con testo bianco grande, bordo bianco e un alone quando arrivano (verde fatto, giallo soldi, rosso problema, blu informazione), al centro dello schermo un po' sopra la metà (sopra il personaggio, sotto i riquadri in alto; mai sopra i pulsanti a destra né sopra il pannello a sinistra in orizzontale). I riquadri fissi, il tutorial e la scritta dell'azione restano nella colonna in alto a sinistra
 - Feste ed eventi del giorno: non più un'etichetta a parte sotto la data, ma una riga piccola dentro l'etichetta della data (toccandola si apre il calendario)
-- In città la visuale mette il personaggio al centro della parte di schermo libera dai riquadri e dai pulsanti; nelle attività, nelle case dei clienti e nella cucina del lavapiatti la stanza si inquadra lasciando libera anche la striscia dei messaggi
+- In città la visuale mette il personaggio al centro della parte di schermo libera dai riquadri e dai pulsanti; nelle attività, nelle case dei clienti e nella cucina del lavapiatti la stanza si inquadra lasciando liberi i riquadri in alto
 
 ### Lavoretti come minigiochi (in corso)
 - I lavoretti diventano minigiochi in una **scena separata** dalla città, giocati **in prima persona** (`src/minigames/arena.ts`): accettato il lavoretto si entra nella scena, a fine lavoro (o rinunciando) si torna in città dove si era. La scena sta lontanissima dalla città (la nebbia la nasconde): si riusano personaggio, luci, cielo e tutta la logica dei lavoretti (fasi, tutorial, oggetti solidi e che pulsano, cerchio a terra). Niente minimappa né freccette nella scena
@@ -431,6 +431,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo
 - Prodotti delle attività: si vedono solo quelli già disponibili; quelli che servono un ampliamento compaiono quando lo compri
 - Missioni settimanali più difficili e meno ricche per unità: 30–40 lavoretti, 3 stelle in 15–20, 3 lavoretti di ogni tipo, 120–180 clienti, guadagna ~€3.000 (premio 20%)
+- Personale delle attività diviso per mansione: un titoletto per reparto (cuochi, cassieri, poi magazzinieri e camerieri, infine il manager) con quanti sono; se manca qualcuno in un reparto che serve compare "Nessuno: serve almeno un dipendente qui". Anche i candidati del giorno sono divisi per mansione
 
 ### Prossimi passi proposti
 - Altre attività (panificio, pulizie, traslochi, artigianato) e altri lavoretti

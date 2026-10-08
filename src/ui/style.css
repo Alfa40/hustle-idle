@@ -234,17 +234,17 @@ body.is-landscape .act-label { max-width: min(360px, 40vw); }
 }
 
 /* ---------- messaggi ---------- */
-/* striscia ad altezza fissa sotto i riquadri in alto (posizione dal LayoutManager, UI.placeTopStack):
-   un messaggio alla volta, mai sopra il personaggio o gli obiettivi. Le stanze la tengono sempre libera. */
+/* messaggi a comparsa rapida: al centro dello schermo, un po' sopra la metà (posizione da UI.placeTopStack),
+   uno alla volta e per poco tempo */
 .toasts {
-  position: fixed; left: var(--sal); top: var(--sat); height: 58px; z-index: 19; pointer-events: none;
-  display: flex; flex-direction: column; justify-content: flex-start;
+  position: fixed; left: 50%; top: 30%; z-index: 19; pointer-events: none; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
 }
 .toast {
   /* colore pieno per tipo, testo bianco grande, bordo bianco: si vede subito anche sopra la città */
   --tc: #2d8fd5; --td: #1f6fa8;
   position: relative; background: var(--tc); color: #fff; padding: 6px 12px; border-radius: 14px;
-  font-size: 15px; font-weight: 800; line-height: 1.25; text-align: left; border: 3px solid #fff;
+  font-size: 15px; font-weight: 800; line-height: 1.25; text-align: center; border: 3px solid #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,.25);
   box-shadow: 0 4px 0 var(--td), 0 6px 16px rgba(0,0,0,.3);
   animation: tin .4s cubic-bezier(.2,1.6,.4,1), tglow 1.2s ease-out .4s; overflow: hidden; box-sizing: border-box;
@@ -257,7 +257,7 @@ body.is-landscape .act-label { max-width: min(360px, 40vw); }
 /* appena arriva: un alone che pulsa una volta */
 @keyframes tglow { 0% { box-shadow: 0 4px 0 var(--td), 0 0 0 0 color-mix(in srgb, var(--tc) 70%, transparent); } 100% { box-shadow: 0 4px 0 var(--td), 0 0 0 12px transparent; } }
 .toast.out { opacity: 0; transform: translateY(6px); transition: all .4s; }
-@keyframes tin { 0% { transform: translateX(-14px) scale(.96); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes tin { 0% { transform: scale(.8); opacity: 0; } 100% { transform: none; opacity: 1; } }
 
 /* ---------- pannelli ---------- */
 .modal {
@@ -776,12 +776,14 @@ body.is-landscape .hud-drop { grid-template-columns: repeat(3, var(--btn)); }
 .ride-btn { width: var(--ride); height: var(--ride); right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px); }
 
 /* riquadri in alto a sinistra: non arrivano mai sotto la colonna di destra */
-.jobbar, .guide, .hand-badge, .preview-bar, .toasts {
+.jobbar, .guide, .hand-badge, .preview-bar {
   /* non arrivano sotto la minimappa né sotto la colonna dei pulsanti */
   width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 18px); max-width: 460px;
 }
 /* orizzontale: pannello laterale a sinistra (la scena resta al centro) */
-body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge, body.is-landscape .preview-bar, body.is-landscape .toasts { width: min(360px, 40vw); }
+body.is-landscape .jobbar, body.is-landscape .guide, body.is-landscape .hand-badge, body.is-landscape .preview-bar { width: min(360px, 40vw); }
+.toasts { width: max-content; max-width: min(86vw, 420px); }
+body.is-landscape .toasts { max-width: min(50vw, 420px); }
 body.is-landscape .guide { max-height: calc(60vh - var(--sat)); overflow: hidden; }
 body.is-landscape.is-short .guide { font-size: 13px; padding: 6px 8px; }
 body.is-landscape.is-short .hb-slot { min-height: 20px; font-size: 12px; }
@@ -931,3 +933,8 @@ body.fp-controls .act-zone { left: 18%; right: 18%; top: 32%; bottom: 34%; }
 /* prima persona: Sali/Scendi sopra il rettangolo dello sguardo (non lo copre) */
 body.fp-controls .ride-btn { bottom: calc(var(--sab) + 38vh); }
 body.fp-controls.is-landscape .ride-btn { bottom: calc(var(--sab) + 57vh); }
+
+/* personale diviso per mansione: un titoletto per reparto, poi le schede dei dipendenti */
+.role-group { margin-bottom: 10px; }
+.role-title { font-size: 15px; margin: 8px 2px 6px; display: flex; align-items: center; gap: 6px; color: var(--ink); }
+.role-empty { margin: 0 2px 6px; padding: 8px 10px; border: 2px dashed #e2d8c2; border-radius: 12px; }
