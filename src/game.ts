@@ -1752,7 +1752,8 @@ export class Game {
     this.sun.position.copy(t).addScaledVector(this.sunDir, 36);
   }
 
-  private updateLighting(fixedHour?: number) {
+  /** Luce e cielo secondo l'ora (anche per le scene separate, che ne copiano il colore del cielo). */
+  updateLighting(fixedHour?: number) {
     const h = fixedHour ?? hourOf(this.state);
     // luce del giorno: piena 8-18, tramonto, notte blu
     const dayF = THREE.MathUtils.clamp(1 - Math.abs(h - 13) / 8.5, 0, 1);

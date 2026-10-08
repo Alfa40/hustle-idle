@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { gltf, Instancer, model } from '../assets';
-import { TILE } from '../config/map';
-import { DIR_ROT, DIR_VEC, HOUSE_MODELS, TREE_MODELS, type Slot } from '../world/city';
+import { gltf, model } from '../assets';
+import { HOUSE_MODELS, TREE_MODELS, type Slot } from '../world/city';
+import { buildSurroundings } from '../world/surroundings';
 import { fencePillar, fenceSegment } from '../world/jobprops';
 
 /**
@@ -139,53 +139,16 @@ export class Arena {
   private lotD = 0;
 
   /**
-   * Il quartiere vero attorno alla casa del lavoretto: ogni casa, palazzo, albero, strada e lampione
-   * della città entro 90 m, girato in modo che la casa guardi il cancello. Il lotto del minigioco è più
-   * grande della tessera vera, quindi tutto ciò che sta attorno si allontana quanto serve e le strade
-   * e i marciapiedi accanto al lotto si allungano: nessun buco e niente che entra nel giardino.
+   * Il quartiere vero attorno alla casa del lavoretto (vedi `buildSurroundings`), girato in modo che la
+   * casa guardi il cancello. Un lampione davanti al cancello si sposta di lato (non copre l'ingresso).
    */
   private buildNeighborhood(slot: Slot, placed: { path: string; m: THREE.Matrix4 }[]) {
     const O = ARENA_ORIGIN;
-    const T = TILE;
-    const [dx, dz] = DIR_VEC[slot.dir];
-    const c = slot.center;
-    const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -DIR_ROT[slot.dir]);
-    // dentro la tessera si allarga, fuori si sposta: continuo e senza buchi
-    const stretch = (u: number, half: number, nh: number) => (Math.abs(u) <= half ? (u * nh) / half : u + Math.sign(u) * (nh - half));
-    const inst = new Instancer();
-    const flat = new Instancer();
-    const p = new THREE.Vector3();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    for (const it of placed) {
-      const ox = it.m.elements[12] - c.x;
-      const oz = it.m.elements[14] - c.z;
-      // coordinate rispetto alla casa: f verso la strada, r di lato
-      const f = ox * dx + oz * dz;
-      const r = ox * dz - oz * dx;
-      if (Math.hypot(f, r) > 90) continue;
-      // la tessera del lotto (casa vera, pavimento): nel minigioco c'è già il giardino
-      if (Math.abs(r) < T / 2 - 0.01 && Math.abs(f) < T / 2 - 0.01) continue;
-      it.m.decompose(p, q, s);
-      const rq = turn.clone().multiply(q);
-      const at = new THREE.Vector3(O.x + stretch(r, T / 2, this.lotW / 2), p.y, O.z + stretch(f, T / 2, this.lotD / 2));
-      const isFlat = it.path.startsWith('roads/') && !it.path.includes('light');
-      if (!isFlat) {
-        // un lampione davanti al cancello si sposta di lato (non copre l'ingresso né la vista)
-        if (it.path.includes('light') && Math.abs(at.x - O.x) < 2.5 && at.z > O.z) at.x = O.x + (at.x >= O.x ? 3 : -3);
-        inst.add(it.path, new THREE.Matrix4().compose(at, rq, s));
-        continue;
-      }
-      // strade e marciapiedi nella fascia del lotto si allungano fino a toccare quelli vicini
-      const sx = Math.abs(r) <= T / 2 ? this.lotW / T : 1;
-      const sz = Math.abs(f) <= T / 2 ? this.lotD / T : 1;
-      const m = new THREE.Matrix4().compose(new THREE.Vector3(), rq, s);
-      m.premultiply(new THREE.Matrix4().makeScale(sx, 1, sz));
-      m.setPosition(at);
-      flat.add(it.path, m);
-    }
-    inst.build(this.group, { castShadow: true });
-    flat.build(this.group);
+    buildSurroundings(this.group, slot, placed, O, this.lotW, this.lotD, {
+      adjust: (path, at) => {
+        if (path.includes('light') && Math.abs(at.x - O.x) < 2.5 && at.z > O.z) at.x = O.x + (at.x >= O.x ? 3 : -3);
+      },
+    });
   }
 
   private buildFence() {

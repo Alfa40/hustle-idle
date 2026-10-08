@@ -18,6 +18,7 @@ import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { updateCutWalls, type CutWall } from './viewcam';
 import { frameRoom, layout, type Occluder } from '../ui/layout';
+import { buildSurroundings } from './surroundings';
 import { KitchenTutorial, type TutStep } from '../ui/biztutorial';
 
 /** Interfaccia sopra la cucina: il riquadro "in mano" (toglie il lato che fa perdere meno spazio) e i pulsanti a destra. */
@@ -220,10 +221,128 @@ export class TruckInterior {
     return LEFT + this.width / 2;
   }
 
+  /**
+   * Fuori dal locale: come nei lavoretti, il quartiere vero attorno al lotto dell'attività (stesse vie,
+   * case, palazzi e parchi della città), girato in modo che la strada sia davanti al bancone, dove
+   * arrivano i clienti. Il lotto è grande quanto la stanza più lo spazio davanti per la fila (e la sala).
+   * Food truck: si lavora dentro il furgone parcheggiato nel parco (ruote e cabina si vedono da fuori);
+   * locale: la stanza è dentro il negozio, con il marciapiede davanti.
+   */
+  private buildOutside() {
+    const s = this.scene;
+    const truck = this.biz.type === 'foodtruck';
+    const x0 = LEFT - 2.2;
+    const x1 = LEFT + this.width + 2.2;
+    // dietro: il furgone ha un po' di prato, il negozio il resto dell'edificio; davanti la fila (e la sala)
+    const z0 = truck ? BACK - 1.2 : BACK - 3.2;
+    const z1 = this.level >= 2 ? 6.8 : 5.4;
+    const O = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    const flat = (w: number, d: number, color: number, x: number, y: number, z: number) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, y, z);
+      m.receiveShadow = true;
+      s.add(m);
+      return m;
+    };
+    // terreno attorno (sotto il quartiere) e il lotto: prato del parco o marciapiede del negozio
+    flat(500, 500, 0x6fae4f, O.x, -0.06, O.z);
+    flat(x1 - x0, z1 - z0, truck ? 0x79b85a : 0xc9cbd6, O.x, -0.02, O.z);
+    // davanti al bancone: il selciato dove i clienti fanno la fila
+    flat(x1 - x0, z1 - COUNTER_Z - 0.3, truck ? 0xcdbf9e : 0xb9bfd1, O.x, -0.012, (COUNTER_Z + 0.3 + z1) / 2);
+    const slot = this.game.city.lots.find((l) => l.id === this.biz.lotId);
+    if (slot) buildSurroundings(s, slot, this.game.city.placed, O, x1 - x0, z1 - z0, { radius: 80 });
+    if (truck) this.truckShell();
+    else this.shopShell(x0, x1, z0);
+  }
+
+  /**
+   * Il negozio visto da fuori: la stanza è dentro l'edificio. Dietro e ai lati della stanza continua il
+   * palazzo (muri e tetto), davanti la vetrina dà sul marciapiede. I blocchi sono più alti della parete di
+   * fondo ma stanno dietro e di lato: non coprono mai la stanza.
+   */
+  private shopShell(x0: number, x1: number, z0: number) {
+    const s = this.scene;
+    const W = this.width;
+    const facade = new THREE.MeshLambertMaterial({ color: 0xe8dcc4 });
+    const roof = new THREE.MeshLambertMaterial({ color: 0x6f7685 });
+    const H = 3.1;
+    const block = (ax: number, bx: number, az: number, bz: number) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(bx - ax, H, bz - az), facade);
+      b.position.set((ax + bx) / 2, H / 2, (az + bz) / 2);
+      b.castShadow = true;
+      const r = new THREE.Mesh(new THREE.BoxGeometry(bx - ax + 0.2, 0.18, bz - az + 0.2), roof);
+      r.position.set((ax + bx) / 2, H + 0.09, (az + bz) / 2);
+      s.add(b, r);
+    };
+    const front = COUNTER_Z + 0.35;
+    // dietro la parete di fondo
+    block(x0, x1, z0, BACK - 0.18);
+    // sul tetto: condizionatori e un comignolo (si capisce che è il tetto del palazzo)
+    const unit = new THREE.MeshLambertMaterial({ color: 0xdfe3ea });
+    for (const [ux, uz, w, h, d] of [[x0 + 1.2, z0 + 0.9, 0.9, 0.5, 0.7], [x1 - 1.6, z0 + 1.2, 1.1, 0.6, 0.8], [(x0 + x1) / 2, z0 + 0.7, 0.4, 0.9, 0.4]]) {
+      const u = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), unit);
+      u.position.set(ux, H + 0.18 + h / 2, uz);
+      u.castShadow = true;
+      s.add(u);
+    }
+    // ai lati della stanza, fino alla vetrina
+    block(x0, LEFT - 0.08, BACK - 0.18, front);
+    block(LEFT + W + 0.08, x1, BACK - 0.18, front);
+    // tenda sopra la vetrina ai lati (non sopra il bancone: non copre niente)
+    for (const [ax, bx] of [[x0, LEFT - 0.08], [LEFT + W + 0.08, x1]]) {
+      const aw = new THREE.Mesh(new THREE.BoxGeometry(bx - ax, 0.08, 0.7), new THREE.MeshLambertMaterial({ color: new THREE.Color(bizType(this.biz.type).color) }));
+      aw.position.set((ax + bx) / 2, 2.3, front + 0.3);
+      aw.rotation.x = 0.25;
+      s.add(aw);
+    }
+  }
+
+  /** Il furgone visto da fuori: ruote sotto la carrozzeria e la cabina di guida a destra. */
+  private truckShell() {
+    const s = this.scene;
+    const col = this.layout.wall;
+    const W = this.width;
+    const tyre = new THREE.MeshLambertMaterial({ color: 0x222831 });
+    const rim = new THREE.MeshLambertMaterial({ color: 0xc9ced8 });
+    for (const x of [LEFT + 1.3, LEFT + W - 1.3]) {
+      for (const z of [BACK - 0.25, COUNTER_Z + 0.32]) {
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.28, 18), tyre);
+        w.rotation.x = Math.PI / 2;
+        w.position.set(x, 0.3, z);
+        const r = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3, 12), rim);
+        r.rotation.x = Math.PI / 2;
+        r.position.copy(w.position);
+        s.add(w, r);
+      }
+    }
+    // cabina: dietro la parete destra, più bassa, con il parabrezza
+    const depth = COUNTER_Z - BACK + 0.6;
+    const cab = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.7, depth), new THREE.MeshLambertMaterial({ color: col }));
+    body.position.y = 0.85;
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, depth - 0.4), new THREE.MeshLambertMaterial({ color: 0x9fd3f0 }));
+    glass.position.set(0.96, 1.25, 0);
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, depth), new THREE.MeshLambertMaterial({ color: 0x9aa3b5 }));
+    bumper.position.set(1.0, 0.3, 0);
+    cab.add(body, glass, bumper);
+    cab.position.set(LEFT + W + 1.05, 0, (BACK + COUNTER_Z) / 2);
+    cab.traverse((m) => ((m as THREE.Mesh).castShadow = true));
+    s.add(cab);
+    for (const z of [BACK - 0.25, COUNTER_Z + 0.32]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.28, 18), tyre);
+      w.rotation.x = Math.PI / 2;
+      w.position.set(LEFT + W + 1.1, 0.3, z);
+      s.add(w);
+    }
+  }
+
   private build() {
     const s = this.scene;
     const def = bizType(this.biz.type);
-    s.background = new THREE.Color(0x2a3350);
+    // fuori: il cielo della città all'ora giusta (aggiornato in update) e la nebbia che sfuma il quartiere
+    s.background = new THREE.Color(0x9fd3f0);
+    s.fog = new THREE.Fog(0x9fd3f0, 55, 150);
     s.add(new THREE.HemisphereLight(0xffffff, 0x6a5a4a, 1.4));
     s.add(this.fx.group);
     const sun = new THREE.DirectionalLight(0xffffff, 1.3);
@@ -233,10 +352,7 @@ export class TruckInterior {
 
     const W = this.width;
     const depth = COUNTER_Z - BACK + 0.3;
-    const outside = new THREE.Mesh(new THREE.PlaneGeometry(90, 60), new THREE.MeshLambertMaterial({ color: 0xb9bfd1 }));
-    outside.rotation.x = -Math.PI / 2;
-    outside.position.y = -0.01;
-    s.add(outside);
+    this.buildOutside();
     const floor = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, depth), new THREE.MeshLambertMaterial({ color: this.layout.floor }));
     floor.position.set(this.center, 0, (BACK + COUNTER_Z) / 2);
     s.add(floor);
@@ -982,9 +1098,20 @@ export class TruckInterior {
 
   // ---------------- aggiornamento ----------------
 
+  private skyT = 99;
+
   update(dt: number) {
     const s = this.game.state;
     const gm = dt * TIME.GAME_MIN_PER_SEC;
+    // il cielo fuori segue l'ora del giorno, come in città
+    this.skyT += dt;
+    if (this.skyT > 1) {
+      this.skyT = 0;
+      this.game.updateLighting();
+      const sky = this.game.scene.background as THREE.Color;
+      (this.scene.background as THREE.Color).copy(sky);
+      this.scene.fog?.color.copy(sky);
+    }
     // all'ora di chiusura, servito l'ultimo cliente, si esce e la porta resta chiusa fino al mattino
     if (!isOpenHour(s) && !this.customers.length && !this.opts.preview && !this.tut) {
       toast(`🔒 L'attività ha chiuso: riapre alle ${BUSINESS.OPEN_HOUR}:00`, 'info');

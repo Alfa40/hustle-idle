@@ -20,7 +20,9 @@
   (es. lotto dei minigiochi `lotSize()` in src/minigames/arena.ts).
 - **Minigiochi nello stesso posto**: la scena di un lavoretto è separata dalla città, ma fuori dal lotto deve
   esserci il vero quartiere attorno al posto dove il lavoretto è stato accettato (stessa casa, stesse vie,
-  case, palazzi, parchi): per il giocatore è lo stesso posto.
+  case, palazzi, parchi): per il giocatore è lo stesso posto. Vale anche per l'interno delle attività
+  (food truck nel suo parco, negozio dentro il suo palazzo): stesso codice, `buildSurroundings()` in
+  src/world/surroundings.ts.
 - **Scala del mondo**: le misure della città passano da `WS` (src/config/map.ts). Edifici, strade e distanze dalle tessere si moltiplicano per `WS`; personaggi, veicoli e oggetti di scena no. Nei lavoretti usare `frame()`/`zoneFor()` (già in scala).
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push
