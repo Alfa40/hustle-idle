@@ -9,8 +9,49 @@ export class Input {
   /** ultimo tocco breve (coordinate schermo), da consumare */
   tap: { x: number; y: number } | null = null;
   actionHeld = false;
-  /** prima persona: la metà destra dello schermo serve a guardarsi intorno */
-  lookMode = false;
+  /**
+   * Prima persona (minigiochi): quadrato in basso a sinistra = joystick, quadrato in basso a destra =
+   * sguardo, tutto il resto dello schermo (centro e parte alta) = azioni. Lati invertibili.
+   */
+  private fp = false;
+  get lookMode() {
+    return this.fp;
+  }
+  set lookMode(v: boolean) {
+    if (v === this.fp) return;
+    this.fp = v;
+    document.body.classList.toggle('fp-controls', v);
+    this.placePads();
+  }
+  private movePad!: HTMLDivElement;
+  private lookPad!: HTMLDivElement;
+
+  /** I due quadrati della prima persona (pixel): joystick e sguardo, in basso, dentro la safe area. */
+  fpZones() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const css = getComputedStyle(document.documentElement);
+    const v = (n: string) => parseFloat(css.getPropertyValue(n)) || 0;
+    const side = Math.round(Math.min(w * 0.4, h * 0.3, 230));
+    const bottom = h - v('--sab') - 14 - side;
+    const landscape = w > h;
+    // in orizzontale lo sguardo sta a sinistra della colonna dei pulsanti
+    const rightEdge = w - v('--sar') - 14 - (landscape ? v('--hud-w') + 8 : 0);
+    const leftEdge = v('--sal') + 14;
+    const a = { x: leftEdge, y: bottom, w: side, h: side };
+    const b = { x: rightEdge - side, y: bottom, w: side, h: side };
+    return settings.swapControls ? { move: b, look: a } : { move: a, look: b };
+  }
+
+  private placePads() {
+    if (!this.movePad) return;
+    const z = this.fpZones();
+    for (const [el, r] of [[this.movePad, z.move], [this.lookPad, z.look]] as const) {
+      el.style.left = `${r.x}px`;
+      el.style.top = `${r.y}px`;
+      el.style.width = el.style.height = `${r.w}px`;
+    }
+  }
   /** spostamento del dito per guardarsi intorno (pixel), da consumare */
   look = { x: 0, y: 0 };
   private lookId: number | null = null;
@@ -32,8 +73,6 @@ export class Input {
    * non gira lo sguardo: tenendo il dito e trascinando si lavora su quello che c'è sotto.
    */
   onActionClaim: ((x: number, y: number) => boolean) | null = null;
-  /** prima persona: c'è un'azione da "tenere premuto" adesso? (se no, il dito fermo non fa niente) */
-  holdAvailable: (() => boolean) | null = null;
   /** dove sta il dito nella metà delle azioni (pixel), null se non c'è */
   actionPos: { x: number; y: number } | null = null;
   private actClaimed = false;
@@ -55,6 +94,15 @@ export class Input {
     this.knob.className = 'joy-knob';
     this.stick.appendChild(this.knob);
     document.body.appendChild(this.stick);
+    // i due quadrati della prima persona (solo disegnati: il tocco arriva comunque alla scena)
+    this.movePad = document.createElement('div');
+    this.movePad.className = 'fp-pad fp-move';
+    this.movePad.innerHTML = '<span>🕹️<b>Muoviti</b></span>';
+    this.lookPad = document.createElement('div');
+    this.lookPad.className = 'fp-pad fp-look';
+    this.lookPad.innerHTML = '<span>👀<b>Guarda</b></span>';
+    document.body.append(this.movePad, this.lookPad);
+    window.addEventListener('resize', () => this.placePads());
 
     surface.addEventListener('pointerdown', (e) => this.down(e));
     window.addEventListener('pointermove', (e) => this.moveEv(e));
@@ -98,17 +146,8 @@ export class Input {
 
   private down(e: PointerEvent) {
     if (!this.enabled) return;
-    // il dito tocca direttamente l'oggetto da lavorare (es. una macchia sull'auto), in qualsiasi
-    // punto dello schermo: si lavora subito, e trascinare non gira lo sguardo né muove
-    if (this.lookMode && this.onActionClaim?.(e.clientX, e.clientY)) {
-      // un dito rimasto "appeso" (pointerup perso) non blocca il nuovo tocco
-      if (this.actionId !== null) this.releaseAction();
-      this.actionId = e.pointerId;
-      this.actionPos = { x: e.clientX, y: e.clientY };
-      this.actClaimed = true;
-      this.actLook = false;
-      this.actionHeld = true;
-      this.onActionDown?.();
+    if (this.fp) {
+      this.downFirstPerson(e);
       return;
     }
     // metà dello schermo delle azioni (di solito la destra): toccare o tenere premuto fa l'azione
@@ -119,20 +158,6 @@ export class Input {
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = false;
-      if (this.lookMode) {
-        // prima persona: trascinando si gira lo sguardo; un tocco breve o il dito fermo fanno l'azione
-        this.actStart = { x: e.clientX, y: e.clientY, t: performance.now() };
-        this.lookLast = { x: e.clientX, y: e.clientY };
-        this.actLook = false;
-        // il dito fermo diventa "tieni premuto" solo se c'è un'azione da tenere premuta adesso
-        this.actHoldTimer = window.setTimeout(() => {
-          if (this.actionId === e.pointerId && !this.actLook && (this.holdAvailable?.() ?? true)) {
-            this.actionHeld = true;
-            this.onActionDown?.();
-          }
-        }, 220);
-        return;
-      }
       this.actionPressed = true;
       this.actionHeld = true;
       this.onActionDown?.();
@@ -145,34 +170,49 @@ export class Input {
     this.dragging = false;
   }
 
-  /** prima persona: inizio del tocco nella metà delle azioni, e se è diventato un "guardarsi attorno" */
-  private actStart = { x: 0, y: 0, t: 0 };
-  private actLook = false;
-  private actHoldTimer = 0;
+  private inside(r: { x: number; y: number; w: number; h: number }, x: number, y: number) {
+    return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+  }
+
+  /** Prima persona: quadrato del joystick, quadrato dello sguardo, il resto è per le azioni. */
+  private downFirstPerson(e: PointerEvent) {
+    const z = this.fpZones();
+    // il dito tocca l'oggetto da lavorare (es. una macchia sull'auto): si lavora lì
+    if (!this.inside(z.move, e.clientX, e.clientY) && !this.inside(z.look, e.clientX, e.clientY) && this.onActionClaim?.(e.clientX, e.clientY)) {
+      if (this.actionId !== null) this.releaseAction();
+      this.actionId = e.pointerId;
+      this.actionPos = { x: e.clientX, y: e.clientY };
+      this.actClaimed = true;
+      this.actionHeld = true;
+      this.onActionDown?.();
+      return;
+    }
+    if (this.inside(z.move, e.clientX, e.clientY)) {
+      if (this.pointerId !== null) this.releaseStick();
+      this.pointerId = e.pointerId;
+      this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this.dragging = false;
+      return;
+    }
+    if (this.inside(z.look, e.clientX, e.clientY)) {
+      this.lookId = e.pointerId;
+      this.lookLast = { x: e.clientX, y: e.clientY };
+      return;
+    }
+    // centro e parte alta: tocco = azione "tocca", dito tenuto = "tieni premuto"
+    if (this.actionId !== null) this.releaseAction();
+    this.actionId = e.pointerId;
+    this.actionPos = { x: e.clientX, y: e.clientY };
+    this.actClaimed = true;
+    this.actionPressed = true;
+    this.actionHeld = true;
+    this.onActionDown?.();
+  }
+
 
   private moveEv(e: PointerEvent) {
     if (e.pointerId === this.actionId) this.actionPos = { x: e.clientX, y: e.clientY };
     if (e.pointerId === this.actionId && this.actClaimed) return;
-    if (e.pointerId === this.actionId && this.lookMode) {
-      // basta spostare un po' il dito per guardarsi attorno, anche dopo averlo tenuto fermo
-      // (se stava "tenendo premuto" un'azione, la si lascia: muovere vince)
-      const moved = Math.hypot(e.clientX - this.actStart.x, e.clientY - this.actStart.y);
-      if (!this.actLook && moved > (this.actionHeld ? 18 : 8)) {
-        this.actLook = true;
-        clearTimeout(this.actHoldTimer);
-        if (this.actionHeld) {
-          this.actionHeld = false;
-          this.onActionUp?.();
-        }
-        this.lookLast = { x: e.clientX, y: e.clientY };
-      }
-      if (this.actLook) {
-        this.look.x += e.clientX - this.lookLast.x;
-        this.look.y += e.clientY - this.lookLast.y;
-      }
-      this.lookLast = { x: e.clientX, y: e.clientY };
-      return;
-    }
     if (e.pointerId === this.lookId) {
       this.look.x += e.clientX - this.lookLast.x;
       this.look.y += e.clientY - this.lookLast.y;
@@ -200,12 +240,6 @@ export class Input {
     if (e.pointerId === this.actionId) {
       this.actionId = null;
       this.actionPos = null;
-      clearTimeout(this.actHoldTimer);
-      // prima persona: un tocco breve senza trascinare è un'azione "tocca"
-      if (this.lookMode && !this.actClaimed && !this.actLook && !this.actionHeld && performance.now() - this.actStart.t < 400) {
-        this.actionPressed = true;
-        this.onActionDown?.();
-      }
       this.actionHeld = false;
       this.onActionUp?.();
       return;
@@ -230,8 +264,6 @@ export class Input {
   private releaseAction() {
     this.actionId = null;
     this.actionPos = null;
-    clearTimeout(this.actHoldTimer);
-    this.actLook = false;
     this.actClaimed = false;
     if (this.actionHeld) {
       this.actionHeld = false;

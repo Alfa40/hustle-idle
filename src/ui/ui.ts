@@ -203,8 +203,6 @@ export class UI {
       if (this.actionPrompt && this.actionPrompt.progress === undefined) this.flashT = performance.now();
     };
     inp.onActionUp = () => document.body.classList.remove('act-pressed');
-    // il dito fermo vale "tieni premuto" solo se adesso c'è un'azione da tenere premuta
-    inp.holdAvailable = () => !!this.actionPrompt && this.actionPrompt.progress !== undefined;
     document.body.append(act, ring, stand, zone, lbl);
     const side = () => document.body.classList.toggle('swap-controls', settings.swapControls);
     side();
@@ -2199,6 +2197,7 @@ export class UI {
             Per muoverti trascina il dito nella metà ${moveSide()} dello schermo: compare un joystick.
             Quando sei sul cerchio a terra davanti a una persona o a un oggetto (l'oggetto pulsa), tocca la <b>metà ${actSide()}</b> dello schermo; se c'è scritto "Tieni premuto" tieni il dito lì finché il cerchio si riempie.
             In ⚙️ Opzioni puoi invertire i lati.
+            Nei lavoretti (in prima persona): quadrato 🕹️ in basso a ${moveSide()} per camminare, quadrato 👀 in basso a ${actSide()} per guardarti attorno, e tocca o tieni premuto al centro dello schermo per le azioni.
             Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
       },

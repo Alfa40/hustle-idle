@@ -19,7 +19,7 @@ function toggle(key: Toggle, label: string, hint: string) {
 /** Controlli delle impostazioni: uguali nella schermata iniziale e in partita. */
 export function settingsHtml() {
   return [
-    toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: ti muovi trascinando il dito nella metà sinistra dello schermo e fai le azioni toccando la metà destra. Acceso: il contrario.'),
+    toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: ti muovi trascinando il dito nella metà sinistra dello schermo e fai le azioni toccando la metà destra (nei lavoretti: joystick in basso a sinistra, sguardo in basso a destra). Acceso: il contrario.'),
     toggle('battery', '🔋 Risparmio batteria', 'Il gioco disegna 30 immagini al secondo (15 quando non tocchi lo schermo) e con un po\' meno dettaglio: consuma circa la metà.'),
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),

@@ -909,3 +909,18 @@ body.swap-controls .ctl-hint .ctl-act { right: auto; left: 0; border-radius: 0 2
 /* ---------- minigioco (scena separata in prima persona) ---------- */
 /* la città non c'è: niente minimappa né freccette verso i lavoretti */
 body.in-arena .hud-right .minimap, body.in-arena .edge-ptr { display: none !important; }
+
+/* ---------- prima persona: quadrato joystick e quadrato sguardo in basso ---------- */
+/* solo disegnati (il tocco arriva alla scena e Input lo smista); il resto dello schermo è per le azioni */
+.fp-pad {
+  position: fixed; z-index: 3; display: none; pointer-events: none; box-sizing: border-box;
+  border: 2px dashed rgba(255,255,255,.55); border-radius: 22px; background: rgba(30,30,50,.12);
+}
+body.fp-controls .fp-pad { display: flex; align-items: flex-end; justify-content: center; }
+.fp-pad span {
+  margin-bottom: 8px; font-size: 18px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); opacity: .8;
+  display: flex; align-items: center; gap: 4px;
+}
+.fp-pad span b { font-size: 12px; font-weight: 800; }
+/* in prima persona la zona delle azioni (per la manina del tutorial) è il centro dello schermo */
+body.fp-controls .act-zone { left: 18%; right: 18%; top: 32%; bottom: 34%; }

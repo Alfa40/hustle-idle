@@ -131,7 +131,7 @@ export class JobTutorial {
       body = '⚠️ Sei uscito dalla zona di lavoro: <b>torna dentro i coni</b>';
     } else if (g.task && !g.near) {
       body = tip;
-      foot = `🚶 Avvicinati all'oggetto che si illumina: trascina il dito a ${moveSide()} per camminare, a ${actSide()} per <b>guardarti attorno</b>. Se resti fermo 3 secondi lo sguardo va da solo verso l'obiettivo`;
+      foot = `🚶 Avvicinati all'oggetto che si illumina: usa il quadrato 🕹️ in basso a ${moveSide()} per <b>camminare</b> e quello 👀 in basso a ${actSide()} per <b>guardarti attorno</b>. Se resti fermo 3 secondi lo sguardo va da solo verso l'obiettivo`;
       anchor = g.task.pos;
     } else if (g.task?.aim) {
       // punti da toccare direttamente sull'oggetto (macchie sull'auto)
@@ -143,7 +143,7 @@ export class JobTutorial {
     } else if (g.task) {
       body = tip;
       gesture = g.task.kind;
-      foot = gesture === 'hold' ? `✊ <b>Tieni il dito sulla metà ${actSide()}</b> dello schermo finché il cerchio si riempie` : `👆 <b>Tocca la metà ${actSide()}</b> dello schermo`;
+      foot = gesture === 'hold' ? '✊ <b>Tieni il dito al centro dello schermo</b> finché il cerchio si riempie' : '👆 <b>Tocca il centro dello schermo</b>';
       anchor = g.task.pos;
     } else {
       body = tip;
