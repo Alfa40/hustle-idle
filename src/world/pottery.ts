@@ -349,6 +349,8 @@ export class PotteryStudio {
 
   /** dove era il dito al fotogramma prima (per sapere se si avvicina al centro o si allontana) */
   private dragPrev: { x: number; y: number } | null = null;
+  /** quanto ha già scorso il dito in questa passata (px) */
+  private dragLen = 0;
 
   /**
    * Il dito che si muove in orizzontale: verso il centro del vaso lo stringe, verso i lati lo allarga,
@@ -368,11 +370,16 @@ export class PotteryStudio {
     const b = c.clone().addScaledVector(right, 0.1).project(this.camera);
     const cx = ((a.x + 1) / 2) * w;
     const pxPerM = Math.max(1, (Math.abs(b.x - a.x) / 2) * w / 0.1);
-    const dr = (Math.abs(x - cx) - Math.abs(prev.x - cx)) / pxPerM;
-    if (!dr) return false;
+    const move = Math.abs(x - cx) - Math.abs(prev.x - cx);
+    if (!move) return false;
+    // tocco delicato: all'inizio della passata il vaso cambia poco (correzioni fini); più si scorre,
+    // più la modifica cresce (fino a seguire il dito). Ogni volta che si alza il dito si riparte piano.
+    this.dragLen += Math.abs(x - prev.x);
+    const gain = 0.15 + 0.75 * THREE.MathUtils.smoothstep(this.dragLen, 10, 180);
+    const dr = (move / pxPerM) * gain;
     for (let i = 0; i < RINGS; i++) {
       const wgt = Math.exp(-((i - rf) ** 2) / (2 * 0.7 ** 2));
-      this.radii[i] = THREE.MathUtils.clamp(this.radii[i] + dr * 0.9 * wgt, MIN_R, MAX_R);
+      this.radii[i] = THREE.MathUtils.clamp(this.radii[i] + dr * wgt, MIN_R, MAX_R);
     }
     return true;
   }
@@ -602,7 +609,10 @@ export class PotteryStudio {
             const rf = this.ringAtHeight(input.actionPos.y);
             if (rf !== null && Math.random() < 0.35) this.fx.emit('bubble', this.vase!.position.clone().setY(this.vase!.position.y + (rf / (RINGS - 1)) * VASE_H), 1, 0xb5764f);
           }
-        } else this.dragPrev = null;
+        } else {
+          this.dragPrev = null;
+          this.dragLen = 0;
+        }
       }
       const rf = st.kind === 'paint' && input.actionHeld && input.actionPos ? this.ringUnder(input.actionPos.x, input.actionPos.y) : null;
       if (rf !== null) {
