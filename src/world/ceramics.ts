@@ -49,14 +49,20 @@ export const GLAZES: { color: number; name: string }[] = [
   { color: 0xf3efe6, name: 'bianco latte' },
 ];
 
-/** Punti del profilo per la LatheGeometry: fondo, fianco (le fasce) e bordo della bocca. */
+/**
+ * Punti del profilo per la LatheGeometry: fondo, fianco esterno (le fasce), bordo della bocca e poi
+ * la parete interna, che segue la stessa forma un po' più dentro fino al fondo. Così l'interno non
+ * esce mai dal vaso (niente anello in cima quando il collo è stretto) e dall'alto si vede che è vuoto.
+ */
 function lathePoints(profile: number[], h: number) {
-  const pts: THREE.Vector2[] = [new THREE.Vector2(0, 0)];
+  const T = 0.014;
   const n = profile.length;
-  for (let i = 0; i < n; i++) pts.push(new THREE.Vector2(Math.max(0.01, profile[i]), (i / (n - 1)) * h));
-  // bordo spesso e un po' di interno: dall'alto si vede che è vuoto
-  const lip = profile[n - 1];
-  pts.push(new THREE.Vector2(Math.max(0.008, lip - 0.016), h), new THREE.Vector2(Math.max(0.006, lip - 0.02), h - 0.06));
+  const y = (i: number) => (i / (n - 1)) * h;
+  const pts: THREE.Vector2[] = [new THREE.Vector2(0, 0)];
+  for (let i = 0; i < n; i++) pts.push(new THREE.Vector2(Math.max(0.01, profile[i]), y(i)));
+  // dentro: dalla bocca verso il basso, sempre `T` più stretto dell'esterno
+  for (let i = n - 1; i >= 1; i--) pts.push(new THREE.Vector2(Math.max(0.004, profile[i] - T), Math.max(T, y(i) - (i === n - 1 ? 0.004 : 0))));
+  pts.push(new THREE.Vector2(0, T));
   return pts;
 }
 
@@ -75,8 +81,8 @@ export function vaseGeometry(profile: number[], h = VASE_H, paint?: number[], gl
     const c = new THREE.Color();
     for (let v = 0; v < g.attributes.position.count; v++) {
       const j = v % per;
-      // j = 0 fondo, 1…n fasce, poi il bordo (stesso colore dell'ultima fascia)
-      const ring = THREE.MathUtils.clamp(j - 1, 0, n - 1);
+      // j = 0 fondo, 1…n fasce esterne, poi le stesse fasce all'interno (dalla bocca in giù)
+      const ring = j <= n ? THREE.MathUtils.clamp(j - 1, 0, n - 1) : THREE.MathUtils.clamp(2 * n - j, 0, n - 1);
       c.copy(CLAY_COL).lerp(gc, THREE.MathUtils.clamp(paint[ring], 0, 1));
       colors[v * 3] = c.r;
       colors[v * 3 + 1] = c.g;
