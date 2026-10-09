@@ -652,6 +652,8 @@ export class PotteryStudio {
   }
 
   private lockT = 0;
+  /** distanza della camera dal vaso al tornio (segue piano la larghezza del vaso) */
+  private camD = 0;
   private camFrom: { pos: THREE.Vector3; quat: THREE.Quaternion } | null = null;
 
   /**
@@ -667,18 +669,29 @@ export class PotteryStudio {
     this.lockT = Math.min(1, this.lockT + dt / 0.45);
     const free = layout.freeRect(STUDIO_UI());
     const { w, h } = layout.info;
-    const vf = THREE.MathUtils.degToRad(cam.fov);
+    // zoom stretto (come un teleobiettivo): il vaso grande e dritto, senza la deformazione della
+    // visuale larga della prima persona; finita la forma si torna alla visuale di sempre
+    const zoom = THREE.MathUtils.lerp(firstPersonFov(w / h), 30, THREE.MathUtils.smoothstep(this.lockT, 0, 1));
+    if (Math.abs(cam.fov - zoom) > 0.01) {
+      cam.fov = zoom;
+      cam.updateProjectionMatrix();
+    }
+    const vf = THREE.MathUtils.degToRad(30);
     const hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
-    // il vaso (con un po' di margine) occupa ~78% dell'altezza libera e ~80% della larghezza libera
-    const dH = (VASE_H + 0.12) / (0.78 * (free.h / h) * 2 * Math.tan(vf / 2));
-    const dW = (MAX_R * 2 + 0.04) / (0.85 * (free.w / w) * 2 * Math.tan(hf / 2));
-    const d = Math.max(dH, dW, 0.45);
+    // il vaso com'è adesso (non il più largo possibile) riempie quasi tutta la zona libera:
+    // ~90% dell'altezza o della larghezza libera; se lo allarghi la camera si allontana piano
+    const wide = Math.max(...this.radii) * 2 + 0.05;
+    const dH = (VASE_H + 0.06) / (0.9 * (free.h / h) * 2 * Math.tan(vf / 2));
+    const dW = wide / (0.9 * (free.w / w) * 2 * Math.tan(hf / 2));
+    const fit = Math.max(dH, dW, 0.5);
+    this.camD = this.camD ? this.camD + (fit - this.camD) * Math.min(1, dt * 3) : fit;
+    const d = this.camD;
     const c = this.vase!.position.clone().setY(this.vase!.position.y + VASE_H / 2);
-    // dalla parte dove sta il giocatore (davanti al tornio), un po' più in alto
+    // dalla parte dove sta il giocatore (davanti al tornio), appena dall'alto (si vede la bocca)
     const dir = new THREE.Vector3(this.player.root.position.x - c.x, 0, this.player.root.position.z - c.z);
     if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
     dir.normalize();
-    const tilt = 0.32;
+    const tilt = 0.14;
     const want = c.clone().addScaledVector(dir, d * Math.cos(tilt)).setY(c.y + d * Math.sin(tilt));
     const look = new THREE.Matrix4().lookAt(want, c, new THREE.Vector3(0, 1, 0));
     const wantQ = new THREE.Quaternion().setFromRotationMatrix(look);
@@ -705,7 +718,9 @@ export class PotteryStudio {
    * dopo 3 s fermo la testa si gira da sola verso ciò che serve (se non si vede già).
    */
   private placeEyes(dt: number) {
+    if (this.lockT > 0) this.resize();
     this.lockT = 0;
+    this.camD = 0;
     const input = this.game.input;
     const l = input.consumeLook();
     const busy = l.x || l.y || Math.hypot(input.vector.x, input.vector.y) > 0.05 || input.actionHeld || input.actionPos;
