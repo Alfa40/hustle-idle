@@ -32,6 +32,12 @@ export interface Ledger {
   costs: number;
   served: number;
   lost: number;
+  /** perché si sono persi i clienti: personale che non basta, prodotti finiti, fila mentre lavori tu */
+  lostStaff?: number;
+  lostStock?: number;
+  lostQueue?: number;
+  /** domanda più alta vista nel periodo (clienti all'ora): le ore di punta per cui serve il personale */
+  peak?: number;
 }
 
 export interface Business {

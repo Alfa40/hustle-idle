@@ -989,5 +989,6 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .report-alert .btn { flex: none; margin-left: auto; }
 .report-alert.short { background: #ffe6e9; color: #9b1c2c; border: 2px solid #ffb3bd; }
 .report-alert.excess { background: #fff4d6; color: #7a5300; border: 2px solid #ffd27a; }
+.report-alert.stock { background: #e6f2ff; color: #1d4f8a; border: 2px solid #a9cdf5; }
 .report-alert.big { display: block; margin: 0 0 10px; font-size: 14px; }
 .card.has-alert { border: 2px solid #ffb3bd; }

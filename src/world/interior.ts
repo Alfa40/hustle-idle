@@ -8,7 +8,7 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { missionProgress } from '../sim/calendar';
 import {
-  CHAR_MODELS, employeeGainXp, employeeRate, isOpenHour, lostCustomer, pickProduct, recordSale, restock, totalDemand, upg,
+  CHAR_MODELS, employeeGainXp, employeeRate, isOpenHour, lostCustomer, notePeak, pickProduct, recordSale, restock, totalDemand, upg,
 } from '../sim/economy';
 import { addFame, addXp, skillLevel } from '../sim/progress';
 import { playStats, type Business, type Employee } from '../sim/state';
@@ -913,7 +913,7 @@ export class TruckInterior {
   private spawnCustomer(tutorial?: ProductId) {
     const ok = this.makeable();
     if (!tutorial && (this.customers.length >= BUSINESS.MAX_QUEUE || !ok.length)) {
-      if (!this.sandbox) lostCustomer(this.biz);
+      if (!this.sandbox) lostCustomer(this.biz, !ok.length ? 'stock' : 'queue');
       return;
     }
     // ordini più grandi quando il locale cresce
@@ -1126,6 +1126,7 @@ export class TruckInterior {
         this.spawnCustomer();
       }
     } else if (isOpenHour(s)) {
+      notePeak(this.biz, totalDemand(s, this.biz));
       this.spawnAcc += (totalDemand(s, this.biz) * gm) / 60;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
@@ -1190,7 +1191,7 @@ export class TruckInterior {
       (c.bubble.material as THREE.SpriteMaterial).color.setRGB(1, 0.55 + 0.45 * f, 0.55 + 0.45 * f);
       if (c.patience <= 0) {
         if (!this.sandbox) {
-          lostCustomer(this.biz);
+          lostCustomer(this.biz, 'queue');
           addFame(this.game.state, 'clientela', -0.2);
         }
         this.removeCustomer(c, false);

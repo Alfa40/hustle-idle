@@ -63,6 +63,35 @@ interface Panel {
   money?: boolean | (() => boolean);
 }
 
+/**
+ * Salva lo scorrimento (orizzontale e verticale) di ogni elemento che scorre dentro `root` e restituisce
+ * la funzione che lo rimette dopo aver ridisegnato il contenuto. Gli elementi si ritrovano per classi e
+ * posizione (la n-esima riga di schede resta la n-esima).
+ */
+function keepScroll(root: HTMLElement) {
+  const saved: { sel: string; i: number; left: number; top: number }[] = [];
+  for (const el of root.querySelectorAll<HTMLElement>('*')) {
+    if (!el.scrollLeft && !el.scrollTop) continue;
+    const sel = el.tagName.toLowerCase() + [...el.classList].map((c) => '.' + CSS.escape(c)).join('');
+    const i = [...root.querySelectorAll(sel)].indexOf(el);
+    saved.push({ sel, i, left: el.scrollLeft, top: el.scrollTop });
+  }
+  return () => {
+    for (const k of saved) {
+      const el = root.querySelectorAll<HTMLElement>(k.sel)[k.i];
+      if (!el) continue;
+      el.scrollLeft = k.left;
+      el.scrollTop = k.top;
+      // controllo (solo in sviluppo): se lo scorrimento non torna dov'era è un bug da sistemare
+      // (le prove automatiche lo vedono come errore in console)
+      if (import.meta.env.DEV && (Math.abs(el.scrollLeft - k.left) > 2 || Math.abs(el.scrollTop - k.top) > 2) &&
+        el.scrollWidth - el.clientWidth >= k.left && el.scrollHeight - el.clientHeight >= k.top) {
+        console.error(`[scroll] posizione persa dopo il ridisegno: ${k.sel} (${k.left},${k.top} → ${el.scrollLeft},${el.scrollTop})`);
+      }
+    }
+  };
+}
+
 /** Soldi al secondo con i centesimi (es. "€1,70/s"). */
 const perSec = (v: number) => `€${v.toFixed(2).replace('.', ',')}/s`;
 
@@ -661,7 +690,10 @@ export class UI {
     sb.addEventListener('touchstart', () => (this.touching = true), { passive: true });
     sb.addEventListener('touchend', () => (this.touching = false), { passive: true });
     sb.addEventListener('touchcancel', () => (this.touching = false), { passive: true });
-    sb.addEventListener('scroll', () => (this.lastScroll = performance.now()), { passive: true });
+    // anche le righe interne che scorrono di lato (l'evento non sale: si ascolta in cattura)
+    modal.addEventListener('scroll', () => (this.lastScroll = performance.now()), { passive: true, capture: true });
+    modal.addEventListener('touchstart', () => (this.touching = true), { passive: true });
+    modal.addEventListener('touchend', () => (this.touching = false), { passive: true });
     this.touching = false;
     this.lastHtml = '';
     document.body.appendChild(modal);
@@ -684,11 +716,17 @@ export class UI {
     this.lastHtml = html;
     const [tabs, content] = html.includes('<!--tabs-->') ? html.split('<!--tabs-->') : ['', html];
     const tabsEl = this.modal.querySelector('.tabs-slot') as HTMLElement;
+    // REGOLA: ridisegnare una finestra non deve mai far perdere dove l'utente ha scorso, né in verticale
+    // né nelle righe che scorrono di lato (schede, gruppi, carte): si salvano e si rimettono uguali
+    const keepTabs = keepScroll(tabsEl);
+    const keepBody = keepScroll(body);
     if (tabsEl.innerHTML !== tabs) tabsEl.innerHTML = tabs;
     body.innerHTML = content;
     // prima si ridisegna (il canvas cambia l'altezza), poi si ripristina lo scorrimento
     this.panel.after?.(body);
     body.scrollTop = scroll;
+    keepTabs();
+    keepBody();
     (this.modal.querySelector('h2') as HTMLElement).textContent = this.panel.title;
     this.updateHeadMoney();
   }
@@ -920,6 +958,10 @@ export class UI {
           this.close();
           this.openBusiness(id, 'personale');
         },
+        stockOf: (id) => {
+          this.close();
+          this.openBusiness(id, 'magazzino');
+        },
         ...this.buyActions(),
       },
     });
@@ -983,7 +1025,7 @@ export class UI {
       const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
         <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
       // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
-      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : '💸'} ${w.text}</span><button class="btn sm" data-a="staff:${r.b.id}">👥 Personale</button></div>`).join('');
+      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : '💸'} ${w.text}</span>${w.kind === 'stock' ? `<button class="btn sm" data-a="stockOf:${r.b.id}">🧊 Magazzino</button>` : `<button class="btn sm" data-a="staff:${r.b.id}">👥 Personale</button>`}</div>`).join('');
       const cards = rows.map((r) => `<div class="card ${r.warn.length ? 'has-alert' : ''}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
@@ -997,7 +1039,7 @@ export class UI {
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.length).length;
-      const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} problemi di personale</b>: clienti persi o dipendenti di troppo. Guarda gli avvisi qui sotto.</div>` : '';
+      const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
       return top + `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
