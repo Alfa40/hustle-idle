@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { JobType } from '../config/jobs';
 import type { Game } from '../game';
 import type { JobRun } from '../minigames/jobs';
 import { toast } from '../sim/bus';
@@ -12,7 +11,8 @@ import { moveSide } from '../settings';
  */
 
 /** Cosa fare in ogni fase, con il perché (null = si usa il punto da fare, es. lavapiatti). */
-const TIPS: Record<JobType, string[] | null> = {
+/** Chiave: il tipo (versione di base) o `tipo:versione` (es. `giardino:1`, la potatura). */
+const TIPS: Record<string, string[] | null> = {
   giardino: [
     'Ti serve il <b>tosasiepi</b>: è nella <b>cassetta rossa</b>',
     'Taglia tutti i <b>cespugli</b> che si illuminano',
@@ -44,6 +44,19 @@ const TIPS: Record<JobType, string[] | null> = {
     'Lavoro finito: <b>togli i teloni</b>',
   ],
   piatti: null,
+  'giardino:1': [
+    'Ti servono le <b>cesoie da potatura</b>: sono nella <b>cassetta rossa</b>',
+    'Le <b>siepi</b> lungo la recinzione hanno delle <b>punte cresciute troppo</b> (verde chiaro): tagliale tutte',
+    'Gli <b>alberi</b> hanno dei <b>rami in eccesso</b> che sporgono: tagliali (alza lo sguardo!)',
+    'I rami tagliati sono caduti a terra: <b>raccoglili</b>',
+    'Butta i rami nella <b>cippatrice</b> arancione vicino alla casa',
+  ],
+};
+
+/** Per i punti da toccare direttamente: su cosa tenere il dito, per ogni fase (chiave del lavoretto). */
+const AIM_WHAT: Record<string, Record<number, string>> = {
+  lavaggio: { 1: 'sulla macchia', 3: 'sulla schiuma', 5: 'sulle gocce' },
+  'giardino:1': { 1: 'sulla punta della siepe', 2: 'sul ramo da tagliare' },
 };
 
 /** Per il lavapiatti: cosa vuol dire ogni punto (prendi → lava → appoggia, per ogni tavolo). */
@@ -55,7 +68,8 @@ const PIATTI: Record<string, string> = {
 };
 
 export class JobTutorial {
-  private type: JobType | null = null;
+  /** chiave del lavoretto (tipo o tipo:versione) */
+  private type: string | null = null;
   private run: JobRun | null = null;
   private bubble: HTMLDivElement;
   private hand: HTMLDivElement;
@@ -75,11 +89,11 @@ export class JobTutorial {
   }
 
   /** Il tutorial di questo lavoretto è già stato completato in questa partita. */
-  isDone(type: JobType) {
+  isDone(type: string) {
     return (this.game.state.jobTutorials ?? []).includes(type);
   }
 
-  start(type: JobType, run: JobRun) {
+  start(type: string, run: JobRun) {
     this.type = type;
     this.run = run;
     run.frozen = true;
@@ -136,8 +150,10 @@ export class JobTutorial {
     } else if (g.task?.aim) {
       // punti da toccare direttamente sull'oggetto (macchie sull'auto)
       body = tip;
-      const what = g.phase === 1 ? 'sulla macchia' : g.phase === 3 ? 'sulla schiuma' : 'sulle gocce';
-      foot = `👆 <b>Tieni il dito ${what}</b> sull'auto finché sparisce. Se lo togli prima, l'<b>anello giallo</b> ti mostra dove finire`;
+      const what = AIM_WHAT[this.type]?.[g.phase] ?? 'sul punto che si illumina';
+      foot = this.type === 'lavaggio'
+        ? `👆 <b>Tieni il dito ${what}</b> sull'auto finché sparisce. Se lo togli prima, l'<b>anello giallo</b> ti mostra dove finire`
+        : `👆 <b>Tieni il dito ${what}</b> finché è tagliato (se serve alza o gira lo sguardo trascinando il dito altrove)`;
       anchor = g.task.pos;
       aimAt = this.visibleAim(g.aims ?? []);
     } else if (g.task) {
@@ -169,7 +185,7 @@ export class JobTutorial {
     let bd = Infinity;
     for (const p of list) {
       const v = p.clone().project(cam);
-      if (v.z > 1 || Math.abs(v.x) > 0.85 || v.y > 0.4 || v.y < -0.9) continue;
+      if (v.z > 1 || Math.abs(v.x) > 0.85 || v.y > 0.7 || v.y < -0.9) continue;
       const d = Math.hypot(v.x, v.y + 0.3);
       if (d < bd) {
         bd = d;

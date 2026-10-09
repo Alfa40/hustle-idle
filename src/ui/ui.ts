@@ -5,7 +5,7 @@ import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/veh
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
 import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
-import { JOBS, JOB_TYPES } from '../config/jobs';
+import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
@@ -713,10 +713,10 @@ export class UI {
   // ---------------- lavori ----------------
 
   openJobOffer(offer: JobOffer) {
-    const def = JOBS[offer.type];
-    // il tutorial è acceso solo finché non hai completato quel tipo di lavoretto (vale per ogni livello);
-    // dopo resta spento, ma lo puoi riaccendere
-    let tut = !this.game.tutorial.isDone(offer.type);
+    const def = jobInfo(offer.type, offer.level);
+    // il tutorial è acceso solo finché non hai completato quel lavoretto (vale per ogni livello, ma ogni
+    // versione nuova del lavoretto, ogni 10 livelli, ha il suo); dopo resta spento, ma lo puoi riaccendere
+    let tut = !this.game.tutorial.isDone(def.key);
     this.open({
       title: `${def.icon} ${def.name}`,
       small: true,
@@ -745,7 +745,7 @@ export class UI {
 
   /** Fine del tutorial: nessuna ricompensa, il lavoretto resta da fare (la scheda si riapre da qui). */
   openTutorialDone(offer: JobOffer) {
-    const def = JOBS[offer.type];
+    const def = jobInfo(offer.type, offer.level);
     this.open({
       title: '🎓 Tutorial completato!',
       small: true,
@@ -764,7 +764,7 @@ export class UI {
   }
 
   openJobResult(offer: JobOffer, stars: number, pay: number, xp: number, fame: number) {
-    const def = JOBS[offer.type];
+    const def = jobInfo(offer.type, offer.level);
     const st = [1, 2, 3].map((i) => `<span class="${i <= stars ? '' : 'off'}">⭐</span>`).join('');
     this.open({
       title: stars ? (stars === 3 ? '🎉 Perfetto!' : '👍 Lavoro completato!') : '😓 Lavoro fallito',

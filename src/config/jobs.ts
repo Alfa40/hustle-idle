@@ -56,3 +56,45 @@ export const JOBS: Record<JobType, JobDef> = {
 };
 
 export const JOB_TYPES = Object.keys(JOBS) as JobType[];
+
+/**
+ * Ogni 10 livelli dell'esperienza del lavoretto, il lavoretto cambia: le persone offrono una versione
+ * nuova e diversa (es. dal Liv. 10 di manualità il giardino diventa la potatura di siepi e alberi).
+ * Missioni e statistiche restano per tipo; ogni versione ha il suo tutorial la prima volta.
+ */
+export interface JobVariant {
+  /** livello dell'esperienza da cui compare */
+  minLevel: number;
+  name: string;
+  icon: string;
+  intro: string;
+  steps: HowStep[];
+}
+
+export const JOB_VARIANTS: Partial<Record<JobType, JobVariant[]>> = {
+  giardino: [
+    {
+      minLevel: 10, name: 'Potatura di siepi e alberi', icon: '🌳',
+      intro: 'Prendi le cesoie, taglia le punte cresciute troppo sulle siepi e i rami in eccesso sugli alberi (tieni il dito proprio sulla punta o sul ramo), raccogli i rami caduti e buttali nella cippatrice.',
+      steps: [['🧰', 'Prendi le cesoie dalla cassetta rossa', 'tap'], ['✂️', 'Taglia le punte che sporgono dalle siepi', 'hold'], ['🪚', 'Taglia i rami in eccesso sugli alberi', 'hold'], ['🌿', 'Raccogli i rami caduti', 'tap'], ['🪵', 'Buttali nella cippatrice', 'tap']],
+    },
+  ],
+};
+
+/** Quale versione del lavoretto tocca a questo livello (0 = quella di base). */
+export function jobVariant(type: JobType, level: number) {
+  const vs = JOB_VARIANTS[type] ?? [];
+  let v = 0;
+  vs.forEach((x, i) => {
+    if (level >= x.minLevel) v = i + 1;
+  });
+  return v;
+}
+
+/** Il lavoretto com'è a questo livello (nome, icona, spiegazione) e la chiave per il suo tutorial. */
+export function jobInfo(type: JobType, level: number) {
+  const v = jobVariant(type, level);
+  const base = JOBS[type];
+  const over = v ? JOB_VARIANTS[type]![v - 1] : null;
+  return { ...base, ...(over ?? {}), variant: v, key: v ? `${type}:${v}` : type };
+}

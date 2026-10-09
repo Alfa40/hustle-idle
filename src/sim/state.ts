@@ -176,7 +176,8 @@ export interface GameState {
   /** scala del mondo con cui è stata salvata la posizione del giocatore */
   ws?: number;
   /** lavoretti di cui è stato completato il tutorial */
-  jobTutorials?: JobType[];
+  /** tutorial dei lavoretti già fatti: tipo, o tipo:versione per le versioni nuove (es. giardino:1) */
+  jobTutorials?: string[];
   /** tipi di attività (con interno) di cui si è già visto il tutorial della cucina */
   bizTutorials?: BusinessType[];
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */

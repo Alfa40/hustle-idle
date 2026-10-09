@@ -3,7 +3,7 @@ import { fetchFriendRequests, fetchFriends, ping as pingOnline, submit as submit
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
 import { BUSINESS, JOB, jobDifficulty, TIME } from './config/balance';
-import { JOBS, JOB_TYPES, type JobType } from './config/jobs';
+import { jobInfo, JOBS, JOB_TYPES, type JobType } from './config/jobs';
 import { LOTS, OLD_HALF, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
 import { Input } from './input';
@@ -30,7 +30,7 @@ import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
 import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interior';
 import { hasInterior } from './config/recipes';
-import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, routeStreetJob, IndoorRun, VisitRun, type JobRun } from './minigames/jobs';
+import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, pruneArenaJob, routeStreetJob, IndoorRun, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
 import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
@@ -917,7 +917,7 @@ export class Game {
     const marker = exclamation();
     marker.position.y = 2.1;
     char.root.add(marker);
-    const def = JOBS[offer.type];
+    const def = jobInfo(offer.type, offer.level);
     const inter = this.addInteractable({
       pos: slot.pos, radius: 1.9, label: def.name, icon: def.icon,
       action: () => this.ui.openJobOffer(offer),
@@ -946,12 +946,17 @@ export class Game {
     if (npc) npc.char.root.visible = false;
     this.runOffer = offer;
     const slot = this.slotsFor(offer.type)[offer.slot];
-    const def = JOBS[offer.type];
+    const def = jobInfo(offer.type, offer.level);
     if (!def.vehicleOk) this.dismount();
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     switch (offer.type) {
-      case 'giardino': this.run = gardenArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title); break;
+      case 'giardino': {
+        const arena = this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed }));
+        // dal Liv. 10 di manualità: potatura di siepi e alberi
+        this.run = def.variant >= 1 ? pruneArenaJob(this, lv, arena, title) : gardenArenaJob(this, lv, arena, title);
+        break;
+      }
       case 'consegna': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package'); break;
       case 'volantini': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer'); break;
       case 'piatti': {
@@ -963,7 +968,7 @@ export class Game {
       case 'lavaggio': this.run = carWashArenaJob(this, lv, this.enterArena(new Arena({ size: carWashLot(lv), slot, placed: this.city.placed })), title); break;
       case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title); break;
     }
-    if (tutorial && this.run) this.tutorial.start(offer.type, this.run);
+    if (tutorial && this.run) this.tutorial.start(def.key, this.run);
     this.ui.jobBar(true);
   }
 
@@ -1179,7 +1184,7 @@ export class Game {
       addXp(s, def.skill, xp);
       addFame(s, def.skill, fame);
       // fatto sul serio almeno una volta: il tutorial di questo tipo resta spento (a ogni livello)
-      s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), offer.type])];
+      s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), jobInfo(offer.type, offer.level).key])];
       const st = playStats(s);
       st.jobs++;
       if (stars === 3) st.jobs3++;
@@ -1278,7 +1283,7 @@ export class Game {
     if (this.run?.target) add(this.run.target, { id: 'target', icon: '🎯', color: '#ff3b5c', label: 'Obiettivo del lavoro', kind: 'target', cat: 'target' });
     else if (!this.run) {
       for (const n of this.npcs.values()) {
-        const d = JOBS[n.offer.type];
+        const d = jobInfo(n.offer.type, n.offer.level);
         add(n.char.root.position, {
           id: 'job:' + n.offer.id, icon: d.icon, color: '#ffc21a', label: d.name, sub: `Lavoretto · €${n.offer.pay} · liv. ${n.offer.level}`,
           kind: 'job', cat: 'jobs', keywords: `lavoro lavoretto ${SKILLS[d.skill].name}`,

@@ -358,3 +358,80 @@ export function postbox(color: number) {
   part(g, new THREE.BoxGeometry(0.03, 0.14, 0.22), 0xe53935, 0.24, 1.55, 0.01);
   return g;
 }
+
+/**
+ * Siepe squadrata lunga `len` (lungo x), con dei ciuffi cresciuti troppo che sporgono sopra e davanti
+ * (verso +z): sono le punte da tagliare nella potatura. Restituisce la siepe e i ciuffi (posizione locale).
+ */
+export function overgrownHedge(len: number, tufts: number) {
+  const g = new THREE.Group();
+  const leaf = lamb(0x3f8f3a, { flatShading: true });
+  const dark = lamb(0x2f7430, { flatShading: true });
+  part(g, new THREE.BoxGeometry(len, 1.05, 0.7), leaf, 0, 0.525, 0);
+  // bordo un po' irregolare (sembra una siepe vera, non una scatola)
+  for (let x = -len / 2 + 0.3; x < len / 2; x += 0.55) part(g, new THREE.IcosahedronGeometry(0.28, 0), dark, x, 1.02, (Math.random() - 0.5) * 0.3);
+  const out: THREE.Mesh[] = [];
+  for (let i = 0; i < tufts; i++) {
+    const x = -len / 2 + 0.4 + ((i + 0.5) / tufts) * (len - 0.8) + (Math.random() - 0.5) * 0.2;
+    const top = i % 2 === 0;
+    const m = part(g, new THREE.IcosahedronGeometry(0.26, 0), lamb(0x9ccc4a, { flatShading: true }), x, top ? 1.35 : 0.75, top ? 0 : 0.5);
+    m.scale.set(1, top ? 1.6 : 1, top ? 1 : 1.5);
+    out.push(m);
+  }
+  return { obj: g, tufts: out };
+}
+
+/**
+ * Albero da potare: tronco, chioma e qualche ramo cresciuto troppo che sporge di lato con un ciuffo di
+ * foglie in punta. Restituisce l'albero e i rami (ognuno è un gruppo; la punta è la posizione del ciuffo).
+ */
+export function overgrownTree(branches: number) {
+  const g = new THREE.Group();
+  const bark = lamb(0x7a5230);
+  part(g, new THREE.CylinderGeometry(0.16, 0.24, 2.2, 8), bark, 0, 1.1, 0);
+  const crown = lamb(0x3f8f3a, { flatShading: true });
+  part(g, new THREE.IcosahedronGeometry(1.05, 1), crown, 0, 2.6, 0);
+  part(g, new THREE.IcosahedronGeometry(0.7, 0), crown, 0.45, 3.15, 0.2);
+  const out: { group: THREE.Group; tip: THREE.Vector3 }[] = [];
+  for (let i = 0; i < branches; i++) {
+    const a = (i / branches) * Math.PI * 2 + Math.random() * 0.5;
+    const b = new THREE.Group();
+    // ramo lungo che esce bene dalla chioma (quasi orizzontale), con un ciuffo chiaro in punta
+    const len = 1.9 + Math.random() * 0.3;
+    const stick = part(b, new THREE.CylinderGeometry(0.04, 0.07, len, 6), bark, 0, len / 2, 0);
+    stick.castShadow = true;
+    part(b, new THREE.IcosahedronGeometry(0.32, 0), lamb(0x9ccc4a, { flatShading: true }), 0, len, 0);
+    part(b, new THREE.IcosahedronGeometry(0.2, 0), lamb(0x9ccc4a, { flatShading: true }), 0.12, len - 0.35, 0.08);
+    b.position.set(0, 1.7 + (i % 3) * 0.3, 0);
+    b.rotation.set(0, a, -1.25 - Math.random() * 0.15, 'YXZ');
+    g.add(b);
+    b.updateMatrix();
+    const tip = new THREE.Vector3(0, len, 0).applyMatrix4(b.matrix);
+    out.push({ group: b, tip });
+  }
+  return { obj: g, branches: out };
+}
+
+/** Ramo tagliato caduto a terra (da raccogliere). */
+export function cutBranch() {
+  const g = new THREE.Group();
+  const s = part(g, new THREE.CylinderGeometry(0.04, 0.06, 1.0, 6), 0x7a5230, 0, 0.06, 0);
+  s.rotation.z = Math.PI / 2;
+  part(g, new THREE.IcosahedronGeometry(0.26, 0), lamb(0x5fb848, { flatShading: true }), 0.5, 0.18, 0);
+  part(g, new THREE.IcosahedronGeometry(0.18, 0), lamb(0x4a9a3c, { flatShading: true }), 0.15, 0.14, 0.12);
+  return g;
+}
+
+/** Cippatrice: macchina che sminuzza i rami (si svuota qui la potatura). */
+export function woodChipper() {
+  const g = new THREE.Group();
+  part(g, new THREE.BoxGeometry(0.9, 0.7, 0.7), 0xe8590c, 0, 0.55, 0);
+  const hopper = part(g, new THREE.CylinderGeometry(0.42, 0.25, 0.5, 4, 1, true), lamb(0x37474f, { side: THREE.DoubleSide }), 0, 1.15, 0);
+  hopper.rotation.y = Math.PI / 4;
+  part(g, new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8), 0x37474f, 0.55, 0.85, 0).rotation.z = -0.9;
+  for (const x of [-0.35, 0.35]) {
+    const w = part(g, new THREE.CylinderGeometry(0.2, 0.2, 0.12, 12), 0x222222, x, 0.2, 0.38);
+    w.rotation.x = Math.PI / 2;
+  }
+  return g;
+}

@@ -10,7 +10,7 @@ import type { Arena, FenceSide } from './arena';
 import { layout } from '../ui/layout';
 import { routeStops, type Street, type StreetHouse } from './street';
 import { TREE_MODELS } from '../world/city';
-import { bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
+import { cutBranch, overgrownHedge, overgrownTree, woodChipper, bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
 export interface JobRun {
   title: string;
@@ -905,6 +905,116 @@ export function gardenArenaJob(game: Game, level: number, arena: Arena, title: s
     const o = run.prop(k(), pos, Math.random() * Math.PI * 2, 1);
     o.userData.noGlow = true;
     o.userData.solid = k !== flowerBed;
+  }
+  return run;
+}
+
+/**
+ * Potatura (giardinaggio dal Liv. 10 di manualità): nello stesso giardino, siepi lungo la recinzione
+ * con le punte cresciute troppo e alberi con i rami in eccesso. Le punte e i rami si tagliano tenendo il
+ * dito direttamente su di loro (come le macchie dell'auto). Fasi: cesoie → regola le siepi → taglia i
+ * rami → raccogli i rami caduti → portali alla cippatrice. Più livello = più siepi, alberi e rami.
+ */
+export function pruneArenaJob(game: Game, level: number, arena: Arena, title: string) {
+  const k = Math.max(0, level - 8);
+  const totalTufts = Math.min(12, 4 + Math.round(k));
+  const totalBranches = Math.min(9, 3 + Math.round(k * 0.6));
+  const box = arena.entry.clone().add(new THREE.Vector3(-2.2, 0, -0.6));
+  const chipper = new THREE.Vector3(arena.house.minX - 1.3, 0, arena.house.maxZ - 0.9);
+  // siepi lungo i lati della recinzione (non davanti al cancello), dentro il giardino
+  const sides = arena.fence.filter((f) => f.side === 'left' || f.side === 'right').concat(arena.fence.filter((f) => f.side === 'back'));
+  const nH = Math.max(1, Math.min(sides.length, Math.ceil(totalTufts / 3)));
+  const chosen = sides.filter((f) => arena.free(f.inner, 0.3)).sort(() => Math.random() - 0.5).slice(0, nH);
+  const perHedge = Math.ceil(totalTufts / Math.max(1, chosen.length));
+  const nT = Math.min(3, 1 + Math.floor(k / 4));
+  const treeAt = arena.scatter(nT, 3.6, 1.8, [box, chipper, arena.entry, ...chosen.map((f) => f.inner)]);
+  const perTree = Math.ceil(totalBranches / Math.max(1, treeAt.length));
+  let run: PhasedRun;
+  // punto da toccare: una sfera invisibile un po' più grande della punta o del ciuffo
+  const aimAt = (pos: THREE.Vector3, r: number) => {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+    m.userData.noGlow = true;
+    run.prop(m, pos, 0, 1);
+    return m;
+  };
+  type Cut = { pos: THREE.Vector3; aim?: THREE.Mesh; obj: THREE.Object3D; part: THREE.Object3D };
+  const tufts: Cut[] = [];
+  const branches: Cut[] = [];
+  const piles: { pos: THREE.Vector3; obj: THREE.Object3D }[] = [];
+  const sp = 1 + 0.04 * level;
+  const phases: Phase[] = [
+    {
+      name: 'Prendi le cesoie', icon: '🧰',
+      tasks: () => [{ pos: box, kind: 'tap', label: 'Prendi le cesoie da potatura', icon: '🧰', onDone: () => hold(game, boxProp(0.12, 0.06, 0.45, 0xd94f4f)) }],
+    },
+    {
+      name: 'Regola le siepi', icon: '✂️',
+      tasks: () => tufts.map((t) => ({
+        pos: t.pos, kind: 'hold' as const, sec: 0.7 / sp, label: 'Taglia la punta della siepe', icon: '✂️', fx: 'leaf' as const, aim: t.aim, obj: t.obj,
+        onProgress: (p: number) => t.part.scale.multiplyScalar(1 - 0.04 * p),
+        onDone: () => (t.part.visible = false),
+      })),
+    },
+    {
+      name: 'Taglia i rami in eccesso', icon: '🪚',
+      tasks: () => branches.map((b, i) => ({
+        pos: b.pos, kind: 'hold' as const, sec: 0.9 / sp, label: 'Taglia il ramo', icon: '🪚', fx: 'leaf' as const, aim: b.aim, obj: b.obj,
+        onProgress: (p: number) => (b.part.rotation.x = Math.sin(performance.now() / 40) * 0.05 * p),
+        onDone: () => {
+          b.part.visible = false;
+          // il ramo cade a terra sotto la punta
+          const at = new THREE.Vector3(b.pos.x, 0, b.pos.z);
+          piles.push({ pos: at, obj: run.prop(cutBranch(), at, (i * 1.7) % 6, 1) });
+        },
+      })),
+    },
+    {
+      name: 'Raccogli i rami tagliati', icon: '🌿',
+      tasks: () => piles.map((pl) => ({
+        pos: pl.pos, kind: 'tap' as const, label: 'Raccogli il ramo', icon: '🌿', fx: 'leaf' as const,
+        onDone: () => {
+          pl.obj.visible = false;
+          hold(game, cylProp(0.2, 0.5, 0x5fb848));
+        },
+      })),
+    },
+    { name: 'Porta i rami alla cippatrice', icon: '🪵', tasks: () => [{ pos: chipper, kind: 'tap', label: 'Butta i rami nella cippatrice', icon: '🪵', fx: 'leaf', onDone: () => hold(game) }] },
+  ];
+  run = new PhasedRun(game, level, title, phases, { time: totalTufts * 4 + totalBranches * 6 + 40 });
+  run.prop(toolbox(), box, 0, 1);
+  run.prop(woodChipper(), chipper, Math.PI / 2, 1).userData.solid = true;
+  for (const f of chosen) {
+    const inward = new THREE.Vector3(f.inner.x - f.pos.x, 0, f.inner.z - f.pos.z).normalize();
+    const h = overgrownHedge(Math.max(1.6, f.len - 0.4), perHedge);
+    const o = run.prop(h.obj, f.inner.clone().addScaledVector(inward, -0.15), Math.atan2(inward.x, inward.z), 1);
+    o.userData.solid = true;
+    o.updateMatrixWorld(true);
+    for (const t of h.tufts) {
+      if (tufts.length >= totalTufts) {
+        t.visible = false;
+        continue;
+      }
+      const pos = t.getWorldPosition(new THREE.Vector3());
+      tufts.push({ pos, aim: aimAt(pos, 0.42), obj: o, part: t });
+    }
+  }
+  for (const at of treeAt) {
+    const tr = overgrownTree(perTree);
+    const o = run.prop(tr.obj, at, Math.random() * 6, 1);
+    o.updateMatrixWorld(true);
+    // solo il tronco blocca il passaggio (sotto la chioma si cammina)
+    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), new THREE.MeshBasicMaterial({ visible: false }));
+    trunk.userData.solid = true;
+    trunk.userData.noGlow = true;
+    run.prop(trunk, at.clone().setY(0.75), 0, 1);
+    for (const b of tr.branches) {
+      if (branches.length >= totalBranches) {
+        b.group.visible = false;
+        continue;
+      }
+      const pos = b.tip.clone().applyMatrix4(o.matrixWorld);
+      branches.push({ pos, aim: aimAt(pos, 0.45), obj: o, part: b.group });
+    }
   }
   return run;
 }
