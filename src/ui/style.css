@@ -353,7 +353,7 @@ body.is-short .sheet-head .back { width: 34px; height: 34px; }
 .demand { display: inline-flex; gap: 2px; vertical-align: middle; }
 .demand i { width: 7px; height: 15px; border-radius: 3px; background: #eadfca; display: inline-block; }
 .demand i.on { background: var(--green); }
-.tag { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #f1ead9; font-size: 12px; font-weight: 600; color: var(--ink); }
+.tag { white-space: nowrap; display: inline-block; padding: 2px 9px; border-radius: 999px; background: #f1ead9; font-size: 12px; font-weight: 600; color: var(--ink); }
 .tag.y { background: var(--yellow); color: #5a3d00; }
 .tag.g { background: var(--green); color: #fff; }
 .tag.r { background: var(--red); color: #fff; }
@@ -963,3 +963,9 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .pc-btn { flex: 1; border: none; border-radius: 10px; background: #e9e1d2; color: var(--ink); font-weight: 800; font-size: 11px; padding: 5px 2px; }
 .pc-btn.ok { flex: 2.2; background: var(--green); color: #fff; }
 .pc-btn:disabled { opacity: .45; }
+
+/* profilo: linee di lavoro di ogni settore */
+.career-lines { margin-top: 8px; border-top: 1px dashed #e6dccb; padding-top: 6px; display: flex; flex-direction: column; gap: 5px; }
+.career-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.cl-ico { width: 22px; text-align: center; }
+.cl-txt small { display: block; color: var(--muted, #7a6f8f); font-size: 11.5px; }

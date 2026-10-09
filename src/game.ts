@@ -3,7 +3,7 @@ import { fetchFriendRequests, fetchFriends, ping as pingOnline, submit as submit
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
 import { BUSINESS, JOB, jobDifficulty, TIME } from './config/balance';
-import { jobInfo, JOBS, JOB_TYPES, type JobType } from './config/jobs';
+import { jobInfo, JOBS, type JobType } from './config/jobs';
 import { LOTS, OLD_HALF, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
 import { Input } from './input';
@@ -12,7 +12,8 @@ import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
-import { addFame, addMoney, addXp, skillLevel } from './sim/progress';
+import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
+import { readyJobTypes } from './config/careers';
 import {
   day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot,
   type GameState, type JobOffer,
@@ -893,8 +894,10 @@ export class Game {
     const s = this.state;
     const key = (sl: Slot) => `${sl.pos.x},${sl.pos.z}`;
     const inUse = new Set(s.jobs.map((j) => key(this.slotsFor(j.type)[j.slot])));
-    const types = JOB_TYPES.filter((t) => !s.jobs.some((j) => j.type === t) || s.jobs.length >= JOB_TYPES.length);
-    const type = pick(types.length ? types : JOB_TYPES);
+    // solo i lavori pronti (config/careers.ts); prima quelli che non sono già offerti
+    const ready = readyJobTypes();
+    const types = ready.filter((t) => !s.jobs.some((j) => j.type === t) || s.jobs.length >= ready.length);
+    const type = pick(types.length ? types : ready);
     const slots = this.slotsFor(type);
     const free = slots.map((_, i) => i).filter((i) => !inUse.has(key(slots[i])));
     if (!free.length) return;
@@ -902,7 +905,8 @@ export class Game {
     const pp = this.player.root.position;
     free.sort((a, b) => slots[a].pos.distanceTo(pp) - slots[b].pos.distanceTo(pp));
     const slot = free[Math.min(free.length - 1, Math.floor(Math.random() * Math.min(5, free.length)))];
-    const level = skillLevel(s, JOBS[type].skill);
+    // il livello del lavoro è quello della sua linea (ogni 10 livelli si evolve)
+    const level = Math.max(1, lineLevel(s, type));
     const offer: JobOffer = { id: s.jobSeq++, type, slot, level, pay: this.offerPay(type, level) };
     s.jobs.push(offer);
     this.spawnNpc(offer);
@@ -1181,7 +1185,7 @@ export class Game {
       xp = Math.round(def.xp * (1 + 0.1 * offer.level) * (0.6 + stars * 0.25));
       fame = def.fame * (stars / 2);
       addMoney(s, pay);
-      addXp(s, def.skill, xp);
+      addJobXp(s, offer.type, xp);
       addFame(s, def.skill, fame);
       // fatto sul serio almeno una volta: il tutorial di questo tipo resta spento (a ogni livello)
       s.jobTutorials = [...new Set([...(s.jobTutorials ?? []), jobInfo(offer.type, offer.level).key])];

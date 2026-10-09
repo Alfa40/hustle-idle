@@ -24,6 +24,10 @@
   (food truck nel suo parco, negozio dentro il suo palazzo): stesso codice, `buildSurroundings()` in
   src/world/surroundings.ts.
 - **Scala del mondo**: le misure della città passano da `WS` (src/config/map.ts). Edifici, strade e distanze dalle tessere si moltiplicano per `WS`; personaggi, veicoli e oggetti di scena no. Nei lavoretti usare `frame()`/`zoneFor()` (già in scala).
+- **Lavori e carriere**: ogni lavoretto è una linea in `src/config/careers.ts` (settore, nome, scala di
+  carriera, `ready`); le versioni giocabili sono in `src/config/jobs.ts` (`JOBS` gradino base,
+  `JOB_VARIANTS` ogni 10 livelli, `jobInfo()`). Livello del settore = somma dell'esperienza delle sue linee
+  + lavoro nelle attività (`sectorXp` in src/sim/progress.ts). Nuovi lavori: si aggiungono lì, non altrove.
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push
   va chiesto di nuovo. Dopo il push si aspetta che la GitHub Action finisca e si conferma il link.

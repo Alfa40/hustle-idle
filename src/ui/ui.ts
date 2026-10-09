@@ -27,7 +27,8 @@ import {
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
-import { addFame, addMoney, rank, skillLevel, totalFame, totalLevel } from '../sim/progress';
+import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
+import { careerLine, EVOLVE_EVERY, linesOf } from '../config/careers';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
@@ -777,7 +778,7 @@ export class UI {
           <div class="stat s-green"><b class="money-t">+${euro(pay)}</b><span>💰 guadagno</span></div>
           <div class="stat s-purple"><b>+${xp} XP</b><span>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</span></div>
           <div class="stat s-yellow"><b>+${fame.toFixed(1)}</b><span>⭐ fama ${SKILLS[def.skill].name}</span></div>
-          <div class="stat"><b>Liv. ${skillLevel(this.s, def.skill)}</b><span>${SKILLS[def.skill].name}</span></div>
+          <div class="stat"><b>${careerLine(offer.type)?.icon ?? def.icon} Liv. ${lineLevel(this.s, offer.type)}</b><span>${careerLine(offer.type)?.name ?? def.name} · ${SKILLS[def.skill].name} Liv. ${skillLevel(this.s, def.skill)}</span></div>
         </div>` : `<p class="center">Tempo scaduto o lavoro abbandonato.<br><span class="bad">-1 fama ${SKILLS[def.skill].name}</span></p>`}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
@@ -1841,15 +1842,26 @@ export class UI {
       render: () => {
         const skills = SKILL_IDS.map((k) => {
           const lvl = skillLevel(s, k);
+          const x = sectorXp(s, k);
           const a = LEVEL.xpForLevel(lvl);
           const b = LEVEL.xpForLevel(lvl + 1);
           const f = s.fame[k];
           const bonus = Math.round((f / (f + 150)) * 100);
+          // le linee di lavoro del settore: livello, lavoro di adesso e prossima evoluzione
+          const lines = linesOf(k).map((l) => {
+            const ll = lineLevel(s, l.id);
+            const step = Math.floor(ll / EVOLVE_EVERY);
+            const now = l.ladder[Math.min(step, l.ladder.length - 1)];
+            const next = l.ladder[step + 1];
+            return `<div class="career-line"><span class="cl-ico">${l.icon}</span><span class="cl-txt"><b>${l.name}</b> · Liv. ${ll}<small>Ora: ${now}${next ? ` · dal Liv. ${(step + 1) * EVOLVE_EVERY}: ${next}` : ''}</small></span></div>`;
+          }).join('');
+          const biz = s.xp[k] > 0 ? `<div class="career-line"><span class="cl-ico">🏪</span><span class="cl-txt"><b>Lavoro nelle attività</b><small>${Math.floor(s.xp[k])} XP</small></span></div>` : '';
           return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${SKILLS[k].icon}</div><h3 style="margin:0">${SKILLS[k].name}</h3></div><span class="tag y">Liv. ${lvl}</span></div>
-            <div class="bar purple"><i style="width:${((s.xp[k] - a) / (b - a)) * 100}%"></i></div>
-            <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(s.xp[k] - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div></div>`;
+            <div class="bar purple"><i style="width:${((x - a) / (b - a)) * 100}%"></i></div>
+            <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(x - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div>
+            ${lines || biz ? `<div class="career-lines">${lines}${biz}</div>` : ''}</div>`;
         }).join('');
-        return `<p class="muted small">L'esperienza sale solo facendo il lavoro di persona. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano. Più fama = più clienti e offerte di lavoro più ricche.</p>${skills}`;
+        return `<p class="muted small">Ogni settore raccoglie i suoi lavori: il livello del settore è la somma dell'esperienza di tutti i suoi lavori (e del lavoro nelle tue attività). Ogni lavoro ha il suo livello e ogni ${EVOLVE_EVERY} livelli si evolve in un lavoro più complesso. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano: più fama = più clienti e offerte più ricche.</p>${skills}`;
       },
       actions: {},
     });

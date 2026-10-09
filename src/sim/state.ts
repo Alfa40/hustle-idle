@@ -3,6 +3,7 @@ import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
 import type { JobType } from '../config/jobs';
 import { PRODUCT_IDS, type ProductId } from '../config/products';
+import { CAREER_LINES } from '../config/careers';
 import type { VaseShape } from '../world/ceramics';
 import type { VehicleId } from '../config/vehicles';
 import { EVENT_BY_ID, type WeatherId } from '../config/events';
@@ -141,7 +142,13 @@ export interface GameState {
   /** minuti di gioco dall'inizio (giorno 0 alle 00:00) */
   minutes: number;
   lastSeen: number;
+  /**
+   * esperienza del lavoro nelle attività di ogni settore (cucinare, servire, ordini…); quella dei
+   * lavoretti è in `jobXp`. Il livello del settore è la somma delle due (sim/progress.ts: sectorXp)
+   */
   xp: Record<SkillId, number>;
+  /** esperienza di ogni linea di lavoro (config/careers.ts): il suo livello e la sua evoluzione */
+  jobXp?: Record<string, number>;
   fame: Record<SkillId, number>;
   businesses: Business[];
   jobs: JobOffer[];
@@ -274,6 +281,24 @@ function parse(raw: string | null): GameState | null {
     for (const k of SKILL_IDS) {
       st.xp[k] ??= 0;
       st.fame[k] ??= 0;
+    }
+    // carriere: l'esperienza di ogni campo si divide tra i suoi lavori in base a quanti ne hai fatti
+    // (il totale del settore non cambia: livelli e fama restano uguali)
+    if (!st.jobXp) {
+      st.jobXp = {};
+      const done = st.stats?.jobsByType ?? {};
+      for (const k of SKILL_IDS) {
+        const lines = CAREER_LINES.filter((l) => l.sector === k && l.ready);
+        const n = lines.reduce((a, l) => a + (done[l.id as JobType] ?? 0), 0);
+        if (!n) continue;
+        let given = 0;
+        for (const l of lines) {
+          const share = Math.floor((st.xp[k] * (done[l.id as JobType] ?? 0)) / n);
+          if (share > 0) st.jobXp[l.id] = share;
+          given += share;
+        }
+        st.xp[k] -= given;
+      }
     }
     for (const p of PRODUCT_IDS) st.demandRand[p] ??= 1;
     st.logo = safeLogo(s.logo) ?? randomLogo();
