@@ -58,6 +58,8 @@ interface Panel {
   onClose?: () => void;
   /** finestra da cui si è arrivati: il tasto "‹ Indietro" ci riporta lì */
   back?: Panel;
+  /** mostra i tuoi soldi nell'intestazione (negozio, migliorie, acquisti); con una funzione, solo quando serve */
+  money?: boolean | (() => boolean);
 }
 
 /** Soldi al secondo con i centesimi (es. "€1,70/s"). */
@@ -376,7 +378,17 @@ export class UI {
       const busy = this.touching || performance.now() - this.lastScroll < 900;
       if (this.liveTimer > 1 && !busy) this.renderPanel(true);
     }
+    // i soldi nell'intestazione salgono anche mentre la finestra è aperta (incassi delle attività)
+    if (this.panel?.money) {
+      this.moneyT += dt;
+      if (this.moneyT > 0.5) {
+        this.moneyT = 0;
+        this.updateHeadMoney();
+      }
+    }
   }
+
+  private moneyT = 0;
 
   /**
    * Azione disponibile: un anello che lampeggia sopra l'oggetto da usare, con la scritta sotto.
@@ -613,7 +625,7 @@ export class UI {
     this.game.input.cancel();
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
+    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><span class="head-money" hidden></span><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
     modal.querySelector('.back')?.addEventListener('click', () => this.goBack());
@@ -677,6 +689,17 @@ export class UI {
     this.panel.after?.(body);
     body.scrollTop = scroll;
     (this.modal.querySelector('h2') as HTMLElement).textContent = this.panel.title;
+    this.updateHeadMoney();
+  }
+
+  /** I tuoi soldi nell'intestazione delle finestre dove si compra (aggiornati anche mentre spendi). */
+  private updateHeadMoney() {
+    const el = this.modal?.querySelector('.head-money') as HTMLElement | null;
+    const m = this.panel?.money;
+    if (!el) return;
+    const show = typeof m === 'function' ? m() : !!m;
+    el.hidden = !show;
+    if (show) el.textContent = `💰 ${euro(this.s.money)}`;
   }
 
   close() {
@@ -855,6 +878,7 @@ export class UI {
   openLot(lotId: string) {
     const lot = lotDef(lotId);
     this.open({
+      money: true,
       title: `🏷️ ${lot.name}`,
       color: 'var(--red)',
       render: () => this.lotCard(lotId, true),
@@ -868,6 +892,7 @@ export class UI {
     let sel: string | null = null;
     const tabs = [['mie', '🏢 Le mie'], ['compra', '🛒 In vendita'], ['resoconti', '📊 Resoconti'], ['mercato', '📈 Mercato']];
     this.open({
+      money: true,
       title: atAgency ? '🏢 Agenzia affari' : '🏢 Attività',
       live: true,
       color: 'var(--purple)',
@@ -995,6 +1020,7 @@ export class UI {
       ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ['personale', '👥 Personale'], ['migliorie', '⬆️ Migliorie'],
     ];
     this.open({
+      money: () => cur === 'migliorie' || cur === 'magazzino' || cur === 'personale',
       title: `${bizType(b().type).icon} ${bizType(b().type).name} · ${lotDef(b().lotId).name}`,
       live: true,
       color: bizType(b().type).color,
@@ -1329,6 +1355,7 @@ export class UI {
     const card = (a: string, icon: string, title: string, sub: string, color: string) =>
       `<button class="shop-card" data-a="${a}" style="--sc:${color}"><span class="shop-ico">${icon}</span><span><b>${title}</b><small>${sub}</small></span><span class="shop-go">›</span></button>`;
     this.open({
+      money: true,
       title: '🛍️ Negozio',
       small: true,
       color: '#e84393',
@@ -1336,7 +1363,7 @@ export class UI {
         ${card('dealer', '🛵', 'Concessionaria', 'Monopattini, scooter e auto per girare più in fretta', 'var(--blue)')}
         ${card('houses', '🏡', 'Agenzia immobiliare', 'Compra case: vivici o affittale per un\'entrata ogni giorno', 'var(--green)')}
         ${card('style', '👕', 'Stile e accessori', 'Cambia look: collane, cappelli, occhiali, zaini…', 'var(--purple)')}
-        <p class="muted small center">💰 Hai ${euro(this.s.money)}</p>`,
+`,
       actions: {
         dealer: () => {
           this.close();
@@ -1359,6 +1386,7 @@ export class UI {
     const s = this.s;
     const g = this.game;
     this.open({
+      money: true,
       title: '🏡 Agenzia immobiliare',
       color: 'var(--green)',
       live: true,
@@ -1445,6 +1473,7 @@ export class UI {
       this.game.save();
     };
     this.open({
+      money: true,
       title: '👕 Stile e accessori',
       color: 'var(--purple)',
       render: () => {
@@ -1463,7 +1492,7 @@ export class UI {
           }).join('');
           return `<h4 class="lg-h">${ACC_SLOT_NAME[slot]}</h4><div class="st-grid">${items}</div>`;
         }).join('');
-        return `<div class="card tint small">Quello che compri resta tuo in questa partita: puoi cambiare quando vuoi. 💰 Hai ${euro(s.money)}</div>
+        return `<div class="card tint small">Quello che compri resta tuo in questa partita: puoi cambiare quando vuoi.</div>
           <h4 class="lg-h">Stile</h4><div class="st-grid">${styles}</div>${slots}`;
       },
       actions: {
@@ -1505,6 +1534,7 @@ export class UI {
   openDealer(canBuy = true) {
     const s = this.s;
     this.open({
+      money: true,
       title: '🛵 Concessionaria',
       color: 'var(--blue)',
       render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}<p class="muted small">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +

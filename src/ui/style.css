@@ -969,3 +969,7 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .career-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
 .cl-ico { width: 22px; text-align: center; }
 .cl-txt small { display: block; color: var(--muted, #7a6f8f); font-size: 11.5px; }
+
+/* i tuoi soldi nell'intestazione delle finestre dove si compra */
+.head-money { flex: none; margin-left: auto; margin-right: 8px; background: #fff; color: #1f8a45; font-weight: 800; font-size: 14px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+.head-money[hidden] { display: none; }
