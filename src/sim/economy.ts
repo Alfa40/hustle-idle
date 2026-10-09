@@ -72,7 +72,11 @@ export function isOpenHour(s: GameState) {
 
 export const hasManager = (b: Business) => b.staff.some((e) => e.role === 'manager');
 
+/** Laboratorio dell'artigiano: lavori su richiesta fatti solo dal giocatore (niente clienti né staff). */
+export const isCraft = (b: Business | BusinessType) => bizType(typeof b === 'string' ? b : b.type).kind === 'craft';
+
 export function isAutonomous(b: Business) {
+  if (isCraft(b)) return false;
   return hasManager(b) && bizType(b.type).roles.every((r) => b.staff.some((e) => e.role === r));
 }
 
@@ -186,7 +190,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   const b: Business = {
     id: 'biz' + lotId,
     type, lotId,
-    products: [bizType(type).products[0]],
+    products: bizType(type).products.slice(0, 1),
     stock: {},
     upgrades: {},
     staff: [],
@@ -202,7 +206,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   addMoney(s, -price);
   s.businesses.push(b);
   // una scorta iniziale per partire subito
-  buyStock(s, b, b.products[0], 20, true);
+  if (b.products[0]) buyStock(s, b, b.products[0], 20, true);
   toast(`Hai aperto: ${bizType(type).icon} ${bizType(type).name} in ${lot.name}!`, 'good');
   return b;
 }
@@ -276,6 +280,8 @@ const acc = new Map<string, number>();
  * `efficiency` < 1 per il guadagno offline.
  */
 export function autoSim(s: GameState, b: Business, minutes: number, efficiency = 1) {
+  // laboratorio: si guadagna solo coi lavori fatti a mano
+  if (isCraft(b)) return;
   if (bizType(b.type).kind === 'service' && !isAutonomous(b)) {
     serviceOrders(s, b, minutes);
     return;
@@ -378,6 +384,7 @@ export function payMonth(s: GameState) {
 }
 
 export function estimateMonthlyProfit(s: GameState, b: Business) {
+  if (isCraft(b) || !b.products.length) return -monthlyCosts(s, b).rent - monthlyCosts(s, b).utilities;
   const perHour = isAutonomous(b) ? Math.min(totalDemand(s, b), autoCapacity(b)) : 0;
   const avgMargin = b.products.reduce((a, p) => a + PRODUCTS[p].price - PRODUCTS[p].cost, 0) / b.products.length;
   const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;

@@ -5,7 +5,7 @@ import { toast } from '../sim/bus';
 import type { SpecialOrder } from '../sim/state';
 import { specialStars, specialTime } from '../sim/specials';
 import type { Character } from './character';
-import { CLAY, GLAZES, LUMP_R, RINGS, VASE_H, VASES, vaseGeometry, vaseSvg, wrappedVase } from './ceramics';
+import { CLAY, GLAZES, LUMP_R, MAX_R, MIN_R, RINGS, VASE_H, VASES, vaseGeometry, vaseSvg, wrappedVase } from './ceramics';
 import { Particles } from './particles';
 import { label, ring } from './props';
 import { firstPersonFov } from './viewcam';
@@ -34,7 +34,7 @@ interface Step {
 }
 
 /**
- * Ordine speciale del negozio di ceramiche, in prima persona nel laboratorio del negozio:
+ * Lavoro su richiesta del laboratorio dell'artigiano (vaso in ceramica), in prima persona:
  * prendi l'argilla → mettila sul tornio → modella il vaso tenendo il dito dove stringere
  * (la foto del vaso richiesto è in alto a destra) → essiccatoio (5 s) → banco pittura (dipingi
  * tenendo il dito sul vaso) → incarta → ripiano delle consegne. Solo il giocatore, mai i dipendenti.
@@ -146,7 +146,7 @@ export class PotteryStudio {
       lamp.position.set(lx, 2.57, 0);
       s.add(lamp);
     }
-    // mensole con vasi finiti alle pareti (si capisce che è un negozio di ceramiche)
+    // mensole con vasi finiti alle pareti (si capisce che è un laboratorio di ceramica)
     const deco = [0x2d6cdb, 0x2fae5e, 0xe8b03a, 0xd9534f, 0x8e5bd6];
     box(2.4, 0.06, 0.35, 0x8a6a4a, 3.4, 1.7, BACK + 0.12);
     for (let i = 0; i < 5; i++) {
@@ -237,7 +237,7 @@ export class PotteryStudio {
     this.steps = [
       { kind: 'tap', label: "Prendi l'argilla", icon: '🟤', stand: this.front(this.clayAt), obj: () => this.clayBin, onDone: () => (this.held = '🟤 argilla') },
       { kind: 'tap', label: "Metti l'argilla sul tornio", icon: '🏺', stand: this.front(this.wheelAt, 0.85), obj: () => this.wheel, onDone: () => this.putClay() },
-      { kind: 'shape', label: 'Modella il vaso: tieni il dito dove stringere', icon: '👐', stand: this.front(this.wheelAt, 0.85), obj: vase },
+      { kind: 'shape', label: 'Modella: dito verso il centro stringe, verso i lati allarga', icon: '👐', stand: this.front(this.wheelAt, 0.85), obj: vase },
       { kind: 'tap', label: 'Prendi il vaso modellato', icon: '🏺', stand: this.front(this.wheelAt, 0.85), obj: vase, onDone: () => this.pick('🏺 vaso crudo') },
       { kind: 'tap', label: 'Metti il vaso a essiccare', icon: '🌬️', stand: this.front(this.dryAt, 0.85), obj: () => this.dryer, onDone: () => this.place(this.dryAt.clone().setY(0.83)) },
       { kind: 'dry', label: 'Il vaso si sta essiccando…', icon: '⏳', stand: this.front(this.dryAt, 0.85), obj: vase },
@@ -327,17 +327,54 @@ export class PotteryStudio {
     return THREE.MathUtils.clamp(local, 0, 1) * (RINGS - 1);
   }
 
-  /** Il dito sul vaso al tornio: l'argilla si stringe lì (e un po' attorno), più piano vicino alla forma giusta. */
-  private shapeAt(rf: number, dt: number) {
-    const under = Math.round(rf);
+  /**
+   * Al tornio: la fascia all'altezza del dito (numero con la virgola), ovunque sia il dito in larghezza:
+   * basta toccare all'altezza della parte da cambiare, non per forza sul bordo del vaso.
+   */
+  private ringAtHeight(y: number) {
+    if (!this.vase || !this.vase.visible) return null;
+    const { h } = layout.info;
+    this.camera.updateMatrixWorld();
+    const v = new THREE.Vector3();
+    const sy = (i: number) => {
+      v.set(this.vase!.position.x, this.vase!.position.y + (i / (RINGS - 1)) * VASE_H, this.vase!.position.z).project(this.camera);
+      return ((1 - v.y) / 2) * h;
+    };
+    const bottom = sy(0);
+    const top = sy(RINGS - 1);
+    const margin = (bottom - top) * 0.12;
+    if (y > bottom + margin || y < top - margin) return null;
+    return THREE.MathUtils.clamp((bottom - y) / (bottom - top), 0, 1) * (RINGS - 1);
+  }
+
+  /** dove era il dito al fotogramma prima (per sapere se si avvicina al centro o si allontana) */
+  private dragPrev: { x: number; y: number } | null = null;
+
+  /**
+   * Il dito che si muove in orizzontale: verso il centro del vaso lo stringe, verso i lati lo allarga,
+   * all'altezza dove sta il dito (e un po' sopra e sotto). Il vaso segue il dito come l'argilla vera.
+   */
+  private shapeDrag(x: number, y: number) {
+    const prev = this.dragPrev;
+    this.dragPrev = { x, y };
+    if (!prev || !this.vase) return false;
+    const rf = this.ringAtHeight(y);
+    if (rf === null) return false;
+    const c = this.vase.position.clone().setY(this.vase.position.y + (rf / (RINGS - 1)) * VASE_H);
+    const { w } = layout.info;
+    this.camera.updateMatrixWorld();
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+    const a = c.clone().project(this.camera);
+    const b = c.clone().addScaledVector(right, 0.1).project(this.camera);
+    const cx = ((a.x + 1) / 2) * w;
+    const pxPerM = Math.max(1, (Math.abs(b.x - a.x) / 2) * w / 0.1);
+    const dr = (Math.abs(x - cx) - Math.abs(prev.x - cx)) / pxPerM;
+    if (!dr) return false;
     for (let i = 0; i < RINGS; i++) {
-      const wgt = Math.exp(-((i - rf) ** 2) / (2 * 0.6 ** 2));
-      const over = this.radii[i] - this.target[i];
-      // più piano vicino alla forma giusta; una fascia già giusta si stringe ancora solo se è proprio
-      // sotto il dito (e piano): le fasce accanto, già a posto, quasi non si toccano
-      const slow = over > 0 ? THREE.MathUtils.clamp(over / 0.03, 0.25, 1) : i === under ? 0.22 : 0.03;
-      this.radii[i] = Math.max(0.035, this.radii[i] - 0.13 * dt * wgt * slow);
+      const wgt = Math.exp(-((i - rf) ** 2) / (2 * 0.7 ** 2));
+      this.radii[i] = THREE.MathUtils.clamp(this.radii[i] + dr * 0.9 * wgt, MIN_R, MAX_R);
     }
+    return true;
   }
 
   private paintAt2(rf: number, dt: number) {
@@ -401,7 +438,7 @@ export class PotteryStudio {
     requestAnimationFrame(() => {
       this.offLayout = layout.on(() => this.resize());
     });
-    toast(`🏺 Ordine speciale: ${VASES[this.order.shape].name} ${this.glazeName}. Inizia dall'argilla`, 'info');
+    toast(`🏺 Lavoro su richiesta: ${VASES[this.order.shape].name} ${this.glazeName}. Inizia dall'argilla`, 'info');
   }
 
   exit() {
@@ -548,7 +585,7 @@ export class PotteryStudio {
     this.ringObj.position.copy(st.stand).setY(0.05);
     // modellare e dipingere: il dito direttamente sul vaso
     const aim = st.kind === 'shape' || st.kind === 'paint';
-    input.onActionClaim = aim && near ? (x, y) => this.ringUnder(x, y) !== null : null;
+    input.onActionClaim = aim && near ? (st.kind === 'shape' ? (_x, y) => this.ringAtHeight(y) !== null : (x, y) => this.ringUnder(x, y) !== null) : null;
     const obj = st.obj();
     const at = this.lookTarget() ?? st.stand.clone().setY(1);
     if (!near) {
@@ -557,21 +594,26 @@ export class PotteryStudio {
       return;
     }
     if (aim) {
-      const rf = input.actionHeld && input.actionPos ? this.ringUnder(input.actionPos.x, input.actionPos.y) : null;
+      if (st.kind === 'shape') {
+        // il dito che scorre in orizzontale stringe o allarga il vaso
+        if (input.actionHeld && input.actionPos) {
+          if (this.shapeDrag(input.actionPos.x, input.actionPos.y)) {
+            this.refreshVase();
+            const rf = this.ringAtHeight(input.actionPos.y);
+            if (rf !== null && Math.random() < 0.35) this.fx.emit('bubble', this.vase!.position.clone().setY(this.vase!.position.y + (rf / (RINGS - 1)) * VASE_H), 1, 0xb5764f);
+          }
+        } else this.dragPrev = null;
+      }
+      const rf = st.kind === 'paint' && input.actionHeld && input.actionPos ? this.ringUnder(input.actionPos.x, input.actionPos.y) : null;
       if (rf !== null) {
-        if (st.kind === 'shape') {
-          this.shapeAt(rf, dt);
-          if (Math.random() < dt * 10) this.fx.emit('bubble', this.vase!.position.clone().setY(this.vase!.position.y + (rf / (RINGS - 1)) * VASE_H), 1, 0xb5764f);
-        } else {
-          this.paintAt2(rf, dt);
-          if (Math.random() < dt * 10) this.fx.emit('paint', this.vase!.position.clone().setY(this.vase!.position.y + (rf / (RINGS - 1)) * VASE_H), 1, this.glaze);
-        }
+        this.paintAt2(rf, dt);
+        if (Math.random() < dt * 10) this.fx.emit('paint', this.vase!.position.clone().setY(this.vase!.position.y + (rf / (RINGS - 1)) * VASE_H), 1, this.glaze);
         this.refreshVase();
       }
       if (st.kind === 'shape') {
         const q = this.shapeQuality();
         // forma quasi perfetta: si chiude da sola
-        if (q >= 0.96) this.finishShape();
+        if (q >= 0.97 && !input.actionHeld) this.finishShape();
         ui.setAction({ label: st.label, icon: st.icon, progress: q, at, obj });
       } else {
         const done = this.paint.reduce((a, x) => a + x, 0) / RINGS;
@@ -629,7 +671,7 @@ export class PotteryStudio {
     const hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
     // il vaso (con un po' di margine) occupa ~78% dell'altezza libera e ~80% della larghezza libera
     const dH = (VASE_H + 0.12) / (0.78 * (free.h / h) * 2 * Math.tan(vf / 2));
-    const dW = (LUMP_R * 2 + 0.08) / (0.8 * (free.w / w) * 2 * Math.tan(hf / 2));
+    const dW = (MAX_R * 2 + 0.04) / (0.85 * (free.w / w) * 2 * Math.tan(hf / 2));
     const d = Math.max(dH, dW, 0.45);
     const c = this.vase!.position.clone().setY(this.vase!.position.y + VASE_H / 2);
     // dalla parte dove sta il giocatore (davanti al tornio), un po' più in alto

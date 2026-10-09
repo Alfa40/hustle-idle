@@ -159,7 +159,6 @@ const PHASE: Record<StationDef['kind'], { name: string; color: number; css: stri
 const SINGULAR: Partial<Record<ProductId, [string, boolean]>> = {
   panini: ['Panino', false], hotdog: ['Hot dog', false], tacos: ['Taco', false], gelati: ['Gelato', false],
   pane: ['Pane', false], cornetti: ['Cornetto', false], pizza: ['Pizza', true], torte: ['Torta', true],
-  vasi: ['Vaso', false], ciotole: ['Ciotola', true], tazze: ['Tazza', true],
 };
 /** Cosa è diventato il prodotto dopo una postazione (maschile) e cosa si fa alla prossima. */
 const DONE: Record<string, string> = {

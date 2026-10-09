@@ -19,7 +19,7 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
-import { specialOrders, specialTime } from '../sim/specials';
+import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
@@ -795,6 +795,18 @@ export class UI {
       .map((t) => {
         const def = bizType(t);
         const price = lotPrice(lotId, t);
+        if (def.kind === 'craft') {
+          // laboratorio: niente clienti, si guadagna coi lavori fatti a mano
+          return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
+              <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small">${def.desc}</div></div></div>
+            <div class="grid2" style="margin-top:8px">
+              <div class="stat s-purple"><b>${SPECIALS_PER_DAY} al giorno</b><span>🛠️ lavori su richiesta</span></div>
+              <div class="stat s-green"><b class="money-t">${euro(150)}–${euro(400)}+</b><span>a lavoro, fatto da te</span></div>
+            </div>
+            <button class="btn good full" style="margin-top:10px" data-a="buy:${lotId}|${t}" ${!canBuy || s.money < price ? 'disabled' : ''}>🛒 Apri per ${euro(price)}</button>
+            ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">Lotto ${euro(lot.price)} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
+          </div>`;
+        }
         const est = estimateLot(s, lotId, t);
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
@@ -833,7 +845,8 @@ export class UI {
         this.game.setupLot(lotId);
         this.game.save();
         this.close();
-        this.openBusiness(b.id, bizType(b.type).kind === 'service' ? 'ordini' : 'prodotti');
+        const k = bizType(b.type).kind;
+        this.openBusiness(b.id, k === 'service' ? 'ordini' : k === 'craft' ? 'lavori' : 'prodotti');
       },
     };
   }
@@ -891,7 +904,7 @@ export class UI {
           const extra = def.kind === 'service' && b.orders.length ? ` · <b>${b.orders.length} ordini in attesa</b>` : '';
           return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble" style="background:${def.color}">${def.icon}</div>
               <div><h3 style="margin:0">${def.name}</h3><div class="muted small">${lot.name}</div></div></div>${this.autoTag(b)}</div>
-            <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : 'clienti'}${extra}</span>
+            <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti'}${extra}</span>
             <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div></div>`;
         })
         .join('');
@@ -946,7 +959,7 @@ export class UI {
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
     return `<p class="muted small">Clienti (o ordini) all'ora previsti oggi per ogni prodotto nelle tre zone. Cambia ogni giorno con stagioni, meteo ed eventi.</p>` +
-      BUSINESS_TYPE_IDS.map((t) => {
+      BUSINESS_TYPE_IDS.filter((t) => bizType(t).products.length).map((t) => {
         const def = bizType(t);
         const fm = fameMultiplier(s, t);
         const rows = def.products.map((p) => `<div class="row between small" style="margin-top:4px"><span style="flex:1">${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>
@@ -963,6 +976,7 @@ export class UI {
   }
 
   private autoTag(b: Business) {
+    if (bizType(b.type).kind === 'craft') return '<span class="tag y">Lavori su richiesta</span>';
     return isAutonomous(b) ? '<span class="tag g">Autonoma</span>' : '<span class="tag y">Serve il titolare</span>';
   }
 
@@ -970,12 +984,12 @@ export class UI {
     const s = this.s;
     const b = () => s.businesses.find((x) => x.id === bizId)!;
     const service = bizType(b().type).kind === 'service';
-    let cur = tab ?? (service ? 'ordini' : 'panoramica');
-    const tabs = [
+    const craft = bizType(b().type).kind === 'craft';
+    let cur = tab ?? (service ? 'ordini' : craft ? 'lavori' : 'panoramica');
+    // laboratorio dell'artigiano: solo lavori su richiesta (niente prodotti, magazzino né personale)
+    const tabs = craft ? [['lavori', '🛠️ Lavori su richiesta'], ['panoramica', '📊 Panoramica'], ['migliorie', '⬆️ Migliorie']] : [
       ...(service ? [['ordini', '📋 Ordini']] : []),
       ['panoramica', '📊 Panoramica'],
-      // negozio di ceramiche: vasi su commissione da fare a mano
-      ...(b().type === 'artigianato' ? [['speciali', '✨ Ordini speciali']] : []),
       ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
       ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ['personale', '👥 Personale'], ['migliorie', '⬆️ Migliorie'],
     ];
@@ -1044,7 +1058,20 @@ export class UI {
     const service = type.kind === 'service';
     const lot = lotDef(b.lotId);
     const unit = service ? 'ordini' : 'clienti';
-    if (tab === 'speciali') {
+    if (type.kind === 'craft' && tab === 'panoramica') {
+      const c = monthlyCosts(s, b);
+      const lv = skillLevel(s, 'artigianato');
+      return `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(b.today.revenue)}</b><span>💰 oggi · ${b.today.served} lavori</span></div>
+          <div class="stat s-purple"><b class="money-t">${euro(b.month.revenue)}</b><span>📅 questo mese</span></div>
+          <div class="stat s-orange"><b>${euro(c.rent + c.utilities)}</b><span>🏠 affitto e bollette al mese</span></div>
+          <div class="stat s-yellow"><b>🎨 Liv. ${lv}</b><span>artigianato</span></div></div>
+        <div class="card tint small" style="margin-top:10px">🛠️ Qui si lavora solo a mano: ogni giorno arrivano <b>lavori su richiesta</b> che fai tu in prima persona, pagati più dei lavoretti. Niente clienti al bancone e niente dipendenti. Più sale l'esperienza in artigianato, più i lavori sono difficili e pagati meglio. Migliorando il laboratorio si sbloccheranno nuovi tipi di lavoro.</div>`;
+    }
+    if (type.kind === 'craft' && tab === 'migliorie') {
+      const jobs = CRAFT_JOBS.map((j) => `<div class="card row between"><span>${j.icon} <b>${j.name}</b><div class="muted small">${j.desc}</div></span>${j.ready ? '<span class="tag g">Sbloccato</span>' : '<span class="tag">🔜 In arrivo</span>'}</div>`).join('');
+      return `<p class="muted small">Migliorando il laboratorio sbloccherai nuovi tipi di lavoro su richiesta. I prossimi sono in preparazione.</p>${jobs}`;
+    }
+    if (tab === 'lavori') {
       const list = specialOrders(s, b);
       const cards = list.map((o) => {
         const v = VASES[o.shape];
@@ -1056,7 +1083,7 @@ export class UI {
             <div class="sp-pay"><b class="money-t">${euro(o.reward)}</b> <span class="muted small">(⭐⭐⭐ ${euro(Math.round(o.reward * 1.35))})</span></div></div>
           ${o.done ? '<span class="tag g">✅ Consegnato</span>' : `<button class="btn sm good" data-a="special:${o.id}">🏺 Realizza</button>`}</div>`;
       }).join('');
-      return `<div class="card tint small">✨ <b>Ordini speciali</b>: vasi su commissione, ben pagati. Li fai solo tu, a mano: prendi l'argilla, modellala al tornio tenendo il dito dove stringere finché somiglia alla foto, falla essiccare, dipingila, incartala e lasciala sul ripiano delle consegne. I dipendenti non li fanno. Nuovi ordini ogni giorno.</div>${cards}`;
+      return `<div class="card tint small">🛠️ <b>Lavori su richiesta</b>: li fai tu, a mano, in prima persona, e pagano più dei lavoretti. <b>🏺 Vasi in ceramica</b>: prendi l'argilla, mettila sul tornio e modellala finché somiglia alla foto (dito verso il centro stringe, verso i lati allarga), falla essiccare, dipingila, incartala e lasciala sul ripiano delle consegne. Nuovi lavori ogni giorno; con l'esperienza diventano più difficili e pagati meglio.</div>${cards}`;
     }
     if (tab === 'ordini') {
       if (isAutonomous(b)) {

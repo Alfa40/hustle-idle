@@ -49,12 +49,12 @@ export interface Business {
   boughtFor: number;
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
-  /** negozio di ceramiche: ordini speciali del giorno (vasi da modellare a mano) */
+  /** laboratorio dell'artigiano: lavori su richiesta del giorno (fatti a mano dal giocatore) */
   specials?: SpecialOrder[];
   specialsDay?: number;
 }
 
-/** Ordine speciale del negozio di ceramiche: un vaso su commissione, fatto solo dal giocatore. */
+/** Lavoro su richiesta del laboratorio dell'artigiano (per ora: un vaso in ceramica), fatto solo dal giocatore. */
 export interface SpecialOrder {
   id: number;
   shape: VaseShape;
@@ -286,30 +286,24 @@ function parse(raw: string | null): GameState | null {
     st.houses ??= [];
     for (const h of st.houses) h.price ??= 12000;
     if (!st.houses.some((h) => h.i === st.homeIdx)) st.homeIdx = -1;
-    // il laboratorio artigiano è diventato il negozio di ceramiche: sedie → ciotole, gioielli → tazze
-    const RENAMED: Record<string, ProductId> = { sedie: 'ciotole', gioielli: 'tazze' };
-    const ren = (p: string) => (RENAMED[p] ?? p) as ProductId;
-    for (const [o, n] of Object.entries(RENAMED)) {
-      const dr = st.demandRand as Record<string, number>;
-      if (o in dr) {
-        dr[n] = dr[o];
-        delete dr[o];
-      }
-    }
+    // prodotti che non esistono più (es. quelli del vecchio laboratorio artigiano): tolti dappertutto
+    const known = new Set<string>(PRODUCT_IDS);
+    for (const k of Object.keys(st.demandRand)) if (!known.has(k)) delete (st.demandRand as Record<string, number>)[k];
     for (const b of st.businesses) {
-      b.products = [...new Set(b.products.map(ren))];
-      const stock = b.stock as Record<string, number>;
-      for (const [o, n] of Object.entries(RENAMED)) {
-        if (o in stock) {
-          stock[n] = (stock[n] ?? 0) + stock[o];
-          delete stock[o];
-        }
+      b.products = b.products.filter((p) => known.has(p));
+      for (const k of Object.keys(b.stock)) if (!known.has(k)) delete (b.stock as Record<string, number>)[k];
+      // il laboratorio dell'artigiano ora è fatto di lavori su richiesta: niente prodotti, clienti né staff
+      if (BUSINESS_TYPES[b.type].kind === 'craft') {
+        b.products = [];
+        b.stock = {};
+        b.staff = [];
       }
       b.orders ??= [];
       // prodotti che ora richiedono un ampliamento: tolti dalla vendita
       const lvl = b.upgrades.ampliamento ?? 0;
       const ok = b.products.filter((p) => productLevel(b.type, p) <= lvl);
-      b.products = ok.length ? ok : [BUSINESS_TYPES[b.type].products[0]];
+      const first = BUSINESS_TYPES[b.type].products[0] as ProductId | undefined;
+      b.products = ok.length ? ok : first ? [first] : [];
     }
     return st;
   } catch {

@@ -982,10 +982,10 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
 }
 
 
-// ---------------- lavori dentro una scena a parte (ordini speciali) ----------------
+// ---------------- lavori dentro una scena a parte (lavori su richiesta del laboratorio) ----------------
 
 /**
- * Lavoro che si fa tutto in una scena separata (es. ordine speciale del negozio di ceramiche):
+ * Lavoro che si fa tutto in una scena separata (es. un lavoro su richiesta del laboratorio dell'artigiano):
  * tempo e stato li aggiorna la scena; qui c'è solo ciò che serve alla barra del lavoro.
  */
 export class IndoorRun extends BaseRun {

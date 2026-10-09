@@ -54,7 +54,7 @@ const common = (level: number): StationDef[] => [
   { id: 'imballo', kind: 'hold', name: 'Imballaggio', icon: '🥡', verb: 'Imballa', model: 'furniture/kitchenCabinet.glb', x: 0, z: ISLAND_Z, level, sec: 1 },
 ];
 
-export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> = {
+export const LAYOUTS: Record<'foodtruck' | 'panificio', Layout> = {
   foodtruck: {
     width: [7.5, 10, 12.5],
     wall: 0xe8590c,
@@ -105,31 +105,6 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio' | 'artigianato', Layout> 
       torte: { steps: ['dispensa', 'impastatrice', 'forno', 'decorazione'], level: 2 },
     },
     extra: { fuochi: 'forno', banco: 'tavolo' },
-  },
-  artigianato: {
-    width: [7.5, 10, 12.5],
-    wall: 0xd99a6c,
-    floor: 0xe9e4da,
-    stations: [
-      { id: 'argilla', kind: 'source', name: 'Argilla', icon: '🟤', verb: 'Prendi', model: 'furniture/bookcaseOpen.glb', x: -2.6, z: BACK_Z, level: 0 },
-      { id: 'tornio', kind: 'hold', name: 'Tornio', icon: '🏺', verb: 'Modella', model: 'furniture/desk.glb', x: -1, z: BACK_Z, level: 0, sec: 1.8 },
-      { id: 'fornace', kind: 'timed', name: 'Fornace', icon: '🔥', verb: 'Cuoci', model: 'furniture/kitchenStove.glb', x: 0.8, z: BACK_Z, level: 0, sec: 7, slots: 2 },
-      { id: 'pittura', kind: 'hold', name: 'Banco pittura', icon: '🎨', verb: 'Dipingi', model: 'furniture/desk.glb', x: -1.6, z: ISLAND_Z, level: 0, sec: 1.6 },
-      { id: 'cestino', kind: 'bin', name: 'Cestino', icon: '🗑️', verb: 'Butta', model: 'furniture/kitchenSink.glb', x: 2.6, z: BACK_Z, level: 0 },
-      { id: 'vetrina', kind: 'counter', name: 'Vetrina', icon: '🛍️', verb: 'Vendi', model: '', x: 0, z: COUNTER_Z, level: 0 },
-      { id: 'passe', kind: 'pass', name: 'Ripiano pronti', icon: '🧺', verb: 'Prendi', model: '', x: 2.2, z: COUNTER_Z, level: 0 },
-      // ampliamento 1: smaltatura (ciotole)
-      { id: 'smalto', kind: 'hold', name: 'Smaltatura', icon: '🫙', verb: 'Smalta', model: 'furniture/desk.glb', x: 3.4, z: ISLAND_Z, level: 1, sec: 1.6 },
-      ...common(1),
-      // ampliamento 2: banco dei decori (tazze)
-      { id: 'decoro', kind: 'hold', name: 'Banco decori', icon: '🖌️', verb: 'Decora', model: 'furniture/desk.glb', x: 5, z: ISLAND_Z, level: 2, sec: 1.8 },
-    ],
-    recipes: {
-      vasi: { steps: ['argilla', 'tornio', 'fornace', 'pittura'], level: 0 },
-      ciotole: { steps: ['argilla', 'tornio', 'smalto', 'fornace'], level: 1 },
-      tazze: { steps: ['argilla', 'tornio', 'decoro', 'fornace'], level: 2 },
-    },
-    extra: { fuochi: 'fornace', banco: 'pittura' },
   },
 };
 

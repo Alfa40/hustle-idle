@@ -161,7 +161,7 @@ export class Game {
   runOffer: JobOffer | null = null;
   /** ordine di un'attività di servizio che il giocatore sta eseguendo */
   runOrder: { bizId: string; order: ServiceOrder } | null = null;
-  /** ordine speciale del negozio di ceramiche in corso */
+  /** lavoro su richiesta del laboratorio dell'artigiano in corso */
   runSpecial: { bizId: string; order: SpecialOrder } | null = null;
   private rideObj: THREE.Object3D | null = null;
   /** il minigioco in corso può sostituire il pulsante azione */
@@ -767,18 +767,20 @@ export class Game {
       mat.position.set(dx * 2.8 * WS, 0.05, dz * 2.8 * WS);
       g.add(mat);
       const service = def.kind === 'service';
+      const craft = def.kind === 'craft';
       const game = this;
       inter = this.addInteractable({
         pos: slot.pos, radius: 2.2,
-        // l'ufficio delle imprese di servizi è sempre raggiungibile; i locali solo da aperti
+        // l'ufficio delle imprese di servizi e il laboratorio sono sempre raggiungibili; i locali solo da aperti
         get label() {
+          if (craft) return `${def.name}: lavori su richiesta`;
           if (service) return `Ufficio ${def.name.toLowerCase()}`;
           return isOpenHour(game.state) ? `Entra: ${def.name}` : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
         },
         get icon() {
-          return service ? '📋' : isOpenHour(game.state) ? '🚪' : '🔒';
+          return craft ? '🛠️' : service ? '📋' : isOpenHour(game.state) ? '🚪' : '🔒';
         },
-        action: () => (service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
+        action: () => (craft ? this.ui.openBusiness(biz.id, 'lavori') : service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
       });
     }
     this.trucks.set(lotId, { lotId, slot, group: g, inter, extra, built: !!biz, open: isOpenHour(this.state) });
@@ -792,6 +794,11 @@ export class Game {
 
   enterBusiness(lotId: string) {
     const biz = bizAtLot(this.state, lotId);
+    // laboratorio dell'artigiano: niente bancone, si apre la scheda dei lavori su richiesta
+    if (biz && bizType(biz.type).kind === 'craft') {
+      this.ui.openBusiness(biz.id, 'lavori');
+      return;
+    }
     if (!biz || this.run) {
       if (this.run) toast('Finisci prima il lavoro in corso', 'bad');
       return;
@@ -1041,7 +1048,7 @@ export class Game {
   }
 
   /**
-   * Ordine speciale del negozio di ceramiche: si entra nel laboratorio del negozio e il vaso si fa
+   * Lavoro su richiesta del laboratorio dell'artigiano: si entra nel laboratorio e il vaso si fa
    * a mano, in prima persona (world/pottery.ts). Solo il giocatore: i dipendenti non lo toccano.
    */
   startSpecial(biz: Business, order: SpecialOrder) {

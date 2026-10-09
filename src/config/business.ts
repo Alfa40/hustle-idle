@@ -72,8 +72,11 @@ export interface BusinessTypeDef {
   name: string;
   icon: string;
   desc: string;
-  /** truck/shop: clienti al bancone · service: ordini da eseguire in giro per la città */
-  kind: 'truck' | 'shop' | 'service';
+  /**
+   * truck/shop: clienti al bancone · service: ordini da eseguire in giro per la città ·
+   * craft: lavori manuali su richiesta fatti dal giocatore in prima persona (niente clienti né staff)
+   */
+  kind: 'truck' | 'shop' | 'service' | 'craft';
   /** su che tipo di lotto si può aprire */
   lot: 'truck' | 'shop';
   /** attrezzatura iniziale, da aggiungere al prezzo del lotto */
@@ -109,11 +112,10 @@ export const BUSINESS_TYPES = {
     stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
   },
   artigianato: {
-    name: 'Negozio di ceramiche', icon: '🏺', desc: 'Vasi, ciotole e tazze fatti a mano: pochi clienti ma pezzi di valore. In più gli ordini speciali da modellare tu al tornio.',
-    kind: 'shop', lot: 'shop', setupCost: 3500, products: ['vasi', 'ciotole', 'tazze'],
-    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Ceramista', cassa: 'Commesso' }, skills: ['artigianato', 'clientela'],
-    rateMul: 0.3, wall: 0xd99a6c, color: '#c0603a',
-    stations: { stock: '🟤 Argilla', work: '🏺 Tornio', counter: '🛍️ Vetrina' },
+    name: "Laboratorio dell'artigiano", icon: '🎨', desc: 'Lavori manuali su richiesta, fatti da te a mano in prima persona: pagano più dei lavoretti. Si parte dai vasi in ceramica; con l\'esperienza arrivano lavori più difficili e pagati meglio.',
+    kind: 'craft', lot: 'shop', setupCost: 3500, products: [],
+    roles: [], roleNames: {}, skills: ['artigianato'],
+    rateMul: 0, color: '#c0603a',
   },
   pulizie: {
     name: 'Impresa di pulizie', icon: '🧽', desc: 'Servizi a domicilio: esegui gli ordini nelle case.',

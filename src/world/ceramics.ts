@@ -3,14 +3,17 @@ import * as THREE from 'three';
 /**
  * Ceramiche fatte a mano (senza modelli 3D esterni): vasi, ciotole e tazze costruiti col tornio
  * (`LatheGeometry`, un profilo che gira attorno all'asse). Servono ai prodotti del negozio di
- * ceramiche e agli ordini speciali, dove il vaso si modella davvero al tornio.
+ * lavori su richiesta del laboratorio dell'artigiano, dove il vaso si modella davvero al tornio.
  */
 
 /** Quante "fasce" ha un vaso da modellare (dal fondo alla bocca) e quanto è alto (m). */
 export const RINGS = 10;
 export const VASE_H = 0.44;
-/** raggio del pane d'argilla appena messo sul tornio: più largo di ogni vaso, si stringe dove serve */
-export const LUMP_R = 0.18;
+/** raggio del pane d'argilla appena messo sul tornio (un cilindro medio: in certi punti si stringe, in altri si allarga) */
+export const LUMP_R = 0.12;
+/** raggio massimo e minimo che si può dare al vaso */
+export const MAX_R = 0.22;
+export const MIN_R = 0.035;
 
 export const CLAY = 0xb5764f;
 const CLAY_COL = new THREE.Color(0xb5764f);
@@ -36,7 +39,7 @@ export const VASES: Record<VaseShape, VaseDef> = {
 };
 export const VASE_IDS = Object.keys(VASES) as VaseShape[];
 
-/** Colori degli smalti per gli ordini speciali (nome per la scheda). */
+/** Colori degli smalti per i lavori su richiesta (nome per la scheda). */
 export const GLAZES: { color: number; name: string }[] = [
   { color: 0x2d6cdb, name: 'blu cobalto' },
   { color: 0x2fae5e, name: 'verde salvia' },
@@ -110,7 +113,7 @@ export function wrappedVase() {
 }
 
 /**
- * Prodotti del negozio di ceramiche ('proc:vaso', 'proc:ciotola', 'proc:tazza'), alti `size` metri.
+ * Ceramiche pronte ('proc:vaso', 'proc:ciotola', 'proc:tazza'), alte `size` metri.
  */
 export function ceramicProduct(kind: string, size: number): THREE.Object3D {
   const g = new THREE.Group();
@@ -144,7 +147,7 @@ export function ceramicProduct(kind: string, size: number): THREE.Object3D {
 export function vaseSvg(profile: number[], color: number, opts: { w?: number; h?: number; current?: number[] } = {}) {
   const W = opts.w ?? 80;
   const H = opts.h ?? 96;
-  const sx = (W / 2 - 4) / LUMP_R;
+  const sx = (W / 2 - 4) / MAX_R;
   const sy = (H - 8) / VASE_H;
   const n = profile.length;
   const side = (p: number[], dir: 1 | -1) => p.map((r, i) => `${(W / 2 + dir * r * sx).toFixed(1)},${(H - 4 - (i / (n - 1)) * VASE_H * sy).toFixed(1)}`);

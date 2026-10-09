@@ -198,7 +198,7 @@ const sizeCache = new Map<string, number>();
  * I prodotti senza modello (es. gioielli) sono costruiti con forme semplici.
  */
 export function productObject(modelPath: string | undefined, size: number): THREE.Object3D {
-  // ceramiche fatte a mano (negozio di ceramiche)
+  // ceramiche fatte a mano ('proc:vaso', 'proc:ciotola', 'proc:tazza')
   if (modelPath?.startsWith('proc:')) return ceramicProduct(modelPath.slice(5), size);
   if (!modelPath) {
     const g = new THREE.Group();
