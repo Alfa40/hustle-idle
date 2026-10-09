@@ -48,5 +48,7 @@
   (repo `github.com/Alfa40/gioco-castello-antico-`, branch `main`), pubblicato su Render come
   `crazy-town.onrender.com` (si aggiorna da solo a ogni push) con database Upstash Redis.
   È condiviso con la classifica di "The Magic Trip": le chiavi di Hustle Idle iniziano con
-  `hustle:` e non bisogna mai toccare quelle di Magic Trip.
+  `hustle:` e non bisogna mai toccare quelle di Magic Trip. Account senza progressi da più di 30 giorni
+  nascosti dalle classifiche, da più di 90 cancellati (dal server, ogni giorno). Le prove automatiche
+  (browser pilotato, `navigator.webdriver`) non inviano niente alla classifica.
 - Asset: modelli Kenney CC0 in `public/models` (zip completi in `assets-src/`, non pubblicati).
