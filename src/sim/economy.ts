@@ -70,8 +70,46 @@ export const demandNow = (s: GameState, b: Business) => totalDemand(s, b) * hour
 function noteHour(s: GameState, b: Business, served: boolean) {
   const h = Math.floor(hourOf(s));
   b.hourly ??= { served: Array(24).fill(0), lost: Array(24).fill(0) };
+  if (b.hourly.lastDay !== day(s)) {
+    b.hourly.lastDay = day(s);
+    b.hourly.days = (b.hourly.days ?? 0) + 1;
+  }
   if (served) b.hourly.served[h]++;
   else b.hourly.lost[h]++;
+}
+
+/** Giorni registrati ora per ora (oggi conta per la parte di giornata già passata). */
+export function hourlyDays(s: GameState, b: Business) {
+  const hd = b.hourly;
+  if (!hd?.days) return 0;
+  const open = BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR;
+  const todayPart = hd.lastDay === day(s) ? Math.min(1, Math.max(0.05, (hourOf(s) - BUSINESS.OPEN_HOUR) / open)) : 1;
+  return hd.days - 1 + todayPart;
+}
+
+/** Ci sono abbastanza dati ora per ora per usarli (almeno mezza giornata e una ventina di clienti). */
+export function hasHourly(s: GameState, b: Business) {
+  const hd = b.hourly;
+  if (!hd) return false;
+  const tot = hd.served.reduce((a, x) => a + x, 0) + hd.lost.reduce((a, x) => a + x, 0);
+  return hourlyDays(s, b) >= 0.5 && tot >= 20;
+}
+
+/**
+ * Clienti all'ora nelle ore di punta: UN solo numero, usato ovunque (resoconto, personale, consigli).
+ * Con i dati veri del mese è l'ora più piena in media (clienti arrivati: serviti + persi);
+ * se i dati sono ancora pochi è la domanda attesa nell'ora più piena (la più alta vista nel mese).
+ */
+export function peakRate(s: GameState, b: Business) {
+  if (hasHourly(s, b)) {
+    const d = hourlyDays(s, b);
+    let best = 0;
+    for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) best = Math.max(best, (b.hourly!.served[h] + b.hourly!.lost[h]) / d);
+    return best;
+  }
+  let f = 0;
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) f = Math.max(f, hourFactor(b.type, h));
+  return Math.max(b.month.peak ?? 0, totalDemand(s, b) * f);
 }
 
 export function isOpenHour(s: GameState) {
@@ -211,6 +249,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
     month: emptyLedger(),
     totalRevenue: 0,
     boughtFor: price,
+    statsFrom: s.minutes,
     orders: [],
   };
   playStats(s).bizOpened++;
@@ -454,11 +493,14 @@ export const randDemand = () => rand(0.7, 1.3);
  * i dipendenti di troppo. Il personale si misura sulle ore di punta del mese, non sulla domanda di adesso.
  */
 export interface StaffWarning {
-  kind: 'short' | 'stock' | 'excess';
+  kind: 'short' | 'stock' | 'excess' | 'info';
   text: string;
   /** dove si sistema: scheda dell'attività (personale, magazzino, migliorie) */
   tab?: 'personale' | 'magazzino' | 'migliorie';
 }
+
+/** Clienti all'ora scritti sempre allo stesso modo in resoconti e consigli (es. "5,1" o "17"). */
+export const fmtRate = (x: number) => (x >= 10 ? String(Math.round(x)) : x.toFixed(1).replace('.', ','));
 
 export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const def = bizType(b.type);
@@ -475,29 +517,26 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const lost = m.lost;
   const share = lost / Math.max(1, m.served + lost);
   const pct = `${Math.round(share * 100)}%`;
-  // ore di punta: la domanda più alta del mese (o quella di adesso, se più alta)
-  const peak = Math.max(m.peak ?? 0, totalDemand(s, b));
+  // ore di punta: lo stesso numero del resoconto (peakRate)
+  const peak = peakRate(s, b);
   const missing = def.roles.filter((r) => !b.staff.some((e) => e.role === r));
   const known = (m.lostStaff ?? 0) + (m.lostStock ?? 0) + (m.lostQueue ?? 0);
-  const bad = lost >= 3 && share >= 0.05;
-  // personale che non basta: reparto vuoto o troppo lento per le ore di punta (quanti ne servono in più)
-  const staffLost = known ? m.lostStaff ?? 0 : bad ? lost : 0;
-  if (b.staff.length && missing.length && (bad || !hasManager(b))) {
-    out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}` });
-  } else if (b.staff.length && staffLost >= 3 && staffLost / Math.max(1, m.served + lost) >= 0.03) {
-    const caps = def.roles.map((r) => ({ r, c: roleCapacity(b, r), n: b.staff.filter((e) => e.role === r).length })).sort((x, y) => x.c - y.c);
-    const slow = caps[0];
-    // ore di punta: quelle registrate o, se mancano (partite vecchie), stimate dai clienti persi
-    // (servi tot e ne perdi tot: nei momenti di punta la richiesta era più o meno serviti + persi)
-    const fromLost = m.served > 0 ? slow.c * ((m.served + staffLost) / m.served) : peak;
-    const top = Math.max(peak, fromLost);
-    // per ogni reparto che non regge: quanti in più ne servono (con un 10% di margine)
-    const hires = caps
-      .map((x) => ({ ...x, need: Math.ceil((top * 1.1 - x.c) / Math.max(0.5, x.n ? x.c / x.n : 2.5)) }))
-      .filter((x) => x.need > 0)
-      .map((x) => `${x.need} ${x.need === 1 ? name(x.r) : plural(x.r)}`);
-    const advice = hires.length ? `Assumi circa ${hires.join(' e ')} in più` : 'Assumi qualcuno in più nel reparto più lento';
-    out.push({ kind: 'short', text: `Persi ${staffLost} clienti questo mese (${pct}) perché il personale non basta nelle ore di punta: arrivano circa ${top.toFixed(1)} clienti all'ora, i ${plural(slow.r)} ne servono ${slow.c.toFixed(1)}. ${advice}` });
+  // clienti persi prima che il gioco registrasse il motivo (partite di prima dell'aggiornamento)
+  const unknown = Math.max(0, lost - known);
+  const caps = def.roles.map((r) => ({ r, c: roleCapacity(b, r), n: b.staff.filter((e) => e.role === r).length })).sort((x, y) => x.c - y.c);
+  // reparti che non reggono le ore di punta, e quanti in più ne servono (10% di margine)
+  const hires = caps
+    .map((x) => ({ ...x, need: Math.ceil((peak * 1.1 - x.c) / Math.max(0.5, x.n ? x.c / x.n : 2.5)) }))
+    .filter((x) => x.need > 0 && x.n > 0);
+  const staffLost = m.lostStaff ?? 0;
+  if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {
+    out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
+  } else if (b.staff.length && hires.length) {
+    const list = hires.map((x) => `${x.need} ${x.need === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
+    const slow = hires[0];
+    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questo mese perché il personale non basta. ` : ''}Nelle ore di punta arrivano circa ${fmtRate(peak)} clienti all'ora, ma i ${plural(slow.r)} ne servono ${fmtRate(slow.c)}: assumi circa ${list} in più`, tab: 'personale' });
+  } else if (unknown >= 3 && b.staff.length) {
+    out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale di adesso le ore di punta (circa ${fmtRate(peak)} clienti all'ora) sono coperte: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
   }
   if (b.staff.length && !hasManager(b) && !missing.length) {
     out.push({ kind: 'short', text: 'Senza manager l\'attività non lavora da sola quando non ci sei: i clienti si perdono. Assumi un manager' });
@@ -514,7 +553,8 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const queueLost = m.lostQueue ?? 0;
   if (queueLost >= 5) out.push({ kind: 'short', text: `Persi ${queueLost} clienti in fila mentre lavoravi nel locale: con un dipendente in più in cucina o alla cassa la fila scorre` });
   // dipendenti di troppo: solo se non si perdono clienti e misurando sulle ore di punta (con margine)
-  if (!out.length && !missing.length && share < 0.03 && peak > 0) {
+  const knownShare = known / Math.max(1, m.served + lost);
+  if (!out.some((w) => w.kind !== 'info') && !missing.length && knownShare < 0.03 && unknown < 3 && peak > 0) {
     let extra = 0;
     let salary = 0;
     for (const r of def.roles) {

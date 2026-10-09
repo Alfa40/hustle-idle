@@ -57,7 +57,10 @@ export interface Business {
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
   /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
-  hourly?: { served: number[]; lost: number[] };
+  /** `days`: giorni in cui si è registrato qualcosa (per fare la media giusta), `lastDay`: l'ultimo */
+  hourly?: { served: number[]; lost: number[]; days?: number; lastDay?: number };
+  /** minuto di gioco da cui contano le statistiche del resoconto (dopo un azzeramento) */
+  statsFrom?: number;
   /** laboratorio dell'artigiano: lavori su richiesta del giorno (fatti a mano dal giocatore) */
   specials?: SpecialOrder[];
   specialsDay?: number;
@@ -167,6 +170,8 @@ export interface GameState {
   jobXp?: Record<string, number>;
   fame: Record<SkillId, number>;
   businesses: Business[];
+  /** versione dei resoconti: 2 = statistiche con motivi dei persi e ore di punta */
+  reportsV?: number;
   /** gruppi personali dentro le catene (attività dello stesso tipo), per applicare modifiche a più negozi */
   chainGroups?: ChainGroup[];
   jobs: JobOffer[];
@@ -240,6 +245,7 @@ export function newState(): GameState {
   const zero = () => Object.fromEntries(SKILL_IDS.map((s) => [s, 0])) as Record<SkillId, number>;
   return {
     version: 1,
+    reportsV: 2,
     money: START_MONEY,
     minutes: START_DAY * 1440 + TIME.START_HOUR * 60,
     lastSeen: Date.now(),
@@ -333,7 +339,18 @@ function parse(raw: string | null): GameState | null {
     // prodotti che non esistono più (es. quelli del vecchio laboratorio artigiano): tolti dappertutto
     const known = new Set<string>(PRODUCT_IDS);
     for (const k of Object.keys(st.demandRand)) if (!known.has(k)) delete (st.demandRand as Record<string, number>)[k];
+    // resoconti nuovi: i dati vecchi (senza motivi dei clienti persi né ore di punta) si azzerano,
+    // il resoconto conta solo da adesso (incassi già fatti e soldi non cambiano)
+    const fresh = (s.reportsV ?? 0) < 2;
+    st.reportsV = 2;
     for (const b of st.businesses) {
+      if (fresh) {
+        b.month = emptyLedger();
+        b.today = emptyLedger();
+        b.yesterday = emptyLedger();
+        b.hourly = undefined;
+        b.statsFrom = st.minutes;
+      }
       b.products = b.products.filter((p) => known.has(p));
       for (const k of Object.keys(b.stock)) if (!known.has(k)) delete (b.stock as Record<string, number>)[k];
       // il laboratorio dell'artigiano ora è fatto di lavori su richiesta: niente prodotti, clienti né staff

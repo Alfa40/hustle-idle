@@ -25,7 +25,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, staffWarnings, fameMultiplier, fire, hasManager,
+  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, staffWarnings, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1035,8 +1035,8 @@ export class UI {
       const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
         <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
       // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
-      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : '💸'} ${w.text}</span><button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab ?? 'personale'}">${w.tab === 'magazzino' ? '🧊 Magazzino' : w.tab === 'migliorie' ? '⬆️ Migliorie' : '👥 Personale'}</button></div>`).join('');
-      const cards = rows.map((r) => `<div class="card report-card ${r.warn.length ? 'has-alert' : ''}" data-a="report:${r.b.id}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
+      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : w.kind === 'info' ? 'ℹ️' : '💸'} ${w.text}</span>${w.kind === 'info' ? '' : `<button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab ?? 'personale'}">${w.tab === 'magazzino' ? '🧊 Magazzino' : w.tab === 'migliorie' ? '⬆️ Migliorie' : '👥 Personale'}</button>`}</div>`).join('');
+      const cards = rows.map((r) => `<div class="card report-card ${r.warn.some((w) => w.kind !== 'info') ? 'has-alert' : ''}" data-a="report:${r.b.id}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
           <div class="stat s-yellow"><b>${euro(r.b.yesterday.revenue)}</b><span>ieri</span></div>
@@ -1049,7 +1049,7 @@ export class UI {
         <div class="report-more">Tocca per il resoconto completo: orario di punta, personale, cosa vendere e consigli ›</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
-      const nWarn = rows.filter((r) => r.warn.length).length;
+      const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
       return top + `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
@@ -1179,7 +1179,7 @@ export class UI {
         const biz = b();
         const def = bizType(biz.type);
         const r = bizReport(s, biz);
-        const n1 = (x: number) => (x >= 10 ? Math.round(x).toString() : x.toFixed(1).replace('.', ','));
+        const n1 = fmtRate;
         const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         // giornata media
@@ -1188,7 +1188,7 @@ export class UI {
           <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
           <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
           <div class="stat s-yellow"><b class="money-t">${euro(r.avg.revenue)}</b><span>incasso al giorno</span></div></div>
-          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questo mese: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu</div>` : ''}</div>`;
+          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questo mese: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu${r.lostWhy.unknown ? ` · ${r.lostWhy.unknown} prima che il gioco registrasse il motivo` : ''}</div>` : ''}</div>`;
         // orario di punta: barre ora per ora (verde serviti, rosso persi)
         const max = Math.max(0.1, ...r.hours.map((x) => x.arrived));
         const bars = r.hours.map((x) => {
@@ -1197,12 +1197,12 @@ export class UI {
           return `<div class="hb ${x.h === r.peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
         }).join('');
         const peakCard = `<div class="card"><h3>⏰ Orario di punta: ${r.peak.h}–${r.peak.h + 1}</h3>
-          <div class="small">In quell'ora arrivano circa <b>${n1(r.peak.arrived)} ${unit}</b>${r.hasData ? ' (media del mese)' : ' (stima dalla domanda di oggi: ancora pochi dati del mese)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
+          <div class="small">In quell'ora arrivano circa <b>${n1(r.peakRate)} ${unit}</b>${r.hasData ? ' (media dei giorni registrati)' : ' (stima dalla domanda: ancora pochi dati registrati)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
           <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
         // personale per reparto
         const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}<div class="small muted">servono ${n1(x.cap)} clienti all'ora · per le ore di punta ne servono ~${x.need}</div></div>
           <span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅ giusto' : x.status === 'short' ? '⚠️ pochi' : '💸 troppi'}</span></div>`).join('');
-        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale nelle ore di punta</h3><div class="small muted">Nelle ore di punta arrivano ~${n1(r.peakRate)} ${unit} all'ora.</div>${staffRows}</div>` : '';
+        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale nelle ore di punta</h3><div class="small muted">Nell'ora di punta arrivano circa ${n1(r.peakRate)} ${unit} (lo stesso numero usato per i consigli).</div>${staffRows}</div>` : '';
         // cosa si vende oggi
         const pmax = Math.max(0.1, ...r.products.map((x) => x.demand));
         const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><span>${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>

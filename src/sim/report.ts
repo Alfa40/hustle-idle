@@ -3,10 +3,10 @@ import { bizType, hourFactor, ROLES, UPGRADES, type Role } from '../config/busin
 import { PRODUCTS } from '../config/products';
 import { productLevel } from '../config/recipes';
 import {
-  estimateMonthlyProfit, eventMultiplier, lotZone, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, roleCapacity, staffWarnings,
-  totalDemand, upg,
+  estimateMonthlyProfit, eventMultiplier, fmtRate, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, roleCapacity, staffWarnings,
+  upg,
 } from './economy';
-import { dayOfMonth, day, hourOf, type Business, type GameState } from './state';
+import { dayOfMonth, day, type Business, type GameState } from './state';
 
 /**
  * Resoconto completo di un'attività: una giornata media (clienti arrivati, serviti, persi, incasso),
@@ -15,7 +15,7 @@ import { dayOfMonth, day, hourOf, type Business, type GameState } from './state'
  * dove andare per farlo. Serve a gestire le attività senza entrare in ognuna a controllare.
  */
 export interface Advice {
-  kind: 'short' | 'stock' | 'excess' | 'grow' | 'ok';
+  kind: 'short' | 'stock' | 'excess' | 'grow' | 'ok' | 'info';
   icon: string;
   text: string;
   /** scheda dell'attività dove si fa (personale, magazzino, migliorie, prodotti) */
@@ -32,13 +32,25 @@ export interface HourRow {
   lost: number;
 }
 
+/** Giornate di apertura (8–22) tra due minuti di gioco, con le frazioni. */
+function openDays(from: number, to: number) {
+  const open = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 60;
+  let tot = 0;
+  for (let d = Math.floor(from / 1440); d <= Math.floor(to / 1440); d++) {
+    const a = Math.max(from, d * 1440 + BUSINESS.OPEN_HOUR * 60);
+    const b = Math.min(to, d * 1440 + BUSINESS.CLOSE_HOUR * 60);
+    if (b > a) tot += b - a;
+  }
+  return tot / open;
+}
+
 export function bizReport(s: GameState, b: Business) {
   const def = bizType(b.type);
   const m = b.month;
-  // giorni del mese passati (oggi conta per la parte di giornata già lavorata)
-  const open = BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR;
-  const todayPart = Math.min(1, Math.max(0, (hourOf(s) - BUSINESS.OPEN_HOUR) / open));
-  const days = Math.max(1, dayOfMonth(day(s)) - 1 + todayPart);
+  // giorni di apertura contati: dall'inizio del mese o, se dopo, da quando l'attività è stata aperta
+  // (o da quando i resoconti sono stati azzerati); le ore di chiusura non contano
+  const monthStart = (day(s) - (dayOfMonth(day(s)) - 1)) * 1440;
+  const days = Math.max(0.05, openDays(Math.max(monthStart, b.statsFrom ?? monthStart), s.minutes));
   const arrived = m.served + m.lost;
   const avg = {
     arrived: arrived / days,
@@ -47,17 +59,20 @@ export function bizReport(s: GameState, b: Business) {
     revenue: m.revenue / days,
   };
   // ora per ora: dati veri del mese, altrimenti quelli attesi dalla domanda di oggi
+  // ora per ora: dati veri (media sui giorni davvero registrati), altrimenti l'andamento atteso
+  // scalato in modo che l'ora più piena valga esattamente peakRate (lo stesso numero ovunque)
   const hourly = b.hourly;
-  const hasData = !!hourly && hourly.served.reduce((a, x) => a + x, 0) + hourly.lost.reduce((a, x) => a + x, 0) >= 10;
-  const demand = totalDemand(s, b);
+  const hasData = hasHourly(s, b);
+  const hd = hourlyDays(s, b);
+  const peakRate = peakRateOf(s, b);
+  let maxF = 0;
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) maxF = Math.max(maxF, hourFactor(b.type, h));
   const hours: HourRow[] = [];
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) {
-    if (hasData) hours.push({ h, arrived: (hourly!.served[h] + hourly!.lost[h]) / days, lost: hourly!.lost[h] / days });
-    else hours.push({ h, arrived: demand * hourFactor(b.type, h), lost: 0 });
+    if (hasData) hours.push({ h, arrived: (hourly!.served[h] + hourly!.lost[h]) / hd, lost: hourly!.lost[h] / hd });
+    else hours.push({ h, arrived: maxF ? (peakRate * hourFactor(b.type, h)) / maxF : peakRate, lost: 0 });
   }
   const peak = hours.reduce((a, x) => (x.arrived > a.arrived ? x : a), hours[0]);
-  // le ore di punta in clienti all'ora: quella registrata del mese o quella attesa
-  const peakRate = Math.max(m.peak ?? 0, demand * Math.max(...hours.map((x) => hourFactor(b.type, x.h))));
   // personale reparto per reparto, rispetto alle ore di punta
   const staff = def.roles.map((r: Role) => {
     const list = b.staff.filter((e) => e.role === r);
@@ -70,8 +85,8 @@ export function bizReport(s: GameState, b: Business) {
   const c = monthlyCosts(s, b);
   const salaries = b.staff.reduce((a, e) => a + e.salary, 0);
   const advice: Advice[] = staffWarnings(s, b).map((w) => ({
-    kind: w.kind, icon: w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : '💸', text: w.text,
-    tab: w.tab ?? 'personale', label: TAB_LABEL[w.tab ?? 'personale'],
+    kind: w.kind, icon: w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : w.kind === 'info' ? 'ℹ️' : '💸', text: w.text,
+    tab: w.kind === 'info' ? undefined : w.tab ?? 'personale', label: w.kind === 'info' ? undefined : TAB_LABEL[w.tab ?? 'personale'],
   }));
   const losing = advice.some((a) => a.kind === 'short' || a.kind === 'stock');
   // crescere: posti liberi nel menù, personale che regge più clienti (marketing, aspetto del locale)
@@ -103,12 +118,12 @@ export function bizReport(s: GameState, b: Business) {
     const worst = sold[sold.length - 1];
     const better = products.find((x) => !x.selling && !x.locked);
     if (worst && better && better.demand > worst.demand * 1.15 && menuSlots(b) <= b.products.length) {
-      advice.push({ kind: 'grow', icon: '📈', text: `Oggi ${PRODUCTS[better.pid].icon} ${PRODUCTS[better.pid].name} è più richiesto di ${PRODUCTS[worst.pid].icon} ${PRODUCTS[worst.pid].name} (${better.demand.toFixed(1)} contro ${worst.demand.toFixed(1)} clienti all'ora): valuta di cambiarlo nel menù`, tab: 'prodotti', label: '🍔 Prodotti' });
+      advice.push({ kind: 'grow', icon: '📈', text: `Oggi ${PRODUCTS[better.pid].icon} ${PRODUCTS[better.pid].name} è più richiesto di ${PRODUCTS[worst.pid].icon} ${PRODUCTS[worst.pid].name} (${fmtRate(better.demand)} contro ${fmtRate(worst.demand)} clienti all'ora): valuta di cambiarlo nel menù`, tab: 'prodotti', label: '🍔 Prodotti' });
     }
     const lockedTop = products[0];
     const bestSold = sold[0];
     if (lockedTop?.locked && bestSold && lockedTop.demand > bestSold.demand * 1.2) {
-      advice.push({ kind: 'grow', icon: '🏗️', text: `Il prodotto più richiesto oggi in questa zona è ${PRODUCTS[lockedTop.pid].icon} ${PRODUCTS[lockedTop.pid].name} (${lockedTop.demand.toFixed(1)} clienti all'ora), ma serve l'ampliamento del locale per venderlo`, tab: 'migliorie', label: '⬆️ Migliorie' });
+      advice.push({ kind: 'grow', icon: '🏗️', text: `Il prodotto più richiesto oggi in questa zona è ${PRODUCTS[lockedTop.pid].icon} ${PRODUCTS[lockedTop.pid].name} (${fmtRate(lockedTop.demand)} clienti all'ora), ma serve l'ampliamento del locale per venderlo`, tab: 'migliorie', label: '⬆️ Migliorie' });
     }
     const hot = products.find((x) => x.event > 1.15 && !x.locked);
     if (hot) advice.push({ kind: 'grow', icon: '🎉', text: `Oggi c'è un evento: ${PRODUCTS[hot.pid].icon} ${PRODUCTS[hot.pid].name} è richiesto ${Math.round((hot.event - 1) * 100)}% più del solito${hot.selling ? ' (ce l\'hai: tieni pieno il magazzino)' : ' (non lo vendi: mettilo nel menù)'}`, tab: hot.selling ? 'magazzino' : 'prodotti', label: hot.selling ? '🧊 Magazzino' : '🍔 Prodotti' });
@@ -121,7 +136,7 @@ export function bizReport(s: GameState, b: Business) {
     days, avg, hours, hasData, peak, peakRate, staff,
     costs: { rent: c.rent, utilities: c.utilities, salaries },
     profit: isAutonomous(b) ? estimateMonthlyProfit(s, b) : null,
-    lostWhy: { staff: m.lostStaff ?? 0, stock: m.lostStock ?? 0, queue: m.lostQueue ?? 0 },
+    lostWhy: { staff: m.lostStaff ?? 0, stock: m.lostStock ?? 0, queue: m.lostQueue ?? 0, unknown: Math.max(0, m.lost - (m.lostStaff ?? 0) - (m.lostStock ?? 0) - (m.lostQueue ?? 0)) },
     products,
     advice,
   };

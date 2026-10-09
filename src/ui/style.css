@@ -1014,3 +1014,5 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .prod-row > span:first-child { width: 112px; flex: none; }
 .prod-row .bar { margin: 0; height: 9px; }
 .tag.g { background: #dff5e7; color: #1f6b3a; } .tag.r { background: #ffe1e5; color: #9b1c2c; } .tag.y { background: #fff1c9; color: #7a5300; }
+
+.report-alert.info { background: #eef0f6; color: #3e4a66; border: 2px solid #cfd5e6; }
