@@ -110,9 +110,15 @@ let lastSent = 0;
  * Invia la fama della partita in corso. Un dispositivo ha un solo posto in classifica:
  * vale la partita con più fama (una partita nuova non cancella quella migliore).
  */
+/**
+ * Browser pilotato da un programma (le prove automatiche headless): non scrive niente sul server,
+ * così le partite di prova non finiscono in classifica.
+ */
+const automated = typeof navigator !== 'undefined' && navigator.webdriver === true;
+
 export async function submit(s: GameState, force = false) {
   const nick = nickname();
-  if (!nick) return;
+  if (!nick || automated) return;
   const fame = Math.round(totalFame(s) * 10) / 10;
   const best = parseFloat(get(BEST_KEY)) || 0;
   if (fame < best) return;
@@ -150,7 +156,7 @@ export async function fetchBoard(limit = 50, kind: BoardKind = 'fame'): Promise<
 
 /** "Sto giocando": i tuoi amici vedono aperto il tuo furgone (e accese le luci del tuo piano). */
 export async function ping() {
-  if (!nickname() || document.hidden) return;
+  if (!nickname() || document.hidden || automated) return;
   try {
     await fetch(API + '/leaderboard/ping', {
       method: 'POST',
@@ -232,6 +238,7 @@ export interface FriendRequest {
 
 /** Aggiungendo un amico gli arriva la richiesta: può ricambiare con un tocco. */
 export async function sendFriendRequest(code: string): Promise<'ok' | 'missing' | 'error'> {
+  if (automated) return 'error';
   try {
     const r = await fetch(API + '/leaderboard/friend-request', {
       method: 'POST',
