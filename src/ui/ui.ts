@@ -19,11 +19,12 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
+import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fameMultiplier, fire, hasManager,
+  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, staffWarnings, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -911,6 +912,14 @@ export class UI {
           this.close();
           this.openBusiness(id);
         },
+        chain: (t) => {
+          this.close();
+          this.openChain(t as BusinessType);
+        },
+        staff: (id) => {
+          this.close();
+          this.openBusiness(id, 'personale');
+        },
         ...this.buyActions(),
       },
     });
@@ -923,7 +932,14 @@ export class UI {
         return `<div class="card center"><div class="hero"><div class="emoji">🏪</div></div><p>Non hai ancora nessuna attività.</p>
           <p class="muted">Metti da parte i soldi con i lavoretti, poi guarda la scheda <b>🛒 In vendita</b>. Il posteggio più economico costa ${euro(Math.min(...LOTS.map((l) => l.price)))}.</p></div>`;
       }
-      return s.businesses
+      // catene: 2 o più attività dello stesso tipo si gestiscono insieme
+      const chains = chainTypes(s).map((t) => {
+        const d = bizType(t);
+        const n = chainOf(s, t).length;
+        return `<button class="card chain-card" data-a="chain:${t}" style="--sc:${d.color}"><div class="icon-bubble" style="background:${d.color};color:#fff">🔗</div>
+          <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${n} attività · gestiscile insieme o a gruppi</div></div><span class="shop-go">›</span></button>`;
+      }).join('');
+      return (chains ? `<h3 class="sec-title">🔗 Le tue catene</h3>${chains}<h3 class="sec-title">🏪 Tutte le attività</h3>` : '') + s.businesses
         .map((b) => {
           const def = bizType(b.type);
           const lot = lotDef(b.lotId);
@@ -961,12 +977,14 @@ export class UI {
       const rows = s.businesses.map((b) => {
         const c = monthlyCosts(s, b);
         const fixed = c.rent + c.utilities + b.staff.reduce((a, e) => a + e.salary, 0);
-        return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, served: b.month.served, lost: b.month.lost };
+        return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, served: b.month.served, lost: b.month.lost, warn: staffWarnings(s, b) };
       }).sort((a, b) => b.month - a.month);
       const max = Math.max(1, ...rows.map((r) => r.month));
       const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
         <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
-      const cards = rows.map((r) => `<div class="card"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>
+      // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
+      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : '💸'} ${w.text}</span><button class="btn sm" data-a="staff:${r.b.id}">👥 Personale</button></div>`).join('');
+      const cards = rows.map((r) => `<div class="card ${r.warn.length ? 'has-alert' : ''}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
           <div class="stat s-yellow"><b>${euro(r.b.yesterday.revenue)}</b><span>ieri</span></div>
@@ -978,7 +996,9 @@ export class UI {
         <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
-      return `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
+      const nWarn = rows.filter((r) => r.warn.length).length;
+      const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} problemi di personale</b>: clienti persi o dipendenti di troppo. Guarda gli avvisi qui sotto.</div>` : '';
+      return top + `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
     }
@@ -1026,9 +1046,19 @@ export class UI {
       color: bizType(b().type).color,
       render: () => {
         const head = `<div class="tabs">${tabs.map(([k, n]) => `<button class="tab ${cur === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
-        return head + this.bizTab(b(), cur);
+        // fa parte di una catena: un tocco per gestire tutti i negozi dello stesso tipo insieme
+        const n = chainOf(s, b().type).length;
+        const chain = cur === 'panoramica' && n >= 2
+          ? `<button class="card chain-card" data-a="chain" style="--sc:${bizType(b().type).color}"><div class="icon-bubble" style="background:${bizType(b().type).color};color:#fff">🔗</div><div style="flex:1;text-align:left"><b>Catena: ${n} attività</b><div class="muted small">Modifiche a tutti i negozi insieme o a gruppi</div></div><span class="shop-go">›</span></button>`
+          : '';
+        return head + chain + this.bizTab(b(), cur);
       },
       actions: {
+        chain: () => {
+          const t = b().type;
+          this.close();
+          this.openChain(t);
+        },
         tab: (k) => (cur = k),
         toggleProduct: (p) => {
           const biz = b();
@@ -1076,6 +1106,149 @@ export class UI {
         },
       },
       onClose: () => this.game.save(),
+    });
+  }
+
+  /**
+   * Catena: le attività dello stesso tipo (2 o più). Si sceglie a chi applicare le modifiche (tutta la
+   * catena, una zona o un gruppo tuo) e si cambiano insieme prodotti, migliorie e magazzino.
+   */
+  openChain(type: BusinessType, startGroup = 'all') {
+    const s = this.s;
+    const def = bizType(type);
+    let gid = startGroup;
+    let tab = hasMenu(type) ? 'prodotti' : 'migliorie';
+    const report = (msg: string, ok: boolean) => toast(msg, ok ? 'good' : 'bad');
+    const sel = () => chainGroups(s, type).find((g) => g.id === gid) ?? chainGroups(s, type)[0];
+    this.open({
+      money: true,
+      live: true,
+      title: `🔗 Catena ${def.icon} ${def.name}`,
+      color: def.color,
+      render: () => {
+        const groups = chainGroups(s, type);
+        const g = sel();
+        const chips = groups.map((x) => `<button class="chip ${x.id === g.id ? 'on' : ''}" data-a="group:${x.id}">${x.icon} ${esc(x.name)} <b>${x.bizs.length}</b></button>`).join('') +
+          `<button class="chip add" data-a="newGroup">＋ Nuovo gruppo</button>`;
+        const today = g.bizs.reduce((a, b) => a + b.today.revenue, 0);
+        const month = g.bizs.reduce((a, b) => a + b.month.revenue, 0);
+        const auto = g.bizs.filter((b) => isAutonomous(b)).length;
+        const shops = g.bizs.map((b) => `<div class="card chain-shop"><div class="row between"><div><b>${esc(lotDef(b.lotId).name)}</b><div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name} · oggi ${euro(b.today.revenue)} · ${b.products.map((p) => PRODUCTS[p].icon).join('') || '—'}</div></div>
+            <div class="row" style="gap:6px">${this.autoTag(b)}<button class="btn sm" data-a="shop:${b.id}">Gestisci</button></div></div></div>`).join('');
+        const tabs = [...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : []), ['negozi', `🏪 Negozi (${g.bizs.length})`]];
+        let body = '';
+        if (tab === 'prodotti') {
+          body = `<p class="muted small">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
+            def.products.map((p) => {
+              const n = g.bizs.filter((b) => b.products.includes(p)).length;
+              return `<div class="card row between"><div><b>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</b><div class="muted small">In vendita in ${n} su ${g.bizs.length}</div></div>
+                <div class="row" style="gap:6px"><button class="btn sm sec" data-a="prod:${p}|0" ${n ? '' : 'disabled'}>Togli</button><button class="btn sm good" data-a="prod:${p}|1" ${n === g.bizs.length ? 'disabled' : ''}>Metti</button></div></div>`;
+            }).join('');
+        } else if (tab === 'migliorie') {
+          const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
+          body = `<p class="muted small">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
+            UPGRADE_IDS.filter((id) => !kitchenOnly.includes(id) || hasInterior(type)).map((id) => {
+              const u = UPGRADES[id];
+              const lv = g.bizs.map((b) => upg(b, id));
+              const lo = Math.min(...lv);
+              const hi = Math.max(...lv);
+              const can = g.bizs.filter((b) => canUpgrade(b, id)).length;
+              const cost = groupUpgradeCost(g.bizs, id);
+              return `<div class="card"><div class="row between"><div><b>${u.icon} ${u.name}</b><div class="muted small">Liv. ${lo === hi ? lo : `${lo}–${hi}`} / ${u.max}</div></div></div>
+                <button class="btn sm full ${can ? 'blue' : 'sec'}" style="margin-top:6px" data-a="upg:${id}" ${!can || s.money < cost ? 'disabled' : ''}>${can ? `Migliora ${can} ${can === 1 ? 'negozio' : 'negozi'} · ${euro(cost)}` : 'Tutti al massimo'}</button></div>`;
+            }).join('');
+        } else if (tab === 'magazzino') {
+          const allAuto = g.bizs.every((b) => b.autoRestock);
+          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small">Ogni prodotto in vendita fino al massimo, in tutti i negozi del gruppo.</div>
+              <button class="btn full" style="margin-top:8px" data-a="fill">Riempi tutto</button></div>
+            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small">Il manager (o il magazziniere) riordina da solo in tutti i negozi del gruppo.</div></div>
+              <span class="switch ${allAuto ? 'on' : ''}"><i></i></span></button>`;
+        } else {
+          body = shops;
+        }
+        const head = `<div class="chips">${chips}</div><!--tabs-->`;
+        const sum = `<div class="grid3"><div class="stat s-green"><b class="money-t">${euro(today)}</b><span>💰 oggi</span></div>
+          <div class="stat s-purple"><b class="money-t">${euro(month)}</b><span>📅 mese</span></div>
+          <div class="stat"><b>${auto}/${g.bizs.length}</b><span>autonome</span></div></div>
+          ${g.custom ? `<div class="row" style="gap:6px;margin-top:8px"><button class="btn sm sec" data-a="editGroup">✏️ Modifica gruppo</button><button class="btn sm danger" data-a="delGroup">🗑️ Elimina gruppo</button></div>` : ''}
+          <div class="tabs" style="margin-top:10px">${tabs.map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div>`;
+        return head + sum + body;
+      },
+      actions: {
+        group: (id) => (gid = id),
+        tab: (k) => (tab = k),
+        shop: (id) => {
+          this.close();
+          this.openBusiness(id);
+        },
+        prod: (arg) => {
+          const [p, a] = arg.split('|');
+          const r = groupProduct(sel().bizs, p as ProductId, a === '1');
+          for (const b of sel().bizs) this.game.setupLot(b.lotId);
+          const why = [r.full ? `${r.full} col menù pieno` : '', r.locked ? `${r.locked} senza l'ampliamento` : '', r.last ? `${r.last} con un solo prodotto` : ''].filter(Boolean).join(', ');
+          report(`${PRODUCTS[p as ProductId].icon} ${a === '1' ? 'Messo' : 'Tolto'} in ${r.done} ${r.done === 1 ? 'negozio' : 'negozi'}${why ? ` (saltati: ${why})` : ''}`, r.done > 0);
+        },
+        upg: (id) => {
+          const r = groupUpgrade(s, sel().bizs, id as UpgradeId);
+          for (const b of sel().bizs) this.game.setupLot(b.lotId);
+          report(`${UPGRADES[id as UpgradeId].icon} Migliorati ${r.done} negozi · ${euro(r.spent)}${r.skipped ? ` (${r.skipped} saltati)` : ''}`, r.done > 0);
+        },
+        fill: () => {
+          const r = groupFill(s, sel().bizs);
+          report(r.items ? `🧊 Magazzini riempiti · ${euro(r.spent)}` : 'Magazzini già pieni o soldi insufficienti', r.items > 0);
+        },
+        auto: () => {
+          const on = !sel().bizs.every((b) => b.autoRestock);
+          for (const b of sel().bizs) b.autoRestock = on;
+        },
+        newGroup: () => this.openChainGroup(type),
+        editGroup: () => {
+          const g = sel().custom;
+          if (g) this.openChainGroup(type, g.id);
+        },
+        delGroup: () => {
+          const g = sel().custom;
+          if (!g) return;
+          deleteGroup(s, g.id);
+          gid = 'all';
+          toast(`🗑️ Gruppo "${g.name}" eliminato`, 'info');
+        },
+      },
+      onClose: () => this.game.save(),
+    });
+  }
+
+  /** Crea o modifica un gruppo della catena: nome e negozi (per zona o come preferisci). */
+  private openChainGroup(type: BusinessType, groupId?: string) {
+    const s = this.s;
+    const old = (s.chainGroups ?? []).find((g) => g.id === groupId);
+    const picked = new Set<string>(old?.bizIds ?? []);
+    let name = old?.name ?? '';
+    this.open({
+      title: old ? '✏️ Modifica gruppo' : '＋ Nuovo gruppo',
+      small: true,
+      color: bizType(type).color,
+      render: () => `<label class="small muted">Nome del gruppo</label>
+        <input class="lb-input text-in" style="width:100%;box-sizing:border-box" data-c="name" maxlength="24" placeholder="Es. Centro, I più grandi…" value="${esc(name)}">
+        <p class="small muted" style="margin:10px 0 4px">Negozi del gruppo</p>
+        ${chainOf(s, type).map((b) => `<button class="card set-toggle" data-a="pick:${b.id}"><div style="flex:1;text-align:left"><b>${esc(lotDef(b.lotId).name)}</b><div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}</div></div><span class="switch ${picked.has(b.id) ? 'on' : ''}"><i></i></span></button>`).join('')}
+        <div class="btnrow"><button class="btn sec" data-a="cancel">Annulla</button><button class="btn good" data-a="save" ${picked.size && name.trim() ? '' : 'disabled'}>Salva</button></div>`,
+      actions: {
+        name: () => (name = (this.modal?.querySelector('.text-in') as HTMLInputElement | null)?.value ?? name),
+        pick: (id) => {
+          name = (this.modal?.querySelector('.text-in') as HTMLInputElement | null)?.value ?? name;
+          if (picked.has(id)) picked.delete(id);
+          else picked.add(id);
+        },
+        cancel: () => this.goBack(),
+        save: () => {
+          name = (this.modal?.querySelector('.text-in') as HTMLInputElement | null)?.value ?? name;
+          if (!name.trim() || !picked.size) return;
+          const g = saveGroup(s, type, name.trim(), [...picked], old?.id);
+          this.close();
+          this.openChain(type, 'g:' + g.id);
+        },
+      },
     });
   }
 

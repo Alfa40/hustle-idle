@@ -417,3 +417,53 @@ export function estimateLot(s: GameState, lotId: string, type: BusinessType) {
 }
 
 export const randDemand = () => rand(0.7, 1.3);
+
+/**
+ * Avvisi sul personale per i resoconti: clienti persi perché manca personale (un reparto vuoto o troppo
+ * lento per la domanda) e costi alti per dipendenti di troppo (lavorano più di quanto serve).
+ */
+export interface StaffWarning {
+  kind: 'short' | 'excess';
+  text: string;
+}
+
+export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
+  const def = bizType(b.type);
+  if (def.kind === 'craft' || !def.roles.length) return [];
+  const out: StaffWarning[] = [];
+  const name = (r: Role) => (def.roleNames[r] ?? ROLES[r].name).toLowerCase();
+  const demand = totalDemand(s, b);
+  const lost = b.month.lost;
+  const lostShare = lost / Math.max(1, b.month.served + lost);
+  const missing = def.roles.filter((r) => !b.staff.some((e) => e.role === r));
+  // clienti persi per mancanza di personale
+  if (lost >= 3 && lostShare >= 0.1) {
+    if (missing.length && b.staff.length) {
+      out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese: manca il reparto ${missing.map(name).join(' e ')}` });
+    } else if (b.staff.length) {
+      const caps = def.roles.map((r) => ({ r, c: roleCapacity(b, r) })).sort((x, y) => x.c - y.c);
+      const slow = caps[0];
+      if (slow && slow.c < demand * 0.95) {
+        out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese (${Math.round(lostShare * 100)}%): troppo pochi ${name(slow.r)} per la domanda (${slow.c.toFixed(1)} all'ora contro ${demand.toFixed(1)} clienti all'ora)` });
+      }
+    }
+    if (!hasManager(b) && b.staff.length) out.push({ kind: 'short', text: 'Senza manager l\'attività non lavora da sola quando non ci sei: i clienti si perdono' });
+  }
+  // dipendenti di troppo: in ogni reparto, chi in più non serve per la domanda (con un margine del 25%)
+  if (!missing.length && demand > 0) {
+    let extra = 0;
+    let salary = 0;
+    for (const r of def.roles) {
+      const staff = b.staff.filter((e) => e.role === r).sort((x, y) => employeeRate(y, b) - employeeRate(x, b));
+      let cap = 0;
+      for (const e of staff) {
+        if (cap >= demand * 1.25) {
+          extra++;
+          salary += e.salary;
+        } else cap += employeeRate(e, b);
+      }
+    }
+    if (extra > 0) out.push({ kind: 'excess', text: `Costi alti: ${extra} ${extra === 1 ? 'dipendente' : 'dipendenti'} di troppo per i clienti che arrivano (${euro(salary)} di stipendi al mese che si potrebbero risparmiare)` });
+  }
+  return out;
+}

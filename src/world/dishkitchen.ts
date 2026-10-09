@@ -8,7 +8,7 @@ import type { Character } from './character';
 import { GuideLine } from './guideline';
 import { Particles } from './particles';
 import { arrow, label, plateStack, ring } from './props';
-import { firstPersonFov, updateCutWalls, type CutWall } from './viewcam';
+import { firstPersonFov, updateCutWalls, type CutWall, LOOK_SENS } from './viewcam';
 import { frameRoom, layout, type Occluder } from '../ui/layout';
 
 /** Interfaccia sopra la cucina: la stanza si inquadra nello spazio libero. */
@@ -331,8 +331,8 @@ export class DishKitchen {
     else this.lookIdle += dt;
     // sensibilità in base allo schermo: trascinare per tutta la larghezza = mezzo giro
     const { w, h } = layout.info;
-    this.yaw += l.x * (Math.PI / Math.max(320, w));
-    this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * ((Math.PI * 0.55) / Math.max(480, h)), -1.0, 0.35);
+    this.yaw += l.x * LOOK_SENS * (Math.PI / Math.max(320, w));
+    this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * LOOK_SENS * ((Math.PI * 0.55) / Math.max(480, h)), -1.0, 0.35);
     const p = this.player.root.position;
     // si guarda l'oggetto da usare (pila di piatti, lavello, scolapiatti), non il punto a terra
     const st = this.step;

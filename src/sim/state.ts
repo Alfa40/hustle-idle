@@ -65,6 +65,14 @@ export interface SpecialOrder {
   done?: boolean;
 }
 
+/** Gruppo di negozi della stessa catena scelto dal giocatore (es. "Centro", "I più grandi"). */
+export interface ChainGroup {
+  id: string;
+  type: BusinessType;
+  name: string;
+  bizIds: string[];
+}
+
 export interface ServiceOrder {
   id: number;
   pid: ProductId;
@@ -151,6 +159,8 @@ export interface GameState {
   jobXp?: Record<string, number>;
   fame: Record<SkillId, number>;
   businesses: Business[];
+  /** gruppi personali dentro le catene (attività dello stesso tipo), per applicare modifiche a più negozi */
+  chainGroups?: ChainGroup[];
   jobs: JobOffer[];
   jobSeq: number;
   missionsDay: number;

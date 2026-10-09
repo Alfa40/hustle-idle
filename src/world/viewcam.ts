@@ -84,3 +84,9 @@ export function updateCutWalls(walls: CutWall[], cam: THREE.Camera) {
   const v = new THREE.Vector3();
   for (const w of walls) w.obj.visible = v.copy(cam.position).sub(w.at).dot(w.out) < 0.3;
 }
+
+/**
+ * Sensibilità della visuale in prima persona (1 = trascinare per tutta la larghezza dello schermo fa
+ * mezzo giro). Un po' più alta: si gira lo sguardo con meno strada del dito.
+ */
+export const LOOK_SENS = 1.3;

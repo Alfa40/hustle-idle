@@ -973,3 +973,21 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 /* i tuoi soldi nell'intestazione delle finestre dove si compra */
 .head-money { flex: none; margin-left: auto; margin-right: 8px; background: #fff; color: #1f8a45; font-weight: 800; font-size: 14px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
 .head-money[hidden] { display: none; }
+
+/* catene: gruppi (chip) e scheda d'ingresso */
+.chips { display: flex; gap: 6px; overflow-x: auto; padding: 6px 14px 8px; scrollbar-width: none; }
+.chip { flex: none; border: 2px solid #e6dccb; background: #fff; color: var(--ink); border-radius: 999px; padding: 6px 12px; font-weight: 700; font-size: 13px; white-space: nowrap; }
+.chip b { margin-left: 4px; background: #f1ead9; border-radius: 999px; padding: 0 6px; font-size: 12px; }
+.chip.on { background: var(--hc, var(--purple)); border-color: var(--hc, var(--purple)); color: #fff; }
+.chip.on b { background: rgba(255,255,255,.3); }
+.chip.add { border-style: dashed; color: var(--muted, #7a6f8f); }
+.chain-card { display: flex; align-items: center; gap: 10px; width: 100%; border: none; text-align: left; border-left: 6px solid var(--sc); }
+.chain-shop { padding: 10px 12px; }
+
+/* resoconti: avvisi sul personale */
+.report-alert { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.3; font-weight: 600; }
+.report-alert .btn { flex: none; margin-left: auto; }
+.report-alert.short { background: #ffe6e9; color: #9b1c2c; border: 2px solid #ffb3bd; }
+.report-alert.excess { background: #fff4d6; color: #7a5300; border: 2px solid #ffd27a; }
+.report-alert.big { display: block; margin: 0 0 10px; font-size: 14px; }
+.card.has-alert { border: 2px solid #ffb3bd; }

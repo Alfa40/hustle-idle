@@ -8,7 +8,7 @@ import type { Character } from './character';
 import { CLAY, GLAZES, LUMP_R, MAX_R, MIN_R, RINGS, VASE_H, VASES, vaseGeometry, vaseSvg, wrappedVase } from './ceramics';
 import { Particles } from './particles';
 import { label, ring } from './props';
-import { firstPersonFov } from './viewcam';
+import { firstPersonFov, LOOK_SENS } from './viewcam';
 import { layout, type Occluder } from '../ui/layout';
 import type { IndoorHooks } from './dishkitchen';
 
@@ -740,8 +740,8 @@ export class PotteryStudio {
     if (busy) this.lookIdle = 0;
     else this.lookIdle += dt;
     const { w, h } = layout.info;
-    this.yaw += l.x * (Math.PI / Math.max(320, w));
-    this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * ((Math.PI * 0.55) / Math.max(480, h)), -1.1, 0.35);
+    this.yaw += l.x * LOOK_SENS * (Math.PI / Math.max(320, w));
+    this.pitch = THREE.MathUtils.clamp(this.pitch - l.y * LOOK_SENS * ((Math.PI * 0.55) / Math.max(480, h)), -1.1, 0.35);
     const p = this.player.root.position;
     const t = this.lookTarget();
     if (t && this.lookIdle > 3 && !this.game.onScreen(t, this.camera)) {

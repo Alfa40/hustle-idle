@@ -25,7 +25,7 @@ import { Traffic, TRAFFIC_ASSETS } from './world/traffic';
 import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
-import { firstPersonFov, ViewControl } from './world/viewcam';
+import { firstPersonFov, ViewControl, LOOK_SENS } from './world/viewcam';
 import { RouteLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
@@ -1587,8 +1587,8 @@ export class Game {
     else this.fpIdle += dt;
     // sensibilità in base allo schermo: trascinare per tutta la larghezza = mezzo giro
     const { w, h } = layout.info;
-    this.fpYaw += l.x * (Math.PI / Math.max(320, w));
-    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * ((Math.PI * 0.55) / Math.max(480, h)), -1.0, 0.35);
+    this.fpYaw += l.x * LOOK_SENS * (Math.PI / Math.max(320, w));
+    this.fpPitch = THREE.MathUtils.clamp(this.fpPitch - l.y * LOOK_SENS * ((Math.PI * 0.55) / Math.max(480, h)), -1.0, 0.35);
     const p = this.player.root.position;
     // se non tocchi lo sguardo, la testa si gira da sola verso il prossimo punto da fare,
     // ma solo se l'obiettivo non si vede già sullo schermo
