@@ -19,6 +19,7 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
+import { bizReport } from '../sim/report';
 import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
@@ -962,6 +963,15 @@ export class UI {
           this.close();
           this.openBusiness(id, 'magazzino');
         },
+        bizTab: (arg) => {
+          const [id, tab] = arg.split('|');
+          this.close();
+          this.openBusiness(id, tab);
+        },
+        report: (id) => {
+          this.close();
+          this.openReport(id);
+        },
         ...this.buyActions(),
       },
     });
@@ -1025,8 +1035,8 @@ export class UI {
       const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
         <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
       // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
-      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : '💸'} ${w.text}</span>${w.kind === 'stock' ? `<button class="btn sm" data-a="stockOf:${r.b.id}">🧊 Magazzino</button>` : `<button class="btn sm" data-a="staff:${r.b.id}">👥 Personale</button>`}</div>`).join('');
-      const cards = rows.map((r) => `<div class="card ${r.warn.length ? 'has-alert' : ''}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
+      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : '💸'} ${w.text}</span><button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab ?? 'personale'}">${w.tab === 'magazzino' ? '🧊 Magazzino' : w.tab === 'migliorie' ? '⬆️ Migliorie' : '👥 Personale'}</button></div>`).join('');
+      const cards = rows.map((r) => `<div class="card report-card ${r.warn.length ? 'has-alert' : ''}" data-a="report:${r.b.id}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
           <div class="stat s-yellow"><b>${euro(r.b.yesterday.revenue)}</b><span>ieri</span></div>
@@ -1035,7 +1045,8 @@ export class UI {
           <div class="stat s-red"><b>${r.lost}</b><span>persi (mese)</span></div>
           <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
         </div>
-        <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div></div>`).join('');
+        <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
+        <div class="report-more">Tocca per il resoconto completo: orario di punta, personale, cosa vendere e consigli ›</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.length).length;
@@ -1148,6 +1159,73 @@ export class UI {
         },
       },
       onClose: () => this.game.save(),
+    });
+  }
+
+  /**
+   * Resoconto completo di un'attività: giornata media, orario di punta ora per ora, personale rispetto
+   * alle ore di punta, cosa si vende oggi, consigli (con dove andare per seguirli) e costi del mese.
+   * Il giocatore decide cosa seguire: il resoconto gli evita di entrare in ogni attività a controllare.
+   */
+  openReport(bizId: string) {
+    const s = this.s;
+    const b = () => s.businesses.find((x) => x.id === bizId)!;
+    this.open({
+      money: true,
+      live: true,
+      title: `📊 ${bizType(b().type).icon} ${lotDef(b().lotId).name}`,
+      color: bizType(b().type).color,
+      render: () => {
+        const biz = b();
+        const def = bizType(biz.type);
+        const r = bizReport(s, biz);
+        const n1 = (x: number) => (x >= 10 ? Math.round(x).toString() : x.toFixed(1).replace('.', ','));
+        const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
+        const unit = def.kind === 'service' ? 'ordini' : 'clienti';
+        // giornata media
+        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(${n1(r.days)} giorni di questo mese)</span></h3>
+          <div class="grid2"><div class="stat s-blue"><b>${n1(r.avg.arrived)}</b><span>${unit} arrivati al giorno</span></div>
+          <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
+          <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
+          <div class="stat s-yellow"><b class="money-t">${euro(r.avg.revenue)}</b><span>incasso al giorno</span></div></div>
+          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questo mese: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu</div>` : ''}</div>`;
+        // orario di punta: barre ora per ora (verde serviti, rosso persi)
+        const max = Math.max(0.1, ...r.hours.map((x) => x.arrived));
+        const bars = r.hours.map((x) => {
+          const hh = (x.arrived / max) * 100;
+          const lh = x.arrived ? (x.lost / x.arrived) * hh : 0;
+          return `<div class="hb ${x.h === r.peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
+        }).join('');
+        const peakCard = `<div class="card"><h3>⏰ Orario di punta: ${r.peak.h}–${r.peak.h + 1}</h3>
+          <div class="small">In quell'ora arrivano circa <b>${n1(r.peak.arrived)} ${unit}</b>${r.hasData ? ' (media del mese)' : ' (stima dalla domanda di oggi: ancora pochi dati del mese)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
+          <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
+        // personale per reparto
+        const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}<div class="small muted">servono ${n1(x.cap)} clienti all'ora · per le ore di punta ne servono ~${x.need}</div></div>
+          <span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅ giusto' : x.status === 'short' ? '⚠️ pochi' : '💸 troppi'}</span></div>`).join('');
+        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale nelle ore di punta</h3><div class="small muted">Nelle ore di punta arrivano ~${n1(r.peakRate)} ${unit} all'ora.</div>${staffRows}</div>` : '';
+        // cosa si vende oggi
+        const pmax = Math.max(0.1, ...r.products.map((x) => x.demand));
+        const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><span>${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>
+            <div class="bar green" style="flex:1"><i style="width:${(x.demand / pmax) * 100}%"></i></div><b class="small">${n1(x.demand)}/h</b>
+            ${x.selling ? '<span class="tag g">in vendita</span>' : x.locked ? '<span class="tag">🔒</span>' : '<span class="tag">non in menù</span>'}${x.event > 1.15 ? `<span class="tag y">🎉 +${Math.round((x.event - 1) * 100)}%</span>` : ''}</div>`).join('')}</div>` : '';
+        // consigli
+        const advice = `<div class="card"><h3>💡 Consigli</h3><div class="small muted" style="margin-bottom:4px">Sono suggerimenti: scegli tu quali seguire.</div>${r.advice.map((a) => `<div class="report-alert ${a.kind === 'grow' ? 'grow' : a.kind === 'ok' ? 'ok' : a.kind}"><span>${a.icon} ${a.text}</span>${a.tab ? `<button class="btn sm" data-a="go:${a.tab}">${a.label}</button>` : ''}</div>`).join('')}</div>`;
+        // costi
+        const tot = r.costs.rent + r.costs.utilities + r.costs.salaries;
+        const costs = `<div class="card"><h3>🧾 Costi del mese</h3>
+          <div class="row between small"><span>Affitto</span><span>${euro(r.costs.rent)}</span></div>
+          <div class="row between small"><span>Bollette</span><span>${euro(r.costs.utilities)}</span></div>
+          <div class="row between small"><span>Stipendi (${biz.staff.length})</span><span>${euro(r.costs.salaries)}</span></div>
+          <div class="row between" style="margin-top:6px"><b>Totale</b><b>${euro(tot)}</b></div>
+          <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
+        return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>` + advice + day + peakCard + staffCard + prod + costs;
+      },
+      actions: {
+        go: (tab) => {
+          this.close();
+          this.openBusiness(bizId, tab);
+        },
+      },
     });
   }
 

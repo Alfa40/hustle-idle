@@ -56,6 +56,8 @@ export interface Business {
   boughtFor: number;
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
+  /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
+  hourly?: { served: number[]; lost: number[] };
   /** laboratorio dell'artigiano: lavori su richiesta del giorno (fatti a mano dal giocatore) */
   specials?: SpecialOrder[];
   specialsDay?: number;

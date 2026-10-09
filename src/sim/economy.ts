@@ -3,7 +3,7 @@ import {
   bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
-import { ROLES } from '../config/business';
+import { hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
@@ -61,6 +61,17 @@ export function productDemand(s: GameState, b: Business, pid: ProductId) {
 
 export function totalDemand(s: GameState, b: Business) {
   return b.products.reduce((a, p) => a + productDemand(s, b, p), 0);
+}
+
+/** Clienti all'ora adesso: la media del giorno per l'andamento della giornata (ore di punta). */
+export const demandNow = (s: GameState, b: Business) => totalDemand(s, b) * hourFactor(b.type, hourOf(s));
+
+/** Conta un cliente servito o perso nell'ora attuale (statistiche ora per ora del mese). */
+function noteHour(s: GameState, b: Business, served: boolean) {
+  const h = Math.floor(hourOf(s));
+  b.hourly ??= { served: Array(24).fill(0), lost: Array(24).fill(0) };
+  if (served) b.hourly.served[h]++;
+  else b.hourly.lost[h]++;
 }
 
 export function isOpenHour(s: GameState) {
@@ -250,6 +261,7 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
   b.stock[pid] = Math.max(0, (b.stock[pid] ?? 0) - 1);
   b.today.revenue += amount;
   b.today.served++;
+  noteHour(s, b, true);
   b.month.revenue += amount;
   b.month.served++;
   b.totalRevenue += amount;
@@ -261,9 +273,10 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
 /** Perché un cliente se n'è andato (per gli avvisi dei resoconti). */
 export type LostWhy = 'staff' | 'stock' | 'queue';
 
-export function lostCustomer(b: Business, why?: LostWhy) {
+export function lostCustomer(b: Business, why?: LostWhy, s?: GameState) {
   b.today.lost++;
   b.month.lost++;
+  if (s) noteHour(s, b, false);
   if (!why) return;
   const k = why === 'staff' ? 'lostStaff' : why === 'stock' ? 'lostStock' : 'lostQueue';
   b.today[k] = (b.today[k] ?? 0) + 1;
@@ -300,9 +313,10 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
     return;
   }
   if (!isAutonomous(b) || !isOpenHour(s)) return;
-  notePeak(b, totalDemand(s, b));
-  const rate = Math.min(totalDemand(s, b), autoCapacity(b));
-  const lostRate = Math.max(0, totalDemand(s, b) - rate);
+  const now = demandNow(s, b);
+  notePeak(b, now);
+  const rate = Math.min(now, autoCapacity(b));
+  const lostRate = Math.max(0, now - rate);
   let a = (acc.get(b.id) ?? 0) + (rate * minutes) / 60;
   let lostAcc = (acc.get(b.id + 'l') ?? 0) + (lostRate * minutes) / 60;
   const kindness = b.staff.filter((e) => e.role === 'cassa').reduce((x, e) => x + e.kindness, 0) /
@@ -313,7 +327,7 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
     if ((b.stock[pid] ?? 0) <= 0) {
       if (b.autoRestock) restock(s, b);
       if ((b.stock[pid] ?? 0) <= 0) {
-        lostCustomer(b, 'stock');
+        lostCustomer(b, 'stock', s);
         continue;
       }
     }
@@ -322,7 +336,7 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
   }
   while (lostAcc >= 1) {
     lostAcc -= 1;
-    lostCustomer(b, 'staff');
+    lostCustomer(b, 'staff', s);
   }
   acc.set(b.id, a);
   acc.set(b.id + 'l', lostAcc);
@@ -335,16 +349,16 @@ export const MAX_ORDERS = 4;
 function serviceOrders(s: GameState, b: Business, minutes: number) {
   b.orders ??= [];
   for (const o of b.orders.filter((x) => x.expires < s.minutes)) {
-    lostCustomer(b, 'staff');
+    lostCustomer(b, 'staff', s);
     b.orders = b.orders.filter((x) => x !== o);
   }
   if (!isOpenHour(s)) return;
-  notePeak(b, totalDemand(s, b));
-  let a = (acc.get(b.id) ?? 0) + (totalDemand(s, b) * minutes) / 60;
+  notePeak(b, demandNow(s, b));
+  let a = (acc.get(b.id) ?? 0) + (demandNow(s, b) * minutes) / 60;
   while (a >= 1) {
     a -= 1;
     if (b.orders.length >= MAX_ORDERS) {
-      lostCustomer(b, 'staff');
+      lostCustomer(b, 'staff', s);
       continue;
     }
     b.orders.push({ id: s.orderSeq++, pid: pickProduct(s, b), expires: s.minutes + 20 * 60, house: randInt(0, 999) });
@@ -390,6 +404,7 @@ export function payMonth(s: GameState) {
     const sum = c.rent + c.utilities + c.salaries;
     total += sum;
     b.month = emptyLedger();
+    b.hourly = undefined;
     for (const e of b.staff) e.hiredDay = day(s);
   }
   if (total > 0) {
@@ -441,6 +456,8 @@ export const randDemand = () => rand(0.7, 1.3);
 export interface StaffWarning {
   kind: 'short' | 'stock' | 'excess';
   text: string;
+  /** dove si sistema: scheda dell'attività (personale, magazzino, migliorie) */
+  tab?: 'personale' | 'magazzino' | 'migliorie';
 }
 
 export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
@@ -491,7 +508,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
     const tip = !b.autoRestock ? 'attiva il riordino automatico nel Magazzino'
       : !hasManager(b) && !b.staff.some((e) => e.role === 'magazzino') ? 'assumi un manager (o un magazziniere) che riordini da solo'
         : 'compra la miglioria del frigo per tenere più scorte';
-    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti perché i prodotti erano finiti: ${tip}` });
+    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti perché i prodotti erano finiti: ${tip}`, tab: tip.includes('frigo') ? 'migliorie' : tip.includes('assumi') ? 'personale' : 'magazzino' });
   }
   // fila troppo lunga mentre lavoravi tu
   const queueLost = m.lostQueue ?? 0;

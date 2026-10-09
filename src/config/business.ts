@@ -144,3 +144,26 @@ export const LAST_NAMES = [
   'Rossi', 'Bianchi', 'Esposito', 'Russo', 'Ferrari', 'Romano', 'Gallo', 'Costa', 'Fontana',
   'Conti', 'Ricci', 'Greco', 'Bruno', 'Marino', 'Rinaldi', 'Moretti',
 ];
+
+/**
+ * Andamento della giornata: quanti clienti arrivano ora per ora rispetto alla media (ore 8–21).
+ * Food truck: pranzo e cena; panificio: colazione e merenda; servizi: mattina. La media del giorno
+ * resta 1 (gli incassi totali non cambiano): cambia quando serve il personale (le ore di punta).
+ */
+const RAW_CURVES: Partial<Record<BusinessType, number[]>> = {
+  //            8    9    10   11   12   13   14   15   16   17   18   19   20   21
+  foodtruck: [0.4, 0.5, 0.7, 1.1, 1.9, 1.8, 1.0, 0.6, 0.6, 0.8, 1.1, 1.6, 1.5, 0.8],
+  panificio: [1.9, 1.7, 1.2, 0.9, 1.0, 0.9, 0.6, 0.7, 1.2, 1.3, 1.0, 0.6, 0.5, 0.4],
+  pulizie: [1.3, 1.5, 1.4, 1.2, 0.9, 0.7, 0.9, 1.0, 1.0, 0.9, 0.8, 0.7, 0.4, 0.3],
+  traslochi: [1.4, 1.5, 1.4, 1.2, 0.8, 0.7, 1.0, 1.1, 1.0, 0.8, 0.7, 0.6, 0.5, 0.3],
+};
+
+/** Fattore dell'ora per un tipo di attività (fuori orario 0; senza curva 1). */
+export function hourFactor(type: BusinessType, hour: number) {
+  const c = RAW_CURVES[type];
+  const h = Math.floor(hour) - 8;
+  if (!c) return 1;
+  if (h < 0 || h >= c.length) return 0;
+  const avg = c.reduce((a, x) => a + x, 0) / c.length;
+  return c[h] / avg;
+}
