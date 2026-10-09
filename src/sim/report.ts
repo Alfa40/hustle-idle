@@ -56,7 +56,7 @@ export function bizReport(s: GameState, b: Business) {
     arrived: arrived / days,
     served: m.served / days,
     lost: m.lost / days,
-    revenue: m.revenue / days,
+    revenue: Math.max(0, m.revenue - (b.statsFrom && b.statsFrom > (day(s) - (dayOfMonth(day(s)) - 1)) * 1440 ? b.statsRev0 ?? 0 : 0)) / days,
   };
   // ora per ora: dati veri del mese, altrimenti quelli attesi dalla domanda di oggi
   // ora per ora: dati veri (media sui giorni davvero registrati), altrimenti l'andamento atteso
@@ -132,8 +132,10 @@ export function bizReport(s: GameState, b: Business) {
     advice.push({ kind: 'short', icon: '👔', text: 'Senza manager l\'attività lavora solo quando ci sei tu', tab: 'personale', label: '👥 Personale' });
   }
   if (!advice.length) advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale giusto per le ore di punta e magazzino pieno' });
+  const monthStart0 = (day(s) - (dayOfMonth(day(s)) - 1)) * 1440;
+  const resetNote = b.statsWhy && (b.statsFrom ?? 0) > monthStart0 ? b.statsWhy : null;
   return {
-    days, avg, hours, hasData, peak, peakRate, staff,
+    resetNote, days, avg, hours, hasData, peak, peakRate, staff,
     costs: { rent: c.rent, utilities: c.utilities, salaries },
     profit: isAutonomous(b) ? estimateMonthlyProfit(s, b) : null,
     lostWhy: { staff: m.lostStaff ?? 0, stock: m.lostStock ?? 0, queue: m.lostQueue ?? 0, unknown: Math.max(0, m.lost - (m.lostStaff ?? 0) - (m.lostStock ?? 0) - (m.lostQueue ?? 0)) },

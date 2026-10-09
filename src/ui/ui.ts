@@ -1183,7 +1183,8 @@ export class UI {
         const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         // giornata media
-        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(${n1(r.days)} giorni di questo mese)</span></h3>
+        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(${n1(r.days)} giorni ${r.resetNote ? 'registrati' : 'di questo mese'})</span></h3>
+          ${r.resetNote ? `<div class="small muted" style="margin-bottom:6px">🔄 Statistiche ripartite da zero dopo la miglioria <b>${esc(r.resetNote)}</b>: l'attività è più veloce, clienti persi e ore di punta si ricalcolano da allora.</div>` : ''}
           <div class="grid2"><div class="stat s-blue"><b>${n1(r.avg.arrived)}</b><span>${unit} arrivati al giorno</span></div>
           <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
           <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>

@@ -61,6 +61,9 @@ export interface Business {
   hourly?: { served: number[]; lost: number[]; days?: number; lastDay?: number };
   /** minuto di gioco da cui contano le statistiche del resoconto (dopo un azzeramento) */
   statsFrom?: number;
+  /** incasso del mese al momento dell'azzeramento (la media al giorno conta solo quello dopo) e perché */
+  statsRev0?: number;
+  statsWhy?: string;
   /** laboratorio dell'artigiano: lavori su richiesta del giorno (fatti a mano dal giocatore) */
   specials?: SpecialOrder[];
   specialsDay?: number;

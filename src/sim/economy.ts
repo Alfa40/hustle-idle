@@ -3,7 +3,7 @@ import {
   bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
-import { hourFactor, ROLES } from '../config/business';
+import { hourFactor, ROLES, SPEED_UPGRADES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
@@ -291,7 +291,28 @@ export function buyUpgrade(s: GameState, b: Business, id: UpgradeId) {
   addMoney(s, -cost);
   b.upgrades[id] = lvl + 1;
   toast(`${def.name} livello ${lvl + 1}`, 'good');
+  // l'attività ora lavora più in fretta: clienti persi e ore di punta si ricalcolano da adesso
+  if ((SPEED_UPGRADES as readonly string[]).includes(id)) resetBizStats(s, b, `${def.name} livello ${lvl + 1}`);
   return true;
+}
+
+/**
+ * Azzera le statistiche del resoconto legate ai clienti persi e alle ore di punta (serviti, persi e
+ * motivi, ore di punta, ora per ora): si ricalcolano da adesso. Soldi e incassi non cambiano.
+ */
+export function resetBizStats(s: GameState, b: Business, why: string) {
+  for (const l of [b.month, b.today]) {
+    l.served = 0;
+    l.lost = 0;
+    l.lostStaff = 0;
+    l.lostStock = 0;
+    l.lostQueue = 0;
+    l.peak = 0;
+  }
+  b.hourly = undefined;
+  b.statsFrom = s.minutes;
+  b.statsRev0 = b.month.revenue;
+  b.statsWhy = why;
 }
 
 /** Registra una vendita (sia manuale sia automatica). */
@@ -444,6 +465,7 @@ export function payMonth(s: GameState) {
     total += sum;
     b.month = emptyLedger();
     b.hourly = undefined;
+    b.statsRev0 = 0;
     for (const e of b.staff) e.hiredDay = day(s);
   }
   if (total > 0) {
