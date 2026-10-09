@@ -375,10 +375,13 @@ export class PotteryStudio {
     // tocco delicato: all'inizio della passata il vaso cambia poco (correzioni fini); più si scorre,
     // più la modifica cresce (fino a seguire il dito). Ogni volta che si alza il dito si riparte piano.
     this.dragLen += Math.abs(x - prev.x);
-    const gain = 0.15 + 0.75 * THREE.MathUtils.smoothstep(this.dragLen, 10, 180);
-    const dr = (move / pxPerM) * gain;
+    const gain = 0.07 + 0.33 * THREE.MathUtils.smoothstep(this.dragLen, 20, 340);
+    // vicino alla forma della foto il vaso rallenta ancora: è facile fermarsi al punto giusto
+    const ri = Math.round(rf);
+    const near = THREE.MathUtils.clamp(Math.abs(this.radii[ri] - this.target[ri]) / 0.02, 0.35, 1);
+    const dr = (move / pxPerM) * gain * near;
     for (let i = 0; i < RINGS; i++) {
-      const wgt = Math.exp(-((i - rf) ** 2) / (2 * 0.7 ** 2));
+      const wgt = Math.exp(-((i - rf) ** 2) / (2 * 0.55 ** 2));
       this.radii[i] = THREE.MathUtils.clamp(this.radii[i] + dr * wgt, MIN_R, MAX_R);
     }
     return true;
