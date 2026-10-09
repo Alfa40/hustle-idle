@@ -17,9 +17,6 @@ export const EXTRA_ROLES: { role: Role; level: number; desc: string }[] = [
   { role: 'sala', level: 2, desc: 'Porta il cibo ai tavoli della sala: clienti più contenti e mance più alte.' },
 ];
 
-/** Migliorie che rendono l'attività più veloce: comprarle azzera le statistiche di clienti persi e ore di punta. */
-export const SPEED_UPGRADES = ['ampliamento', 'fuochi', 'banco', 'ripiano', 'attrezzatura'] as const;
-
 export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
 
 export interface UpgradeDef {

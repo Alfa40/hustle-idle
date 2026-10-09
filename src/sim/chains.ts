@@ -2,7 +2,8 @@ import { bizType, UPGRADES, type BusinessType, type UpgradeId } from '../config/
 import { ZONES, type ZoneId } from '../config/map';
 import type { ProductId } from '../config/products';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
-import { buyStock, buyUpgrade, lotZone, menuSlots, stockCap, upg } from './economy';
+import { buyStock, buyUpgrade, lotZone, menuSlots, resetBizStats, stockCap, upg } from './economy';
+import { PRODUCTS } from '../config/products';
 import type { Business, ChainGroup, GameState } from './state';
 
 /**
@@ -59,7 +60,7 @@ export function saveGroup(s: GameState, type: BusinessType, name: string, bizIds
 export const deleteGroup = (s: GameState, id: string) => (s.chainGroups = (s.chainGroups ?? []).filter((g) => g.id !== id));
 
 /** Mette o toglie un prodotto in tutti i negozi del gruppo (dove si può). Quanti cambiati e perché gli altri no. */
-export function groupProduct(bizs: Business[], pid: ProductId, add: boolean) {
+export function groupProduct(s: GameState, bizs: Business[], pid: ProductId, add: boolean) {
   const r = { done: 0, locked: 0, full: 0, last: 0 };
   for (const b of bizs) {
     const has = b.products.includes(pid);
@@ -69,12 +70,14 @@ export function groupProduct(bizs: Business[], pid: ProductId, add: boolean) {
       else if (b.products.length >= menuSlots(b)) r.full++;
       else {
         b.products.push(pid);
+        resetBizStats(s, b, `messo in vendita ${PRODUCTS[pid].name}`);
         r.done++;
       }
     } else if (has) {
       if (b.products.length <= 1) r.last++;
       else {
         b.products = b.products.filter((x) => x !== pid);
+        resetBizStats(s, b, `tolto dalla vendita ${PRODUCTS[pid].name}`);
         r.done++;
       }
     }

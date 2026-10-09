@@ -3,7 +3,7 @@ import {
   bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
-import { hourFactor, ROLES, SPEED_UPGRADES } from '../config/business';
+import { hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
@@ -184,6 +184,7 @@ export function hire(s: GameState, b: Business, candId: number) {
   e.hiredDay = day(s);
   b.staff.push(e);
   toast(`${e.name} assunto come ${roleName(b.type, e.role).toLowerCase()}`, 'good');
+  resetBizStats(s, b, `assunto ${e.name} (${roleName(b.type, e.role).toLowerCase()})`);
 }
 
 export function fire(s: GameState, b: Business, empId: number) {
@@ -193,6 +194,7 @@ export function fire(s: GameState, b: Business, empId: number) {
   const owed = proratedSalary(s, e);
   b.staff = b.staff.filter((x) => x.id !== empId);
   if (owed > 0) addMoney(s, -owed, `liquidazione ${e.name}`);
+  resetBizStats(s, b, `licenziato ${e.name}`);
 }
 
 /** Stipendio maturato dall'assunzione o dall'ultimo pagamento (hiredDay si azzera a fine mese). */
@@ -291,14 +293,18 @@ export function buyUpgrade(s: GameState, b: Business, id: UpgradeId) {
   addMoney(s, -cost);
   b.upgrades[id] = lvl + 1;
   toast(`${def.name} livello ${lvl + 1}`, 'good');
-  // l'attività ora lavora più in fretta: clienti persi e ore di punta si ricalcolano da adesso
-  if ((SPEED_UPGRADES as readonly string[]).includes(id)) resetBizStats(s, b, `${def.name} livello ${lvl + 1}`);
+  // cambia quanti clienti arrivano o quanti se ne servono: clienti persi e ore di punta si ricalcolano da
+  // adesso. L'ampliamento da solo no: dà solo più spazio, l'attività lavora come prima finché non ci metti
+  // attrezzatura o prodotti nuovi (e quelli azzerano)
+  if (id !== 'ampliamento') resetBizStats(s, b, `${def.name} livello ${lvl + 1}`);
   return true;
 }
 
 /**
  * Azzera le statistiche del resoconto legate ai clienti persi e alle ore di punta (serviti, persi e
- * motivi, ore di punta, ora per ora): si ricalcolano da adesso. Soldi e incassi non cambiano.
+ * motivi, ore di punta, ora per ora): si ricalcolano da adesso. Si fa a ogni cambio che sposta la domanda
+ * o quanti clienti l'attività riesce a servire: migliorie, personale assunto o licenziato, prodotti in
+ * vendita. Soldi e incassi non cambiano.
  */
 export function resetBizStats(s: GameState, b: Business, why: string) {
   for (const l of [b.month, b.today]) {
