@@ -6,7 +6,7 @@ import {
   estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, partialDue, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, covers, employeeRate, shiftsFor, staffWarnings,
   upg,
 } from './economy';
-import { shiftText } from './shifts';
+import { SHIFT_HOURS, shiftText, shortRanges } from './shifts';
 import type { Business, GameState } from './state';
 
 /**
@@ -69,7 +69,8 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
   // personale reparto per reparto con i turni da 8 ore organizzati dal manager
   const dem = Array(24).fill(0);
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) dem[h] = maxF ? (peakRate * hourFactor(b.type, h)) / maxF : peakRate;
-  const staff = covers(b, dem, (e) => employeeRate(e, b), shiftsFor(s, b).plan.byRole).map((x) => ({
+  const cov = covers(b, dem, (e) => employeeRate(e, b), shiftsFor(s, b).plan.byRole);
+  const staff = cov.map((x) => ({
     role: x.r as Role,
     name: def.roleNames[x.r] ?? ROLES[x.r].name,
     n: x.n,
@@ -96,7 +97,13 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
       if (best) advice.push({ kind: 'grow', icon: '🍔', text: `Hai ${free} ${free === 1 ? 'posto libero' : 'posti liberi'} nel menù: aggiungi ${PRODUCTS[best].icon} ${PRODUCTS[best].name} (il più richiesto che non vendi)`, tab: 'prodotti', label: '🍔 Prodotti' });
     }
   }
-  if (!losing && isAutonomous(b)) {
+  // dipendenti a vuoto solo in parte del turno (non di troppo): servono più clienti per sfruttarli
+  const idle = cov.flatMap((x) => x.idle.map((i) => ({ ...i, r: x.r }))).filter((i) => i.hours.length < SHIFT_HOURS);
+  const growId = upg(b, 'marketing') < UPGRADES.marketing.max ? 'marketing' : upg(b, 'look') < UPGRADES.look.max ? 'look' : null;
+  if (!losing && isAutonomous(b) && idle.length) {
+    const who = idle.slice(0, 3).map((i) => `${i.emp.name.split(' ')[0]} (${(def.roleNames[i.r] ?? ROLES[i.r].name).toLowerCase()}) ${i.hours.length} ${i.hours.length === 1 ? 'ora' : 'ore'} su ${SHIFT_HOURS}, ${shortRanges(hoursCap(i.hours), hoursDem()).ranges.join(', ')}`).join('; ');
+    advice.push({ kind: 'grow', icon: '📣', text: `${idle.length === 1 ? 'Un dipendente lavora' : `${idle.length} dipendenti lavorano`} a vuoto per una parte del turno: ${who}${idle.length > 3 ? ' e altri' : ''}. Nelle altre ore servono, quindi non sono di troppo: aumenta la clientela${growId ? ` con ${UPGRADES[growId].name}` : ''} per sfruttarli`, tab: growId ? 'migliorie' : undefined, label: growId ? '⬆️ Migliorie' : undefined });
+  } else if (!losing && isAutonomous(b)) {
     const slowest = Math.min(...staff.map((x) => x.cap));
     if (slowest > peakRate * 1.4) {
       const id = upg(b, 'marketing') < UPGRADES.marketing.max ? 'marketing' : upg(b, 'look') < UPGRADES.look.max ? 'look' : null;
@@ -142,6 +149,10 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
 }
 
 export type BizReport = ReturnType<typeof bizReport>;
+
+// per scrivere le ore a vuoto come fasce ("8–10, 15–16") con shortRanges: capacità 0 nelle ore date, domanda 1
+const hoursCap = (hours: number[]) => Array.from({ length: 24 }, (_, h) => (hours.includes(h) ? 0 : 1));
+const hoursDem = () => Array(24).fill(1);
 
 /**
  * Resoconto della settimana: alla chiusura (22:00) di ogni giorno si controlla se la settimana in corso ha

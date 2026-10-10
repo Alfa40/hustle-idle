@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { model } from '../assets';
 import { BUSINESS, TIME } from '../config/balance';
-import { bizType } from '../config/business';
+import { bizType, ROLES } from '../config/business';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { COUNTER_Z, kitchenLayout, LAYOUTS, type Layout, type StationDef } from '../config/recipes';
 import type { Game } from '../game';
@@ -461,7 +461,8 @@ export class TruckInterior {
     // chi è al corso di formazione non c'è
     for (const e of this.biz.staff.filter((x) => !x.trainingEnd)) {
       const char = new Character(e.model || CHAR_MODELS[e.id % CHAR_MODELS.length]);
-      const tag = label(e.name.split(' ')[0], { scale: 0.2 });
+      // icona della mansione sul nome: si vede subito chi cucina e chi serve
+      const tag = label(`${ROLES[e.role].icon} ${e.name.split(' ')[0]}`, { scale: 0.2 });
       tag.position.y = 1.75;
       char.root.add(tag);
       if (e.role === 'cassa') {
@@ -1406,8 +1407,31 @@ export class TruckInterior {
         return;
       }
       case 'cook': {
-        const free = st.slots.find((sl) => !sl.item);
+        let free = st.slots.find((sl) => !sl.item);
         if (!free) {
+          // fuochi pieni di cose già pronte (anche sue): le toglie lui e ci mette la sua, invece di
+          // aspettare per sempre con il prodotto in mano mentre quelle sul fuoco bruciano
+          const done = st.slots.find((sl) => sl.item && sl.p >= 1 && (!sl.claim || sl.claim === w));
+          if (done) {
+            const it = done.item!;
+            const burnt = done.p >= BURN;
+            done.item = null;
+            done.claim = done.owner = undefined;
+            done.bar.visible = done.fill.visible = false;
+            this.fx.emit('spark', st.pos.clone().setY(1.3), 6);
+            free = done;
+            free.item = w.item!;
+            free.p = 0;
+            free.owner = w;
+            if (burnt) this.setWorkerItem(w);
+            else {
+              it.step++;
+              this.markReady(it);
+              this.setWorkerItem(w, it);
+            }
+            w.job = undefined;
+            return;
+          }
           job.t += dt;
           if (job.t > 1.5) w.job = undefined;
           return;
