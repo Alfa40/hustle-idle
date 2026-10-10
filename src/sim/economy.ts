@@ -424,6 +424,7 @@ export function resetBizStats(s: GameState, b: Business, why: string) {
   // la raccolta per il resoconto della settimana riparte da adesso (il resoconto vecchio non vale più)
   b.week = { ...emptyLedger(), from: s.minutes };
   b.report = undefined;
+  b.partial = undefined;
 }
 
 /** Registra una vendita (sia manuale sia automatica). */
@@ -479,6 +480,8 @@ export function openDays(from: number, to: number) {
 
 /** Giornate raccolte per il resoconto della settimana (ne servono REPORT_DAYS). */
 export const REPORT_DAYS = 7;
+/** Dal terzo giorno, finché non c'è il primo resoconto completo, il manager ne prepara uno provvisorio ogni sera. */
+export const PARTIAL_DAYS = 3;
 export const weekDays = (s: GameState, b: Business) => openDays(weekOf(s, b).from, s.minutes);
 
 /**
@@ -487,8 +490,17 @@ export const weekDays = (s: GameState, b: Business) => openDays(weekOf(s, b).fro
  */
 export function weeklyClose(s: GameState, b: Business, make: (s: GameState, b: Business) => import('./report').BizReport) {
   if (bizType(b.type).kind === 'craft') return false;
-  if (weekDays(s, b) < REPORT_DAYS - 0.01) return false;
+  const done = weekDays(s, b);
+  if (done < REPORT_DAYS - 0.01) {
+    // nessun resoconto completo (prima settimana o dopo un cambio): dal 3° giorno uno provvisorio
+    // (si conta il giorno di calendario: anche se la raccolta è partita a metà del 1° giorno, alla chiusura del 3°)
+    const from = weekOf(s, b).from;
+    const calDays = day(s) - Math.floor(from / 1440) - (from % 1440 >= BUSINESS.CLOSE_HOUR * 60 ? 1 : 0) + 1;
+    if (!b.report && calDays >= PARTIAL_DAYS && done >= 1.5) b.partial = { day: day(s), from: weekOf(s, b).from, days: done, data: make(s, b) };
+    return false;
+  }
   b.report = { day: day(s), from: weekOf(s, b).from, data: make(s, b) };
+  b.partial = undefined;
   b.week = { ...emptyLedger(), from: s.minutes };
   b.hourly = undefined;
   return true;

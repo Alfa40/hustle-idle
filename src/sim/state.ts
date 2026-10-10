@@ -69,6 +69,8 @@ export interface Business {
   hourly?: { served: number[]; lost: number[]; days?: number; lastDay?: number };
   /** resoconto della settimana (pronto dopo 7 giornate di dati raccolti, resta fisso fino al prossimo) */
   report?: { day: number; from: number; data: import('./report').BizReport };
+  /** resoconto provvisorio (dal 3° giorno, finché non c'è quello completo della settimana) */
+  partial?: { day: number; from: number; days: number; data: import('./report').BizReport };
   /** dati della settimana in corso per il prossimo resoconto (da `from`, minuto di gioco) */
   week?: Ledger & { from: number };
   /** minuto di gioco da cui contano le statistiche del resoconto (dopo un azzeramento) */
@@ -377,6 +379,7 @@ function parse(raw: string | null): GameState | null {
       }
       if (weekly) {
         b.report = undefined;
+        b.partial = undefined;
         b.hourly = undefined;
         b.week = { ...emptyLedger(), from: st.minutes };
       }

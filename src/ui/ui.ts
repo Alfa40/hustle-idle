@@ -25,7 +25,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canTrain, empStat, fmtRate, MAX_LEVEL, MAX_STARS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canTrain, empStat, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1033,7 +1033,7 @@ export class UI {
         const c = monthlyCosts(s, b);
         const fixed = c.rent + c.utilities + b.staff.reduce((a, e) => a + e.salary, 0);
         // avvisi e clienti dal resoconto di fine giornata (si aggiorna una volta al giorno)
-        const rep = b.report?.data;
+        const rep = (b.report ?? b.partial)?.data;
         const warn = (rep?.advice ?? []).filter((a) => a.kind === 'short' || a.kind === 'stock' || a.kind === 'excess' || a.kind === 'info');
         return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, rep, warn };
       }).sort((a, b) => b.month - a.month);
@@ -1052,13 +1052,13 @@ export class UI {
           <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
         </div>
         <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
-        ${r.rep ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${this.reportProgress(r.b, false)}</div>`}
-        <div class="report-more">${r.rep ? 'Tocca per il resoconto della settimana: orario di punta, personale, cosa vendere e consigli ›' : 'Tocca per i dettagli ›'}</div></div>`).join('');
+        ${r.b.report ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${r.rep ? ` Intanto c'è un <b>resoconto provvisorio</b> di ${fmtRate(Math.floor(r.b.partial!.days * 10) / 10)} giornate.` : ` Dal ${PARTIAL_DAYS}° giorno ne preparerà uno provvisorio.`}${this.reportProgress(r.b, false)}</div>`}
+        <div class="report-more">${r.b.report ? 'Tocca per il resoconto della settimana: orario di punta, personale, cosa vendere e consigli ›' : r.rep ? 'Tocca per il resoconto provvisorio ›' : 'Tocca per i dettagli ›'}</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
-      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
+      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati; dal ${PARTIAL_DAYS}° giorno uno provvisorio); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
     }
@@ -1193,19 +1193,21 @@ export class UI {
       render: () => {
         const biz = b();
         const def = bizType(biz.type);
-        const snap = biz.report;
+        const full = biz.report;
+        const snap = full ?? biz.partial;
         if (!snap) return this.reportWaiting(biz);
         // statistiche dal resoconto della settimana; la domanda dei prodotti invece è quella di oggi
         // (cambia ogni giorno: i consigli su cosa vendere restano aggiornati)
         const isMarket = (a: { icon: string }) => ['📈', '🎉', '🏗️', '🍔'].includes(a.icon);
         const live = bizReport(s, biz);
-        const r = { ...snap.data, products: live.products, advice: [...snap.data.advice.filter((a) => !isMarket(a) && a.kind !== 'ok'), ...live.advice.filter(isMarket)] };
+        // nel provvisorio niente consigli di licenziare: con pochi giorni di dati è presto per dirlo
+        const r = { ...snap.data, products: live.products, advice: [...snap.data.advice.filter((a) => !isMarket(a) && a.kind !== 'ok' && (full || a.kind !== 'excess')), ...live.advice.filter(isMarket)] };
         if (!r.advice.length) r.advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale giusto per le ore di punta e magazzino pieno' });
         const n1 = fmtRate;
         const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         // giornata media
-        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(media di ${n1(r.days)} giornate di apertura)</span></h3>
+        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(media di ${n1(Math.floor(r.days * 10) / 10)} giornate di apertura)</span></h3>
           <div class="grid2"><div class="stat s-blue"><b>${n1(r.avg.arrived)}</b><span>${unit} arrivati al giorno</span></div>
           <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
           <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
@@ -1243,7 +1245,8 @@ export class UI {
           <div class="row between" style="margin-top:6px"><b>Totale</b><b>${euro(tot)}</b></div>
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
         return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
-          <div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>` + advice + day + peakCard + staffCard + prod + costs;
+          ${full ? `<div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>`
+            : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Il manager sta ancora raccogliendo informazioni: con pochi giorni i numeri possono cambiare. Si aggiorna ogni sera alla chiusura; il resoconto completo arriva a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
         go: (tab) => {
@@ -1369,7 +1372,7 @@ export class UI {
     return `<div class="card center"><div class="hero"><div class="emoji">🧑‍💼</div></div>
       <p><b>Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.</b></p>
       ${this.reportProgress(biz, false)}${why}
-      <p class="muted small">Il resoconto arriva alla chiusura (${BUSINESS.CLOSE_HOUR}:00) del giorno in cui le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+      <p class="muted small">Dalla ${PARTIAL_DAYS}ª giornata, alla chiusura (${BUSINESS.CLOSE_HOUR}:00), il manager prepara un resoconto provvisorio; quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
   }
 
   /** Giornate raccolte per il prossimo resoconto (con la barra). */
