@@ -8,10 +8,10 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { missionProgress } from '../sim/calendar';
 import {
-  CHAR_MODELS, employeeGainXp, employeeRate, demandNow, isOpenHour, lostCustomer, notePeak, pickProduct, recordSale, restock, totalDemand, upg,
+  CHAR_MODELS, employeeGainXp, employeeRate, demandNow, isOpenHour, lostCustomer, notePeak, onShift, pickProduct, recordSale, restock, totalDemand, upg,
 } from '../sim/economy';
 import { addFame, addXp, skillLevel } from '../sim/progress';
-import { playStats, type Business, type Employee } from '../sim/state';
+import { hourOf, playStats, type Business, type Employee } from '../sim/state';
 import { Character, CHAR_HEIGHT } from './character';
 import { arrow, boxProp, label, productObject, ring } from './props';
 import { GuideLine } from './guideline';
@@ -1234,7 +1234,15 @@ export class TruckInterior {
    * - 📦 magazzino: il magazziniere porta le scorte al frigo.
    */
   private updateWorkers(dt: number, _gm: number) {
+    const h = hourOf(this.game.state);
     for (const w of this.workers) {
+      // turni: chi non è di turno non c'è (finisce prima quello che ha in mano); nelle anteprime ci sono tutti
+      const on = !!this.opts.preview || w.emp.role === 'manager' || onShift(this.game.state, this.biz, w.emp, h);
+      if (!on && !w.item && !w.job) {
+        w.char.root.visible = false;
+        continue;
+      }
+      w.char.root.visible = true;
       w.char.update(dt);
       // nel tutorial lavori solo tu: i dipendenti aspettano
       if (this.tut) continue;

@@ -1020,3 +1020,16 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .report-prog { margin: 8px 0 4px; text-align: left; font-size: 13px; }
 .report-prog .bar { margin-top: 4px; }
 .report-wait { margin-top: 8px; padding: 8px 10px; border-radius: 12px; background: #f1ecfb; color: #4b3a7a; font-size: 13px; font-weight: 600; }
+.shifts { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 2px; }
+.shift { font-size: 11.5px; font-weight: 700; background: #eef3ff; color: #2a4a8a; border-radius: 8px; padding: 1px 7px; }
+/* righe dei prodotti: la barra non si schiaccia quando ci sono più etichette (vanno a capo) */
+.prod-row { flex-wrap: wrap; }
+.prod-row .bar { flex: 0 0 30%; min-width: 0; }
+.prod-row .tag { font-size: 11px; padding: 1px 7px; }
+
+/* cosa si vende oggi: nome, etichette e valore sopra, barra sotto (stessa lunghezza per tutti) */
+.prod-row { display: block !important; padding: 6px 0; }
+.prod-row .pr-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+.prod-row .pr-name { flex: 1; min-width: 0; width: auto !important; }
+.prod-row .pr-val { margin-left: auto; }
+.prod-row .bar { width: 100%; flex: none !important; }

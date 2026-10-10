@@ -3,7 +3,7 @@ import { bizType, hourFactor, ROLES, UPGRADES, type Role } from '../config/busin
 import { PRODUCTS } from '../config/products';
 import { productLevel } from '../config/recipes';
 import {
-  estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, roleCapacity, staffWarnings,
+  estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, covers, employeeRate, shiftsFor, staffWarnings,
   upg,
 } from './economy';
 import type { Business, GameState } from './state';
@@ -65,15 +65,21 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
     else hours.push({ h, arrived: maxF ? (peakRate * hourFactor(b.type, h)) / maxF : peakRate, lost: 0 });
   }
   const peak = hours.reduce((a, x) => (x.arrived > a.arrived ? x : a), hours[0]);
-  // personale reparto per reparto, rispetto alle ore di punta
-  const staff = def.roles.map((r: Role) => {
-    const list = b.staff.filter((e) => e.role === r);
-    const cap = roleCapacity(b, r);
-    const per = list.length ? cap / list.length : 2.5;
-    const need = Math.max(1, Math.ceil((peakRate * 1.1) / Math.max(0.5, per)));
-    const status: 'ok' | 'short' | 'excess' = cap < peakRate ? 'short' : list.length > need ? 'excess' : 'ok';
-    return { role: r, name: def.roleNames[r] ?? ROLES[r].name, n: list.length, cap, need, status, salary: list.reduce((a, e) => a + e.salary, 0) };
-  });
+  // personale reparto per reparto con i turni da 8 ore organizzati dal manager
+  const dem = Array(24).fill(0);
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) dem[h] = maxF ? (peakRate * hourFactor(b.type, h)) / maxF : peakRate;
+  const staff = covers(b, dem, (e) => employeeRate(e, b)).map((x) => ({
+    role: x.r as Role,
+    name: def.roleNames[x.r] ?? ROLES[x.r].name,
+    n: x.n,
+    // i turni veri di oggi, organizzati dal manager
+    shifts: (shiftsFor(s, b).plan.byRole.get(x.r)?.shifts ?? []).map((sh) => ({ name: sh.emp.name.split(' ')[0], start: sh.start, end: sh.end })).sort((p, q) => p.start - q.start),
+    short: x.short.ranges,
+    need: x.short.hours.length ? x.n + x.hire : x.n - x.excess,
+    status: (x.n && x.short.hours.length ? 'short' : x.excess ? 'excess' : 'ok') as 'ok' | 'short' | 'excess',
+    cap: Math.max(...x.plan.cap),
+    salary: b.staff.filter((e) => e.role === x.r).reduce((a, e) => a + e.salary, 0),
+  }));
   const c = monthlyCosts(s, b);
   const salaries = b.staff.reduce((a, e) => a + e.salary, 0);
   const advice: Advice[] = staffWarnings(s, b).map((w) => ({

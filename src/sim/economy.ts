@@ -10,6 +10,7 @@ import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
+import { demandCurve, planRole, planShifts, shortRanges, SHIFT_HOURS } from './shifts';
 import { activeToday, effectMultiplier } from './effects';
 import { addFame, addMoney } from './progress';
 import {
@@ -140,6 +141,36 @@ export function employeeRate(e: Employee, b: Business) {
 export function roleCapacity(b: Business, role: Role) {
   return b.staff.filter((e) => e.role === role).reduce((a, e) => a + employeeRate(e, b), 0);
 }
+
+// ---------------- turni ----------------
+
+const shiftCache = new WeakMap<Business, { key: string; plan: ReturnType<typeof planShifts>; curve: number[] }>();
+
+/**
+ * I turni di oggi organizzati dal manager (dipendenti da 8 ore al massimo, più coperti nelle ore di
+ * punta): si rifanno quando cambiano il giorno, il personale o la domanda.
+ */
+export function shiftsFor(s: GameState, b: Business) {
+  const curve = demandCurve(b.type, totalDemand(s, b));
+  const key = `${day(s)}|${b.staff.map((e) => `${e.id}:${e.level}:${e.speed}`).join(',')}|${upg(b, 'attrezzatura')}|${curve.map((x) => x.toFixed(1)).join(',')}`;
+  const c = shiftCache.get(b);
+  if (c && c.key === key) return c;
+  const v = { key, plan: planShifts(b, (e) => employeeRate(e, b), curve), curve };
+  shiftCache.set(b, v);
+  return v;
+}
+
+/** Clienti all'ora che l'attività serve in quell'ora con chi è di turno. */
+export const capacityAt = (s: GameState, b: Business, h: number) => shiftsFor(s, b).plan.capAt(Math.floor(h));
+
+/** Il dipendente è di turno a quest'ora? */
+export function onShift(s: GameState, b: Business, e: Employee, h = hourOf(s)) {
+  const sh = shiftsFor(s, b).plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
+  return !!sh && h >= sh.start && h < sh.end;
+}
+
+/** Turno di un dipendente (es. { start: 11, end: 19 }). */
+export const shiftOf = (s: GameState, b: Business, e: Employee) => shiftsFor(s, b).plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
 
 export function autoCapacity(b: Business) {
   return Math.min(...bizType(b.type).roles.map((r) => roleCapacity(b, r)));
@@ -426,7 +457,8 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
   if (!isAutonomous(b) || !isOpenHour(s)) return;
   const now = demandNow(s, b);
   notePeak(b, now, s);
-  const rate = Math.min(now, autoCapacity(b));
+  // serve solo chi è di turno in quest'ora
+  const rate = Math.min(now, capacityAt(s, b, hourOf(s)));
   const lostRate = Math.max(0, now - rate);
   let a = (acc.get(b.id) ?? 0) + (rate * minutes) / 60;
   let lostAcc = (acc.get(b.id + 'l') ?? 0) + (lostRate * minutes) / 60;
@@ -525,7 +557,13 @@ export function payMonth(s: GameState) {
 
 export function estimateMonthlyProfit(s: GameState, b: Business) {
   if (isCraft(b) || !b.products.length) return -monthlyCosts(s, b).rent - monthlyCosts(s, b).utilities;
-  const perHour = isAutonomous(b) ? Math.min(totalDemand(s, b), autoCapacity(b)) : 0;
+  // clienti serviti in un giorno con i turni: ora per ora, quanti ne regge chi è di turno
+  let perDay = 0;
+  if (isAutonomous(b)) {
+    const { plan, curve } = shiftsFor(s, b);
+    for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) perDay += Math.min(curve[h], plan.capAt(h));
+  }
+  const perHour = perDay / (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR);
   const avgMargin = b.products.reduce((a, p) => a + PRODUCTS[p].price - PRODUCTS[p].cost, 0) / b.products.length;
   const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;
   const c = monthlyCosts(s, b);
@@ -573,6 +611,37 @@ export interface StaffWarning {
 /** Clienti all'ora scritti sempre allo stesso modo in resoconti e consigli (es. "5,1" o "17"). */
 export const fmtRate = (x: number) => (x >= 10 ? String(Math.round(x)) : x.toFixed(1).replace('.', ','));
 
+/**
+ * Copertura di ogni reparto con i turni: ore scoperte (dove chi è di turno non regge i clienti),
+ * quanti dipendenti in più servirebbero per coprirle e quanti si potrebbero togliere senza scoprirne.
+ */
+export function covers(b: Business, dem: number[], rate: (e: Employee) => number) {
+  return bizType(b.type).roles.map((r) => {
+    const emps = b.staff.filter((e) => e.role === r);
+    const avg = emps.length ? emps.reduce((a, e) => a + rate(e), 0) / emps.length : 3;
+    const fake = (k: number) => Array.from({ length: k }, (_, i) => ({ ...(emps[0] ?? b.staff[0]), id: -1 - i, role: r }) as Employee);
+    const rateOr = (e: Employee) => (e.id < 0 ? avg : rate(e));
+    const plan = planRole(emps, rate, dem);
+    const short = shortRanges(plan.cap, dem);
+    let hire = 0;
+    if (short.hours.length) {
+      for (hire = 1; hire < 10; hire++) if (!shortRanges(planRole([...emps, ...fake(hire)], rateOr, dem).cap, dem).hours.length) break;
+    }
+    // dipendenti di troppo: si tolgono i più lenti finché, con un 15% di margine, nessuna ora resta scoperta
+    let excess = 0;
+    let excessSalary = 0;
+    if (!short.hours.length) {
+      const sorted = [...emps].sort((x, y) => rate(x) - rate(y));
+      const big = dem.map((x) => x * 1.15);
+      while (excess < sorted.length - 1 && !shortRanges(planRole(sorted.slice(excess + 1), rate, big).cap, big).hours.length) {
+        excessSalary += sorted[excess].salary;
+        excess++;
+      }
+    }
+    return { r, n: emps.length, plan, short, hire, excess, excessSalary };
+  });
+}
+
 export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const def = bizType(b.type);
   if (def.kind === 'craft' || !def.roles.length) return [];
@@ -594,21 +663,23 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const known = (m.lostStaff ?? 0) + (m.lostStock ?? 0) + (m.lostQueue ?? 0);
   // clienti persi prima che il gioco registrasse il motivo (partite di prima dell'aggiornamento)
   const unknown = Math.max(0, lost - known);
-  const caps = def.roles.map((r) => ({ r, c: roleCapacity(b, r), n: b.staff.filter((e) => e.role === r).length })).sort((x, y) => x.c - y.c);
-  // reparti che non reggono le ore di punta, e quanti in più ne servono (10% di margine)
-  const hires = caps
-    .map((x) => ({ ...x, need: Math.ceil((peak * 1.1 - x.c) / Math.max(0.5, x.n ? x.c / x.n : 2.5)) }))
-    // solo i reparti che davvero non reggono le ore di punta (il margine serve a dire quanti assumere)
-    .filter((x) => x.n > 0 && x.c < peak && x.need > 0);
+  // turni: la domanda ora per ora della settimana (l'ora più piena vale `peak`, come nel resoconto)
+  const dem = Array(24).fill(0);
+  let maxF = 0;
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) maxF = Math.max(maxF, hourFactor(b.type, h));
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) dem[h] = maxF ? (peak * hourFactor(b.type, h)) / maxF : peak;
+  const rate = (e: Employee) => employeeRate(e, b);
+  const cover = covers(b, dem, rate);
   const staffLost = m.lostStaff ?? 0;
+  const shortRoles = cover.filter((x) => x.n > 0 && x.short.hours.length);
   if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {
     out.push({ kind: 'short', text: `Persi ${lost} clienti questa settimana (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
-  } else if (b.staff.length && hires.length) {
-    const list = hires.map((x) => `${x.need} ${x.need === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
-    const slow = hires[0];
-    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Nelle ore di punta arrivano circa ${fmtRate(peak)} clienti all'ora, ma i ${plural(slow.r)} ne servono ${fmtRate(slow.c)}: assumi circa ${list} in più`, tab: 'personale' });
+  } else if (b.staff.length && shortRoles.length) {
+    const list = shortRoles.map((x) => `${x.hire} ${x.hire === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
+    const where = shortRoles.map((x) => `i ${plural(x.r)} non bastano ${x.short.ranges.length > 1 ? 'nelle ore' : 'nell\'ora'} ${x.short.ranges.join(', ')}`).join('; ');
+    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Con i turni da ${SHIFT_HOURS} ore ${where} (nell'ora di punta arrivano circa ${fmtRate(peak)} clienti). Assumi circa ${list} in più: il manager li mette nei turni dove servono`, tab: 'personale' });
   } else if (unknown >= 3 && b.staff.length) {
-    out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale di adesso le ore di punta (circa ${fmtRate(peak)} clienti all'ora) sono coperte: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
+    out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale e i turni di adesso tutta la giornata è coperta: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
   }
   if (b.staff.length && !hasManager(b) && !missing.length) {
     out.push({ kind: 'short', text: 'Senza manager l\'attività non lavora da sola quando non ci sei: i clienti si perdono. Assumi un manager' });
@@ -627,19 +698,9 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   // dipendenti di troppo: solo se non si perdono clienti e misurando sulle ore di punta (con margine)
   const knownShare = known / Math.max(1, m.served + lost);
   if (!out.some((w) => w.kind !== 'info') && !missing.length && knownShare < 0.03 && unknown < 3 && peak > 0) {
-    let extra = 0;
-    let salary = 0;
-    for (const r of def.roles) {
-      const staff = b.staff.filter((e) => e.role === r).sort((x, y) => employeeRate(y, b) - employeeRate(x, b));
-      let cap = 0;
-      for (const e of staff) {
-        if (cap >= peak * 1.3) {
-          extra++;
-          salary += e.salary;
-        } else cap += employeeRate(e, b);
-      }
-    }
-    if (extra > 0) out.push({ kind: 'excess', text: `Costi alti: ${extra} ${extra === 1 ? 'dipendente' : 'dipendenti'} di troppo anche nelle ore di punta (${euro(salary)} di stipendi al mese che si potrebbero risparmiare)` });
+    const extra = cover.reduce((a, x) => a + x.excess, 0);
+    const salary = cover.reduce((a, x) => a + x.excessSalary, 0);
+    if (extra > 0) out.push({ kind: 'excess', text: `Costi alti: anche con i turni nelle ore di punta ${extra === 1 ? 'c\'è 1 dipendente' : `ci sono ${extra} dipendenti`} di troppo (${euro(salary)} di stipendi al mese che si potrebbero risparmiare)`, tab: 'personale' });
   }
   return out;
 }

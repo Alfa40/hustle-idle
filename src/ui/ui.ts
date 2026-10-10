@@ -25,7 +25,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, REPORT_DAYS, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, REPORT_DAYS, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1218,14 +1218,16 @@ export class UI {
           <div class="small">In quell'ora arrivano circa <b>${n1(r.peakRate)} ${unit}</b>${r.hasData ? ' (media della settimana)' : ' (stima dalla domanda: ancora pochi dati registrati)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
           <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
         // personale per reparto
-        const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}<div class="small muted">servono ${n1(x.cap)} clienti all'ora · per le ore di punta ne servono ~${x.need}</div></div>
+        const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}
+            <div class="shifts">${x.shifts.map((sh) => `<span class="shift">${esc(sh.name)} ${sh.start}–${sh.end}</span>`).join('') || '<span class="muted small">nessuno</span>'}</div>
+            <div class="small muted">${x.status === 'short' ? `scoperto nelle ore ${x.short.join(', ')} · ne servono ~${x.need}` : x.status === 'excess' ? `ne basterebbero ~${x.need}` : 'tutta la giornata coperta'}</div></div>
           <span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅ giusto' : x.status === 'short' ? '⚠️ pochi' : '💸 troppi'}</span></div>`).join('');
-        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale nelle ore di punta</h3><div class="small muted">Nell'ora di punta arrivano circa ${n1(r.peakRate)} ${unit} (lo stesso numero usato per i consigli).</div>${staffRows}</div>` : '';
+        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale e turni</h3><div class="small muted">Aperti dalle ${BUSINESS.OPEN_HOUR} alle ${BUSINESS.CLOSE_HOUR} (14 ore), turni di massimo 8 ore: il manager mette più persone nelle ore di punta (circa ${n1(r.peakRate)} ${unit} all'ora) e meno nelle ore morte.</div>${staffRows}</div>` : '';
         // cosa si vende oggi
         const pmax = Math.max(0.1, ...r.products.map((x) => x.demand));
-        const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><span>${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>
-            <div class="bar green" style="flex:1"><i style="width:${(x.demand / pmax) * 100}%"></i></div><b class="small">${n1(x.demand)}/h</b>
-            ${x.selling ? '<span class="tag g">in vendita</span>' : x.locked ? '<span class="tag">🔒</span>' : '<span class="tag">non in menù</span>'}${x.event > 1.15 ? `<span class="tag y">🎉 +${Math.round((x.event - 1) * 100)}%</span>` : ''}</div>`).join('')}</div>` : '';
+        const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><div class="pr-top"><span class="pr-name">${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>
+            ${x.selling ? '<span class="tag g">in vendita</span>' : x.locked ? '<span class="tag">🔒 ampliamento</span>' : '<span class="tag">non in menù</span>'}${x.event > 1.15 ? `<span class="tag y">🎉 +${Math.round((x.event - 1) * 100)}%</span>` : ''}<b class="small pr-val">${n1(x.demand)}/h</b></div>
+            <div class="bar green"><i style="width:${(x.demand / pmax) * 100}%"></i></div></div>`).join('')}</div>` : '';
         // consigli
         const advice = `<div class="card"><h3>💡 Consigli</h3><div class="small muted" style="margin-bottom:4px">Sono suggerimenti: scegli tu quali seguire.</div>${r.advice.map((a) => `<div class="report-alert ${a.kind === 'grow' ? 'grow' : a.kind === 'ok' ? 'ok' : a.kind}"><span>${a.icon} ${a.text}</span>${a.tab ? `<button class="btn sm" data-a="go:${a.tab}">${a.label}</button>` : ''}</div>`).join('')}</div>`;
         // costi
@@ -1465,7 +1467,7 @@ export class UI {
       const c = monthlyCosts(s, b);
       const fullSal = b.staff.reduce((a, e) => a + e.salary, 0);
       const dem = totalDemand(s, b);
-      const cap = autoCapacity(b);
+      const cap = capacityAt(s, b, hourOf(s));
       const alone = service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
       return `
         <div class="card ${isAutonomous(b) ? '' : 'hl'}"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
@@ -1474,7 +1476,7 @@ export class UI {
         </div>
         <div class="grid2">
           <div class="stat s-purple"><b>${dem.toFixed(2)}/h</b><span>🙋 ${unit} richiesti ora</span></div>
-          <div class="stat"><b>${isAutonomous(b) ? cap.toFixed(2) + '/h' : '—'}</b><span>👥 capacità dipendenti</span></div>
+          <div class="stat"><b>${isAutonomous(b) ? cap.toFixed(2) + '/h' : '—'}</b><span>👥 capacità ora (chi è di turno)</span></div>
           <div class="stat s-green"><b class="money-t">${euro(b.today.revenue)}</b><span>💰 oggi · ${b.today.served} ${unit}</span></div>
           <div class="stat s-red"><b>${b.today.lost}</b><span>😠 ${unit} persi oggi</span></div>
           <div class="stat s-yellow"><b>${euro(b.yesterday.revenue)}</b><span>📅 incasso ieri</span></div>
@@ -1549,7 +1551,10 @@ export class UI {
           .join('');
       const staff = group(
         b.staff,
-        (e) => this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`),
+        (e) => {
+          const sh = shiftOf(s, b, e);
+          return this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`, sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : '');
+        },
         (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
       );
       const cands = group(
@@ -1637,10 +1642,10 @@ export class UI {
     return [...st, ...pr, 'stanza più grande', 'ordini più ricchi'].join(', ');
   }
 
-  private empCard(e: Employee, type: BusinessType, btn: string) {
+  private empCard(e: Employee, type: BusinessType, btn: string, extra = '') {
     const r = ROLES[e.role];
     const st = (n: string, v: number) => `<div class="small">${n}<div class="bar"><i style="width:${v * 10}%"></i></div></div>`;
-    return `<div class="card"><div class="row between"><div><b>${r.icon} ${esc(e.name)}</b> <span class="tag">Liv. ${e.level}</span><div class="muted small">${roleName(type, e.role)} · ${euro(e.salary)}/mese</div></div>${btn}</div>
+    return `<div class="card"><div class="row between"><div><b>${r.icon} ${esc(e.name)}</b> <span class="tag">Liv. ${e.level}</span><div class="muted small">${roleName(type, e.role)} · ${euro(e.salary)}/mese${extra}</div></div>${btn}</div>
       <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">${st('Velocità', e.speed)}${st('Abilità', e.skill)}${st('Cortesia', e.kindness)}</div></div>`;
   }
 
