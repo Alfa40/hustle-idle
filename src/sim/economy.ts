@@ -336,7 +336,7 @@ function proratedSalary(s: GameState, e: Employee) {
 }
 
 /** Esperienza per il prossimo livello (cresce col livello e con le stelle). */
-export const xpForEmpLevel = (e: Employee) => Math.round(15 * Math.max(1, e.level) ** 1.5 * (1 + 0.3 * (e.stars ?? 0)));
+export const xpForEmpLevel = (e: Employee) => Math.round(30 * Math.max(1, e.level) ** 1.5 * (1 + 0.3 * (e.stars ?? 0)));
 
 export function employeeGainXp(e: Employee, amount: number) {
   if (e.trainingEnd || e.level >= MAX_LEVEL) return;

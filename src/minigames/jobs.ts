@@ -181,9 +181,22 @@ export interface Task {
 
 /** grandezza degli indicatori sopra gli obiettivi dei lavoretti (3 = il triplo di prima) */
 const MARKER_SIZE = 3;
-/** metà altezza dell'indicatore (m) e spazio tra l'oggetto e il fondo dell'indicatore: appena sopra, ben visibile in prima persona */
-const MARKER_HALF = (0.45 * MARKER_SIZE * 0.72) / 2;
+/** spazio tra la parte più alta dell'oggetto e il fondo dell'indicatore (m) */
 const MARKER_GAP = 0.15;
+
+/** La cima vera di un oggetto: solo le sue mesh visibili, al vertice (niente scritte, insegne-sprite o box larghi). */
+function meshTop(root: THREE.Object3D) {
+  let top = 0;
+  const box = new THREE.Box3();
+  root.updateWorldMatrix(true, true);
+  root.traverseVisible((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || (o as unknown as THREE.Sprite).isSprite) return;
+    box.setFromObject(m, true);
+    if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
+  });
+  return top;
+}
 
 export interface Phase {
   name: string;
@@ -408,27 +421,35 @@ export class PhasedRun extends BaseRun {
       // (mai sovrapposto a cassette, giochi…): vicino a ciò che indica, non in cielo
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 * MARKER_SIZE });
       const mp = t.markerAt ?? t.pos;
-      const top = this.markerY({ ...t, pos: mp });
-      m.userData.top = top;
-      m.userData.baseY = Math.max(0.3, top) + MARKER_GAP + MARKER_HALF;
+      this.placeMarker(m, t);
       m.position.set(mp.x, m.userData.baseY, mp.z);
       this.game.scene.add(m);
       this.markers.set(t, m);
     }
   }
 
+  /** Mette l'indicatore 15 cm sopra la parte più alta dell'oggetto (rifatto se l'oggetto arriva dopo, es. l'edicola). */
+  private placeMarker(m: THREE.Object3D, t: Task) {
+    const top = this.markerY({ pos: t.markerAt ?? t.pos, obj: t.obj } as Task);
+    m.userData.top = top;
+    // in prima persona l'indicatore è rimpicciolito: il fondo resta comunque 15 cm sopra l'oggetto (vedi update)
+    m.userData.baseY = top + MARKER_GAP + m.scale.y / 2;
+    m.userData.hasObj = !!t.obj;
+  }
+
   /** Altezza della cima degli oggetti di scena entro 1,1 m dal punto (l'indicatore va appena sopra). */
   private markerY(t: Task) {
     let top = 0;
-    const box = new THREE.Box3();
     for (const o of this.objs) {
       if ((o as THREE.Sprite).isSprite || o.userData.noGlow || !o.visible) continue;
       if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.1) continue;
-      box.setFromObject(o);
-      if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
+      top = Math.max(top, meshTop(o));
     }
+    // l'oggetto indicato (edicola, negozio, auto…): sopra la sua parte più alta, anche se il suo centro è lontano
+    if (t.obj?.visible) top = Math.max(top, meshTop(t.obj));
     return top;
   }
+
 
   private pending() {
     const p = this.tasks.filter((t) => !t.done);
@@ -472,7 +493,9 @@ export class PhasedRun extends BaseRun {
     const t0 = performance.now() / 250;
     for (const [t, m] of this.markers) {
       m.visible = !t.done && pend.includes(t);
-      m.position.y = (m.userData.baseY ?? 1.5) + Math.sin(t0 + t.pos.x) * 0.06;
+      if (!m.userData.hasObj && t.obj) this.placeMarker(m, t);
+      // il fondo dell'indicatore 15 cm sopra la cima dell'oggetto (con la grandezza di adesso), ondeggia solo verso l'alto
+      m.position.y = (m.userData.top ?? 1) + MARKER_GAP + m.scale.y / 2 + (Math.sin(t0 + t.pos.x) + 1) * 0.04;
     }
     let near: Task | null = null;
     let nd = Infinity;
