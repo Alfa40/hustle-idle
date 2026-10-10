@@ -1019,10 +1019,8 @@ export class UI {
           this.close();
           this.openBusiness(id);
         },
-        chain: (t) => {
-          this.close();
-          this.openChain(t as BusinessType);
-        },
+        // la catena si apre in avanti: con "‹ Indietro" si torna qui (allo stesso punto)
+        chain: (t) => this.openChain(t as BusinessType),
         staff: (id) => {
           this.close();
           this.openBusiness(id, 'personale');
@@ -1057,7 +1055,7 @@ export class UI {
         const d = bizType(t);
         const n = chainOf(s, t).length;
         return `<button class="card chain-card" data-a="chain:${t}" style="--sc:${d.color}"><div class="icon-bubble" style="background:${d.color};color:#fff">🔗</div>
-          <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${n} attività · gestiscile insieme o a gruppi</div></div><span class="shop-go">›</span></button>`;
+          <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${n} attività · resoconto e gestione insieme o a gruppi</div></div><span class="shop-go">›</span></button>`;
       }).join('');
       return (chains ? `<h3 class="sec-title">🔗 Le tue catene</h3>${chains}<h3 class="sec-title">🏪 Tutte le attività</h3>` : '') + s.businesses
         .map((b) => {
@@ -1123,10 +1121,19 @@ export class UI {
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
+      // catene (2 o più attività dello stesso tipo): il loro resoconto, con quanti negozi hanno da sistemare
+      const chainCards = chainTypes(s).map((t) => {
+        const d = bizType(t);
+        const shops = rows.filter((r) => r.b.type === t);
+        const bad = shops.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
+        const day = shops.reduce((a, r) => a + (r.rep?.avg.revenue ?? 0), 0);
+        return `<button class="card chain-card" data-a="chain:${t}" style="--sc:${d.color}"><div class="icon-bubble" style="background:${d.color};color:#fff">🔗</div>
+          <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${shops.length} negozi · ${euro(day)} al giorno in media${bad ? ` · <b class="bad">⚠️ ${bad} da sistemare</b>` : ' · ✅ tutto in ordine'}</div><div class="report-more">Tocca per il resoconto della catena ›</div></div><span class="shop-go">›</span></button>`;
+      }).join('');
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
       return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati; dal ${PARTIAL_DAYS}° giorno uno provvisorio); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
-        <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
+        <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${chainCards ? `<h3 class="sec-title">🔗 Resoconti delle catene</h3>${chainCards}<h3 class="sec-title">🏪 Attività una per una</h3>` : ''}${cards}`;
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
