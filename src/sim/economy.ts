@@ -511,8 +511,37 @@ export function openDays(from: number, to: number) {
 
 /** Giornate raccolte per il resoconto della settimana (ne servono REPORT_DAYS). */
 export const REPORT_DAYS = 7;
-/** Dal terzo giorno, finché non c'è il primo resoconto completo, il manager ne prepara uno provvisorio ogni sera. */
+/**
+ * Dal terzo giorno, finché non c'è il primo resoconto completo, c'è un resoconto provvisorio: il manager lo
+ * prepara alla chiusura del 2° giorno di raccolta (così il 3° giorno si vede già) e lo rifà ogni sera.
+ */
 export const PARTIAL_DAYS = 3;
+
+/** Giorni di raccolta già chiusi alle 22:00 (il giorno in cui è partita la raccolta conta se è partita prima della chiusura). */
+export function closedDays(s: GameState, b: Business) {
+  const from = weekOf(s, b).from;
+  const close = BUSINESS.CLOSE_HOUR * 60;
+  const lastClose = s.minutes % 1440 >= close ? day(s) : day(s) - 1;
+  const first = Math.floor(from / 1440) + (from % 1440 >= close ? 1 : 0);
+  return Math.max(0, lastClose - first + 1);
+}
+
+/** Tra quanti giorni (0 = stasera, 1 = domani sera…) il manager prepara il resoconto provvisorio alla chiusura. */
+export function partialIn(s: GameState, b: Business) {
+  const from = weekOf(s, b).from;
+  const close = BUSINESS.CLOSE_HOUR * 60;
+  let at = day(s) * 1440 + close;
+  if (s.minutes >= at) at += 1440;
+  for (let k = 1; k <= REPORT_DAYS; k++, at += 1440) {
+    const first = Math.floor(from / 1440) + (from % 1440 >= close ? 1 : 0);
+    if (Math.floor(at / 1440) - first + 1 >= PARTIAL_DAYS - 1 && openDays(from, at) >= 1.5) return Math.floor(at / 1440) - day(s);
+  }
+  return null;
+}
+
+/** Va preparato il resoconto provvisorio? (niente resoconto completo, almeno 2 giorni chiusi e 1,5 giornate di dati) */
+export const partialDue = (s: GameState, b: Business) =>
+  bizType(b.type).kind !== 'craft' && !b.report && closedDays(s, b) >= PARTIAL_DAYS - 1 && weekDays(s, b) >= 1.5;
 export const weekDays = (s: GameState, b: Business) => openDays(weekOf(s, b).from, s.minutes);
 
 /**
@@ -524,10 +553,7 @@ export function weeklyClose(s: GameState, b: Business, make: (s: GameState, b: B
   const done = weekDays(s, b);
   if (done < REPORT_DAYS - 0.01) {
     // nessun resoconto completo (prima settimana o dopo un cambio): dal 3° giorno uno provvisorio
-    // (si conta il giorno di calendario: anche se la raccolta è partita a metà del 1° giorno, alla chiusura del 3°)
-    const from = weekOf(s, b).from;
-    const calDays = day(s) - Math.floor(from / 1440) - (from % 1440 >= BUSINESS.CLOSE_HOUR * 60 ? 1 : 0) + 1;
-    if (!b.report && calDays >= PARTIAL_DAYS && done >= 1.5) b.partial = { day: day(s), from: weekOf(s, b).from, days: done, data: make(s, b) };
+    if (partialDue(s, b)) b.partial = { day: day(s), from: weekOf(s, b).from, days: done, data: make(s, b) };
     return false;
   }
   b.report = { day: day(s), from: weekOf(s, b).from, data: make(s, b) };

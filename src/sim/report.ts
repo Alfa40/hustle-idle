@@ -3,7 +3,7 @@ import { bizType, hourFactor, ROLES, UPGRADES, type Role } from '../config/busin
 import { PRODUCTS } from '../config/products';
 import { productLevel } from '../config/recipes';
 import {
-  estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, covers, employeeRate, shiftsFor, staffWarnings,
+  estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, partialDue, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, covers, employeeRate, shiftsFor, staffWarnings,
   upg,
 } from './economy';
 import type { Business, GameState } from './state';
@@ -146,6 +146,15 @@ export type BizReport = ReturnType<typeof bizReport>;
  * Resoconto della settimana: alla chiusura (22:00) di ogni giorno si controlla se la settimana in corso ha
  * 7 giornate di dati; se sì il manager prepara il resoconto (fisso fino al prossimo) e si ricomincia.
  */
+/**
+ * Resoconti provvisori mancanti (partite di prima dell'aggiornamento, o raccolte già oltre il 2° giorno):
+ * si preparano subito invece di aspettare la prossima chiusura.
+ */
+export function ensurePartials(s: GameState) {
+  for (const b of s.businesses) if (!b.partial && partialDue(s, b)) b.partial = { day: Math.floor(s.minutes / 1440), from: b.week!.from, days: openDaysOf(s, b), data: bizReport(s, b) };
+}
+const openDaysOf = (s: GameState, b: Business) => openDays(b.week!.from, s.minutes);
+
 export function weeklyReports(s: GameState) {
   let made = 0;
   for (const b of s.businesses) if (weeklyClose(s, b, (st, bb) => bizReport(st, bb))) made++;

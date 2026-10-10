@@ -19,13 +19,13 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
-import { bizReport } from '../sim/report';
+import { bizReport, ensurePartials } from '../sim/report';
 import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1028,6 +1028,7 @@ export class UI {
         ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}`;
     }
     if (tab === 'resoconti') {
+      ensurePartials(s);
       if (!s.businesses.length) return '<div class="card center muted">Qui vedrai i conti e i confronti tra le tue attività.</div>';
       const rows = s.businesses.map((b) => {
         const c = monthlyCosts(s, b);
@@ -1052,7 +1053,7 @@ export class UI {
           <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
         </div>
         <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
-        ${r.b.report ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${r.rep ? ` Intanto c'è un <b>resoconto provvisorio</b> di ${fmtRate(Math.floor(r.b.partial!.days * 10) / 10)} giornate.` : ` Dal ${PARTIAL_DAYS}° giorno ne preparerà uno provvisorio.`}${this.reportProgress(r.b, false)}</div>`}
+        ${r.b.report ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${r.rep ? ` Intanto c'è un <b>resoconto provvisorio</b> di ${fmtRate(Math.floor(r.b.partial!.days * 10) / 10)} giornate.` : ` ${this.partialWhen(r.b)}`}${this.reportProgress(r.b, false)}</div>`}
         <div class="report-more">${r.b.report ? 'Tocca per il resoconto della settimana: orario di punta, personale, cosa vendere e consigli ›' : r.rep ? 'Tocca per il resoconto provvisorio ›' : 'Tocca per i dettagli ›'}</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
@@ -1199,6 +1200,7 @@ export class UI {
       render: () => {
         const biz = b();
         const def = bizType(biz.type);
+        ensurePartials(s);
         const full = biz.report;
         const snap = full ?? biz.partial;
         if (!snap) return this.reportWaiting(biz);
@@ -1378,7 +1380,16 @@ export class UI {
     return `<div class="card center"><div class="hero"><div class="emoji">🧑‍💼</div></div>
       <p><b>Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.</b></p>
       ${this.reportProgress(biz, false)}${why}
-      <p class="muted small">Dalla ${PARTIAL_DAYS}ª giornata, alla chiusura (${BUSINESS.CLOSE_HOUR}:00), il manager prepara un resoconto provvisorio; quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+      <p><b>📋 ${this.partialWhen(biz)}</b></p>
+      <p class="muted small">Il resoconto provvisorio si vede dal ${PARTIAL_DAYS}° giorno di raccolta e si aggiorna ogni sera alla chiusura (${BUSINESS.CLOSE_HOUR}:00); quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+  }
+
+  /** Quando arriva il resoconto provvisorio (stasera, domani sera, tra N giorni). */
+  private partialWhen(biz: Business) {
+    const w = partialIn(this.s, biz);
+    if (w === null) return '';
+    const when = w === 0 ? 'stasera' : w === 1 ? 'domani sera' : `tra ${w} giorni`;
+    return `Il resoconto provvisorio arriva ${when} alla chiusura (${BUSINESS.CLOSE_HOUR}:00).`;
   }
 
   /** Giornate raccolte per il prossimo resoconto (con la barra). */
