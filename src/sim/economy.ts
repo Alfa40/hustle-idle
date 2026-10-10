@@ -3,7 +3,7 @@ import {
   bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
-import { hourFactor, ROLES } from '../config/business';
+import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
@@ -296,6 +296,37 @@ export function fire(s: GameState, b: Business, empId: number) {
   b.staff = b.staff.filter((x) => x.id !== empId);
   if (owed > 0) addMoney(s, -owed, `liquidazione ${e.name}`);
   resetBizStats(s, b, `licenziato ${e.name}`);
+}
+
+/** Con almeno una stella il dipendente è fidato: si può spostare in un'altra delle tue attività. */
+export const canMove = (e: Employee) => (e.stars ?? 0) >= 1 && !e.trainingEnd;
+
+/**
+ * Dove si può spostare: le altre attività dove c'è lo stesso lavoro (stesso nome della mansione: un cuoco va
+ * in un altro food truck, un fornaio in un altro panificio; manager ovunque se lì manca, magazziniere e
+ * cameriere dove l'ampliamento li rende utili).
+ */
+export function moveTargets(s: GameState, from: Business, e: Employee) {
+  const name = roleName(from.type, e.role);
+  return s.businesses.filter((b) => {
+    if (b.id === from.id) return false;
+    if (e.role === 'manager') return bizType(b.type).kind !== 'craft' && !hasManager(b);
+    const extra = EXTRA_ROLES.find((x) => x.role === e.role);
+    if (extra) return hasInterior(b.type) && upg(b, 'ampliamento') >= extra.level;
+    return (bizType(b.type).roles as Role[]).includes(e.role) && roleName(b.type, e.role) === name;
+  });
+}
+
+/** Sposta un dipendente fidato: tiene stelle, livello e stipendio; le statistiche di entrambe ripartono. */
+export function moveEmployee(s: GameState, from: Business, to: Business, empId: number) {
+  const e = from.staff.find((x) => x.id === empId);
+  if (!e || !canMove(e) || !moveTargets(s, from, e).includes(to)) return false;
+  from.staff = from.staff.filter((x) => x !== e);
+  to.staff.push(e);
+  toast(`↔️ ${e.name} spostato in ${lotDef(to.lotId).name}`, 'good');
+  resetBizStats(s, from, `spostato ${e.name} in un'altra attività`);
+  resetBizStats(s, to, `arrivato ${e.name} (${roleName(to.type, e.role).toLowerCase()})`);
+  return true;
 }
 
 /** Stipendio maturato dall'assunzione o dall'ultimo pagamento (hiredDay si azzera a fine mese). */

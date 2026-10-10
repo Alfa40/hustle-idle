@@ -25,7 +25,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canTrain, empStat, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1152,6 +1152,12 @@ export class UI {
           refreshCandidates(s);
         },
         fire: (id) => fire(s, b(), +id),
+        move: (id) => (this.moveOpen = this.moveOpen === +id ? null : +id),
+        moveTo: (arg) => {
+          const [id, to] = arg.split('|');
+          const dest = s.businesses.find((x) => x.id === to);
+          if (dest && moveEmployee(s, b(), dest, +id)) this.moveOpen = null;
+        },
         train: (id) => {
           const e = b().staff.find((x) => x.id === +id);
           if (e) startTraining(s, b(), e);
@@ -1560,7 +1566,13 @@ export class UI {
         b.staff,
         (e) => {
           const sh = shiftOf(s, b, e);
-          return this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`, e.trainingEnd ? ' · 🎓 in formazione' : sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : '', b.id);
+          // con almeno una stella è fidato: si può spostare in un'altra attività dove c'è lo stesso lavoro
+          const targets = canMove(e) ? moveTargets(s, b, e) : [];
+          const btns = `<div class="row emp-btns">${canMove(e) ? `<button class="btn sm sec" data-a="move:${e.id}">↔️ Sposta</button>` : ''}<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button></div>`;
+          const move = this.moveOpen === e.id ? `<div class="emp-move"><b>↔️ Sposta ${esc(e.name.split(' ')[0])} in:</b>${targets.length
+            ? targets.map((t) => `<button class="btn sm full" data-a="moveTo:${e.id}|${t.id}">${bizType(t.type).icon} ${esc(lotDef(t.lotId).name)} <span class="small">· ${roleName(t.type, e.role).toLowerCase()} già lì: ${t.staff.filter((x) => x.role === e.role).length}</span></button>`).join('')
+            : `<span class="small">${e.role === 'manager' ? 'Le altre tue attività hanno già un manager.' : `Nessun'altra tua attività dove fa lo stesso lavoro (${roleName(b.type, e.role).toLowerCase()}).`}</span>`}</div>` : '';
+          return this.empCard(e, b.type, btns, (e.trainingEnd ? ' · 🎓 in formazione' : sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : ''), b.id, move);
         },
         (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
       );
@@ -1654,7 +1666,10 @@ export class UI {
    * veri (crescono piano con livello e stelle) e, a livello 10, il corso di formazione per la stella.
    * `bizId`: è un tuo dipendente (si può mandare al corso).
    */
-  private empCard(e: Employee, type: BusinessType, btn: string, extra = '', bizId?: string) {
+  /** dipendente di cui è aperta la scelta "Sposta in…" nel Personale */
+  private moveOpen: number | null = null;
+
+  private empCard(e: Employee, type: BusinessType, btn: string, extra = '', bizId?: string, after = '') {
     const r = ROLES[e.role];
     const stars = e.stars ?? 0;
     const st = (n: string, k: 'speed' | 'skill' | 'kindness') => {
@@ -1675,7 +1690,7 @@ export class UI {
       train = '<div class="emp-train done">🏆 Dipendente completo: 5 stelle e livello 10, tutto al massimo</div>';
     }
     return `<div class="card ${e.trainingEnd ? 'emp-away' : ''}"><div class="row between"><div><b>${r.icon} ${esc(e.name)}</b> ${starRow} <span class="tag">Liv. ${e.level}</span><div class="muted small">${roleName(type, e.role)} · ${euro(e.salary)}/mese${extra}</div></div>${btn}</div>
-      <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">${st('Velocità', 'speed')}${st('Abilità', 'skill')}${st('Cortesia', 'kindness')}</div>${xpBar}${train}</div>`;
+      <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">${st('Velocità', 'speed')}${st('Abilità', 'skill')}${st('Cortesia', 'kindness')}</div>${xpBar}${train}${after}</div>`;
   }
 
   openOrderResult(biz: Business, order: ServiceOrder, stars: number, earned: number, xp: number) {
