@@ -1345,6 +1345,15 @@ export class UI {
    * Resoconto della catena (o del gruppo): somma dei resoconti dei negozi (completi o provvisori), orario di
    * punta di tutta la catena, cosa sistemare negozio per negozio e un riepilogo per negozio con il suo resoconto.
    */
+  /** Tasto della catena per la prossima miglioria del gruppo (prima i negozi più indietro, poi tutti). */
+  private chainUpgBtn(bizs: Business[], id: UpgradeId) {
+    const t = groupUpgradeTargets(bizs, id);
+    if (!t.length) return '';
+    const cost = groupUpgradeCost(bizs, id);
+    const to = upg(t[0], id) + 1;
+    return `<button class="btn sm blue" data-a="upg:${id}" ${this.s.money < cost ? 'disabled' : ''}>${UPGRADES[id].icon} ${UPGRADES[id].name} → Liv. ${to} (${t.length === bizs.length ? 'tutti' : t.length}) · ${euro(cost)}</button>`;
+  }
+
   private chainReport(bizs: Business[]) {
     const s = this.s;
     ensurePartials(s);
@@ -1399,14 +1408,63 @@ export class UI {
     }).join('');
     const peakCard = `<div class="card"><h3>⏰ Orario di punta della catena: ${peak.h}–${peak.h + 1}</h3><div class="small">In quell'ora arrivano circa <b>${n1(peak.arrived)} clienti</b> in tutti i negozi insieme.</div>
       <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
-    // cosa sistemare, negozio per negozio (nei provvisori niente "di troppo": troppo presto per dirlo)
-    const fix = got.flatMap((r) => r.snap!.data.advice.filter((a) => (a.kind === 'short' || a.kind === 'stock' || (a.kind === 'excess' && r.full))).map((a) => ({ r, a })));
-    const growShops = got.filter((r) => r.snap!.data.advice.some((a) => a.kind === 'grow' && a.icon === '📣'));
-    const adv = [
-      ...fix.map(({ r, a }) => `<div class="report-alert ${a.kind}"><span>${a.icon} <b>${name(r.b)}</b>: ${a.text}</span><div class="emp-btns row"><button class="btn sm sec" data-a="rep:${r.b.id}">📊</button>${a.tab ? `<button class="btn sm" data-a="bizTab:${r.b.id}|${a.tab}">${a.label}</button>` : ''}</div></div>`),
-      ...(growShops.length ? [`<div class="report-alert grow"><span>📣 In ${growShops.length === 1 ? '1 negozio' : `${growShops.length} negozi`} (${growShops.map((r) => name(r.b)).join(', ')}) il personale regge più clienti di quelli che arrivano: aumenta la clientela con Pubblicità o Look, anche per tutto il gruppo insieme</span><button class="btn sm" data-a="tab:migliorie">⬆️ Migliorie</button></div>`] : []),
-    ];
-    const advice = `<div class="card"><h3>💡 Da sistemare nella catena</h3>${adv.length ? adv.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta e magazzini pieni</span></div>'}</div>`;
+    // COSA FARE NELLA CATENA: i problemi raggruppati per tipo (non negozio per negozio), con il modo più veloce
+    // per sistemarli: un tasto che lo fa in tutto il gruppo (migliorie, magazzini, riordino, menù) oppure,
+    // per il personale (che si assume negozio per negozio), un tasto per ogni negozio con quanti ne servono.
+    const type = bizs[0].type;
+    const shopBtn = (b: Business, tab: string, txt: string) => `<button class="btn sm" data-a="bizTab:${b.id}|${tab}">${txt}</button>`;
+    const block = (kind: string, icon: string, title: string, lines: string[], btns: string) =>
+      `<div class="chain-fix ${kind}"><div class="cf-title">${icon} ${title}</div>${lines.length ? `<ul class="cf-list">${lines.map((l) => `<li>${l}</li>`).join('')}</ul>` : ''}${btns ? `<div class="cf-btns">${btns}</div>` : ''}</div>`;
+    const blocks: string[] = [];
+    // 1) personale che non basta: per reparto quanti assumere in ogni negozio
+    const short = got.map((r) => ({ r, roles: r.snap!.data.staff.filter((x) => x.status === 'short') })).filter((x) => x.roles.length);
+    if (short.length) {
+      const tot = new Map<string, number>();
+      for (const x of short) for (const ro of x.roles) tot.set(ro.name, (tot.get(ro.name) ?? 0) + Math.max(1, ro.need - ro.n));
+      blocks.push(block('short', '⚠️', `Personale che non basta in ${short.length} ${short.length === 1 ? 'negozio' : 'negozi'}: servono ${[...tot].map(([n, k]) => `${k} ${n.toLowerCase()}`).join(' e ')} in tutto`,
+        short.map((x) => `<b>${name(x.r.b)}</b>: ${x.roles.map((ro) => `+${Math.max(1, ro.need - ro.n)} ${ro.name.toLowerCase()} (ore ${ro.short.join(', ')})`).join(', ')}`),
+        short.map((x) => shopBtn(x.r.b, 'personale', `👥 ${name(x.r.b)}`)).join('')));
+    }
+    // 2) altri problemi del personale (reparto o manager mancante, fila mentre lavori tu)
+    const other = got.flatMap((r) => r.snap!.data.advice.filter((a) => a.kind === 'short' && !a.text.includes('Assumi circa')).map((a) => ({ r, a })));
+    if (other.length) blocks.push(block('short', '👔', `Da sistemare nel personale in ${new Set(other.map((o) => o.r)).size} ${other.length === 1 ? 'negozio' : 'negozi'}`,
+      other.map((o) => `<b>${name(o.r.b)}</b>: ${o.a.text}`), [...new Set(other.map((o) => o.r.b))].map((b) => shopBtn(b, 'personale', `👥 ${name(b)}`)).join('')));
+    // 3) prodotti finiti: si sistema per tutto il gruppo in un tocco
+    const stock = got.filter((r) => r.snap!.data.advice.some((a) => a.kind === 'stock'));
+    if (stock.length) {
+      const noAuto = bizs.filter((b) => !b.autoRestock).length;
+      blocks.push(block('stock', '📦', `Prodotti finiti in ${stock.length} ${stock.length === 1 ? 'negozio' : 'negozi'} (${stock.map((r) => name(r.b)).join(', ')})`, [],
+        `${noAuto ? `<button class="btn sm" data-a="autoOn">🔁 Riordino automatico in tutti (spento in ${noAuto})</button>` : ''}<button class="btn sm" data-a="fill">🧊 Riempi tutti i magazzini</button>${this.chainUpgBtn(bizs, 'frigo')}`));
+    }
+    // 4) dipendenti di troppo (solo dai resoconti completi): per reparto e negozio, con i nomi
+    const excess = got.filter((r) => r.full).map((r) => ({ r, a: r.snap!.data.advice.find((a) => a.kind === 'excess') })).filter((x) => x.a);
+    if (excess.length) blocks.push(block('excess', '💸', `Dipendenti di troppo in ${excess.length} ${excess.length === 1 ? 'negozio' : 'negozi'}`,
+      excess.map((x) => `<b>${name(x.r.b)}</b>: ${x.a!.text.replace(/^Costi alti: /, '')}`), excess.map((x) => shopBtn(x.r.b, 'personale', `👥 ${name(x.r.b)}`)).join('')));
+    // 5) personale a vuoto (in tutto o in parte del turno): più clienti per tutto il gruppo
+    const idle = got.filter((r) => r.snap!.data.advice.some((a) => a.kind === 'grow' && a.icon === '📣'));
+    if (idle.length) blocks.push(block('grow', '📣', `In ${idle.length} ${idle.length === 1 ? 'negozio' : 'negozi'} il personale ha ore a vuoto (${idle.map((r) => name(r.b)).join(', ')}): aumenta la clientela`, [],
+      this.chainUpgBtn(bizs, 'marketing') + this.chainUpgBtn(bizs, 'look')));
+    // 6) menù: cosa si vende di più oggi (dati di oggi, come nel resoconto del negozio)
+    const market = bizs.map((b) => ({ b, a: bizReport(s, b).advice.filter((a) => a.icon === '📈' || a.icon === '🍔' || a.icon === '🎉') })).filter((x) => x.a.length);
+    if (market.length) {
+      // lo stesso consiglio in più negozi una volta sola, con i negozi (senza i numeri, che cambiano da negozio a negozio)
+      const same = new Map<string, Business[]>();
+      for (const x of market) for (const a of x.a) {
+        const k = a.text.replace(/ \([^)]*\d[^)]*\)/g, '');
+        same.set(k, [...(same.get(k) ?? []), x.b]);
+      }
+      blocks.push(block('grow', '📈', `Menù da sistemare oggi in ${market.length} ${market.length === 1 ? 'negozio' : 'negozi'}`,
+        [...same].map(([k, bs]) => `${k} <span class="muted">— ${bs.length === bizs.length ? 'in tutti' : bs.map(name).join(', ')}</span>`), '<button class="btn sm" data-a="tab:prodotti">🍔 Prodotti della catena</button>'));
+    }
+    // 7) migliorie a livelli diversi tra i negozi: si pareggiano dal gruppo
+    const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
+    const uneven = UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(type)) && (id !== 'cassa' || hasCashUpgrade(type)))
+      .filter((id) => groupUpgradeTargets(bizs, id).length && groupUpgradeTargets(bizs, id).length < bizs.length);
+    if (uneven.length) blocks.push(block('info', '⚖️', 'Migliorie a livelli diversi tra i negozi: pareggiale', uneven.map((id) => {
+      const lv = bizs.map((b) => upg(b, id));
+      return `${UPGRADES[id].icon} ${UPGRADES[id].name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
+    }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
+    const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3><div class="small muted" style="margin-bottom:4px">I problemi di tutti i negozi raggruppati: dove si può, un tasto lo sistema in tutto il gruppo.</div>${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta, magazzini pieni e migliorie pari</span></div>'}</div>`;
     // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
     const rows = reps.map(({ b, snap, full }) => {
       const d = snap?.data;
@@ -1497,10 +1555,14 @@ export class UI {
         },
         // dal resoconto della catena: resoconto di un negozio ("‹ Indietro" torna qui) o una sua scheda
         rep: (id) => this.openReport(id),
+        // in avanti: con "‹ Indietro" si torna al resoconto della catena (allo stesso punto)
         bizTab: (arg) => {
           const [id, t] = arg.split('|');
-          this.close();
           this.openBusiness(id, t);
+        },
+        autoOn: () => {
+          for (const b of sel().bizs) b.autoRestock = true;
+          report('🔁 Riordino automatico acceso in tutti i negozi del gruppo', true);
         },
         prod: (arg) => {
           const [p, a] = arg.split('|');
