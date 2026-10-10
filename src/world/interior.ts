@@ -770,7 +770,12 @@ export class TruckInterior {
       }
       rows.push(`<div class="hb-slot"><b>${p.icon} ${one}${done}${x.takeaway ? ' 🥡' : ''}</b><em style="background:${css}">${state}</em></div>`);
     }
-    const html = rows.join('');
+    // in cima: soldi e orario (dentro le attività la barra con soldi e data è nascosta)
+    const st = this.game.state;
+    const mins = st.minutes % 1440;
+    const clock = `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(Math.floor(mins % 60) - (Math.floor(mins % 60) % 5)).padStart(2, '0')}`;
+    const info = `<div class="hb-info"><span class="money-t">💰 €${Math.round(st.money).toLocaleString('it-IT')}</span><span>🕐 ${clock} · ${isOpenHour(st) ? '🟢 aperto' : '🔴 chiuso'}</span></div>`;
+    const html = info + rows.join('');
     if (html === this.handHtml) return;
     this.handHtml = html;
     this.handEl.innerHTML = html;
@@ -798,7 +803,7 @@ export class TruckInterior {
     player.root.rotation.y = Math.PI;
     this.scene.add(player.root);
     this.biz.__playerInside = true;
-    // dentro le attività niente riquadro con soldi e capienze: solo quello con gli oggetti in mano
+    // dentro le attività un solo riquadro: soldi e orario in cima, poi gli oggetti in mano
     // (le capienze stanno sulle etichette delle postazioni)
     this.handEl = document.createElement('div');
     this.handEl.className = 'hand-badge';

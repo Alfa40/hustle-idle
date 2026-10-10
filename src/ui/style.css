@@ -641,6 +641,8 @@ body.guide-on .hud-top { display: none; }
 .hb-slot b { min-width: 0; max-width: 100%; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hb-slot em { margin-left: auto; font-style: normal; font-weight: 800; font-size: 12px; color: #fff; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
 .hb-slot.empty { background: transparent; border: 2px dashed #ecd9a8; min-height: 22px; }
+.hb-info { display: flex; justify-content: space-between; gap: 6px; padding: 0 4px 2px; font-size: 13px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+.hb-info .money-t { color: var(--green-d); }
 @media (orientation: landscape) { .hand-badge { width: min(480px, 46vw); } }
 
 /* ---------- logo ---------- */
