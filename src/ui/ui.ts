@@ -26,7 +26,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -43,7 +43,7 @@ import {
 type Actions = Record<string, (arg: string) => void>;
 
 /** Migliorie che cambiano la cucina e si possono provare prima di comprarle. */
-const PREVIEW_UPGRADES: UpgradeId[] = ['ampliamento', 'fuochi', 'banco', 'ripiano', 'attrezzatura'];
+const PREVIEW_UPGRADES: UpgradeId[] = ['ampliamento', 'fuochi', 'banco', 'ripiano', 'attrezzatura', 'cassa'];
 
 interface Panel {
   render: () => string;
@@ -417,7 +417,9 @@ export class UI {
     if (this.panel?.live) {
       this.liveTimer += dt;
       // niente aggiornamenti mentre il dito scorre il pannello (interromperebbero lo scorrimento)
-      const busy = this.touching || performance.now() - this.lastScroll < 900;
+      // anche subito dopo aver alzato il dito: il "click" arriva dopo il touchend, e se intanto la finestra si
+      // ridisegna il pulsante toccato non c'è più (tocco perso, es. "Cerca altri candidati")
+      const busy = this.touching || performance.now() - this.lastScroll < 900 || performance.now() - this.lastTouchEnd < 600;
       if (this.liveTimer > 1 && !busy) this.renderPanel(true);
     }
     // i soldi nell'intestazione salgono anche mentre la finestra è aperta (incassi delle attività)
@@ -722,12 +724,12 @@ export class UI {
     });
     const sb = modal.querySelector('.sheet-body') as HTMLElement;
     sb.addEventListener('touchstart', () => (this.touching = true), { passive: true });
-    sb.addEventListener('touchend', () => (this.touching = false), { passive: true });
-    sb.addEventListener('touchcancel', () => (this.touching = false), { passive: true });
+    sb.addEventListener('touchend', () => this.touchEnd(), { passive: true });
+    sb.addEventListener('touchcancel', () => this.touchEnd(), { passive: true });
     // anche le righe interne che scorrono di lato (l'evento non sale: si ascolta in cattura)
     modal.addEventListener('scroll', () => (this.lastScroll = performance.now()), { passive: true, capture: true });
     modal.addEventListener('touchstart', () => (this.touching = true), { passive: true });
-    modal.addEventListener('touchend', () => (this.touching = false), { passive: true });
+    modal.addEventListener('touchend', () => this.touchEnd(), { passive: true });
     this.touching = false;
     this.lastHtml = '';
     document.body.appendChild(modal);
@@ -736,6 +738,11 @@ export class UI {
   }
 
   private touching = false;
+  private lastTouchEnd = 0;
+  private touchEnd() {
+    this.touching = false;
+    this.lastTouchEnd = performance.now();
+  }
   private lastScroll = 0;
   private lastHtml = '';
 
@@ -1625,11 +1632,11 @@ export class UI {
       return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
         <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
         <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
-        <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40</button>`;
+        <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40${s.money < 40 ? ' (non hai abbastanza soldi)' : ''}</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
     const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
-    return UPGRADE_IDS.filter((id) => !kitchenOnly.includes(id) || hasInterior(b.type)).map((id) => {
+    return UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(b.type)) && (id !== 'cassa' || hasCashUpgrade(b.type))).map((id) => {
       const u = UPGRADES[id];
       const lvl = upg(b, id);
       const cost = u.cost(lvl);

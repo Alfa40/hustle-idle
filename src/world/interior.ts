@@ -396,13 +396,15 @@ export class TruckInterior {
         wrap.rotation.y = d.rot ?? 0;
         wrap.add(o);
         // attrezzatura professionale: postazioni di lavoro lucide e dorate
-        if (pro > 0 && (d.kind === 'hold' || d.kind === 'timed')) {
+        // (cassa veloce: anche il bancone, dove è un mobile)
+        const shine = d.kind === 'hold' || d.kind === 'timed' ? pro : d.kind === 'counter' ? upg(this.biz, 'cassa') : 0;
+        if (shine > 0) {
           o.traverse((m) => {
             const mesh = m as THREE.Mesh;
             if (!mesh.isMesh) return;
             const mat = (mesh.material as THREE.MeshLambertMaterial).clone();
             mat.emissive = new THREE.Color(0xffb300);
-            mat.emissiveIntensity = 0.08 + pro * 0.05;
+            mat.emissiveIntensity = 0.08 + shine * 0.05;
             mesh.material = mat;
           });
         }

@@ -17,7 +17,7 @@ export const EXTRA_ROLES: { role: Role; level: number; desc: string }[] = [
   { role: 'sala', level: 2, desc: 'Porta il cibo ai tavoli della sala: clienti più contenti e mance più alte.' },
 ];
 
-export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'look' | 'menu' | 'frigo' | 'marketing';
+export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'cassa' | 'look' | 'menu' | 'frigo' | 'marketing';
 
 export interface UpgradeDef {
   name: string;
@@ -45,8 +45,12 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     cost: (l) => [400, 1000, 2400][l] ?? Infinity,
   },
   attrezzatura: {
-    name: 'Attrezzatura professionale', icon: '⚡', desc: 'Si lavora più in fretta (+15% per livello). Le postazioni diventano lucide e dorate.', max: 8,
+    name: 'Attrezzatura professionale', icon: '⚡', desc: 'Si prepara più in fretta (+15% per livello). Le postazioni di lavoro diventano lucide e dorate.', max: 8,
     cost: (l) => Math.round(400 * 1.8 ** l),
+  },
+  cassa: {
+    name: 'Cassa veloce', icon: '💳', desc: 'Registratore e POS moderni: i cassieri servono e incassano più in fretta (+15% per livello), per stare al passo con la cucina.', max: 8,
+    cost: (l) => Math.round((350 * 1.8 ** l) / 10) * 10,
   },
   look: {
     name: 'Look e insegna', icon: '✨', desc: 'Attira più clienti (+15% di domanda per livello). Piante, luci e un pavimento più bello.', max: 8,

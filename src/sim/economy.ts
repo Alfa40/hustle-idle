@@ -205,11 +205,18 @@ export function isAutonomous(b: Business) {
  */
 const ROLE_SPEED: Partial<Record<Role, number>> = { cassa: 1.5 };
 
+/** La miglioria "Cassa veloce" c'è nelle attività con bancone e cassieri (food truck, panificio). */
+export const hasCashUpgrade = (t: BusinessType) => hasInterior(t) && (bizType(t).roles as Role[]).includes('cassa');
+
 export function employeeRate(e: Employee, b: Business) {
   // velocità vera e strada fatta (livello e stelle): un dipendente a 5 stelle lavora molto più in fretta
   let r = (2 + empStat(e, 'speed') * 0.6) * empMult(e) * (ROLE_SPEED[e.role] ?? 1);
-  // l'attrezzatura professionale velocizza tutte le postazioni (cucina e cassa), non solo i cuochi
-  if (e.role !== 'manager') r *= 1 + 0.15 * upg(b, 'attrezzatura');
+  // attrezzatura professionale: chi prepara; cassa veloce: cassieri e camerieri. Nelle attività senza
+  // bancone (niente cassa veloce, es. traslochi) l'attrezzatura vale per tutti
+  if (hasCashUpgrade(b.type)) {
+    if (e.role === 'cucina') r *= 1 + 0.15 * upg(b, 'attrezzatura');
+    else if (e.role === 'cassa' || e.role === 'sala') r *= 1 + 0.15 * upg(b, 'cassa');
+  } else if (e.role !== 'manager') r *= 1 + 0.15 * upg(b, 'attrezzatura');
   if (hasManager(b)) r *= 1.1;
   return r * bizType(b.type).rateMul;
 }
@@ -228,7 +235,7 @@ const shiftCache = new WeakMap<Business, { key: string; plan: ReturnType<typeof 
  */
 export function shiftsFor(s: GameState, b: Business) {
   const curve = demandCurve(b.type, totalDemand(s, b));
-  const key = `${day(s)}|${working(b).map((e) => `${e.id}:${e.level}:${e.stars ?? 0}:${e.speed}`).join(',')}|${upg(b, 'attrezzatura')}|${curve.map((x) => x.toFixed(1)).join(',')}`;
+  const key = `${day(s)}|${working(b).map((e) => `${e.id}:${e.level}:${e.stars ?? 0}:${e.speed}`).join(',')}|${upg(b, 'attrezzatura')}:${upg(b, 'cassa')}|${curve.map((x) => x.toFixed(1)).join(',')}`;
   const c = shiftCache.get(b);
   if (c && c.key === key) return c;
   const v = { key, plan: planShifts(b, (e) => employeeRate(e, b), curve), curve };
