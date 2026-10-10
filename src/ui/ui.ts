@@ -61,6 +61,8 @@ interface Panel {
   onClose?: () => void;
   /** finestra da cui si è arrivati: il tasto "‹ Indietro" ci riporta lì */
   back?: Panel;
+  /** dove era scorsa quando si è andati avanti in un'altra finestra: tornando con "Indietro" si rimette lì */
+  scroll?: ScrollSave;
   /** mostra i tuoi soldi nell'intestazione (negozio, migliorie, acquisti); con una funzione, solo quando serve */
   money?: boolean | (() => boolean);
 }
@@ -70,14 +72,33 @@ interface Panel {
  * la funzione che lo rimette dopo aver ridisegnato il contenuto. Gli elementi si ritrovano per classi e
  * posizione (la n-esima riga di schede resta la n-esima).
  */
-function keepScroll(root: HTMLElement) {
-  const saved: { sel: string; i: number; left: number; top: number }[] = [];
+type ScrollSave = { sel: string; i: number; left: number; top: number }[];
+
+/** Scorrimento di `root` e di tutto ciò che scorre dentro (per rimetterlo con `keepScroll`/`putScroll`). */
+function saveScroll(root: HTMLElement, self = false): ScrollSave {
+  const saved: ScrollSave = [];
+  if (self && (root.scrollLeft || root.scrollTop)) saved.push({ sel: ':scope', i: -1, left: root.scrollLeft, top: root.scrollTop });
   for (const el of root.querySelectorAll<HTMLElement>('*')) {
     if (!el.scrollLeft && !el.scrollTop) continue;
     const sel = el.tagName.toLowerCase() + [...el.classList].map((c) => '.' + CSS.escape(c)).join('');
     const i = [...root.querySelectorAll(sel)].indexOf(el);
     saved.push({ sel, i, left: el.scrollLeft, top: el.scrollTop });
   }
+  return saved;
+}
+
+/** Rimette lo scorrimento salvato (anche in una finestra ridisegnata da capo, tornando con "Indietro"). */
+function putScroll(root: HTMLElement, saved: ScrollSave) {
+  for (const k of saved) {
+    const el = k.i < 0 ? root : root.querySelectorAll<HTMLElement>(k.sel)[k.i];
+    if (!el) continue;
+    el.scrollLeft = k.left;
+    el.scrollTop = k.top;
+  }
+}
+
+function keepScroll(root: HTMLElement) {
+  const saved = saveScroll(root);
   return () => {
     for (const k of saved) {
       const el = root.querySelectorAll<HTMLElement>(k.sel)[k.i];
@@ -735,6 +756,11 @@ export class UI {
     document.body.appendChild(modal);
     this.modal = modal;
     this.renderPanel();
+    // tornando con "Indietro": la finestra è di nuovo dove l'avevi lasciata (i contenuti sono aggiornati)
+    if (p.scroll) {
+      putScroll(modal.querySelector('.sheet') as HTMLElement, p.scroll);
+      p.scroll = undefined;
+    }
   }
 
   private touching = false;
@@ -784,6 +810,8 @@ export class UI {
 
   close() {
     const p = this.panel;
+    // si va avanti in un'altra finestra: si ricorda dove era scorsa, per quando si torna indietro
+    if (p && p === this.navFrom && this.modal) p.scroll = saveScroll(this.modal.querySelector('.sheet') as HTMLElement);
     this.modal?.remove();
     this.modal = null;
     this.panel = null;

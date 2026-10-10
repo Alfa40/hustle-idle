@@ -42,7 +42,8 @@
 - **Scorrimento**: nessun aggiornamento automatico (finestre `live`, soldi, incassi) deve far perdere dove
   l'utente ha scorso, né in verticale né nelle righe che scorrono di lato (schede, gruppi, carte).
   `renderPanel` lo garantisce per tutte le finestre (`keepScroll` in src/ui/ui.ts) e in sviluppo segnala in
-  console `[scroll] posizione persa…`. Ogni nuova schermata con liste o righe scorrevoli va provata: scorri,
+  console `[scroll] posizione persa…`. Anche tornando con "‹ Indietro" la finestra è dove l'avevi lasciata
+  (`Panel.scroll`); chiudendo tutto e tornando a giocare si riparte dall'inizio. Ogni nuova schermata con liste o righe scorrevoli va provata: scorri,
   aspetta un aggiornamento (es. cambia i soldi), controlla che la posizione resti uguale e che non ci siano
   errori `[scroll]`. Mai ridisegnare a mano un contenitore scorrevole senza salvare e rimettere lo scorrimento.
 - Prove: headless con Chrome (puppeteer-core) che pilota `window.game` con script di prova
