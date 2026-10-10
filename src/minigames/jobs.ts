@@ -179,9 +179,11 @@ export interface Task {
   onFoot?: boolean;
 }
 
-/** grandezza degli indicatori sopra gli obiettivi dei lavoretti (3 = il triplo di prima) e quanto salgono */
+/** grandezza degli indicatori sopra gli obiettivi dei lavoretti (3 = il triplo di prima) */
 const MARKER_SIZE = 3;
-const MARKER_LIFT = 0.55;
+/** metà altezza dell'indicatore (m) e spazio tra l'oggetto e il fondo dell'indicatore: appena sopra, ben visibile in prima persona */
+const MARKER_HALF = (0.45 * MARKER_SIZE * 0.72) / 2;
+const MARKER_GAP = 0.15;
 
 export interface Phase {
   name: string;
@@ -402,18 +404,20 @@ export class PhasedRun extends BaseRun {
     for (const t of this.tasks) {
       this.addGlow(t);
       if (t.aim) continue; // i punti sull'oggetto si vedono già (macchie): niente indicatori sopra
-      // indicatore grande (si vede bene anche da lontano), sopra l'oggetto più alto lì vicino
-      // (mai sovrapposto a cassette, giochi…); più grande = un po' più in alto
+      // indicatore grande (si vede bene anche da lontano), appena sopra l'oggetto più alto lì vicino
+      // (mai sovrapposto a cassette, giochi…): vicino a ciò che indica, non in cielo
       const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 * MARKER_SIZE });
       const mp = t.markerAt ?? t.pos;
-      m.userData.baseY = this.markerY({ ...t, pos: mp }) + MARKER_LIFT;
+      const top = this.markerY({ ...t, pos: mp });
+      m.userData.top = top;
+      m.userData.baseY = Math.max(0.3, top) + MARKER_GAP + MARKER_HALF;
       m.position.set(mp.x, m.userData.baseY, mp.z);
       this.game.scene.add(m);
       this.markers.set(t, m);
     }
   }
 
-  /** Altezza dell'indicatore: sopra gli oggetti di scena entro 1,1 m dal punto. */
+  /** Altezza della cima degli oggetti di scena entro 1,1 m dal punto (l'indicatore va appena sopra). */
   private markerY(t: Task) {
     let top = 0;
     const box = new THREE.Box3();
@@ -423,7 +427,7 @@ export class PhasedRun extends BaseRun {
       box.setFromObject(o);
       if (Number.isFinite(box.max.y)) top = Math.max(top, box.max.y);
     }
-    return Math.max(2.3, top + 0.75);
+    return top;
   }
 
   private pending() {
@@ -468,7 +472,7 @@ export class PhasedRun extends BaseRun {
     const t0 = performance.now() / 250;
     for (const [t, m] of this.markers) {
       m.visible = !t.done && pend.includes(t);
-      m.position.y = (m.userData.baseY ?? 2.3) + Math.sin(t0 + t.pos.x) * 0.12;
+      m.position.y = (m.userData.baseY ?? 1.5) + Math.sin(t0 + t.pos.x) * 0.06;
     }
     let near: Task | null = null;
     let nd = Infinity;
@@ -513,7 +517,7 @@ export class PhasedRun extends BaseRun {
     // l'anello da toccare sta sull'oggetto (a metà altezza, sotto l'indicatore)
     const mk = this.markers.get(near);
     const mp = near.markerAt ?? near.pos;
-    const at = new THREE.Vector3(mp.x, Math.min(1.6, Math.max(0.5, ((mk?.userData.baseY ?? 2.3 + MARKER_LIFT) - MARKER_LIFT - 0.75) * 0.55)), mp.z);
+    const at = new THREE.Vector3(mp.x, Math.min(1.6, Math.max(0.5, (mk?.userData.top ?? 1.55) * 0.55)), mp.z);
     if (near.kind === 'hold') {
       if (this.game.input.actionHeld) {
         near.progress = (near.progress ?? 0) + dt / (near.sec ?? 1.2);
