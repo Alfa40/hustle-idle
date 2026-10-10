@@ -109,7 +109,7 @@ export function peakRate(s: GameState, b: Business) {
   }
   let f = 0;
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) f = Math.max(f, hourFactor(b.type, h));
-  return Math.max(b.month.peak ?? 0, totalDemand(s, b) * f);
+  return Math.max(weekOf(s, b).peak ?? 0, totalDemand(s, b) * f);
 }
 
 export function isOpenHour(s: GameState) {
@@ -252,6 +252,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
     totalRevenue: 0,
     boughtFor: price,
     statsFrom: s.minutes,
+    week: { ...emptyLedger(), from: s.minutes },
     orders: [],
   };
   playStats(s).bizOpened++;
@@ -317,8 +318,10 @@ export function resetBizStats(s: GameState, b: Business, why: string) {
   }
   b.hourly = undefined;
   b.statsFrom = s.minutes;
-  b.statsRev0 = b.month.revenue;
   b.statsWhy = why;
+  // la raccolta per il resoconto della settimana riparte da adesso (il resoconto vecchio non vale più)
+  b.week = { ...emptyLedger(), from: s.minutes };
+  b.report = undefined;
 }
 
 /** Registra una vendita (sia manuale sia automatica). */
@@ -327,6 +330,9 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
   b.stock[pid] = Math.max(0, (b.stock[pid] ?? 0) - 1);
   b.today.revenue += amount;
   b.today.served++;
+  const w = weekOf(s, b);
+  w.served++;
+  w.revenue += amount;
   noteHour(s, b, true);
   b.month.revenue += amount;
   b.month.served++;
@@ -342,17 +348,56 @@ export type LostWhy = 'staff' | 'stock' | 'queue';
 export function lostCustomer(b: Business, why?: LostWhy, s?: GameState) {
   b.today.lost++;
   b.month.lost++;
+  const w = s ? weekOf(s, b) : b.week;
+  if (w) w.lost++;
   if (s) noteHour(s, b, false);
   if (!why) return;
   const k = why === 'staff' ? 'lostStaff' : why === 'stock' ? 'lostStock' : 'lostQueue';
   b.today[k] = (b.today[k] ?? 0) + 1;
   b.month[k] = (b.month[k] ?? 0) + 1;
+  if (w) w[k] = (w[k] ?? 0) + 1;
+}
+
+/** I dati della settimana in corso (per il prossimo resoconto). */
+export function weekOf(s: GameState, b: Business) {
+  return (b.week ??= { ...emptyLedger(), from: s.minutes });
+}
+
+/** Giornate di apertura (8–22) tra due minuti di gioco, con le frazioni. */
+export function openDays(from: number, to: number) {
+  const open = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 60;
+  let tot = 0;
+  for (let d = Math.floor(from / 1440); d <= Math.floor(to / 1440); d++) {
+    const a = Math.max(from, d * 1440 + BUSINESS.OPEN_HOUR * 60);
+    const e = Math.min(to, d * 1440 + BUSINESS.CLOSE_HOUR * 60);
+    if (e > a) tot += e - a;
+  }
+  return tot / open;
+}
+
+/** Giornate raccolte per il resoconto della settimana (ne servono REPORT_DAYS). */
+export const REPORT_DAYS = 7;
+export const weekDays = (s: GameState, b: Business) => openDays(weekOf(s, b).from, s.minutes);
+
+/**
+ * Alla chiusura (22:00): se la settimana ha 7 giornate di dati il manager prepara il resoconto della
+ * settimana e si comincia a raccogliere la prossima. Restituisce true se ha preparato un resoconto.
+ */
+export function weeklyClose(s: GameState, b: Business, make: (s: GameState, b: Business) => import('./report').BizReport) {
+  if (bizType(b.type).kind === 'craft') return false;
+  if (weekDays(s, b) < REPORT_DAYS - 0.01) return false;
+  b.report = { day: day(s), from: weekOf(s, b).from, data: make(s, b) };
+  b.week = { ...emptyLedger(), from: s.minutes };
+  b.hourly = undefined;
+  return true;
 }
 
 /** Ricorda la domanda più alta (le ore di punta): il personale va calcolato su quella, non su oggi. */
-export function notePeak(b: Business, demand: number) {
+export function notePeak(b: Business, demand: number, s?: GameState) {
   b.today.peak = Math.max(b.today.peak ?? 0, demand);
   b.month.peak = Math.max(b.month.peak ?? 0, demand);
+  const w = s ? weekOf(s, b) : b.week;
+  if (w) w.peak = Math.max(w.peak ?? 0, demand);
 }
 
 /** Sceglie il prodotto di un nuovo cliente in base alla domanda. */
@@ -380,7 +425,7 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
   }
   if (!isAutonomous(b) || !isOpenHour(s)) return;
   const now = demandNow(s, b);
-  notePeak(b, now);
+  notePeak(b, now, s);
   const rate = Math.min(now, autoCapacity(b));
   const lostRate = Math.max(0, now - rate);
   let a = (acc.get(b.id) ?? 0) + (rate * minutes) / 60;
@@ -419,7 +464,7 @@ function serviceOrders(s: GameState, b: Business, minutes: number) {
     b.orders = b.orders.filter((x) => x !== o);
   }
   if (!isOpenHour(s)) return;
-  notePeak(b, demandNow(s, b));
+  notePeak(b, demandNow(s, b), s);
   let a = (acc.get(b.id) ?? 0) + (demandNow(s, b) * minutes) / 60;
   while (a >= 1) {
     a -= 1;
@@ -470,8 +515,6 @@ export function payMonth(s: GameState) {
     const sum = c.rent + c.utilities + c.salaries;
     total += sum;
     b.month = emptyLedger();
-    b.hourly = undefined;
-    b.statsRev0 = 0;
     for (const e of b.staff) e.hiredDay = day(s);
   }
   if (total > 0) {
@@ -541,7 +584,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
     if (n.startsWith('addetto')) return 'addetti alle pulizie';
     return n.replace(/co$/, 'chi').replace(/io$/, 'i').replace(/[aeo]$/, 'i');
   };
-  const m = b.month;
+  const m = weekOf(s, b);
   const lost = m.lost;
   const share = lost / Math.max(1, m.served + lost);
   const pct = `${Math.round(share * 100)}%`;
@@ -559,11 +602,11 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
     .filter((x) => x.n > 0 && x.c < peak && x.need > 0);
   const staffLost = m.lostStaff ?? 0;
   if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {
-    out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
+    out.push({ kind: 'short', text: `Persi ${lost} clienti questa settimana (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
   } else if (b.staff.length && hires.length) {
     const list = hires.map((x) => `${x.need} ${x.need === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
     const slow = hires[0];
-    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questo mese perché il personale non basta. ` : ''}Nelle ore di punta arrivano circa ${fmtRate(peak)} clienti all'ora, ma i ${plural(slow.r)} ne servono ${fmtRate(slow.c)}: assumi circa ${list} in più`, tab: 'personale' });
+    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Nelle ore di punta arrivano circa ${fmtRate(peak)} clienti all'ora, ma i ${plural(slow.r)} ne servono ${fmtRate(slow.c)}: assumi circa ${list} in più`, tab: 'personale' });
   } else if (unknown >= 3 && b.staff.length) {
     out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale di adesso le ore di punta (circa ${fmtRate(peak)} clienti all'ora) sono coperte: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
   }

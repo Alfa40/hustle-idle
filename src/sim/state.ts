@@ -59,12 +59,13 @@ export interface Business {
   /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
   /** `days`: giorni in cui si è registrato qualcosa (per fare la media giusta), `lastDay`: l'ultimo */
   hourly?: { served: number[]; lost: number[]; days?: number; lastDay?: number };
-  /** resoconto di fine giornata (calcolato all'inizio di ogni giorno, resta fisso fino al giorno dopo) */
-  report?: { day: number; data: import('./report').BizReport };
+  /** resoconto della settimana (pronto dopo 7 giornate di dati raccolti, resta fisso fino al prossimo) */
+  report?: { day: number; from: number; data: import('./report').BizReport };
+  /** dati della settimana in corso per il prossimo resoconto (da `from`, minuto di gioco) */
+  week?: Ledger & { from: number };
   /** minuto di gioco da cui contano le statistiche del resoconto (dopo un azzeramento) */
   statsFrom?: number;
-  /** incasso del mese al momento dell'azzeramento (la media al giorno conta solo quello dopo) e perché */
-  statsRev0?: number;
+  /** perché la raccolta dei dati è ripartita (l'ultimo cambio: miglioria, personale, prodotti) */
   statsWhy?: string;
   /** laboratorio dell'artigiano: lavori su richiesta del giorno (fatti a mano dal giocatore) */
   specials?: SpecialOrder[];
@@ -250,7 +251,7 @@ export function newState(): GameState {
   const zero = () => Object.fromEntries(SKILL_IDS.map((s) => [s, 0])) as Record<SkillId, number>;
   return {
     version: 1,
-    reportsV: 2,
+    reportsV: 3,
     money: START_MONEY,
     minutes: START_DAY * 1440 + TIME.START_HOUR * 60,
     lastSeen: Date.now(),
@@ -347,7 +348,9 @@ function parse(raw: string | null): GameState | null {
     // resoconti nuovi: i dati vecchi (senza motivi dei clienti persi né ore di punta) si azzerano,
     // il resoconto conta solo da adesso (incassi già fatti e soldi non cambiano)
     const fresh = (s.reportsV ?? 0) < 2;
-    st.reportsV = 2;
+    // resoconti settimanali: la raccolta della settimana parte da adesso
+    const weekly = (s.reportsV ?? 0) < 3;
+    st.reportsV = 3;
     for (const b of st.businesses) {
       if (fresh) {
         b.month = emptyLedger();
@@ -355,6 +358,11 @@ function parse(raw: string | null): GameState | null {
         b.yesterday = emptyLedger();
         b.hourly = undefined;
         b.statsFrom = st.minutes;
+      }
+      if (weekly) {
+        b.report = undefined;
+        b.hourly = undefined;
+        b.week = { ...emptyLedger(), from: st.minutes };
       }
       b.products = b.products.filter((p) => known.has(p));
       for (const k of Object.keys(b.stock)) if (!known.has(k)) delete (b.stock as Record<string, number>)[k];

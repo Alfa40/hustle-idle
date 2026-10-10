@@ -1017,3 +1017,6 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 
 .report-alert.info { background: #eef0f6; color: #3e4a66; border: 2px solid #cfd5e6; }
 .report-date { margin: -2px 0 10px; font-size: 12.5px; font-weight: 700; color: var(--muted, #7a6f8f); background: #f4eee2; border-radius: 10px; padding: 6px 10px; }
+.report-prog { margin: 8px 0 4px; text-align: left; font-size: 13px; }
+.report-prog .bar { margin-top: 4px; }
+.report-wait { margin-top: 8px; padding: 8px 10px; border-radius: 12px; background: #f1ecfb; color: #4b3a7a; font-size: 13px; font-weight: 600; }

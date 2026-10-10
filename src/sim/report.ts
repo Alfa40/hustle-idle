@@ -3,10 +3,10 @@ import { bizType, hourFactor, ROLES, UPGRADES, type Role } from '../config/busin
 import { PRODUCTS } from '../config/products';
 import { productLevel } from '../config/recipes';
 import {
-  estimateMonthlyProfit, eventMultiplier, fmtRate, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, roleCapacity, staffWarnings,
+  estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, roleCapacity, staffWarnings,
   upg,
 } from './economy';
-import { dayOfMonth, day, type Business, type GameState } from './state';
+import type { Business, GameState } from './state';
 
 /**
  * Resoconto completo di un'attività: una giornata media (clienti arrivati, serviti, persi, incasso),
@@ -32,35 +32,23 @@ export interface HourRow {
   lost: number;
 }
 
-/** Giornate di apertura (8–22) tra due minuti di gioco, con le frazioni. */
-function openDays(from: number, to: number) {
-  const open = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 60;
-  let tot = 0;
-  for (let d = Math.floor(from / 1440); d <= Math.floor(to / 1440); d++) {
-    const a = Math.max(from, d * 1440 + BUSINESS.OPEN_HOUR * 60);
-    const b = Math.min(to, d * 1440 + BUSINESS.CLOSE_HOUR * 60);
-    if (b > a) tot += b - a;
-  }
-  return tot / open;
-}
-
 /**
  * `s`: lo stato per le statistiche (a fine giornata: l'ultimo minuto del giorno appena finito);
  * `ms`: lo stato per la domanda dei prodotti (il giorno nuovo, per i consigli su cosa vendere oggi).
  */
 export function bizReport(s: GameState, b: Business, ms: GameState = s) {
   const def = bizType(b.type);
-  const m = b.month;
+  // la settimana raccolta (7 giornate di apertura): dati solo da quando è iniziata
+  const m = weekOf(s, b);
   // giorni di apertura contati: dall'inizio del mese o, se dopo, da quando l'attività è stata aperta
   // (o da quando i resoconti sono stati azzerati); le ore di chiusura non contano
-  const monthStart = (day(s) - (dayOfMonth(day(s)) - 1)) * 1440;
-  const days = Math.max(0.05, openDays(Math.max(monthStart, b.statsFrom ?? monthStart), s.minutes));
+  const days = Math.max(0.05, openDays(m.from, s.minutes));
   const arrived = m.served + m.lost;
   const avg = {
     arrived: arrived / days,
     served: m.served / days,
     lost: m.lost / days,
-    revenue: Math.max(0, m.revenue - (b.statsFrom && b.statsFrom > (day(s) - (dayOfMonth(day(s)) - 1)) * 1440 ? b.statsRev0 ?? 0 : 0)) / days,
+    revenue: m.revenue / days,
   };
   // ora per ora: dati veri del mese, altrimenti quelli attesi dalla domanda di oggi
   // ora per ora: dati veri (media sui giorni davvero registrati), altrimenti l'andamento atteso
@@ -136,10 +124,8 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
     advice.push({ kind: 'short', icon: '👔', text: 'Senza manager l\'attività lavora solo quando ci sei tu', tab: 'personale', label: '👥 Personale' });
   }
   if (!advice.length) advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale giusto per le ore di punta e magazzino pieno' });
-  const monthStart0 = (day(s) - (dayOfMonth(day(s)) - 1)) * 1440;
-  const resetNote = b.statsWhy && (b.statsFrom ?? 0) > monthStart0 ? b.statsWhy : null;
   return {
-    resetNote, days, avg, hours, hasData, peak, peakRate, staff,
+    days, avg, hours, hasData, peak, peakRate, staff,
     costs: { rent: c.rent, utilities: c.utilities, salaries },
     profit: isAutonomous(b) ? estimateMonthlyProfit(s, b) : null,
     lostWhy: { staff: m.lostStaff ?? 0, stock: m.lostStock ?? 0, queue: m.lostQueue ?? 0, unknown: Math.max(0, m.lost - (m.lostStaff ?? 0) - (m.lostStock ?? 0) - (m.lostQueue ?? 0)) },
@@ -151,13 +137,11 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
 export type BizReport = ReturnType<typeof bizReport>;
 
 /**
- * Resoconto di fine giornata: si calcola una volta al giorno, alla chiusura delle attività (22:00), con i
- * dati della giornata appena finita, e resta uguale fino alla chiusura del giorno dopo.
+ * Resoconto della settimana: alla chiusura (22:00) di ogni giorno si controlla se la settimana in corso ha
+ * 7 giornate di dati; se sì il manager prepara il resoconto (fisso fino al prossimo) e si ricomincia.
  */
-export function snapshotReports(s: GameState) {
-  const d = day(s);
-  for (const b of s.businesses) {
-    if (bizType(b.type).kind === 'craft') continue;
-    b.report = { day: d, data: bizReport(s, b) };
-  }
+export function weeklyReports(s: GameState) {
+  let made = 0;
+  for (const b of s.businesses) if (weeklyClose(s, b, (st, bb) => bizReport(st, bb))) made++;
+  return made;
 }

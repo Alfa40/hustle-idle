@@ -6,7 +6,7 @@ import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
 import { autoSim, payMonth, randDemand, refreshCandidates } from './economy';
-import { snapshotReports } from './report';
+import { weeklyReports } from './report';
 import { totalFame, totalLevel } from './progress';
 import {
   day, dayOfMonth, emptyLedger, monthIndex, pick, randInt,
@@ -23,11 +23,11 @@ export function advance(s: GameState, minutes: number, efficiency = 1, online = 
     s.minutes += step;
     minutes -= step;
     for (const b of s.businesses) if (!online || !b.__playerInside) autoSim(s, b, step, efficiency);
-    // alla chiusura delle attività (22:00) si prepara il resoconto della giornata
+    // alla chiusura delle attività (22:00): resoconti delle attività che hanno una settimana di dati
     const hAfter = (s.minutes % 1440) / 60;
     if (day(s) === before && hBefore < BUSINESS.CLOSE_HOUR && hAfter >= BUSINESS.CLOSE_HOUR) {
-      snapshotReports(s);
-      if (online && s.businesses.some((b) => b.report?.day === day(s))) toast('📊 Giornata finita: i resoconti delle attività sono pronti', 'info');
+      const made = weeklyReports(s);
+      if (online && made) toast(`📊 Il manager ha preparato ${made === 1 ? 'il resoconto' : `${made} resoconti`} della settimana`, 'info');
     }
     if (day(s) !== before) newDay(s, online);
   }

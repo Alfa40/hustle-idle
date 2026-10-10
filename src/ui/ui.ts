@@ -19,12 +19,13 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
+import { bizReport } from '../sim/report';
 import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, resetBizStats, fameMultiplier, fire, hasManager,
+  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, REPORT_DAYS, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -101,6 +102,9 @@ function demandBars(v: number, max = 4) {
   const n = Math.max(0, Math.min(5, Math.round((v / max) * 5)));
   return `<span class="demand">${[0, 1, 2, 3, 4].map((i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`;
 }
+
+/** "Mar 1 Maggio" */
+const dayName = (d: number) => `${WEEKDAYS[d % 7]} ${dayOfMonth(d)} ${MONTH_NAMES[monthIndex(d)]}`;
 
 export function formatDate(minutes: number) {
   const d = Math.floor(minutes / 1440);
@@ -1048,12 +1052,13 @@ export class UI {
           <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
         </div>
         <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
-        <div class="report-more">${r.rep ? 'Tocca per il resoconto completo: orario di punta, personale, cosa vendere e consigli ›' : 'Il primo resoconto arriva alla fine di questa giornata ›'}</div></div>`).join('');
+        ${r.rep ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${this.reportProgress(r.b, false)}</div>`}
+        <div class="report-more">${r.rep ? 'Tocca per il resoconto della settimana: orario di punta, personale, cosa vendere e consigli ›' : 'Tocca per i dettagli ›'}</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
-      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti si aggiornano alla fine di ogni giornata di gioco; incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
+      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
     }
@@ -1185,23 +1190,23 @@ export class UI {
         const biz = b();
         const def = bizType(biz.type);
         const snap = biz.report;
-        if (!snap) {
-          const left = (BUSINESS.CLOSE_HOUR - hourOf(s) + 24) % 24 || 24;
-          return `<div class="card center"><div class="hero"><div class="emoji">📊</div></div><p><b>Il resoconto si prepara alla fine di ogni giornata, quando le attività chiudono.</b></p>
-            <p class="muted">Il primo per questa attività arriva alla chiusura delle ${BUSINESS.CLOSE_HOUR}:00, tra circa ${Math.ceil(left)} ${Math.ceil(left) === 1 ? 'ora' : 'ore'} di gioco: con i dati di tutta la giornata, l'orario di punta e i consigli.</p></div>`;
-        }
-        const r = snap.data;
+        if (!snap) return this.reportWaiting(biz);
+        // statistiche dal resoconto della settimana; la domanda dei prodotti invece è quella di oggi
+        // (cambia ogni giorno: i consigli su cosa vendere restano aggiornati)
+        const isMarket = (a: { icon: string }) => ['📈', '🎉', '🏗️', '🍔'].includes(a.icon);
+        const live = bizReport(s, biz);
+        const r = { ...snap.data, products: live.products, advice: [...snap.data.advice.filter((a) => !isMarket(a) && a.kind !== 'ok'), ...live.advice.filter(isMarket)] };
+        if (!r.advice.length) r.advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale giusto per le ore di punta e magazzino pieno' });
         const n1 = fmtRate;
         const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         // giornata media
-        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(${n1(r.days)} giorni ${r.resetNote ? 'registrati' : 'di questo mese'})</span></h3>
-          ${r.resetNote ? `<div class="small muted" style="margin-bottom:6px">🔄 Statistiche ripartite da zero dopo l'ultimo cambio (<b>${esc(r.resetNote)}</b>): clienti persi e ore di punta si ricalcolano da allora.</div>` : ''}
+        const day = `<div class="card"><h3>📅 Una giornata media <span class="muted small">(media di ${n1(r.days)} giornate di apertura)</span></h3>
           <div class="grid2"><div class="stat s-blue"><b>${n1(r.avg.arrived)}</b><span>${unit} arrivati al giorno</span></div>
           <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
           <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
           <div class="stat s-yellow"><b class="money-t">${euro(r.avg.revenue)}</b><span>incasso al giorno</span></div></div>
-          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questo mese: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu${r.lostWhy.unknown ? ` · ${r.lostWhy.unknown} prima che il gioco registrasse il motivo` : ''}</div>` : ''}</div>`;
+          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questa settimana: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu${r.lostWhy.unknown ? ` · ${r.lostWhy.unknown} prima che il gioco registrasse il motivo` : ''}</div>` : ''}</div>`;
         // orario di punta: barre ora per ora (verde serviti, rosso persi)
         const max = Math.max(0.1, ...r.hours.map((x) => x.arrived));
         const bars = r.hours.map((x) => {
@@ -1210,7 +1215,7 @@ export class UI {
           return `<div class="hb ${x.h === r.peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
         }).join('');
         const peakCard = `<div class="card"><h3>⏰ Orario di punta: ${r.peak.h}–${r.peak.h + 1}</h3>
-          <div class="small">In quell'ora arrivano circa <b>${n1(r.peakRate)} ${unit}</b>${r.hasData ? ' (media dei giorni registrati)' : ' (stima dalla domanda: ancora pochi dati registrati)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
+          <div class="small">In quell'ora arrivano circa <b>${n1(r.peakRate)} ${unit}</b>${r.hasData ? ' (media della settimana)' : ' (stima dalla domanda: ancora pochi dati registrati)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
           <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
         // personale per reparto
         const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}<div class="small muted">servono ${n1(x.cap)} clienti all'ora · per le ore di punta ne servono ~${x.need}</div></div>
@@ -1232,7 +1237,7 @@ export class UI {
           <div class="row between" style="margin-top:6px"><b>Totale</b><b>${euro(tot)}</b></div>
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
         return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
-          <div class="report-date">📅 Resoconto della giornata · ${esc(`${WEEKDAYS[snap.day % 7]} ${dayOfMonth(snap.day)} ${MONTH_NAMES[monthIndex(snap.day)]}`)} · il prossimo ${hourOf(s) >= BUSINESS.CLOSE_HOUR || snap.day === Math.floor(s.minutes / 1440) ? 'domani' : 'stasera'} alle ${BUSINESS.CLOSE_HOUR}:00</div>` + advice + day + peakCard + staffCard + prod + costs;
+          <div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>` + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
         go: (tab) => {
@@ -1350,6 +1355,22 @@ export class UI {
       },
       onClose: () => this.game.save(),
     });
+  }
+
+  /** Il manager sta ancora raccogliendo i dati: meno di 7 giornate dalla fine dell'ultimo resoconto o dall'ultimo cambio. */
+  private reportWaiting(biz: Business) {
+    const why = biz.statsWhy && (biz.week?.from ?? 0) === biz.statsFrom ? `<p class="muted small">🔄 La raccolta è ripartita dopo l'ultimo cambio (<b>${esc(biz.statsWhy)}</b>): i dati di prima non valgono più.</p>` : '';
+    return `<div class="card center"><div class="hero"><div class="emoji">🧑‍💼</div></div>
+      <p><b>Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.</b></p>
+      ${this.reportProgress(biz, false)}${why}
+      <p class="muted small">Il resoconto arriva alla chiusura (${BUSINESS.CLOSE_HOUR}:00) del giorno in cui le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+  }
+
+  /** Giornate raccolte per il prossimo resoconto (con la barra). */
+  private reportProgress(biz: Business, next: boolean) {
+    const done = Math.min(REPORT_DAYS, weekDays(this.s, biz));
+    const shown = Math.floor(done * 10) / 10;
+    return `<div class="report-prog"><span>${next ? 'Prossimo resoconto' : 'Giornate raccolte'}: <b>${fmtRate(shown)} di ${REPORT_DAYS}</b></span><div class="bar purple"><i style="width:${(done / REPORT_DAYS) * 100}%"></i></div></div>`;
   }
 
   /** Crea o modifica un gruppo della catena: nome e negozi (per zona o come preferisci). */
