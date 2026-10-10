@@ -44,7 +44,11 @@ function openDays(from: number, to: number) {
   return tot / open;
 }
 
-export function bizReport(s: GameState, b: Business) {
+/**
+ * `s`: lo stato per le statistiche (a fine giornata: l'ultimo minuto del giorno appena finito);
+ * `ms`: lo stato per la domanda dei prodotti (il giorno nuovo, per i consigli su cosa vendere oggi).
+ */
+export function bizReport(s: GameState, b: Business, ms: GameState = s) {
   const def = bizType(b.type);
   const m = b.month;
   // giorni di apertura contati: dall'inizio del mese o, se dopo, da quando l'attività è stata aperta
@@ -93,7 +97,7 @@ export function bizReport(s: GameState, b: Business) {
   if (def.kind !== 'craft' && def.kind !== 'service') {
     const free = menuSlots(b) - b.products.length;
     if (free > 0) {
-      const best = def.products.filter((p) => !b.products.includes(p)).sort((x, y) => productDemand(s, b, y) - productDemand(s, b, x))[0];
+      const best = def.products.filter((p) => !b.products.includes(p)).sort((x, y) => productDemand(ms, b, y) - productDemand(ms, b, x))[0];
       if (best) advice.push({ kind: 'grow', icon: '🍔', text: `Hai ${free} ${free === 1 ? 'posto libero' : 'posti liberi'} nel menù: aggiungi ${PRODUCTS[best].icon} ${PRODUCTS[best].name} (il più richiesto che non vendi)`, tab: 'prodotti', label: '🍔 Prodotti' });
     }
   }
@@ -108,10 +112,10 @@ export function bizReport(s: GameState, b: Business) {
   const zone = lotZone[b.lotId];
   const products = def.products.map((p) => ({
     pid: p,
-    demand: productDemand(s, b, p),
+    demand: productDemand(ms, b, p),
     selling: b.products.includes(p),
     locked: productLevel(b.type, p) > upg(b, 'ampliamento'),
-    event: eventMultiplier(s, p, zone),
+    event: eventMultiplier(ms, p, zone),
   })).sort((x, y) => y.demand - x.demand);
   if (def.kind !== 'craft' && def.kind !== 'service' && products.length) {
     const sold = products.filter((x) => x.selling);
@@ -142,4 +146,18 @@ export function bizReport(s: GameState, b: Business) {
     products,
     advice,
   };
+}
+
+export type BizReport = ReturnType<typeof bizReport>;
+
+/**
+ * Resoconto di fine giornata: si calcola una volta al giorno, alla chiusura delle attività (22:00), con i
+ * dati della giornata appena finita, e resta uguale fino alla chiusura del giorno dopo.
+ */
+export function snapshotReports(s: GameState) {
+  const d = day(s);
+  for (const b of s.businesses) {
+    if (bizType(b.type).kind === 'craft') continue;
+    b.report = { day: d, data: bizReport(s, b) };
+  }
 }

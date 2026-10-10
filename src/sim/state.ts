@@ -59,6 +59,8 @@ export interface Business {
   /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
   /** `days`: giorni in cui si è registrato qualcosa (per fare la media giusta), `lastDay`: l'ultimo */
   hourly?: { served: number[]; lost: number[]; days?: number; lastDay?: number };
+  /** resoconto di fine giornata (calcolato all'inizio di ogni giorno, resta fisso fino al giorno dopo) */
+  report?: { day: number; data: import('./report').BizReport };
   /** minuto di gioco da cui contano le statistiche del resoconto (dopo un azzeramento) */
   statsFrom?: number;
   /** incasso del mese al momento dell'azzeramento (la media al giorno conta solo quello dopo) e perché */

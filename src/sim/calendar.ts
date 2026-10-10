@@ -1,4 +1,4 @@
-import { TIME } from '../config/balance';
+import { BUSINESS, TIME } from '../config/balance';
 import { EVENTS, WEATHER } from '../config/events';
 import { ensureWeather, sureEvents, weatherOf } from './effects';
 import { JOBS, JOB_TYPES } from '../config/jobs';
@@ -6,6 +6,7 @@ import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
 import { autoSim, payMonth, randDemand, refreshCandidates } from './economy';
+import { snapshotReports } from './report';
 import { totalFame, totalLevel } from './progress';
 import {
   day, dayOfMonth, emptyLedger, monthIndex, pick, randInt,
@@ -18,9 +19,16 @@ export function advance(s: GameState, minutes: number, efficiency = 1, online = 
   while (minutes > 0) {
     const step = Math.min(minutes, 10);
     const before = day(s);
+    const hBefore = (s.minutes % 1440) / 60;
     s.minutes += step;
     minutes -= step;
     for (const b of s.businesses) if (!online || !b.__playerInside) autoSim(s, b, step, efficiency);
+    // alla chiusura delle attività (22:00) si prepara il resoconto della giornata
+    const hAfter = (s.minutes % 1440) / 60;
+    if (day(s) === before && hBefore < BUSINESS.CLOSE_HOUR && hAfter >= BUSINESS.CLOSE_HOUR) {
+      snapshotReports(s);
+      if (online && s.businesses.some((b) => b.report?.day === day(s))) toast('📊 Giornata finita: i resoconti delle attività sono pronti', 'info');
+    }
     if (day(s) !== before) newDay(s, online);
   }
 }

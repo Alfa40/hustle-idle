@@ -1016,3 +1016,4 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .tag.g { background: #dff5e7; color: #1f6b3a; } .tag.r { background: #ffe1e5; color: #9b1c2c; } .tag.y { background: #fff1c9; color: #7a5300; }
 
 .report-alert.info { background: #eef0f6; color: #3e4a66; border: 2px solid #cfd5e6; }
+.report-date { margin: -2px 0 10px; font-size: 12.5px; font-weight: 700; color: var(--muted, #7a6f8f); background: #f4eee2; border-radius: 10px; padding: 6px 10px; }

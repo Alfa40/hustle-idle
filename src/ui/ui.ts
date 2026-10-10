@@ -19,13 +19,12 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
-import { bizReport } from '../sim/report';
 import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, resetBizStats, staffWarnings, fameMultiplier, fire, hasManager,
+  autoCapacity, bizAtLot, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, resetBizStats, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1029,29 +1028,32 @@ export class UI {
       const rows = s.businesses.map((b) => {
         const c = monthlyCosts(s, b);
         const fixed = c.rent + c.utilities + b.staff.reduce((a, e) => a + e.salary, 0);
-        return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, served: b.month.served, lost: b.month.lost, warn: staffWarnings(s, b) };
+        // avvisi e clienti dal resoconto di fine giornata (si aggiorna una volta al giorno)
+        const rep = b.report?.data;
+        const warn = (rep?.advice ?? []).filter((a) => a.kind === 'short' || a.kind === 'stock' || a.kind === 'excess' || a.kind === 'info');
+        return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, rep, warn };
       }).sort((a, b) => b.month - a.month);
       const max = Math.max(1, ...rows.map((r) => r.month));
       const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
         <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
       // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
-      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.kind === 'short' ? '⚠️' : w.kind === 'stock' ? '📦' : w.kind === 'info' ? 'ℹ️' : '💸'} ${w.text}</span>${w.kind === 'info' ? '' : `<button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab ?? 'personale'}">${w.tab === 'magazzino' ? '🧊 Magazzino' : w.tab === 'migliorie' ? '⬆️ Migliorie' : '👥 Personale'}</button>`}</div>`).join('');
+      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.icon} ${w.text}</span>${w.tab ? `<button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab}">${w.label}</button>` : ''}</div>`).join('');
       const cards = rows.map((r) => `<div class="card report-card ${r.warn.some((w) => w.kind !== 'info') ? 'has-alert' : ''}" data-a="report:${r.b.id}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
           <div class="stat s-yellow"><b>${euro(r.b.yesterday.revenue)}</b><span>ieri</span></div>
           <div class="stat s-orange"><b>${euro(r.month)}</b><span>mese</span></div>
-          <div class="stat"><b>${r.served}</b><span>serviti (mese)</span></div>
-          <div class="stat s-red"><b>${r.lost}</b><span>persi (mese)</span></div>
+          <div class="stat"><b>${r.rep ? fmtRate(r.rep.avg.served) : '—'}</b><span>serviti al giorno</span></div>
+          <div class="stat s-red"><b>${r.rep ? fmtRate(r.rep.avg.lost) : '—'}</b><span>persi al giorno</span></div>
           <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
         </div>
         <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
-        <div class="report-more">Tocca per il resoconto completo: orario di punta, personale, cosa vendere e consigli ›</div></div>`).join('');
+        <div class="report-more">${r.rep ? 'Tocca per il resoconto completo: orario di punta, personale, cosa vendere e consigli ›' : 'Il primo resoconto arriva alla fine di questa giornata ›'}</div></div>`).join('');
       const totMonth = rows.reduce((a, r) => a + r.month, 0);
       const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
       const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
-      return top + `<div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
+      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti si aggiornano alla fine di ogni giornata di gioco; incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${cards}`;
     }
@@ -1182,7 +1184,13 @@ export class UI {
       render: () => {
         const biz = b();
         const def = bizType(biz.type);
-        const r = bizReport(s, biz);
+        const snap = biz.report;
+        if (!snap) {
+          const left = (BUSINESS.CLOSE_HOUR - hourOf(s) + 24) % 24 || 24;
+          return `<div class="card center"><div class="hero"><div class="emoji">📊</div></div><p><b>Il resoconto si prepara alla fine di ogni giornata, quando le attività chiudono.</b></p>
+            <p class="muted">Il primo per questa attività arriva alla chiusura delle ${BUSINESS.CLOSE_HOUR}:00, tra circa ${Math.ceil(left)} ${Math.ceil(left) === 1 ? 'ora' : 'ore'} di gioco: con i dati di tutta la giornata, l'orario di punta e i consigli.</p></div>`;
+        }
+        const r = snap.data;
         const n1 = fmtRate;
         const lostPct = r.avg.arrived ? Math.round((r.avg.lost / r.avg.arrived) * 100) : 0;
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
@@ -1223,7 +1231,8 @@ export class UI {
           <div class="row between small"><span>Stipendi (${biz.staff.length})</span><span>${euro(r.costs.salaries)}</span></div>
           <div class="row between" style="margin-top:6px"><b>Totale</b><b>${euro(tot)}</b></div>
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
-        return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>` + advice + day + peakCard + staffCard + prod + costs;
+        return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
+          <div class="report-date">📅 Resoconto della giornata · ${esc(`${WEEKDAYS[snap.day % 7]} ${dayOfMonth(snap.day)} ${MONTH_NAMES[monthIndex(snap.day)]}`)} · il prossimo ${hourOf(s) >= BUSINESS.CLOSE_HOUR || snap.day === Math.floor(s.minutes / 1440) ? 'domani' : 'stasera'} alle ${BUSINESS.CLOSE_HOUR}:00</div>` + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
         go: (tab) => {

@@ -555,7 +555,8 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   // reparti che non reggono le ore di punta, e quanti in più ne servono (10% di margine)
   const hires = caps
     .map((x) => ({ ...x, need: Math.ceil((peak * 1.1 - x.c) / Math.max(0.5, x.n ? x.c / x.n : 2.5)) }))
-    .filter((x) => x.need > 0 && x.n > 0);
+    // solo i reparti che davvero non reggono le ore di punta (il margine serve a dire quanti assumere)
+    .filter((x) => x.n > 0 && x.c < peak && x.need > 0);
   const staffLost = m.lostStaff ?? 0;
   if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {
     out.push({ kind: 'short', text: `Persi ${lost} clienti questo mese (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
