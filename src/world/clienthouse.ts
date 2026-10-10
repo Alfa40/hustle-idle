@@ -6,7 +6,7 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { Character } from './character';
 import type { Employee } from '../sim/state';
-import { employeeGainXp } from '../sim/economy';
+import { employeeGainXp, empStat } from '../sim/economy';
 import { label } from './props';
 import { Particles } from './particles';
 import { GuideLine } from './guideline';
@@ -416,7 +416,7 @@ export class ClientHouse {
 
   /** I dipendenti dell'impresa vengono con te e fanno una parte del lavoro. */
   private spawnHelpers() {
-    this.staff.filter((e) => e.role !== 'manager').slice(0, 3).forEach((e, i) => {
+    this.staff.filter((e) => e.role !== 'manager' && !e.trainingEnd).slice(0, 3).forEach((e, i) => {
       const char = new Character(e.model || 'character-female-b');
       const tag = label(e.name.split(' ')[0], { scale: 0.2 });
       tag.position.y = 1.75;
@@ -424,7 +424,7 @@ export class ClientHouse {
       char.root.position.copy(this.door).add(new THREE.Vector3(1.2 + i * 0.6, 0, -0.9));
       this.scene.add(char.root);
       // velocità: più il dipendente è bravo, più in fretta lavora
-      this.helpers.push({ emp: e, char, task: null, work: 0, speed: 0.6 + e.speed * 0.08 + (e.level - 1) * 0.05 });
+      this.helpers.push({ emp: e, char, task: null, work: 0, speed: 0.6 + empStat(e, 'speed') * 0.08 + ((e.stars ?? 0) * 11 + e.level - 1) * 0.05 });
     });
   }
 

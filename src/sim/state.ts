@@ -16,9 +16,17 @@ export interface Employee {
   id: number;
   name: string;
   role: Role;
+  /** livello dentro la stella (0–10: dopo la formazione si riparte da 0) */
   level: number;
   xp: number;
-  /** 1–10 */
+  /** stelle (0–5): si guadagnano con un corso di formazione a livello 10 */
+  stars?: number;
+  /** in formazione fino a questo minuto di gioco (non lavora) */
+  trainingEnd?: number;
+  /**
+   * Talento di partenza (1–7). I valori veri crescono piano con livello e stelle e arrivano al massimo
+   * (10) solo a 5 stelle e livello 10: vedi empStat in sim/economy.ts
+   */
   speed: number;
   skill: number;
   kindness: number;
@@ -352,6 +360,14 @@ function parse(raw: string | null): GameState | null {
     const weekly = (s.reportsV ?? 0) < 3;
     st.reportsV = 3;
     for (const b of st.businesses) {
+      // stelle dei dipendenti: i valori salvati diventano il talento di partenza (la crescita ora la dà il livello)
+      for (const e of b.staff) {
+        if (e.stars === undefined) {
+          e.stars = 0;
+          // il talento resta quello di prima (al massimo 7: il 10 si raggiunge solo a 5 stelle e livello 10)
+          for (const k of ['speed', 'skill', 'kindness'] as const) e[k] = Math.min(7, Math.max(1, e[k]));
+        }
+      }
       if (fresh) {
         b.month = emptyLedger();
         b.today = emptyLedger();

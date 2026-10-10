@@ -5,7 +5,7 @@ import { JOBS, JOB_TYPES } from '../config/jobs';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
-import { autoSim, payMonth, randDemand, refreshCandidates } from './economy';
+import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates } from './economy';
 import { weeklyReports } from './report';
 import { totalFame, totalLevel } from './progress';
 import {
@@ -30,6 +30,7 @@ export function advance(s: GameState, minutes: number, efficiency = 1, online = 
       if (online && made) toast(`📊 Il manager ha preparato ${made === 1 ? 'il resoconto' : `${made} resoconti`} della settimana`, 'info');
     }
     if (day(s) !== before) newDay(s, online);
+    finishTrainings(s);
   }
 }
 

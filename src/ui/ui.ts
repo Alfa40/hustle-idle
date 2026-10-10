@@ -25,7 +25,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, fmtRate, REPORT_DAYS, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canTrain, empStat, fmtRate, MAX_LEVEL, MAX_STARS, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -895,7 +895,7 @@ export class UI {
       ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>
         <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
       <h3 class="sec-title">Cosa puoi aprire qui</h3>${opts}
-      <p class="muted small">* Stima con la domanda di oggi, un dipendente per reparto e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.</p>`;
+      <p class="muted small">* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.</p>`;
   }
 
   private buyActions() {
@@ -1152,6 +1152,10 @@ export class UI {
           refreshCandidates(s);
         },
         fire: (id) => fire(s, b(), +id),
+        train: (id) => {
+          const e = b().staff.find((x) => x.id === +id);
+          if (e) startTraining(s, b(), e);
+        },
         upgrade: (id) => {
           buyUpgrade(s, b(), id as never);
           this.game.setupLot(b().lotId);
@@ -1553,7 +1557,7 @@ export class UI {
         b.staff,
         (e) => {
           const sh = shiftOf(s, b, e);
-          return this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`, sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : '');
+          return this.empCard(e, b.type, `<button class="btn sm danger" data-a="fire:${e.id}">Licenzia</button>`, e.trainingEnd ? ' · 🎓 in formazione' : sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : '', b.id);
         },
         (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
       );
@@ -1642,11 +1646,33 @@ export class UI {
     return [...st, ...pr, 'stanza più grande', 'ordini più ricchi'].join(', ');
   }
 
-  private empCard(e: Employee, type: BusinessType, btn: string, extra = '') {
+  /**
+   * Scheda di un dipendente: stelle (0–5) e livello (0–10), esperienza per il prossimo livello, valori
+   * veri (crescono piano con livello e stelle) e, a livello 10, il corso di formazione per la stella.
+   * `bizId`: è un tuo dipendente (si può mandare al corso).
+   */
+  private empCard(e: Employee, type: BusinessType, btn: string, extra = '', bizId?: string) {
     const r = ROLES[e.role];
-    const st = (n: string, v: number) => `<div class="small">${n}<div class="bar"><i style="width:${v * 10}%"></i></div></div>`;
-    return `<div class="card"><div class="row between"><div><b>${r.icon} ${esc(e.name)}</b> <span class="tag">Liv. ${e.level}</span><div class="muted small">${roleName(type, e.role)} · ${euro(e.salary)}/mese${extra}</div></div>${btn}</div>
-      <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">${st('Velocità', e.speed)}${st('Abilità', e.skill)}${st('Cortesia', e.kindness)}</div></div>`;
+    const stars = e.stars ?? 0;
+    const st = (n: string, k: 'speed' | 'skill' | 'kindness') => {
+      const v = empStat(e, k);
+      return `<div class="small">${n} <b>${v.toFixed(1).replace('.', ',')}</b><div class="bar"><i style="width:${v * 10}%"></i></div></div>`;
+    };
+    const starRow = `<span class="emp-stars" aria-label="${stars} stelle">${'★'.repeat(stars)}<i>${'★'.repeat(MAX_STARS - stars)}</i></span>`;
+    const complete = stars >= MAX_STARS && e.level >= MAX_LEVEL;
+    const xpBar = complete || e.level >= MAX_LEVEL ? '' : `<div class="emp-xp small muted">Esperienza per il livello ${e.level + 1}<div class="bar green"><i style="width:${Math.min(100, (e.xp / xpForEmpLevel(e)) * 100)}%"></i></div></div>`;
+    let train = '';
+    if (bizId && e.trainingEnd) {
+      const left = Math.max(0, e.trainingEnd - this.s.minutes);
+      train = `<div class="emp-train on">🎓 Al corso di formazione: torna tra ${Math.ceil(left / 1440)} ${Math.ceil(left / 1440) === 1 ? 'giorno' : 'giorni'} con ${'★'.repeat(stars + 1)} (intanto non lavora)</div>`;
+    } else if (bizId && canTrain(e)) {
+      train = `<div class="emp-train">🎓 Livello 10: pronto per la ${stars + 1}ª stella. Torna a livello 0 ma lavora meglio e più in fretta
+        <button class="btn sm purple full" data-a="train:${e.id}" ${this.s.money < trainingCost(e) ? 'disabled' : ''}>Corso di formazione · ${euro(trainingCost(e))} · ${trainingDays(e)} giorni</button></div>`;
+    } else if (complete) {
+      train = '<div class="emp-train done">🏆 Dipendente completo: 5 stelle e livello 10, tutto al massimo</div>';
+    }
+    return `<div class="card ${e.trainingEnd ? 'emp-away' : ''}"><div class="row between"><div><b>${r.icon} ${esc(e.name)}</b> ${starRow} <span class="tag">Liv. ${e.level}</span><div class="muted small">${roleName(type, e.role)} · ${euro(e.salary)}/mese${extra}</div></div>${btn}</div>
+      <div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">${st('Velocità', 'speed')}${st('Abilità', 'skill')}${st('Cortesia', 'kindness')}</div>${xpBar}${train}</div>`;
   }
 
   openOrderResult(biz: Business, order: ServiceOrder, stars: number, earned: number, xp: number) {
@@ -2755,7 +2781,7 @@ export class UI {
           <div class="stat ${r.net >= 0 ? 's-green' : 's-red'}"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>🧾 saldo dopo i costi</span></div>
         </div>
         ${r.rent ? `<div class="stat s-yellow" style="margin-top:8px"><b class="money-t">+${euro(r.rent)}</b><span>🔑 affitti delle tue case</span></div>` : ''}
-        ${r.revenue === 0 ? '<p class="muted small">Solo le attività con un dipendente per reparto e un manager lavorano mentre sei via.</p>' : ''}
+        ${r.revenue === 0 ? '<p class="muted small">Solo le attività con almeno un dipendente per reparto e un manager lavorano mentre sei via (con una persona per reparto, solo per un turno di 8 ore).</p>' : ''}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
     });

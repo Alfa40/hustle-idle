@@ -120,26 +120,95 @@ export function isOpenHour(s: GameState) {
 
 // ---------------- personale ----------------
 
-export const hasManager = (b: Business) => b.staff.some((e) => e.role === 'manager');
+// ---------------- dipendenti: livello, stelle, formazione ----------------
+
+export const MAX_STARS = 5;
+export const MAX_LEVEL = 10;
+/** una stella vale un po' più di 10 livelli: la formazione dà un piccolo balzo */
+const STAR_UNITS = 11;
+const MAX_UNITS = MAX_STARS * STAR_UNITS + MAX_LEVEL;
+
+/**
+ * Quanto rende la strada fatta: fino al livello 10 della prima stella come sempre (+10% a livello),
+ * poi ogni livello e ogni stella un po' meno (+4%): a 5 stelle e livello 10 circa 4 volte.
+ */
+export function empMult(e: Employee) {
+  const u = (e.stars ?? 0) * STAR_UNITS + e.level;
+  return 1 + 0.1 * Math.min(u - 1, 9) + 0.04 * Math.max(0, u - 10);
+}
+
+/** Quanta strada ha fatto il dipendente (0 nuovo … 1 a 5 stelle e livello 10). */
+export const empProgress = (e: Employee) => Math.min(1, ((e.stars ?? 0) * STAR_UNITS + e.level) / MAX_UNITS);
+
+/**
+ * Valore vero di velocità, abilità o cortesia (1–10): parte dal talento e cresce piano con livello e
+ * stelle; arriva a 10 solo a 5 stelle e livello 10.
+ */
+export function empStat(e: Employee, k: 'speed' | 'skill' | 'kindness') {
+  const base = Math.min(7, e[k]);
+  return base + (10 - base) * empProgress(e);
+}
+
+/** chi è in formazione non lavora (né turni né locale) */
+export const working = (b: Business) => b.staff.filter((e) => !e.trainingEnd);
+
+/** Durata (giorni) e costo del corso per guadagnare la prossima stella. */
+export const trainingDays = (e: Employee) => 2 + (e.stars ?? 0);
+export const trainingCost = (e: Employee) => Math.round((ROLES[e.role].baseSalary * (1 + (e.stars ?? 0) * 0.8)) / 10) * 10;
+export const canTrain = (e: Employee) => e.level >= MAX_LEVEL && (e.stars ?? 0) < MAX_STARS && !e.trainingEnd;
+
+/** Manda il dipendente al corso di formazione (a livello 10): torna con una stella in più e livello 0. */
+export function startTraining(s: GameState, b: Business, e: Employee) {
+  if (!canTrain(e)) return false;
+  const cost = trainingCost(e);
+  if (s.money < cost) {
+    toast('Non hai abbastanza soldi per il corso', 'bad');
+    return false;
+  }
+  addMoney(s, -cost, `corso di formazione di ${e.name}`);
+  e.trainingEnd = s.minutes + trainingDays(e) * 1440;
+  toast(`🎓 ${e.name} è al corso di formazione per ${trainingDays(e)} giorni`, 'info');
+  resetBizStats(s, b, `${e.name} in formazione`);
+  return true;
+}
+
+/** Chi ha finito il corso torna con una stella in più, livello 0 e valori un po' più alti. */
+export function finishTrainings(s: GameState) {
+  for (const b of s.businesses) {
+    for (const e of b.staff) {
+      if (!e.trainingEnd || s.minutes < e.trainingEnd) continue;
+      e.trainingEnd = undefined;
+      e.stars = Math.min(MAX_STARS, (e.stars ?? 0) + 1);
+      e.level = 0;
+      e.xp = 0;
+      e.salary = salaryFor(e);
+      toast(`⭐ ${e.name} è tornato dalla formazione: ${'★'.repeat(e.stars)} (livello 0)`, 'good');
+      resetBizStats(s, b, `${e.name} tornato dalla formazione`);
+    }
+  }
+}
+
+export const hasManager = (b: Business) => working(b).some((e) => e.role === 'manager');
 
 /** Laboratorio dell'artigiano: lavori su richiesta fatti solo dal giocatore (niente clienti né staff). */
 export const isCraft = (b: Business | BusinessType) => bizType(typeof b === 'string' ? b : b.type).kind === 'craft';
 
 export function isAutonomous(b: Business) {
   if (isCraft(b)) return false;
-  return hasManager(b) && bizType(b.type).roles.every((r) => b.staff.some((e) => e.role === r));
+  return hasManager(b) && bizType(b.type).roles.every((r) => working(b).some((e) => e.role === r));
 }
 
 /** Clienti/ora che un dipendente riesce a gestire. */
 export function employeeRate(e: Employee, b: Business) {
-  let r = (2 + e.speed * 0.6) * (1 + 0.1 * (e.level - 1));
+  // velocità vera e strada fatta (livello e stelle): un dipendente a 5 stelle lavora molto più in fretta
+  let r = (2 + empStat(e, 'speed') * 0.6) * empMult(e);
   if (e.role === 'cucina') r *= 1 + 0.15 * upg(b, 'attrezzatura');
   if (hasManager(b)) r *= 1.1;
   return r * bizType(b.type).rateMul;
 }
 
 export function roleCapacity(b: Business, role: Role) {
-  return b.staff.filter((e) => e.role === role).reduce((a, e) => a + employeeRate(e, b), 0);
+  return working(b).filter((e) => e.role === role).reduce((a, e) => a + employeeRate(e, b), 0);
 }
 
 // ---------------- turni ----------------
@@ -152,7 +221,7 @@ const shiftCache = new WeakMap<Business, { key: string; plan: ReturnType<typeof 
  */
 export function shiftsFor(s: GameState, b: Business) {
   const curve = demandCurve(b.type, totalDemand(s, b));
-  const key = `${day(s)}|${b.staff.map((e) => `${e.id}:${e.level}:${e.speed}`).join(',')}|${upg(b, 'attrezzatura')}|${curve.map((x) => x.toFixed(1)).join(',')}`;
+  const key = `${day(s)}|${working(b).map((e) => `${e.id}:${e.level}:${e.stars ?? 0}:${e.speed}`).join(',')}|${upg(b, 'attrezzatura')}|${curve.map((x) => x.toFixed(1)).join(',')}`;
   const c = shiftCache.get(b);
   if (c && c.key === key) return c;
   const v = { key, plan: planShifts(b, (e) => employeeRate(e, b), curve), curve };
@@ -178,11 +247,11 @@ export function autoCapacity(b: Business) {
 
 export function makeCandidate(s: GameState, role: Role): Employee {
   const level = Math.random() < 0.15 ? 2 : 1;
-  const stat = () => Math.min(10, randInt(2, 6) + (level - 1) * 2);
+  const stat = () => Math.min(7, randInt(2, 6) + (level - 1));
   const e: Employee = {
     id: s.empSeq++,
     name: `${pick(FIRST_NAMES)} ${pick(LAST_NAMES)}`,
-    role, level, xp: 0,
+    role, level, xp: 0, stars: 0,
     speed: stat(), skill: stat(), kindness: stat(),
     salary: 0,
     model: pick(CHAR_MODELS),
@@ -194,7 +263,8 @@ export function makeCandidate(s: GameState, role: Role): Employee {
 
 export function salaryFor(e: Employee) {
   const base = ROLES[e.role].baseSalary;
-  return Math.round((base * (1 + (e.speed + e.skill + e.kindness - 12) * 0.04) * (1 + 0.15 * (e.level - 1))) / 10) * 10;
+  // lo stipendio sale come il lavoro che fa: un dipendente a stelle costa di più ma ne vale tanti
+  return Math.round((base * (1 + (empStat(e, 'speed') + empStat(e, 'skill') + empStat(e, 'kindness') - 12) * 0.04) * empMult(e)) / 10) * 10;
 }
 
 export function refreshCandidates(s: GameState) {
@@ -234,17 +304,18 @@ function proratedSalary(s: GameState, e: Employee) {
   return Math.round((e.salary * worked) / 30);
 }
 
+/** Esperienza per il prossimo livello (cresce col livello e con le stelle). */
+export const xpForEmpLevel = (e: Employee) => Math.round(15 * Math.max(1, e.level) ** 1.5 * (1 + 0.3 * (e.stars ?? 0)));
+
 export function employeeGainXp(e: Employee, amount: number) {
+  if (e.trainingEnd || e.level >= MAX_LEVEL) return;
   e.xp += amount;
-  const need = 40 * e.level * e.level;
-  if (e.xp >= need && e.level < 10) {
+  const need = xpForEmpLevel(e);
+  if (e.xp >= need) {
     e.xp -= need;
     e.level++;
-    const stats = ['speed', 'skill', 'kindness'] as const;
-    const st = pick(stats);
-    e[st] = Math.min(10, e[st] + 1);
     e.salary = salaryFor(e);
-    toast(`${e.name} è salito al livello ${e.level}`, 'good');
+    toast(e.level >= MAX_LEVEL && (e.stars ?? 0) < MAX_STARS ? `${e.name} è al livello 10: mandalo al corso di formazione per la prossima stella` : `${e.name} è salito al livello ${e.level}`, 'good');
   }
 }
 
@@ -462,8 +533,8 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
   const lostRate = Math.max(0, now - rate);
   let a = (acc.get(b.id) ?? 0) + (rate * minutes) / 60;
   let lostAcc = (acc.get(b.id + 'l') ?? 0) + (lostRate * minutes) / 60;
-  const kindness = b.staff.filter((e) => e.role === 'cassa').reduce((x, e) => x + e.kindness, 0) /
-    Math.max(1, b.staff.filter((e) => e.role === 'cassa').length);
+  const kindness = working(b).filter((e) => e.role === 'cassa').reduce((x, e) => x + empStat(e, 'kindness'), 0) /
+    Math.max(1, working(b).filter((e) => e.role === 'cassa').length);
   while (a >= 1) {
     a -= 1;
     const pid = pickProduct(s, b);
@@ -475,7 +546,8 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
       }
     }
     recordSale(s, b, pid, false, 1 + kindness * 0.01, efficiency);
-    for (const e of b.staff) employeeGainXp(e, 1);
+    // esperienza a chi è di turno (chi lavora quell'ora)
+    for (const e of working(b)) if (e.role === 'manager' || onShift(s, b, e)) employeeGainXp(e, 1);
   }
   while (lostAcc >= 1) {
     lostAcc -= 1;
@@ -582,10 +654,17 @@ export function estimateLot(s: GameState, lotId: string, type: BusinessType) {
     .sort((a, b) => b.d * (PRODUCTS[b.p].price - PRODUCTS[b.p].cost) - a.d * (PRODUCTS[a.p].price - PRODUCTS[a.p].cost))[0];
   const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;
   const margin = PRODUCTS[best.p].price - PRODUCTS[best.p].cost;
-  // staff base: un dipendente per reparto a velocità media
+  // staff base: due dipendenti per reparto a velocità media (con i turni da 8 ore coprono tutta la
+  // giornata: 8–16 e 14–22), più un manager; clienti serviti ora per ora secondo l'andamento del giorno
   const cap = (2 + 4 * 0.6) * 1.1 * def.rateMul;
-  const perHour = Math.min(best.d, cap);
-  const staff = def.roles.reduce((a, r) => a + ROLES[r].baseSalary, 0) + ROLES.manager.baseSalary;
+  const curve = demandCurve(type, best.d);
+  let perDay = 0;
+  for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) {
+    const on = (h < BUSINESS.OPEN_HOUR + SHIFT_HOURS ? 1 : 0) + (h >= BUSINESS.CLOSE_HOUR - SHIFT_HOURS ? 1 : 0);
+    perDay += Math.min(curve[h], cap * on);
+  }
+  const perHour = perDay / (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR);
+  const staff = def.roles.reduce((a, r) => a + 2 * ROLES[r].baseSalary, 0) + ROLES.manager.baseSalary;
   return {
     best: best.p,
     demand: best.d,
@@ -615,14 +694,15 @@ export const fmtRate = (x: number) => (x >= 10 ? String(Math.round(x)) : x.toFix
  * Copertura di ogni reparto con i turni: ore scoperte (dove chi è di turno non regge i clienti),
  * quanti dipendenti in più servirebbero per coprirle e quanti si potrebbero togliere senza scoprirne.
  */
-export function covers(b: Business, dem: number[], rate: (e: Employee) => number) {
+export function covers(b: Business, dem: number[], rate: (e: Employee) => number, actual?: Map<string, { cap: number[] }>) {
   return bizType(b.type).roles.map((r) => {
-    const emps = b.staff.filter((e) => e.role === r);
+    const emps = working(b).filter((e) => e.role === r);
     const avg = emps.length ? emps.reduce((a, e) => a + rate(e), 0) / emps.length : 3;
     const fake = (k: number) => Array.from({ length: k }, (_, i) => ({ ...(emps[0] ?? b.staff[0]), id: -1 - i, role: r }) as Employee);
     const rateOr = (e: Employee) => (e.id < 0 ? avg : rate(e));
     const plan = planRole(emps, rate, dem);
-    const short = shortRanges(plan.cap, dem);
+    // ore scoperte con i turni veri di oggi (gli stessi mostrati nel resoconto e nel personale)
+    const short = shortRanges(actual?.get(r)?.cap ?? plan.cap, dem);
     let hire = 0;
     if (short.hours.length) {
       for (hire = 1; hire < 10; hire++) if (!shortRanges(planRole([...emps, ...fake(hire)], rateOr, dem).cap, dem).hours.length) break;
@@ -659,7 +739,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const pct = `${Math.round(share * 100)}%`;
   // ore di punta: lo stesso numero del resoconto (peakRate)
   const peak = peakRate(s, b);
-  const missing = def.roles.filter((r) => !b.staff.some((e) => e.role === r));
+  const missing = def.roles.filter((r) => !working(b).some((e) => e.role === r));
   const known = (m.lostStaff ?? 0) + (m.lostStock ?? 0) + (m.lostQueue ?? 0);
   // clienti persi prima che il gioco registrasse il motivo (partite di prima dell'aggiornamento)
   const unknown = Math.max(0, lost - known);
@@ -669,7 +749,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) maxF = Math.max(maxF, hourFactor(b.type, h));
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) dem[h] = maxF ? (peak * hourFactor(b.type, h)) / maxF : peak;
   const rate = (e: Employee) => employeeRate(e, b);
-  const cover = covers(b, dem, rate);
+  const cover = covers(b, dem, rate, shiftsFor(s, b).plan.byRole);
   const staffLost = m.lostStaff ?? 0;
   const shortRoles = cover.filter((x) => x.n > 0 && x.short.hours.length);
   if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {

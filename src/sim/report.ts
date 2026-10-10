@@ -68,7 +68,7 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
   // personale reparto per reparto con i turni da 8 ore organizzati dal manager
   const dem = Array(24).fill(0);
   for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) dem[h] = maxF ? (peakRate * hourFactor(b.type, h)) / maxF : peakRate;
-  const staff = covers(b, dem, (e) => employeeRate(e, b)).map((x) => ({
+  const staff = covers(b, dem, (e) => employeeRate(e, b), shiftsFor(s, b).plan.byRole).map((x) => ({
     role: x.r as Role,
     name: def.roleNames[x.r] ?? ROLES[x.r].name,
     n: x.n,

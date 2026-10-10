@@ -69,9 +69,11 @@ export function planRole(emps: Employee[], rate: (e: Employee) => number, demand
 
 /** Turni di tutta l'attività (tutti i reparti, compresi manager e ruoli extra) e capacità ora per ora. */
 export function planShifts(b: Business, rate: (e: Employee) => number, demand: number[]) {
-  const roles = [...new Set(b.staff.map((e) => e.role))] as Role[];
+  // chi è al corso di formazione non è nei turni
+  const staff = b.staff.filter((e) => !e.trainingEnd);
+  const roles = [...new Set(staff.map((e) => e.role))] as Role[];
   const byRole = new Map<Role, { shifts: Shift[]; cap: number[] }>();
-  for (const r of roles) byRole.set(r, planRole(b.staff.filter((e) => e.role === r), rate, demand));
+  for (const r of roles) byRole.set(r, planRole(staff.filter((e) => e.role === r), rate, demand));
   // capacità dell'attività in un'ora: il reparto più lento tra quelli che servono
   const need = bizType(b.type).roles;
   const capAt = (h: number) => (need.length ? Math.min(...need.map((r) => byRole.get(r)?.cap[h] ?? 0)) : 0);

@@ -1033,3 +1033,12 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .prod-row .pr-name { flex: 1; min-width: 0; width: auto !important; }
 .prod-row .pr-val { margin-left: auto; }
 .prod-row .bar { width: 100%; flex: none !important; }
+
+/* dipendenti: stelle, esperienza e formazione */
+.emp-stars { color: #f0a500; font-size: 14px; letter-spacing: 1px; white-space: nowrap; }
+.emp-stars i { font-style: normal; color: #e6dccb; }
+.emp-xp { margin-top: 6px; }
+.emp-train { margin-top: 8px; padding: 8px 10px; border-radius: 12px; background: #f1ecfb; color: #4b3a7a; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; }
+.emp-train.on { background: #fff4d6; color: #7a5300; }
+.emp-train.done { background: #e7f7ec; color: #1f6b3a; }
+.card.emp-away { opacity: .8; }

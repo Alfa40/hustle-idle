@@ -8,7 +8,7 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { missionProgress } from '../sim/calendar';
 import {
-  CHAR_MODELS, employeeGainXp, employeeRate, demandNow, isOpenHour, lostCustomer, notePeak, onShift, pickProduct, recordSale, restock, totalDemand, upg,
+  CHAR_MODELS, employeeGainXp, employeeRate, demandNow, empStat, isOpenHour, lostCustomer, notePeak, onShift, pickProduct, recordSale, restock, totalDemand, upg,
 } from '../sim/economy';
 import { addFame, addXp, skillLevel } from '../sim/progress';
 import { hourOf, playStats, type Business, type Employee } from '../sim/state';
@@ -458,7 +458,8 @@ export class TruckInterior {
     // dipendenti: i cuochi alle postazioni, i cassieri al bancone
     let wi = 0;
     let ci = 0;
-    for (const e of this.biz.staff) {
+    // chi è al corso di formazione non c'è
+    for (const e of this.biz.staff.filter((x) => !x.trainingEnd)) {
       const char = new Character(e.model || CHAR_MODELS[e.id % CHAR_MODELS.length]);
       const tag = label(e.name.split(' ')[0], { scale: 0.2 });
       tag.position.y = 1.75;
@@ -987,9 +988,9 @@ export class TruckInterior {
       const frac = Math.max(0, c.patience / c.maxPatience);
       // con un cassiere al bancone i clienti sono serviti meglio: mance più alte;
       // in sala il cameriere porta il cibo al tavolo: mancia ancora più alta
-      const cashierBonus = this.workers.filter((w) => w.emp.role === 'cassa').reduce((a, w) => a + w.emp.kindness * 0.015, 0) +
-        (c.table && emp?.role === 'sala' ? 0.2 + emp.kindness * 0.02 : 0);
-      const tip = (manual ? 1 + 0.3 * frac : 1 + (emp ? emp.kindness * 0.01 : 0)) + cashierBonus;
+      const cashierBonus = this.workers.filter((w) => w.emp.role === 'cassa').reduce((a, w) => a + empStat(w.emp, 'kindness') * 0.015, 0) +
+        (c.table && emp?.role === 'sala' ? 0.2 + empStat(emp, 'kindness') * 0.02 : 0);
+      const tip = (manual ? 1 + 0.3 * frac : 1 + (emp ? empStat(emp, 'kindness') * 0.01 : 0)) + cashierBonus;
       // anteprima e tutorial: è solo una prova, niente soldi, scorte, esperienza o fama
       const amount = this.sandbox
         ? PRODUCTS[it.pid].price * tip * (it.takeaway ? 1.1 : 1)
@@ -1239,6 +1240,13 @@ export class TruckInterior {
       // turni: chi non è di turno non c'è (finisce prima quello che ha in mano); nelle anteprime ci sono tutti
       const on = !!this.opts.preview || w.emp.role === 'manager' || onShift(this.game.state, this.biz, w.emp, h);
       if (!on && !w.item && !w.job) {
+        // finisce il turno: i prodotti che aveva sul fuoco li prendono gli altri (non restano "suoi" a bruciare)
+        if (w.char.root.visible) {
+          for (const st of this.stations) for (const sl of st.slots) {
+            if (sl.owner === w) sl.owner = undefined;
+            if (sl.claim === w) sl.claim = undefined;
+          }
+        }
         w.char.root.visible = false;
         continue;
       }
