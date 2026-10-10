@@ -10,7 +10,7 @@ import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
-import { demandCurve, planRole, planShifts, shortRanges, SHIFT_HOURS } from './shifts';
+import { demandCurve, inShift, planRole, planShifts, shortRanges, SHIFT_HOURS } from './shifts';
 import { activeToday, effectMultiplier } from './effects';
 import { addFame, addMoney } from './progress';
 import {
@@ -199,10 +199,17 @@ export function isAutonomous(b: Business) {
 }
 
 /** Clienti/ora che un dipendente riesce a gestire. */
+/**
+ * Quanto è veloce un reparto rispetto a chi prepara: incassare e servire è più rapido che cucinare (o
+ * pulire, portare mobili), quindi un cassiere/commesso/autista regge circa 1,5 volte i clienti di un cuoco.
+ */
+const ROLE_SPEED: Partial<Record<Role, number>> = { cassa: 1.5 };
+
 export function employeeRate(e: Employee, b: Business) {
   // velocità vera e strada fatta (livello e stelle): un dipendente a 5 stelle lavora molto più in fretta
-  let r = (2 + empStat(e, 'speed') * 0.6) * empMult(e);
-  if (e.role === 'cucina') r *= 1 + 0.15 * upg(b, 'attrezzatura');
+  let r = (2 + empStat(e, 'speed') * 0.6) * empMult(e) * (ROLE_SPEED[e.role] ?? 1);
+  // l'attrezzatura professionale velocizza tutte le postazioni (cucina e cassa), non solo i cuochi
+  if (e.role !== 'manager') r *= 1 + 0.15 * upg(b, 'attrezzatura');
   if (hasManager(b)) r *= 1.1;
   return r * bizType(b.type).rateMul;
 }
@@ -235,10 +242,10 @@ export const capacityAt = (s: GameState, b: Business, h: number) => shiftsFor(s,
 /** Il dipendente è di turno a quest'ora? */
 export function onShift(s: GameState, b: Business, e: Employee, h = hourOf(s)) {
   const sh = shiftsFor(s, b).plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
-  return !!sh && h >= sh.start && h < sh.end;
+  return !!sh && inShift(sh, Math.floor(h));
 }
 
-/** Turno di un dipendente (es. { start: 11, end: 19 }). */
+/** Turno di un dipendente (uno o due pezzi, es. 11–15 + 18–22). */
 export const shiftOf = (s: GameState, b: Business, e: Employee) => shiftsFor(s, b).plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
 
 export function autoCapacity(b: Business) {
@@ -826,7 +833,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   } else if (b.staff.length && shortRoles.length) {
     const list = shortRoles.map((x) => `${x.hire} ${x.hire === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
     const where = shortRoles.map((x) => `i ${plural(x.r)} non bastano ${x.short.ranges.length > 1 ? 'nelle ore' : 'nell\'ora'} ${x.short.ranges.join(', ')}`).join('; ');
-    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Con i turni da ${SHIFT_HOURS} ore ${where} (nell'ora di punta arrivano circa ${fmtRate(peak)} clienti). Assumi circa ${list} in più: il manager li mette nei turni dove servono`, tab: 'personale' });
+    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Con i turni (massimo ${SHIFT_HOURS} ore a testa, anche divise in due) ${where} (nell'ora di punta arrivano circa ${fmtRate(peak)} clienti). Assumi circa ${list} in più: il manager li mette nei turni dove servono`, tab: 'personale' });
   } else if (unknown >= 3 && b.staff.length) {
     out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale e i turni di adesso tutta la giornata è coperta: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
   }

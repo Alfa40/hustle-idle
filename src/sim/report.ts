@@ -6,6 +6,7 @@ import {
   estimateMonthlyProfit, eventMultiplier, fmtRate, openDays, weekOf, weeklyClose, partialDue, hasHourly, hourlyDays, lotZone, peakRate as peakRateOf, hasManager, isAutonomous, menuSlots, monthlyCosts, productDemand, covers, employeeRate, shiftsFor, staffWarnings,
   upg,
 } from './economy';
+import { shiftText } from './shifts';
 import type { Business, GameState } from './state';
 
 /**
@@ -73,7 +74,7 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
     name: def.roleNames[x.r] ?? ROLES[x.r].name,
     n: x.n,
     // i turni veri di oggi, organizzati dal manager
-    shifts: (shiftsFor(s, b).plan.byRole.get(x.r)?.shifts ?? []).map((sh) => ({ name: sh.emp.name.split(' ')[0], start: sh.start, end: sh.end })).sort((p, q) => p.start - q.start),
+    shifts: (shiftsFor(s, b).plan.byRole.get(x.r)?.shifts ?? []).map((sh) => ({ name: sh.emp.name.split(' ')[0], start: sh.start, end: sh.end, text: shiftText(sh) })).sort((p, q) => p.start - q.start),
     short: x.short.ranges,
     need: x.short.hours.length ? x.n + x.hire : x.n - x.excess,
     status: (x.n && x.short.hours.length ? 'short' : x.excess ? 'excess' : 'ok') as 'ok' | 'short' | 'excess',

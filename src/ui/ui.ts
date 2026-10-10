@@ -20,6 +20,7 @@ import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../wo
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
 import { bizReport, ensurePartials } from '../sim/report';
+import { shiftText } from '../sim/shifts';
 import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
@@ -112,6 +113,12 @@ export function formatDate(minutes: number) {
   const m = Math.floor(minutes % 60);
   return `${WEEKDAYS[d % 7]} ${dayOfMonth(d)} ${MONTH_NAMES[monthIndex(d)].slice(0, 3)} · ${String(h).padStart(2, '0')}:${String(m - (m % 5)).padStart(2, '0')}`;
 }
+
+/** "azione:argomento" → [azione, argomento]; l'argomento può contenere altri ':' */
+const splitAction = (v: string) => {
+  const i = v.indexOf(':');
+  return i < 0 ? [v, ''] : [v.slice(0, i), v.slice(i + 1)];
+};
 
 export class UI {
   private root = document.getElementById('ui')!;
@@ -210,10 +217,11 @@ export class UI {
 
     const job = document.createElement('div');
     job.className = 'jobbar';
-    job.innerHTML = `<div class="row"><span id="j-title"></span><span id="j-time"></span><button class="quit" id="j-quit">Rinuncia</button></div>
+    job.innerHTML = `<div class="row"><span id="j-title"></span><span id="j-time"></span><button class="quit" id="j-pause">⏸ Pausa</button></div>
       <div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>`;
     this.root.appendChild(job);
-    job.querySelector('#j-quit')!.addEventListener('click', () => this.game.cancelJob());
+    // "Rinuncia" sta nella finestra della pausa (così nella barra resta spazio per il nome del lavoretto)
+    job.querySelector('#j-pause')!.addEventListener('click', () => this.openJobPause());
     this.jobEl = job;
 
     // azione: si tocca l'oggetto (zona invisibile un po' più grande dell'oggetto) oppure il cerchio
@@ -549,6 +557,27 @@ export class UI {
     this.labelEl.style.top = `${Math.round(this.stackBottom + 6)}px`;
   }
 
+  /** Pausa del lavoretto: con la finestra aperta il lavoretto è fermo (tempo, clienti, sporco…). */
+  openJobPause() {
+    const run = this.game.run;
+    if (!run || this.isOpen) return;
+    this.open({
+      title: '⏸️ Pausa',
+      small: true,
+      render: () => `<p class="center"><b>${esc(run.title)}</b></p>
+        <p class="center muted small">Il lavoretto è fermo${run.frozen ? '' : `: restano <b>${Math.ceil(run.timeLeft)} secondi</b>, il timer riparte quando riprendi`}.</p>
+        <button class="btn good full" data-a="resume">▶️ Riprendi</button>
+        <button class="btn sec full" data-a="quit" style="margin-top:8px">Rinuncia al lavoretto</button>`,
+      actions: {
+        resume: () => this.close(),
+        quit: () => {
+          this.close();
+          this.game.cancelJob();
+        },
+      },
+    });
+  }
+
   jobBar(on: boolean) {
     this.jobEl.classList.toggle('on', on);
     document.body.classList.toggle('job-on', on);
@@ -670,7 +699,8 @@ export class UI {
     modal.addEventListener('click', (e) => {
       const el = (e.target as HTMLElement).closest<HTMLElement>('[data-a]');
       if (!el || !this.panel) return;
-      const [name, arg = ''] = el.dataset.a!.split(':');
+      // solo il primo ':' separa l'azione dall'argomento (es. "group:zone:centro", "group:g:abc")
+      const [name, arg = ''] = splitAction(el.dataset.a!);
       this.navFrom = this.panel;
       try {
         this.panel.actions[name]?.(arg);
@@ -686,7 +716,7 @@ export class UI {
     modal.addEventListener('change', (e) => {
       const el = e.target as HTMLInputElement;
       if (!el.dataset.c || !this.panel) return;
-      const [name, arg = ''] = el.dataset.c.split(':');
+      const [name, arg = ''] = splitAction(el.dataset.c);
       this.panel.actions[name]?.(arg);
       this.renderPanel();
     });
@@ -1233,10 +1263,10 @@ export class UI {
           <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
         // personale per reparto
         const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}
-            <div class="shifts">${x.shifts.map((sh) => `<span class="shift">${esc(sh.name)} ${sh.start}–${sh.end}</span>`).join('') || '<span class="muted small">nessuno</span>'}</div>
+            <div class="shifts">${x.shifts.map((sh) => `<span class="shift">${esc(sh.name)} ${sh.text ?? `${sh.start}–${sh.end}`}</span>`).join('') || '<span class="muted small">nessuno</span>'}</div>
             <div class="small muted">${x.status === 'short' ? `scoperto nelle ore ${x.short.join(', ')} · ne servono ~${x.need}` : x.status === 'excess' ? `ne basterebbero ~${x.need}` : 'tutta la giornata coperta'}</div></div>
           <span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅ giusto' : x.status === 'short' ? '⚠️ pochi' : '💸 troppi'}</span></div>`).join('');
-        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale e turni</h3><div class="small muted">Aperti dalle ${BUSINESS.OPEN_HOUR} alle ${BUSINESS.CLOSE_HOUR} (14 ore), turni di massimo 8 ore: il manager mette più persone nelle ore di punta (circa ${n1(r.peakRate)} ${unit} all'ora) e meno nelle ore morte.</div>${staffRows}</div>` : '';
+        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale e turni</h3><div class="small muted">Aperti dalle ${BUSINESS.OPEN_HOUR} alle ${BUSINESS.CLOSE_HOUR} (14 ore), massimo 8 ore a testa, di fila o divise in due (es. 4 + 4, 6 + 2): il manager mette più persone nelle ore di punta (circa ${n1(r.peakRate)} ${unit} all'ora) e meno nelle ore morte.</div>${staffRows}</div>` : '';
         // cosa si vende oggi
         const pmax = Math.max(0.1, ...r.products.map((x) => x.demand));
         const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><div class="pr-top"><span class="pr-name">${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>
@@ -1583,7 +1613,7 @@ export class UI {
           const move = this.moveOpen === e.id ? `<div class="emp-move"><b>↔️ Sposta ${esc(e.name.split(' ')[0])} in:</b>${targets.length
             ? targets.map((t) => `<button class="btn sm full" data-a="moveTo:${e.id}|${t.id}">${bizType(t.type).icon} ${esc(lotDef(t.lotId).name)} <span class="small">· ${roleName(t.type, e.role).toLowerCase()} già lì: ${t.staff.filter((x) => x.role === e.role).length}</span></button>`).join('')
             : `<span class="small">${e.role === 'manager' ? 'Le altre tue attività hanno già un manager.' : `Nessun'altra tua attività dove fa lo stesso lavoro (${roleName(b.type, e.role).toLowerCase()}).`}</span>`}</div>` : '';
-          return this.empCard(e, b.type, btns, (e.trainingEnd ? ' · 🎓 in formazione' : sh ? ` · 🕐 turno ${sh.start}–${sh.end}` : ''), b.id, move);
+          return this.empCard(e, b.type, btns, (e.trainingEnd ? ' · 🎓 in formazione' : sh ? ` · 🕐 turno ${shiftText(sh)}` : ''), b.id, move);
         },
         (r) => (needed.has(r) ? `<p class="muted small role-empty">Nessuno${r === 'manager' ? ': senza manager l\'attività non lavora da sola' : ': serve almeno un dipendente qui'}</p>` : ''),
       );

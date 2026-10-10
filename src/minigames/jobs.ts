@@ -810,6 +810,13 @@ export function paintArenaJob(game: Game, level: number, arena: Arena, title: st
   const toPaint = arena.fence.filter((f) => sides.includes(f.side));
   // il colore resta anche quando l'oggetto smette di pulsare: si colora sempre il materiale originale
   const mats = toPaint.map((f) => f.body.material as THREE.MeshLambertMaterial);
+  // i tratti che non tocca a te dipingere (ai primi livelli) sono già del colore finale: si vede com'è da fare
+  for (const f of arena.fence) {
+    if (sides.includes(f.side)) continue;
+    const m = (f.body.material as THREE.MeshLambertMaterial).clone();
+    m.color.set(col);
+    f.body.material = m;
+  }
   const cans = arena.entry.clone().add(new THREE.Vector3(2.2, 0, -0.6));
   // cose del giardino da coprire: lontane dal muretto (resta un corridoio libero per dipingere)
   const nItems = Math.min(10, 2 + Math.floor(level));
