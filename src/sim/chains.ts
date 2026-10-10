@@ -94,18 +94,27 @@ export function canUpgrade(b: Business, id: UpgradeId) {
   return true;
 }
 
-/** Costo per migliorare di un livello tutti i negozi del gruppo che possono. */
-export const groupUpgradeCost = (bizs: Business[], id: UpgradeId) =>
-  bizs.filter((b) => canUpgrade(b, id)).reduce((a, b) => a + UPGRADES[id].cost(upg(b, id)), 0);
+/**
+ * A chi tocca la prossima miglioria del gruppo: prima si pareggia (solo i negozi più indietro, al livello più
+ * basso tra quelli che possono ancora migliorare), poi, quando sono tutti uguali, tutti insieme.
+ * Es. ampliamento: 2 negozi al Liv. 1 e 5 al Liv. 0 → si migliorano i 5; poi tutti e 7 insieme.
+ */
+export function groupUpgradeTargets(bizs: Business[], id: UpgradeId) {
+  const can = bizs.filter((b) => canUpgrade(b, id));
+  if (!can.length) return [];
+  const lo = Math.min(...can.map((b) => upg(b, id)));
+  return can.filter((b) => upg(b, id) === lo);
+}
 
-/** Migliora di un livello ogni negozio del gruppo (finché bastano i soldi). */
+/** Costo della prossima miglioria del gruppo (solo i negozi a cui tocca). */
+export const groupUpgradeCost = (bizs: Business[], id: UpgradeId) =>
+  groupUpgradeTargets(bizs, id).reduce((a, b) => a + UPGRADES[id].cost(upg(b, id)), 0);
+
+/** Migliora di un livello i negozi a cui tocca (prima i più indietro), finché bastano i soldi. */
 export function groupUpgrade(s: GameState, bizs: Business[], id: UpgradeId) {
   const r = { done: 0, skipped: 0, spent: 0 };
-  for (const b of bizs) {
-    if (!canUpgrade(b, id)) {
-      r.skipped++;
-      continue;
-    }
+  const targets = groupUpgradeTargets(bizs, id);
+  for (const b of targets) {
     const cost = UPGRADES[id].cost(upg(b, id));
     if (s.money < cost) {
       r.skipped++;

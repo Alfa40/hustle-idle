@@ -21,7 +21,7 @@ import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
 import { bizReport, ensurePartials } from '../sim/report';
 import { shiftText } from '../sim/shifts';
-import { canUpgrade, chainGroups, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
+import { chainGroups, groupUpgradeTargets, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
@@ -1461,10 +1461,15 @@ export class UI {
               const lv = g.bizs.map((b) => upg(b, id));
               const lo = Math.min(...lv);
               const hi = Math.max(...lv);
-              const can = g.bizs.filter((b) => canUpgrade(b, id)).length;
+              // prima si pareggiano i negozi più indietro, poi si migliorano tutti insieme
+              const targets = groupUpgradeTargets(g.bizs, id);
+              const can = targets.length;
               const cost = groupUpgradeCost(g.bizs, id);
-              return `<div class="card"><div class="row between"><div><b>${u.icon} ${u.name}</b><div class="muted small">Liv. ${lo === hi ? lo : `${lo}–${hi}`} / ${u.max}</div></div></div>
-                <button class="btn sm full ${can ? 'blue' : 'sec'}" style="margin-top:6px" data-a="upg:${id}" ${!can || s.money < cost ? 'disabled' : ''}>${can ? `Migliora ${can} ${can === 1 ? 'negozio' : 'negozi'} · ${euro(cost)}` : 'Tutti al massimo'}</button></div>`;
+              const to = can ? upg(targets[0], id) + 1 : 0;
+              const even = can === g.bizs.length;
+              const label = !can ? 'Tutti al massimo' : even ? `Migliora tutti (${can}) al Liv. ${to} · ${euro(cost)}` : `Porta ${can} ${can === 1 ? 'negozio' : 'negozi'} al Liv. ${to} · ${euro(cost)}`;
+              return `<div class="card"><div class="row between"><div><b>${u.icon} ${u.name}</b><div class="muted small">Liv. ${lo === hi ? lo : `${lo}–${hi}`} / ${u.max}${can && !even ? ` · prima si pareggiano i negozi più indietro` : ''}</div></div></div>
+                <button class="btn sm full ${can ? 'blue' : 'sec'}" style="margin-top:6px" data-a="upg:${id}" ${!can || s.money < cost ? 'disabled' : ''}>${label}</button></div>`;
             }).join('');
         } else if (tab === 'magazzino') {
           const allAuto = g.bizs.every((b) => b.autoRestock);
@@ -1507,7 +1512,7 @@ export class UI {
         upg: (id) => {
           const r = groupUpgrade(s, sel().bizs, id as UpgradeId);
           for (const b of sel().bizs) this.game.setupLot(b.lotId);
-          report(`${UPGRADES[id as UpgradeId].icon} Migliorati ${r.done} negozi · ${euro(r.spent)}${r.skipped ? ` (${r.skipped} saltati)` : ''}`, r.done > 0);
+          report(`${UPGRADES[id as UpgradeId].icon} ${r.done === 1 ? 'Migliorato 1 negozio' : `Migliorati ${r.done} negozi`} · ${euro(r.spent)}${r.skipped ? ` (${r.skipped} senza soldi abbastanza)` : ''}`, r.done > 0);
         },
         fill: () => {
           const r = groupFill(s, sel().bizs);
