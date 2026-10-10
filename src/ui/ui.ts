@@ -1334,11 +1334,90 @@ export class UI {
    * Catena: le attività dello stesso tipo (2 o più). Si sceglie a chi applicare le modifiche (tutta la
    * catena, una zona o un gruppo tuo) e si cambiano insieme prodotti, migliorie e magazzino.
    */
+  /**
+   * Resoconto della catena (o del gruppo): somma dei resoconti dei negozi (completi o provvisori), orario di
+   * punta di tutta la catena, cosa sistemare negozio per negozio e un riepilogo per negozio con il suo resoconto.
+   */
+  private chainReport(bizs: Business[]) {
+    const s = this.s;
+    ensurePartials(s);
+    const reps = bizs.map((b) => ({ b, snap: b.report ?? b.partial, full: !!b.report }));
+    const got = reps.filter((r) => r.snap);
+    const nFull = reps.filter((r) => r.full).length;
+    const nPart = got.length - nFull;
+    const nWait = reps.length - got.length;
+    const name = (b: Business) => esc(lotDef(b.lotId).name);
+    const status = `<div class="report-date">📅 ${nFull} ${nFull === 1 ? 'resoconto completo' : 'resoconti completi'}${nPart ? ` · ${nPart} ${nPart === 1 ? 'provvisorio' : 'provvisori'}` : ''}${nWait ? ` · ${nWait} ${nWait === 1 ? 'negozio' : 'negozi'} ancora senza dati` : ''}<br><span class="small">Somma dei resoconti dei negozi (quelli provvisori hanno ancora pochi giorni di dati).</span></div>`;
+    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div>`;
+    const sum = (f: (r: (typeof got)[number]) => number) => got.reduce((a, r) => a + f(r), 0);
+    const arrived = sum((r) => r.snap!.data.avg.arrived);
+    const served = sum((r) => r.snap!.data.avg.served);
+    const lost = sum((r) => r.snap!.data.avg.lost);
+    const revenue = sum((r) => r.snap!.data.avg.revenue);
+    const lostPct = arrived ? Math.round((lost / arrived) * 100) : 0;
+    const costs = bizs.reduce((a, b) => {
+      const c = monthlyCosts(s, b);
+      return a + c.rent + c.utilities + b.staff.reduce((x, e) => x + e.salary, 0);
+    }, 0);
+    // utile al mese con la media della settimana (incassi meno costo dei prodotti venduti, meno i costi fissi)
+    // dei negozi con un resoconto: si confronta con gli stessi numeri della giornata media
+    const auto = bizs.filter((b) => isAutonomous(b));
+    const profit = got.reduce((a, r) => {
+      const b = r.b;
+      const d = r.snap!.data.avg;
+      const avgCost = b.products.length ? b.products.reduce((x, p) => x + PRODUCTS[p].cost, 0) / b.products.length : 0;
+      const c = monthlyCosts(s, b);
+      return a + (d.revenue - d.served * avgCost) * TIME.DAYS_PER_MONTH - c.rent - c.utilities - b.staff.reduce((x, e) => x + e.salary, 0);
+    }, 0);
+    const n1 = fmtRate;
+    const day = `<div class="card"><h3>📅 Una giornata media della catena</h3>
+      <div class="grid2"><div class="stat s-blue"><b>${n1(arrived)}</b><span>clienti arrivati al giorno</span></div>
+      <div class="stat s-green"><b>${n1(served)}</b><span>serviti al giorno</span></div>
+      <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
+      <div class="stat s-yellow"><b class="money-t">${euro(revenue)}</b><span>incasso al giorno</span></div>
+      <div class="stat s-purple"><b>${euro(costs)}</b><span>costi fissi al mese</span></div>
+      <div class="stat"><b class="${profit >= 0 ? 'good' : 'bad'}">${euro(profit)}</b><span>utile al mese con questa media${auto.length < bizs.length ? ` (${auto.length} autonome su ${bizs.length})` : ''}</span></div></div></div>`;
+    // orario di punta di tutta la catena: i clienti di ogni ora sommati
+    const hours = got[0].snap!.data.hours.map((x) => {
+      const arr = sum((r) => r.snap!.data.hours.find((y) => y.h === x.h)?.arrived ?? 0);
+      const ls = sum((r) => r.snap!.data.hours.find((y) => y.h === x.h)?.lost ?? 0);
+      return { h: x.h, arrived: arr, lost: ls };
+    });
+    const peak = hours.reduce((a, x) => (x.arrived > a.arrived ? x : a), hours[0]);
+    const max = Math.max(0.1, ...hours.map((x) => x.arrived));
+    const bars = hours.map((x) => {
+      const hh = (x.arrived / max) * 100;
+      const lh = x.arrived ? (x.lost / x.arrived) * hh : 0;
+      return `<div class="hb ${x.h === peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
+    }).join('');
+    const peakCard = `<div class="card"><h3>⏰ Orario di punta della catena: ${peak.h}–${peak.h + 1}</h3><div class="small">In quell'ora arrivano circa <b>${n1(peak.arrived)} clienti</b> in tutti i negozi insieme.</div>
+      <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
+    // cosa sistemare, negozio per negozio (nei provvisori niente "di troppo": troppo presto per dirlo)
+    const fix = got.flatMap((r) => r.snap!.data.advice.filter((a) => (a.kind === 'short' || a.kind === 'stock' || (a.kind === 'excess' && r.full))).map((a) => ({ r, a })));
+    const growShops = got.filter((r) => r.snap!.data.advice.some((a) => a.kind === 'grow' && a.icon === '📣'));
+    const adv = [
+      ...fix.map(({ r, a }) => `<div class="report-alert ${a.kind}"><span>${a.icon} <b>${name(r.b)}</b>: ${a.text}</span><div class="emp-btns row"><button class="btn sm sec" data-a="rep:${r.b.id}">📊</button>${a.tab ? `<button class="btn sm" data-a="bizTab:${r.b.id}|${a.tab}">${a.label}</button>` : ''}</div></div>`),
+      ...(growShops.length ? [`<div class="report-alert grow"><span>📣 In ${growShops.length === 1 ? '1 negozio' : `${growShops.length} negozi`} (${growShops.map((r) => name(r.b)).join(', ')}) il personale regge più clienti di quelli che arrivano: aumenta la clientela con Pubblicità o Look, anche per tutto il gruppo insieme</span><button class="btn sm" data-a="tab:migliorie">⬆️ Migliorie</button></div>`] : []),
+    ];
+    const advice = `<div class="card"><h3>💡 Da sistemare nella catena</h3>${adv.length ? adv.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta e magazzini pieni</span></div>'}</div>`;
+    // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
+    const rows = reps.map(({ b, snap, full }) => {
+      const d = snap?.data;
+      const lp = d && d.avg.arrived ? Math.round((d.avg.lost / d.avg.arrived) * 100) : 0;
+      const staff = d ? d.staff.map((x) => `<span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅' : x.status === 'short' ? '⚠️' : '💸'} ${esc(x.name)}</span>`).join(' ') : '';
+      return `<div class="card report-card" data-a="rep:${b.id}"><div class="row between"><b>${name(b)}</b>${this.autoTag(b)}</div>
+        <div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}${d ? ` · ${full ? 'settimana' : '📋 provvisorio'} · ${n1(d.avg.served)} serviti al giorno · ${n1(d.avg.lost)} persi (${lp}%) · ${euro(d.avg.revenue)} al giorno` : ' · 🧑‍💼 il manager sta raccogliendo i dati'}</div>
+        ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
+        <div class="report-more">Tocca per il resoconto del negozio ›</div></div>`;
+    }).join('');
+    return status + advice + day + peakCard + `<h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows;
+  }
+
   openChain(type: BusinessType, startGroup = 'all') {
     const s = this.s;
     const def = bizType(type);
     let gid = startGroup;
-    let tab = hasMenu(type) ? 'prodotti' : 'migliorie';
+    let tab = 'resoconto';
     const report = (msg: string, ok: boolean) => toast(msg, ok ? 'good' : 'bad');
     const sel = () => chainGroups(s, type).find((g) => g.id === gid) ?? chainGroups(s, type)[0];
     this.open({
@@ -1356,9 +1435,11 @@ export class UI {
         const auto = g.bizs.filter((b) => isAutonomous(b)).length;
         const shops = g.bizs.map((b) => `<div class="card chain-shop"><div class="row between"><div><b>${esc(lotDef(b.lotId).name)}</b><div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name} · oggi ${euro(b.today.revenue)} · ${b.products.map((p) => PRODUCTS[p].icon).join('') || '—'}</div></div>
             <div class="row" style="gap:6px">${this.autoTag(b)}<button class="btn sm" data-a="shop:${b.id}">Gestisci</button></div></div></div>`).join('');
-        const tabs = [...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : []), ['negozi', `🏪 Negozi (${g.bizs.length})`]];
+        const tabs = [['resoconto', '📊 Resoconto'], ...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : []), ['negozi', `🏪 Negozi (${g.bizs.length})`]];
         let body = '';
-        if (tab === 'prodotti') {
+        if (tab === 'resoconto') {
+          body = this.chainReport(g.bizs);
+        } else if (tab === 'prodotti') {
           body = `<p class="muted small">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
             def.products.map((p) => {
               const n = g.bizs.filter((b) => b.products.includes(p)).length;
@@ -1368,7 +1449,7 @@ export class UI {
         } else if (tab === 'migliorie') {
           const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
           body = `<p class="muted small">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
-            UPGRADE_IDS.filter((id) => !kitchenOnly.includes(id) || hasInterior(type)).map((id) => {
+            UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(type)) && (id !== 'cassa' || hasCashUpgrade(type))).map((id) => {
               const u = UPGRADES[id];
               const lv = g.bizs.map((b) => upg(b, id));
               const lo = Math.min(...lv);
@@ -1401,6 +1482,13 @@ export class UI {
         shop: (id) => {
           this.close();
           this.openBusiness(id);
+        },
+        // dal resoconto della catena: resoconto di un negozio ("‹ Indietro" torna qui) o una sua scheda
+        rep: (id) => this.openReport(id),
+        bizTab: (arg) => {
+          const [id, t] = arg.split('|');
+          this.close();
+          this.openBusiness(id, t);
         },
         prod: (arg) => {
           const [p, a] = arg.split('|');
