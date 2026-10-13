@@ -76,6 +76,8 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 
 ## 6. Lavori (fase iniziale)
 
+> Tabella provvisoria di tutti i lavori, le loro evoluzioni e le attività: `CARRIERE.md`.
+
 - Si trovano **girando per la città**: NPC con il **punto esclamativo "!"**.
 - Ogni lavoro è un **mini-gioco** semplice, per esempio: tagliare siepi o prato (tieni premuto sulle zone), consegne da A a B, lavapiatti o cameriere part-time.
 - **Timer + valutazione a stelle (1–3):** più sei bravo e veloce, più guadagni.
