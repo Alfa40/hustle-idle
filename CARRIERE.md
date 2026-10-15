@@ -251,6 +251,13 @@ La gestione (dipendenti, mezzi, turni, zone) esiste **solo nelle attività**, ma
 Le linee collegate sono quelle che danno esperienza e che si giocano dentro l'attività.
 Gli ordini fatti di persona dal titolare seguono la regola dei 5 minuti.
 
+**Come si evolve (deciso il 15/10):**
+- Serve avere **tutti gli ampliamenti e tutte le migliorie al massimo**, più un **costo in soldi** alto: è una
+  ristrutturazione completa, non è economica.
+- L'attività vecchia **si trasforma e non c'è più** (il suo posto torna libero).
+- Si **sceglie un locale libero** dove aprire la nuova attività e si paga **un solo prezzo** che comprende il
+  locale nuovo e la ristrutturazione.
+
 ### 🚚 Alberi di Trasporti e logistica
 
 ```
@@ -307,5 +314,5 @@ le linee urbane sono appalti di qualche mese con penali per i ritardi.
 ## Da decidere
 - Quante linee per settore all'inizio (oggi 3, qui ne propongo 4–5)
 - Se le linee arrivano a 5 gradini (Liv. 40) o restano a 3
-- Condizioni esatte per evolvere un'attività (ampliamenti e migliorie al massimo? costo?) e cosa succede alla vecchia forma
+- Prezzi delle evoluzioni delle attività
 - Quali righe fare per prime
