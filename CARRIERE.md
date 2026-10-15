@@ -8,6 +8,10 @@ Quando una riga è decisa passa in `src/config/careers.ts` (lavori) o `src/confi
 **Regola delle evoluzioni:** ogni linea di lavoro cambia ogni 10 livelli (Liv. 1, 10, 20, 30, 40).
 Oggi le linee hanno 3 gradini; la proposta è arrivare a 5 (gli ultimi due 🆕).
 
+**Regola della durata:** ogni minigioco, anche al Liv. 40, si finisce in **meno di 5 minuti** (chi gioca bene in 2–3).
+Salendo di livello cresce la difficoltà, non la lunghezza: meno cose da fare ma più difficili, imprevisti al posto
+di un passo (massimo 1–2 per partita), mai fasi in più una dopo l'altra.
+
 ---
 
 ## 🚚 Trasporti e logistica

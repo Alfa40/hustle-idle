@@ -18,6 +18,11 @@
   insieme alle cose da fare (livello, ampliamenti). Sempre abbastanza per muoversi, mai così tanto che
   spostarsi diventa lungo: al livello 1 spazio piccolo e poche cose, poi entrambi salgono gradualmente
   (es. lotto dei minigiochi `lotSize()` in src/minigames/arena.ts).
+- **Durata massima 5 minuti**: ogni lavoretto o minigioco, anche al livello più alto, si finisce in **meno di
+  5 minuti** (il tempo a disposizione non supera mai 5 minuti; chi gioca bene finisce in 2–3). La difficoltà
+  cresce con la **densità** (cose più difficili, tempi più stretti, imprevisti) e non con la quantità: quando arriva
+  una meccanica nuova, le cose da fare restano le stesse o diminuiscono. Gli imprevisti **sostituiscono** un passo,
+  non se ne aggiungono, e al massimo uno o due per partita.
 - **Minigiochi nello stesso posto**: la scena di un lavoretto è separata dalla città, ma fuori dal lotto deve
   esserci il vero quartiere attorno al posto dove il lavoretto è stato accettato (stessa casa, stesse vie,
   case, palazzi, parchi): per il giocatore è lo stesso posto. Vale anche per l'interno delle attività
