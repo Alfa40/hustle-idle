@@ -65,7 +65,16 @@ interface Panel {
   scroll?: ScrollSave;
   /** mostra i tuoi soldi nell'intestazione (negozio, migliorie, acquisti); con una funzione, solo quando serve */
   money?: boolean | (() => boolean);
+  /** spiegazioni aperte col tasto "?" (restano aperte finché la finestra resta aperta) */
+  help?: boolean;
 }
+
+/**
+ * Spiegazioni nascoste: ogni testo che spiega come funziona qualcosa ha la classe `explain` e resta nascosto
+ * finché non si tocca il tasto "?" nell'intestazione della finestra (il tasto c'è solo se ci sono spiegazioni).
+ * `explain(testo)` è la forma breve per un paragrafo di spiegazione.
+ */
+const explain = (html: string, cls = '') => `<p class="muted small explain ${cls}">${html}</p>`;
 
 /**
  * Salva lo scorrimento (orizzontale e verticale) di ogni elemento che scorre dentro `root` e restituisce
@@ -711,10 +720,15 @@ export class UI {
     this.game.input.cancel();
     const modal = document.createElement('div');
     modal.className = 'modal';
-    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><span class="head-money" hidden></span><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
+    modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><span class="head-money" hidden></span><button class="help-q" hidden aria-label="Spiegazioni">?</button><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
     modal.querySelector('.back')?.addEventListener('click', () => this.goBack());
+    modal.querySelector('.help-q')!.addEventListener('click', () => {
+      if (!this.panel) return;
+      this.panel.help = !this.panel.help;
+      this.updateHelp();
+    });
     if (p.locked) (modal.querySelector('.x') as HTMLElement).style.display = 'none';
     modal.addEventListener('pointerdown', (e) => {
       if (e.target === modal && !this.panel?.locked) this.close();
@@ -796,6 +810,17 @@ export class UI {
     keepBody();
     (this.modal.querySelector('h2') as HTMLElement).textContent = this.panel.title;
     this.updateHeadMoney();
+    this.updateHelp();
+  }
+
+  /** Tasto "?": c'è solo se la finestra ha spiegazioni; le mostra o le nasconde tutte insieme. */
+  private updateHelp() {
+    if (!this.modal || !this.panel) return;
+    const sheet = this.modal.querySelector('.sheet') as HTMLElement;
+    const btn = this.modal.querySelector('.help-q') as HTMLElement;
+    btn.hidden = !sheet.querySelector('.explain');
+    sheet.classList.toggle('show-help', !!this.panel.help);
+    btn.classList.toggle('on', !!this.panel.help);
   }
 
   /** I tuoi soldi nell'intestazione delle finestre dove si compra (aggiornati anche mentre spendi). */
@@ -860,9 +885,9 @@ export class UI {
           <div class="stat s-purple"><b>Liv. ${offer.level}</b><span>📈 difficoltà</span></div>
           <div class="stat"><b>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</b><span>esperienza che guadagni</span></div>
         </div>
-        <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
+        <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small explain">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
           <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>
-        <p class="muted small center" style="margin:10px 0 0">${tut ? '🎓 Il tutorial è una prova: niente soldi né esperienza, ma il lavoretto resta disponibile per farlo sul serio' : 'Più sei veloce, più stelle prendi ⭐'}</p>
+        <p class="muted small center explain" style="margin:10px 0 0">${tut ? '🎓 Il tutorial è una prova: niente soldi né esperienza, ma il lavoretto resta disponibile per farlo sul serio' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
         tut: () => (tut = !tut),
@@ -883,7 +908,7 @@ export class UI {
       small: true,
       color: 'var(--purple)',
       render: () => `<div class="card hero tint"><div class="emoji">${def.icon}</div><div class="big">Ora sai come si fa</div></div>
-        <p class="muted center">Il tutorial era una prova: niente soldi né esperienza. Il lavoretto <b>${def.name}</b> è ancora disponibile: fallo sul serio per essere pagato, più sei veloce più stelle prendi ⭐</p>
+        <p class="muted center explain">Il tutorial era una prova: niente soldi né esperienza. Il lavoretto <b>${def.name}</b> è ancora disponibile: fallo sul serio per essere pagato, più sei veloce più stelle prendi ⭐</p>
         <div class="btnrow"><button class="btn sec" data-a="later">Più tardi</button><button class="btn good" data-a="go">▶ Fallo adesso</button></div>`,
       actions: {
         later: () => this.close(),
@@ -930,7 +955,7 @@ export class UI {
         if (def.kind === 'craft') {
           // laboratorio: niente clienti, si guadagna coi lavori fatti a mano
           return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
-              <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small">${def.desc}</div></div></div>
+              <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small explain">${def.desc}</div></div></div>
             <div class="grid2" style="margin-top:8px">
               <div class="stat s-purple"><b>${SPECIALS_PER_DAY} al giorno</b><span>🛠️ lavori su richiesta</span></div>
               <div class="stat s-green"><b class="money-t">${euro(150)}–${euro(400)}+</b><span>a lavoro, fatto da te</span></div>
@@ -942,7 +967,7 @@ export class UI {
         const est = estimateLot(s, lotId, t);
         const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
-            <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small">${def.desc}</div></div></div>
+            <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small explain">${def.desc}</div></div></div>
           <div class="grid3" style="margin-top:8px">
             <div class="stat s-purple"><b>${est.demand.toFixed(1)}/h</b><span>${unit} (${PRODUCTS[est.best].icon})</span></div>
             <div class="stat s-green"><b class="money-t">${euro(est.revenue)}</b><span>incasso/mese*</span></div>
@@ -960,7 +985,7 @@ export class UI {
       ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>
         <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
       <h3 class="sec-title">Cosa puoi aprire qui</h3>${opts}
-      <p class="muted small">* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.</p>`;
+      ${explain(`* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.`)}`;
   }
 
   private buyActions() {
@@ -1131,13 +1156,13 @@ export class UI {
           <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${shops.length} negozi · ${euro(day)} al giorno in media${bad ? ` · <b class="bad">⚠️ ${bad} da sistemare</b>` : ' · ✅ tutto in ordine'}</div><div class="report-more">Tocca per il resoconto della catena ›</div></div><span class="shop-go">›</span></button>`;
       }).join('');
       const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
-      return top + `<p class="muted small" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati; dal ${PARTIAL_DAYS}° giorno uno provvisorio); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
+      return top + `<p class="muted small explain" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati; dal ${PARTIAL_DAYS}° giorno uno provvisorio); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
           <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
         <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${chainCards ? `<h3 class="sec-title">🔗 Resoconti delle catene</h3>${chainCards}<h3 class="sec-title">🏪 Attività una per una</h3>` : ''}${cards}`;
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
-    return `<p class="muted small">Clienti (o ordini) all'ora previsti oggi per ogni prodotto nelle tre zone. Cambia ogni giorno con stagioni, meteo ed eventi.</p>` +
+    return `<p class="muted small explain">Clienti (o ordini) all'ora previsti oggi per ogni prodotto nelle tre zone. Cambia ogni giorno con stagioni, meteo ed eventi.</p>` +
       BUSINESS_TYPE_IDS.filter((t) => bizType(t).products.length).map((t) => {
         const def = bizType(t);
         const fm = fameMultiplier(s, t);
@@ -1505,7 +1530,7 @@ export class UI {
         if (tab === 'resoconto') {
           body = this.chainReport(g.bizs);
         } else if (tab === 'prodotti') {
-          body = `<p class="muted small">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
+          body = `<p class="muted small explain">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
             def.products.map((p) => {
               const n = g.bizs.filter((b) => b.products.includes(p)).length;
               return `<div class="card row between"><div><b>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</b><div class="muted small">In vendita in ${n} su ${g.bizs.length}</div></div>
@@ -1513,7 +1538,7 @@ export class UI {
             }).join('');
         } else if (tab === 'migliorie') {
           const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
-          body = `<p class="muted small">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
+          body = `<p class="muted small explain">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
             UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(type)) && (id !== 'cassa' || hasCashUpgrade(type))).map((id) => {
               const u = UPGRADES[id];
               const lv = g.bizs.map((b) => upg(b, id));
@@ -1531,9 +1556,9 @@ export class UI {
             }).join('');
         } else if (tab === 'magazzino') {
           const allAuto = g.bizs.every((b) => b.autoRestock);
-          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small">Ogni prodotto in vendita fino al massimo, in tutti i negozi del gruppo.</div>
+          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small explain">Ogni prodotto in vendita fino al massimo, in tutti i negozi del gruppo.</div>
               <button class="btn full" style="margin-top:8px" data-a="fill">Riempi tutto</button></div>
-            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small">Il manager (o il magazziniere) riordina da solo in tutti i negozi del gruppo.</div></div>
+            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small explain">Il manager (o il magazziniere) riordina da solo in tutti i negozi del gruppo.</div></div>
               <span class="switch ${allAuto ? 'on' : ''}"><i></i></span></button>`;
         } else {
           body = shops;
@@ -1608,7 +1633,7 @@ export class UI {
       <p><b>Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.</b></p>
       ${this.reportProgress(biz, false)}${why}
       <p><b>📋 ${this.partialWhen(biz)}</b></p>
-      <p class="muted small">Il resoconto provvisorio si vede dal ${PARTIAL_DAYS}° giorno di raccolta e si aggiorna ogni sera alla chiusura (${BUSINESS.CLOSE_HOUR}:00); quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+      <p class="muted small explain">Il resoconto provvisorio si vede dal ${PARTIAL_DAYS}° giorno di raccolta e si aggiorna ogni sera alla chiusura (${BUSINESS.CLOSE_HOUR}:00); quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
   }
 
   /** Quando arriva il resoconto provvisorio (stasera, domani sera, tra N giorni). */
@@ -1676,8 +1701,8 @@ export class UI {
         <div class="card tint small" style="margin-top:10px">🛠️ Qui si lavora solo a mano: ogni giorno arrivano <b>lavori su richiesta</b> che fai tu in prima persona, pagati più dei lavoretti. Niente clienti al bancone e niente dipendenti. Più sale l'esperienza in artigianato, più i lavori sono difficili e pagati meglio. Migliorando il laboratorio si sbloccheranno nuovi tipi di lavoro.</div>`;
     }
     if (type.kind === 'craft' && tab === 'migliorie') {
-      const jobs = CRAFT_JOBS.map((j) => `<div class="card row between"><span>${j.icon} <b>${j.name}</b><div class="muted small">${j.desc}</div></span>${j.ready ? '<span class="tag g">Sbloccato</span>' : '<span class="tag">🔜 In arrivo</span>'}</div>`).join('');
-      return `<p class="muted small">Migliorando il laboratorio sbloccherai nuovi tipi di lavoro su richiesta. I prossimi sono in preparazione.</p>${jobs}`;
+      const jobs = CRAFT_JOBS.map((j) => `<div class="card row between"><span>${j.icon} <b>${j.name}</b><div class="muted small explain">${j.desc}</div></span>${j.ready ? '<span class="tag g">Sbloccato</span>' : '<span class="tag">🔜 In arrivo</span>'}</div>`).join('');
+      return `<p class="muted small explain">Migliorando il laboratorio sbloccherai nuovi tipi di lavoro su richiesta. I prossimi sono in preparazione.</p>${jobs}`;
     }
     if (tab === 'lavori') {
       const list = specialOrders(s, b);
@@ -1723,7 +1748,7 @@ export class UI {
       return `
         <div class="card ${isAutonomous(b) ? '' : 'hl'}"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
           ${missing.length ? `<p class="muted small" style="margin:0">Per farla lavorare da sola serve: <b>${missing.join(', ')}</b>. ${alone}</p>`
-            : '<p class="muted small" style="margin:0">Lavora da sola anche quando sei altrove o offline.</p>'}
+            : '<p class="muted small explain" style="margin:0">Lavora da sola anche quando sei altrove o offline.</p>'}
         </div>
         <div class="grid2">
           <div class="stat s-purple"><b>${dem.toFixed(2)}/h</b><span>🙋 ${unit} richiesti ora</span></div>
@@ -1738,12 +1763,12 @@ export class UI {
           <div class="row between small"><span>Bollette</span><span>${euro(c.utilities)}</span></div>
           <div class="row between small"><span>Stipendi (${b.staff.length})</span><span>${euro(fullSal)}</span></div>
           <hr><div class="row between"><b>Utile stimato al mese</b><b class="${estimateMonthlyProfit(s, b) >= 0 ? 'good' : 'bad'}">${isAutonomous(b) ? euro(estimateMonthlyProfit(s, b)) : '—'}</b></div>
-          <p class="muted small" style="margin-bottom:0">Aperto dalle ${BUSINESS.OPEN_HOUR}:00 alle ${BUSINESS.CLOSE_HOUR}:00. I costi si pagano il 1° del mese.</p>
+          <p class="muted small explain" style="margin-bottom:0">Aperto dalle ${BUSINESS.OPEN_HOUR}:00 alle ${BUSINESS.CLOSE_HOUR}:00. I costi si pagano il 1° del mese.</p>
         </div>`;
     }
     if (tab === 'prodotti') {
       const slots = menuSlots(b);
-      return `<p class="muted small">Scegli cosa offrire guardando la domanda di oggi (${b.products.length}/${slots} posti). La domanda cambia ogni giorno, con le stagioni, il meteo e gli eventi.</p>` +
+      return `<p class="muted small explain">Scegli cosa offrire guardando la domanda di oggi (${b.products.length}/${slots} posti). La domanda cambia ogni giorno, con le stagioni, il meteo e gli eventi.</p>` +
         type.products
           // i prodotti che servono un ampliamento non ancora comprato non si mostrano
           .filter((p) => productLevel(b.type, p) <= upg(b, 'ampliamento'))
@@ -1770,7 +1795,7 @@ export class UI {
     if (tab === 'magazzino') {
       const cap = stockCap(b);
       return `<div class="card"><label class="toggle"><input type="checkbox" ${b.autoRestock ? 'checked' : ''} data-c="autoRestock"> Riordino automatico</label>
-        <p class="muted small" style="margin-bottom:0">${hasManager(b) ? 'Il manager riordina da solo quando le scorte scendono.' : 'Il riordino automatico funziona solo con un manager.'}
+        <p class="muted small explain" style="margin-bottom:0">${hasManager(b) ? 'Il manager riordina da solo quando le scorte scendono.' : 'Il riordino automatico funziona solo con un manager.'}
         ${service ? ' Ogni servizio consuma 1 unità di materiali.' : ''}</p></div>` +
         b.products
           .map((p) => {
@@ -1819,9 +1844,9 @@ export class UI {
         (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
-      return `<p class="muted small">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
+      return `<p class="muted small explain">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
         <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
-        <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
+        <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small explain" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40${s.money < 40 ? ' (non hai abbastanza soldi)' : ''}</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
@@ -1838,7 +1863,7 @@ export class UI {
       // prova gratis prima di comprare (solo le migliorie che cambiano la cucina)
       const canTry = hasInterior(b.type) && PREVIEW_UPGRADES.includes(id) && !maxed && !noRoom;
       return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
-        <p class="muted small" style="margin:0 0 8px">${u.desc}${id === 'ampliamento' && !maxed ? `<br><b style="color:var(--ink)">Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b>` : ''}</p>
+        <p class="muted small explain" style="margin:0 0 8px">${u.desc}</p>${id === 'ampliamento' && !maxed ? `<p class="small" style="margin:0 0 8px"><b>Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b></p>` : ''}
         ${canTry ? `<div class="btnrow upg-btns"><button class="btn sm purple" data-a="previewUpg:${id}">👁️ Prova</button>${buyBtn}</div>` : buyBtn}</div>`;
     }).join('');
   }
@@ -2152,7 +2177,7 @@ export class UI {
       money: true,
       title: '🛵 Concessionaria',
       color: 'var(--blue)',
-      render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}<p class="muted small">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +
+      render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}<p class="muted small explain">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +
         VEHICLE_IDS.map((id) => {
           const v = VEHICLES[id];
           const owned = s.vehicles.includes(id);
@@ -2162,7 +2187,7 @@ export class UI {
             ? `<button class="btn sm ${using ? 'sec' : 'blue'}" data-a="use:${id}" ${using ? 'disabled' : ''}>${using ? 'In uso' : 'Usa'}</button>`
             : `<button class="btn sm good" data-a="buyv:${id}" ${s.money < v.price || !canBuy ? 'disabled' : ''}>Compra ${euro(v.price)}</button>`;
           return `<div class="card ${owned ? 'hl' : ''}"><div class="row"><div class="icon-bubble" style="font-size:30px;width:54px;height:54px">${v.icon}</div>
-            <div style="flex:1"><h3 style="margin:0">${v.name} ${owned ? '<span class="tag g">tuo</span>' : ''}</h3><div class="muted small">${v.desc}</div></div></div>
+            <div style="flex:1"><h3 style="margin:0">${v.name} ${owned ? '<span class="tag g">tuo</span>' : ''}</h3><div class="muted small explain">${v.desc}</div></div></div>
             <div class="grid3" style="margin-top:8px">
               <div class="stat s-green"><b>+${pct}%</b><span>velocità</span></div>
               <div class="stat s-yellow"><b>${Math.round(v.speed * 3.6)} km/h</b><span>massima</span></div>
@@ -2235,8 +2260,8 @@ export class UI {
             return `<div class="row between small"><span>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>${demandBars(d, 2.4)}</div>`;
           })
           .join('');
-        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama. I premi delle missioni non contano per "Guadagna".</p>${ms}
-          <h3 class="sec-title">🗓️ Missioni della settimana</h3><p class="muted small" style="margin-top:-4px">Più lunghe, con premi più ricchi. ${left > 1 ? `Restano ${left} giorni` : 'Ultimo giorno'}.</p>${wk}
+        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small explain" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama. I premi delle missioni non contano per "Guadagna".</p>${ms}
+          <h3 class="sec-title">🗓️ Missioni della settimana</h3><p class="muted small explain" style="margin-top:-4px">Più lunghe, con premi più ricchi.</p><p class="small" style="margin:-4px 0 6px">⏳ ${left > 1 ? `Restano ${left} giorni` : 'Ultimo giorno'}</p>${wk}
           <h3 class="sec-title">📅 Prossimi giorni</h3>${evs}
           <button class="btn blue full" data-a="cal" style="margin-bottom:10px">📅 Apri il calendario completo</button>
           <div class="card"><h3>📊 Domanda del giorno</h3>${prods}</div>`;
@@ -2347,7 +2372,7 @@ export class UI {
           </div>
           <h3 class="sec-title">🔎 Giorno scelto</h3>${this.dayCard(sel)}
           <div class="card"><h3>🗓️ Prossimi eventi sicuri</h3>${upcoming.join('') || '<div class="muted small">Nessuno nei prossimi due mesi.</div>'}
-            <p class="muted small" style="margin-bottom:0">Ogni sabato c'è il 🛒 mercato e ogni domenica 🌳 la gente va al parco. Il meteo si può prevedere al massimo ${FORECAST_DAYS} giorni prima.</p></div>`;
+            <p class="muted small explain" style="margin-bottom:0">Ogni sabato c'è il 🛒 mercato e ogni domenica 🌳 la gente va al parco. Il meteo si può prevedere al massimo ${FORECAST_DAYS} giorni prima.</p></div>`;
       },
     });
   }
@@ -2419,7 +2444,7 @@ export class UI {
       title: '✏️ Il tuo nome',
       small: true,
       color: 'var(--blue)',
-      render: () => `<p class="muted small">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici.</p>
+      render: () => `<p class="muted small explain">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici.</p>
         <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
         <button class="btn good full" data-a="save" style="margin-top:10px">✅ Salva il nome</button>`,
       actions: {
@@ -2506,7 +2531,7 @@ export class UI {
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(x - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div>
             ${lines || biz ? `<div class="career-lines">${lines}${biz}</div>` : ''}</div>`;
         }).join('');
-        return `<p class="muted small">Ogni settore raccoglie i suoi lavori: il livello del settore è la somma dell'esperienza di tutti i suoi lavori (e del lavoro nelle tue attività). Ogni lavoro ha il suo livello e ogni ${EVOLVE_EVERY} livelli si evolve in un lavoro più complesso. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano: più fama = più clienti e offerte più ricche.</p>${skills}`;
+        return `<p class="muted small explain">Ogni settore raccoglie i suoi lavori: il livello del settore è la somma dell'esperienza di tutti i suoi lavori (e del lavoro nelle tue attività). Ogni lavoro ha il suo livello e ogni ${EVOLVE_EVERY} livelli si evolve in un lavoro più complesso. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano: più fama = più clienti e offerte più ricche.</p>${skills}`;
       },
       actions: {},
     });
@@ -2538,7 +2563,7 @@ export class UI {
           ${invite ? `<div class="card fr-drop"><div class="row between"><span><small class="muted">Il tuo codice amico</small><br><b class="fr-code">${code}</b></span>
               <span class="row"><button class="btn sm sec" data-a="copy">📋 Copia</button><button class="btn sm blue" data-a="share">📤 Invia</button></span></div>
             <div class="row" style="margin-top:8px;gap:6px"><input class="lb-input fr-input" maxlength="7" placeholder="Codice di un amico" style="flex:1;font-size:16px;padding:9px 12px"><button class="btn sm good" data-a="addf">➕ Aggiungi</button></div>
-            <small class="muted">Quando aggiungi qualcuno, gli arriva una richiesta: può ricambiare con un tocco, senza mandarti il suo codice.</small></div>` : ''}`;
+            <small class="muted explain">Quando aggiungi qualcuno, gli arriva una richiesta: può ricambiare con un tocco, senza mandarti il suo codice.</small></div>` : ''}`;
         const reqs = this.game.friendRequests;
         const reqHtml = reqs.length ? `<h3 class="sec-title">📨 Richieste di amicizia (${reqs.length})</h3>` + reqs.map((r) =>
           `<div class="lb-row">${logoImg(r.logo, 34) || '<span class="logo-img empty"></span>'}<span class="lb-name"><b>${esc(r.nickname)}</b><small>${esc(r.title)} · ⭐ ${r.fame.toFixed(1)}</small></span>
@@ -2758,10 +2783,10 @@ export class UI {
         } else if (tab === 'foto') {
           // scegliere una foto (o gestire quella già scelta)
           main = draft.photo
-            ? `<div class="card center"><img class="lg-photo-big" src="${logoUrl(draft, 320)}" alt=""><p class="muted small">Il tuo logo ora usa questa foto. La vedono solo i tuoi amici: nella classifica mondiale compare il logo disegnato.</p>
+            ? `<div class="card center"><img class="lg-photo-big" src="${logoUrl(draft, 320)}" alt=""><p class="muted small explain">Il tuo logo ora usa questa foto. La vedono solo i tuoi amici: nella classifica mondiale compare il logo disegnato.</p>
                 <div class="lg-row" style="justify-content:center"><button class="btn sm purple" data-a="retouch">✏️ Ritocca</button><button class="btn sm sec" data-a="upload">📷 Cambia foto</button><button class="btn sm danger" data-a="nophoto">🗑️ Togli la foto</button></div></div>`
-            : `<div class="card center lg-pick"><div class="emoji">📷</div><b>Usa una tua foto come logo</b><p class="muted small">Scegli una foto dal telefono: potrai spostarla, ingrandirla, ruotarla e ritoccare luce e colori dentro la forma che preferisci.</p>
-                <button class="btn purple full" data-a="upload">📷 Scegli una foto</button><p class="muted small" style="margin:8px 0 0">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato (scheda 🎨 Crea logo).</p></div>`;
+            : `<div class="card center lg-pick"><div class="emoji">📷</div><b>Usa una tua foto come logo</b><p class="muted small explain">Scegli una foto dal telefono: potrai spostarla, ingrandirla, ruotarla e ritoccare luce e colori dentro la forma che preferisci.</p>
+                <button class="btn purple full" data-a="upload">📷 Scegli una foto</button><p class="muted small explain" style="margin:8px 0 0">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato (scheda 🎨 Crea logo).</p></div>`;
           foot = `<button class="btn good" data-a="save">✅ Salva il logo</button>`;
         } else {
           // creare il logo da zero
@@ -2931,7 +2956,7 @@ export class UI {
       color: '#5b4bb7',
       render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small></div></div>
         <div class="grid2"><div class="stat ${f.online ? 's-green' : ''}"><b>${f.online ? '🟢 Aperto' : '💤 Chiuso'}</b><span>${f.online ? 'sta giocando adesso' : 'non sta giocando'}</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 ${def.icon} ${def.name}</span></div></div>
-        <p class="muted small">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora le vedi nella tua città: ${mine ? 'qui c\'è anche la tua attività.' : 'questo posto da te è libero e puoi comprarlo lo stesso: le attività degli amici restano accanto alla tua.'}</p>
+        <p class="muted small explain">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora le vedi nella tua città: ${mine ? 'qui c\'è anche la tua attività.' : 'questo posto da te è libero e puoi comprarlo lo stesso: le attività degli amici restano accanto alla tua.'}</p>
         <div class="btnrow">${mine ? '' : '<button class="btn sec" data-a="lot">🏷️ Vedi il posto</button>'}<button class="btn" data-a="board">👥 I tuoi amici</button></div>`,
       actions: {
         lot: () => {
@@ -2956,7 +2981,7 @@ export class UI {
         const h = hourOf(s);
         const canSleep = h >= 19 || h < 6;
         return `<div class="hero"><div class="emoji">🏡</div></div>
-          <p class="muted center">La casa è il tuo punto di teletrasporto: con il pulsante verde <b>🏠 Casa</b> ci torni all'istante da qualsiasi punto della città.</p>
+          <p class="muted center explain">La casa è il tuo punto di teletrasporto: con il pulsante verde <b>🏠 Casa</b> ci torni all'istante da qualsiasi punto della città.</p>
           <button class="btn blue full" data-a="sleep" ${canSleep ? '' : 'disabled'}>😴 Dormi fino alle 7:00</button>
           <p class="center muted small">${canSleep ? 'Le attività sono chiuse di notte: dormire fa passare il tempo.' : 'Puoi dormire dalle 19:00 in poi.'}</p>`;
       },
@@ -2983,9 +3008,9 @@ export class UI {
         if (tab === 'impostazioni') return tabs + settingsHtml();
         if (tab === 'partita') {
           return tabs + `
-            <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot} · la partita si salva da sola ogni pochi secondi.</p></div>
+            <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot}</p><p class="muted small explain" style="margin:6px 0 0">La partita si salva da sola ogni pochi secondi.</p></div>
             <button class="btn blue full" data-a="menu">🏠 Salva e torna al menu principale</button>
-            <p class="muted small center">Dal menu puoi cambiare partita o iniziarne una nuova.</p>
+            <p class="muted small center explain">Dal menu puoi cambiare partita o iniziarne una nuova.</p>
             <hr>
             <button class="btn danger full" data-a="reset">${confirm ? '⚠️ Sicuro? Tocca di nuovo per cancellare questa partita' : '🗑️ Ricomincia questa partita da capo'}</button>`;
         }
@@ -3037,7 +3062,7 @@ export class UI {
           <div class="stat ${r.net >= 0 ? 's-green' : 's-red'}"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>🧾 saldo dopo i costi</span></div>
         </div>
         ${r.rent ? `<div class="stat s-yellow" style="margin-top:8px"><b class="money-t">+${euro(r.rent)}</b><span>🔑 affitti delle tue case</span></div>` : ''}
-        ${r.revenue === 0 ? '<p class="muted small">Solo le attività con almeno un dipendente per reparto e un manager lavorano mentre sei via (con una persona per reparto, solo per un turno di 8 ore).</p>' : ''}
+        ${r.revenue === 0 ? '<p class="muted small explain">Solo le attività con almeno un dipendente per reparto e un manager lavorano mentre sei via (con una persona per reparto, solo per un turno di 8 ore).</p>' : ''}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
     });

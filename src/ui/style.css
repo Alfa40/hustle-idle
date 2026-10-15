@@ -1059,3 +1059,14 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .cf-list { margin: 4px 0 0; padding-left: 18px; font-weight: 600; }
 .cf-list li { margin-top: 2px; }
 .cf-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* Spiegazioni dietro il tasto "?" (vedi `explain` in ui.ts): nascoste finché non si tocca "?" */
+.sheet-head .help-q {
+  width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.25);
+  font-size: 20px; color: #fff; font-weight: 800; flex: none; padding: 0;
+}
+.sheet-head .help-q.on { background: #fff; color: var(--hc); }
+.sheet-head .help-q[hidden] { display: none; }
+body.is-short .sheet-head .help-q { width: 34px; height: 34px; }
+.sheet:not(.show-help) .explain { display: none !important; }
+.sheet.show-help .explain { background: #eef6ff; border-left: 4px solid var(--blue); border-radius: 10px; padding: 7px 10px; color: var(--ink-2); }

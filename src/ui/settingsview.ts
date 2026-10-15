@@ -7,12 +7,12 @@ function segmented(key: Choice, label: string, hint: string) {
   const opts = SETTING_OPTIONS[key].map(
     ([v, n]) => `<button class="seg ${settings[key] === v ? 'on' : ''}" data-a="set:${key}|${v}">${n}</button>`,
   ).join('');
-  return `<div class="card"><div class="row between"><b>${label}</b></div><div class="segs">${opts}</div><div class="muted small" style="margin-top:6px">${hint}</div></div>`;
+  return `<div class="card"><div class="row between"><b>${label}</b></div><div class="segs">${opts}</div><div class="muted small explain" style="margin-top:6px">${hint}</div></div>`;
 }
 
 function toggle(key: Toggle, label: string, hint: string) {
   const on = settings[key];
-  return `<button class="card set-toggle" data-a="tog:${key}"><div style="flex:1;text-align:left"><b>${label}</b><div class="muted small">${hint}</div></div>
+  return `<button class="card set-toggle" data-a="tog:${key}"><div style="flex:1;text-align:left"><b>${label}</b><div class="muted small explain">${hint}</div></div>
     <span class="switch ${on ? 'on' : ''}"><i></i></span></button>`;
 }
 
@@ -41,7 +41,7 @@ function hudHtml() {
       <button class="btn sm sec" data-a="hud:down|${k}" ${i === n - 1 ? 'disabled' : ''} aria-label="Giù">▼</button>
       <button class="btn sm ${inMenu ? 'purple' : 'sec'}" data-a="hud:menu|${k}">${inMenu ? '☰ Nel menu' : '👁️ Visibile'}</button></div>`;
   }).join('');
-  return `<div class="card"><b>🧭 Pulsanti a destra</b><div class="muted small" style="margin:2px 0 8px">Cambia l'ordine con ▲▼ (dall'alto in basso). Quelli messi "nel menu" spariscono dalla colonna e si trovano toccando ☰ Menu: puoi metterci tutti i pulsanti, alcuni o nessuno.</div>
+  return `<div class="card"><b>🧭 Pulsanti a destra</b><div class="muted small explain" style="margin:2px 0 8px">Cambia l'ordine con ▲▼ (dall'alto in basso). Quelli messi "nel menu" spariscono dalla colonna e si trovano toccando ☰ Menu: puoi metterci tutti i pulsanti, alcuni o nessuno.</div>
     ${rows}<button class="btn sm sec full" data-a="hud:reset|x" style="margin-top:8px">↺ Disposizione iniziale</button></div>`;
 }
 

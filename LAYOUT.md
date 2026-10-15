@@ -87,3 +87,8 @@ anche per ogni schermata nuova.
 simulati che cambiano lato (`?safe=top,right,bottom,left`, letto dal LayoutManager).
 
 Misure da provare sempre, in verticale e in orizzontale: 360×640, 390×844, 430×932, 768×1024.
+
+## Spiegazioni nelle finestre
+Le spiegazioni non occupano spazio: hanno la classe `explain` e compaiono solo toccando il tasto **?**
+nell'intestazione della finestra (accanto a ✕). Il tasto si vede solo se la finestra ha spiegazioni; aperte,
+hanno uno sfondo azzurro con la riga blu a sinistra e restano aperte finché la finestra resta aperta.

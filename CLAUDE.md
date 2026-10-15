@@ -36,6 +36,10 @@
 - **Lavoretti sempre "con le mani"** a ogni gradino (guidare, caricare, consegnare…): la gestione di persone,
   mezzi e turni sta **solo nelle attività**. Le attività nuove **non si sbloccano col livello**: si compra
   un'attività base e, ampliandola e migliorandola, si evolve in un'altra (albero con bivi, vedi `CARRIERE.md`).
+- **Spiegazioni dietro il "?"**: nelle finestre ogni testo che spiega come funziona qualcosa (descrizioni,
+  regole, consigli, note "come si calcola") ha la classe `explain` (o si scrive con `explain(...)` in src/ui/ui.ts)
+  e resta nascosto finché non si tocca il tasto **?** nell'intestazione. Restano visibili solo dati, stati,
+  avvisi e i pulsanti. Vale per ogni finestra nuova.
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push
   va chiesto di nuovo. Dopo il push si aspetta che la GitHub Action finisca e si conferma il link.
