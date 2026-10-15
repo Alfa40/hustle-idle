@@ -1,10 +1,11 @@
 import { BUSINESS, FAME } from '../config/balance';
 import {
-  bizType, FIRST_NAMES, LAST_NAMES, roleName, UPGRADES,
+  bizType, evolvesOf, FIRST_NAMES, LAST_NAMES, roleName, upgOf, upgradeIdsFor,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
 import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
+import { sectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
@@ -377,9 +378,74 @@ export function menuSlots(b: Business) {
 /** Prezzo totale: lotto + attrezzatura iniziale dell'attività. */
 export const lotPrice = (lotId: string, type: BusinessType) => lotDef(lotId).price + bizType(type).setupCost;
 
-/** Tipi di attività che si possono aprire in un lotto. */
+/**
+ * Tipi di attività che si possono comprare in un lotto: solo quelle base (le altre si ottengono evolvendo)
+ * e solo dei settori accesi (config/careers.ts: FOCUS_SECTORS).
+ */
 export const typesForLot = (lotId: string) =>
-  (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => bizType(t).lot === lotDef(lotId).kind);
+  (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => {
+    const d = bizType(t);
+    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || sectorOn(d.sector));
+  });
+
+// ---------------- evoluzione delle attività ----------------
+
+/**
+ * Cosa manca per evolvere un'attività: tutte le migliorie (e gli ampliamenti) al massimo. Vuoto = si può
+ * (resta da pagare la ristrutturazione, vedi evolvePrice).
+ */
+export function evolveMissing(b: Business) {
+  return upgradeIdsFor(b.type, hasInterior(b.type), hasCashUpgrade(b.type))
+    .map((id) => ({ id, def: upgOf(b.type, id), lvl: upg(b, id) }))
+    .filter((x) => x.lvl < x.def.max);
+}
+
+/** Prezzo unico per evolvere in `target` nel locale `lotId`: il locale nuovo più la ristrutturazione. */
+export const evolvePrice = (lotId: string, target: BusinessType) => lotDef(lotId).price + (bizType(target).evolveCost ?? 0);
+
+/** Locali liberi dove si può aprire l'attività evoluta (dello stesso tipo di lotto, non già tuoi). */
+export const evolveLots = (s: GameState, target: BusinessType) =>
+  LOTS.filter((l) => l.kind === bizType(target).lot && !bizAtLot(s, l.id)).map((l) => l.id);
+
+/**
+ * Evolve un'attività: quella vecchia si trasforma (il suo posto torna libero) e la nuova apre nel locale
+ * scelto, con un solo prezzo (locale + ristrutturazione). I dipendenti passano alla nuova attività; migliorie,
+ * scorte e statistiche ripartono da zero (è un'attività nuova, più grande).
+ */
+export function evolveBusiness(s: GameState, b: Business, target: BusinessType, lotId: string) {
+  const price = evolvePrice(lotId, target);
+  if (!evolvesOf(b.type).includes(target) || evolveMissing(b).length || bizAtLot(s, lotId) || s.money < price) return null;
+  if (bizType(target).lot !== lotDef(lotId).kind) return null;
+  addMoney(s, -price);
+  const nb: Business = {
+    id: 'biz' + lotId,
+    type: target, lotId,
+    products: bizType(target).products.slice(0, 1),
+    stock: {},
+    upgrades: {},
+    // i ruoli sono gli stessi (reparto principale, secondo reparto, manager): chi non serve più nella nuova
+    // attività (es. un secondo reparto che non c'è) resta lo stesso, il resoconto dirà se è di troppo
+    staff: b.staff.filter((e) => e.role === 'manager' || (bizType(target).roles as Role[]).includes(e.role)),
+    autoRestock: true,
+    today: emptyLedger(),
+    yesterday: emptyLedger(),
+    month: emptyLedger(),
+    totalRevenue: 0,
+    boughtFor: b.boughtFor + price,
+    statsFrom: s.minutes,
+    week: { ...emptyLedger(), from: s.minutes },
+    orders: [],
+  };
+  // chi non ha posto nella nuova attività torna tra i candidati di oggi
+  for (const e of b.staff) if (!nb.staff.includes(e)) s.candidates.push(e);
+  s.businesses = s.businesses.filter((x) => x !== b);
+  s.businesses.push(nb);
+  // i gruppi della catena non contano più il negozio vecchio
+  for (const g of s.chainGroups ?? []) g.bizIds = g.bizIds.filter((id) => id !== b.id);
+  if (nb.products[0]) buyStock(s, nb, nb.products[0], 20, true);
+  toast(`🌱 ${bizType(b.type).icon} ${bizType(b.type).name} è diventata ${bizType(target).icon} ${bizType(target).name} in ${lotDef(lotId).name}!`, 'good');
+  return nb;
+}
 
 export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   const lot = lotDef(lotId);
@@ -429,7 +495,7 @@ export function buyStock(s: GameState, b: Business, pid: ProductId, qty: number,
 
 export function buyUpgrade(s: GameState, b: Business, id: UpgradeId) {
   const lvl = upg(b, id);
-  const def = UPGRADES[id];
+  const def = upgOf(b.type, id);
   const cost = def.cost(lvl);
   if (lvl >= def.max || s.money < cost) return false;
   // i locali hanno pareti limitate: niente postazioni nuove se non c'è posto

@@ -14,14 +14,14 @@ di un passo (massimo 1–2 per partita), mai fasi in più una dopo l'altra.
 
 ---
 
-## 🚚 Trasporti e logistica ✔️ (tabella completa, 15/10)
+## 🚚 Trasporti e logistica ✅ (nel gioco dal 15/10: tutto giocabile)
 
 **Regole rispettate:** lavori sempre "con le mani" (la gestione solo nelle attività) · ogni minigioco sotto i
 5 minuti anche al Liv. 40 (tra parentesi la durata per chi gioca bene) · salendo di livello cresce la difficoltà,
 non la quantità · imprevisti al posto di un passo, massimo 1–2 a partita · lo spazio cresce con le cose da fare ·
 i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le attività si evolvono da un'attività base.
 
-### A. Lavoretti (5 linee × 5 gradini)
+### A. Lavoretti (3 linee × 5 gradini, tutte giocabili ✅; Corriere e Camionista tolti il 15/10)
 
 #### 📦 Consegne ✅
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
@@ -32,16 +32,7 @@ i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le atti
 | 30 | Trasporti delicati | un oggetto prezioso: pianoforte col montacarichi dalla finestra (equilibrio col dito) o quadri nelle casse imbottite | oggetti più preziosi, piani più alti, vento | 2–3 min |
 | 40 | Traslochi d'azienda | un ufficio con aiutanti a cui dici cosa portare: accorciano il lavoro | da 2 a 3 stanze, da 2 a 3 aiutanti, oggetti speciali (server, acquario) | 3–4 min |
 
-#### 🛵 Corriere 🟡
-| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
-|---|---|---|---|---|
-| 1 | Rider di cibo | un ordine: ritiro al locale, borsa termica che si raffredda, bibite che si rovesciano a frenate e curve brusche, mancia se veloce | distanze più lunghe, traffico, bibite più piene, a volte l'ordine non è ancora pronto | 1–2 min |
-| 10 | Corriere espresso | gli ordini arrivano mentre guidi: accetti o rifiuti, fasce orarie, scegli tu l'ordine | da 2 a 3 ordini insieme, fasce più strette | 2–3 min |
-| 20 | Consegne urgenti | farmaci e documenti, tempi strettissimi, semafori, scorciatoie in bici per parchi e vicoli | da 1 a 2 consegne, tempo che scende | 1½–2½ min |
-| 30 | Corriere aeroportuale | un plico da portare prima che parta l'aereo, con un cambio di mezzo | tempo più stretto, controlli all'arrivo | 2–3 min |
-| 40 | Portavalori | furgone blindato: tappe in banca, attese sicure, seminare chi ti segue cambiando strada | da 2 a 3 tappe, inseguimento dal Liv. 45 | 3–4 min |
-
-#### 🏭 Magazzino 🟡
+#### 🏭 Magazzino ✅
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
 |---|---|---|---|---|
 | 1 | Magazziniere | scarica il camion, ogni scatola sullo scaffale del suo colore, pesanti in basso | da 6 a 10 scatole; dai colori ai codici | 1½–2 min |
@@ -50,7 +41,7 @@ i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le atti
 | 30 | Addetto spedizioni | scatola giusta, riempitivo, nastro, etichetta; carica in ordine (ultimo dentro = prima consegna) | da 2 a 3 pacchi, oggetti dalle forme strane | 2–3 min |
 | 40 | Centro di smistamento | nastri: tocca i deviatori al momento giusto per mandare ogni pacco alla sua zona | turno sempre di 2 minuti: sale la velocità e le zone vanno da 3 a 5 | 2 min |
 
-#### 🚌 Autista 🆕
+#### 🚌 Autista ✅
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
 |---|---|---|---|---|
 | 1 | Autista di navetta | accosta dentro la zona della fermata, i passeggeri salgono, portali a destinazione | 2 fermate, zona di accosto più piccola, traffico | 1½–2 min |
@@ -58,15 +49,6 @@ i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le atti
 | 20 | Bus turistico | giro ai monumenti, guida dolce (le frenate brusche tolgono gradimento) | da 2 a 3 monumenti, vie più strette | 3 min |
 | 30 | Autista privato | una corsa con un bicchiere d'acqua sul cruscotto da non rovesciare | richieste del cliente, un cambio di destinazione | 2–3 min |
 | 40 | Limousine per eventi | matrimonio: ritiro puntuale, corteo, arrivo col tappeto rosso | da 2 a 3 tappe, vie affollate | 3–4 min |
-
-#### 🚛 Camionista 🆕
-| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
-|---|---|---|---|---|
-| 1 | Furgoncino per i negozi | rifornisci i negozi della città (anche i tuoi) | da 2 a 3 negozi, vie strette | 2–3 min |
-| 10 | Camion | una manovra in retromarcia fino alla banchina di carico | rimorchio più lungo, ostacoli nel piazzale | 1–2 min |
-| 20 | Camion frigo | consegne con la temperatura da tenere sotto controllo | da 1 a 2 consegne, d'estate la temperatura sale più in fretta | 2–3 min |
-| 30 | Trasporti eccezionali | carico lunghissimo: curve larghe, auto di scorta | curve più strette, strade chiuse | 3 min |
-| 40 | Bisarca | carica le auto sui due piani nell'ordine giusto e portale alla concessionaria | da 4 a 6 auto | 3 min |
 
 ### B. Attività (3 alberi)
 
@@ -78,13 +60,13 @@ il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della li
 #### 🚲 Albero delle Consegne in bici
 | Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
 |---|---|---|---|---|---|
-| 🚲 Consegne in bici | base, posteggio | ordini di consegna dai negozi del quartiere, raggio piccolo | Rider di cibo | rider in bici | più bici e rastrelliera · borse termiche (mance) · zona più grande · bici elettriche (velocità) · app degli ordini (domanda) |
-| 🛵 Consegne veloci | 1ª, bivio A | ordini da tutta la città; porta a domicilio i prodotti delle tue attività di ristorazione (più clienti per loro) | Corriere espresso | rider in scooter, centralinista | più scooter · zone di consegna · turni di pranzo e cena · assicurazione (meno incidenti) · con la pioggia più ordini |
-| 🚐 Corriere espresso | 2ª | pacchi in giornata per negozi e privati | Consegne urgenti | autisti di furgone, smistatore | più furgoni · deposito di smistamento · consegne serali |
-| 🌍 Compagnia di corrieri | 3ª | contratti mensili con tutta la città | Corriere aeroportuale, Portavalori | come sopra + guardie del portavalori | servizio aeroporto · furgoni blindati · filiali (catena) |
-| 📮 Punto ritiro pacchi | 1ª, bivio B | bancone: la gente ritira e spedisce, tu cerchi il pacco sullo scaffale | al bancone (come il food truck) | commessi, magazziniere | scaffali più grandi · cassa veloce · orario prolungato |
+| 🚲 Consegne in bici | base, posteggio | ordini di consegna dai negozi del quartiere, raggio piccolo | Consegna pacchi | rider in bici | più bici e rastrelliera · borse termiche (mance) · zona più grande · bici elettriche (velocità) · app degli ordini (domanda) |
+| 🛵 Consegne veloci | 1ª, bivio A | ordini da tutta la città; porta a domicilio i prodotti delle tue attività di ristorazione (più clienti per loro) | Consegna pacchi | rider in scooter, centralinista | più scooter · zone di consegna · turni di pranzo e cena · assicurazione (meno incidenti) · con la pioggia più ordini |
+| 🚐 Corriere espresso | 2ª | pacchi in giornata per negozi e privati | Consegna pacchi | autisti di furgone, smistatore | più furgoni · deposito di smistamento · consegne serali |
+| 🌍 Compagnia di corrieri | 3ª | contratti mensili con tutta la città | Consegna pacchi | come sopra + guardie del portavalori | servizio aeroporto · furgoni blindati · filiali (catena) |
+| 📮 Punto ritiro pacchi | 1ª, bivio B | la gente ritira e spedisce, tu sistemi i pacchi sugli scaffali | Magazziniere, Addetto spedizioni | commessi, magazziniere | scaffali più grandi · cassa veloce · orario prolungato |
 | 📦 Centro spedizioni | 2ª | imballa e spedisce per privati e negozi | Addetto spedizioni | imballatori, commessi | bilance e nastro · imballaggi speciali · ritiro a domicilio |
-| 🗄️ Armadietti in città | 3ª | armadietti sparsi per la città: un incasso per ogni armadietto più i pacchi | Corriere espresso (rifornisci gli armadietti) | autisti, tecnico | numero di armadietti (si piazzano sulla mappa) · armadietti refrigerati |
+| 🗄️ Armadietti in città | 3ª | armadietti sparsi per la città: un incasso per ogni armadietto più i pacchi | Magazziniere | autisti, tecnico | numero di armadietti (si piazzano sulla mappa) · armadietti refrigerati |
 
 #### 🚛 Albero della Ditta traslochi
 | Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
@@ -95,9 +77,9 @@ il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della li
 | 🏬 Deposito mobili | 1ª, bivio B | custodia: un incasso al mese per ogni box occupato, più i traslochi | Magazziniere | magazzinieri | più box · allarme e sorveglianza · box climatizzati |
 | 🏭 Deposito merci | 2ª | tiene le merci per i negozi; i tuoi negozi riordinano da qui a prezzo d'ingrosso | Carrellista, Preparatore ordini | carrellisti, preparatori | muletti · scaffali alti · spazio affittato ad altri |
 | 🔀 Centro di distribuzione | 3ª | rifornisce tutta la città | Centro di smistamento | addetti ai nastri | nastri · smistatori automatici · banchine di carico |
-| 🚚 Autotrasporti | 1ª, bivio C | contratti fissi con i negozi della città | Furgoncino, Camion | camionisti, meccanico | più camion · gasolio · manutenzione dei mezzi |
-| ❄️ Trasporti refrigerati | 2ª | cibo fresco per ristoranti e supermercati (anche i tuoi) | Camion frigo | camionisti | celle frigorifere · consegne all'alba |
-| 🚛 Trasporti eccezionali | 3ª | carichi enormi; bisarche per la concessionaria | Trasporti eccezionali, Bisarca | camionisti, auto di scorta | bisarche · permessi speciali · scorte |
+| 🚚 Autotrasporti | 1ª, bivio C | contratti fissi con i negozi della città | Carrellista | camionisti, meccanico | più camion · gasolio · manutenzione dei mezzi |
+| ❄️ Trasporti refrigerati | 2ª | cibo fresco per ristoranti e supermercati (anche i tuoi) | Carrellista | camionisti | celle frigorifere · consegne all'alba |
+| 🚛 Trasporti eccezionali | 3ª | carichi enormi; bisarche per la concessionaria | Carrellista | camionisti, auto di scorta | bisarche · permessi speciali · scorte |
 
 #### 🚐 Albero della Navetta
 | Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
@@ -316,15 +298,11 @@ Gli alberi completi di ogni settore sono nella sezione del settore (Trasporti e 
 | 🚚 Food truck | 🍳 | Cucina | furgone → furgone con magazzino → con tavolini → 🆕 chiosco fisso → 🆕 trattoria | ✅ |
 | 🥖 Panificio | 🍳 | Forno, Cucina | bancone → con magazzino → con sala → 🆕 pasticceria → 🆕 torte su ordinazione | ✅ |
 | 🧽 Impresa di pulizie | 🔨 | Pulizie 🆕 | case → uffici → vetri → 🆕 eventi → 🆕 sanificazione | ✅ |
-| 🚛 Ditta traslochi | 🚚 | Consegne | piccoli → grandi → sgomberi → 🆕 trasporti delicati → 🆕 eventi | ✅ |
 | 🎨 Laboratorio dell'artigiano | 🎨 | Ceramica, Falegnameria, Pittura | vasi ✅ → servizi da tavola → opere → mobili e restauro (sblocchi con le migliorie) | ✅ |
 | ☕ Bar / caffetteria | 🍳 | Bar | bancone → tavolini → cocktail serali → locale per eventi | 🆕 |
 | 🍕 Pizzeria | 🍳 | Cucina | asporto → sala → forno a legna → consegne a domicilio | 🆕 |
 | 🍽️ Ristorante | 🍳 | Cucina, Sala | trattoria → ristorante → ristorante stellato | 🆕 |
 | 🥂 Catering | 🍳 | Sala ed eventi | feste → matrimoni → grandi eventi | 🆕 |
-| 🛵 Consegne veloci | 🚚 | Corriere | rider in bici → scooter → furgoni | 🆕 |
-| 🏭 Deposito merci | 🚚 | Magazzino | magazzino → con muletti → centro di distribuzione | 🆕 |
-| 🚌 Noleggio con autista | 🚚 | Autista | navette → bus turistici → limousine | 🆕 |
 | 🏪 Minimarket | 🤝 | Vendita, Mercato | negozio di quartiere → minimarket → supermercato | 🆕 |
 | 🧺 Banco al mercato | 🤝 | Mercato | bancarella → banco fisso → negozio all'ingrosso | 🆕 |
 | 📣 Agenzia di eventi | 🤝 | Pubbliche relazioni | promoter → feste private → grandi eventi in città | 🆕 |

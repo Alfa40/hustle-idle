@@ -1,5 +1,5 @@
 import { BUSINESS } from '../config/balance';
-import { bizType, hourFactor, ROLES, UPGRADES, type Role } from '../config/business';
+import { bizType, hourFactor, ROLES, upgOf, type Role } from '../config/business';
 import { PRODUCTS } from '../config/products';
 import { productLevel } from '../config/recipes';
 import {
@@ -99,15 +99,15 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
   }
   // dipendenti a vuoto solo in parte del turno (non di troppo): servono più clienti per sfruttarli
   const idle = cov.flatMap((x) => x.idle.map((i) => ({ ...i, r: x.r }))).filter((i) => i.hours.length < SHIFT_HOURS);
-  const growId = upg(b, 'marketing') < UPGRADES.marketing.max ? 'marketing' : upg(b, 'look') < UPGRADES.look.max ? 'look' : null;
+  const growId = upg(b, 'marketing') < upgOf(b.type, 'marketing').max ? 'marketing' : upg(b, 'look') < upgOf(b.type, 'look').max ? 'look' : null;
   if (!losing && isAutonomous(b) && idle.length) {
     const who = idle.slice(0, 3).map((i) => `${i.emp.name.split(' ')[0]} (${(def.roleNames[i.r] ?? ROLES[i.r].name).toLowerCase()}) ${i.hours.length} ${i.hours.length === 1 ? 'ora' : 'ore'} su ${SHIFT_HOURS}, ${shortRanges(hoursCap(i.hours), hoursDem()).ranges.join(', ')}`).join('; ');
-    advice.push({ kind: 'grow', icon: '📣', text: `${idle.length === 1 ? 'Un dipendente lavora' : `${idle.length} dipendenti lavorano`} a vuoto per una parte del turno: ${who}${idle.length > 3 ? ' e altri' : ''}. Nelle altre ore servono, quindi non sono di troppo: aumenta la clientela${growId ? ` con ${UPGRADES[growId].name}` : ''} per sfruttarli`, tab: growId ? 'migliorie' : undefined, label: growId ? '⬆️ Migliorie' : undefined });
+    advice.push({ kind: 'grow', icon: '📣', text: `${idle.length === 1 ? 'Un dipendente lavora' : `${idle.length} dipendenti lavorano`} a vuoto per una parte del turno: ${who}${idle.length > 3 ? ' e altri' : ''}. Nelle altre ore servono, quindi non sono di troppo: aumenta la clientela${growId ? ` con ${upgOf(b.type, growId).name}` : ''} per sfruttarli`, tab: growId ? 'migliorie' : undefined, label: growId ? '⬆️ Migliorie' : undefined });
   } else if (!losing && isAutonomous(b)) {
     const slowest = Math.min(...staff.map((x) => x.cap));
     if (slowest > peakRate * 1.4) {
-      const id = upg(b, 'marketing') < UPGRADES.marketing.max ? 'marketing' : upg(b, 'look') < UPGRADES.look.max ? 'look' : null;
-      if (id) advice.push({ kind: 'grow', icon: '📣', text: `Il personale regge più clienti di quelli che arrivano: con ${UPGRADES[id].name} ne arrivano di più e lo sfrutti meglio`, tab: 'migliorie', label: '⬆️ Migliorie' });
+      const id = upg(b, 'marketing') < upgOf(b.type, 'marketing').max ? 'marketing' : upg(b, 'look') < upgOf(b.type, 'look').max ? 'look' : null;
+      if (id) advice.push({ kind: 'grow', icon: '📣', text: `Il personale regge più clienti di quelli che arrivano: con ${upgOf(b.type, id).name} ne arrivano di più e lo sfrutti meglio`, tab: 'migliorie', label: '⬆️ Migliorie' });
     }
   }
   // domanda di oggi: cosa si vende di più nella zona del negozio (con stagione ed eventi del giorno)

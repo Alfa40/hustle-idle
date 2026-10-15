@@ -59,8 +59,8 @@
   aspetta un aggiornamento (es. cambia i soldi), controlla che la posizione resti uguale e che non ci siano
   errori `[scroll]`. Mai ridisegnare a mano un contenitore scorrevole senza salvare e rimettere lo scorrimento.
 - Prove: headless con Chrome (puppeteer-core) che pilota `window.game` con script di prova
-  usa-e-getta (non si salvano nel progetto). Prima di consegnare: giocare tutti e 6 i lavoretti
-  fino alla fine, e per le schermate le misure di `LAYOUT.md`.
+  usa-e-getta (non si salvano nel progetto). Prima di consegnare: giocare fino alla fine tutti i lavoretti
+  dei settori accesi (ogni gradino), e per le schermate le misure di `LAYOUT.md`.
 
 ## Pubblicazione e servizi
 

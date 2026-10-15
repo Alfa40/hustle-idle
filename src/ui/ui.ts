@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, EXTRA_ROLES, roleName, ROLES, UPGRADES, UPGRADE_IDS, type BusinessType, type Role, type UpgradeId } from '../config/business';
+import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, evolvesOf, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -26,7 +26,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1196,6 +1196,8 @@ export class UI {
       ['panoramica', '📊 Panoramica'],
       ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
       ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ['personale', '👥 Personale'], ['migliorie', '⬆️ Migliorie'],
+      // si può evolvere in un'attività più grande (albero delle evoluzioni)
+      ...(evolvesOf(b().type).length ? [['evoluzione', '🌱 Evoluzione']] : []),
     ];
     this.open({
       money: () => cur === 'migliorie' || cur === 'magazzino' || cur === 'personale',
@@ -1276,8 +1278,75 @@ export class UI {
           this.close();
           this.game.startOrder(b(), o);
         },
+        evolve: (t) => this.openEvolveLots(bizId, t as BusinessType),
       },
       onClose: () => this.game.save(),
+    });
+  }
+
+  /** Scheda dell'evoluzione: cosa manca (migliorie al massimo) e i rami in cui può diventare. */
+  private evolveTab(b: Business) {
+    const s = this.s;
+    const def = bizType(b.type);
+    const miss = evolveMissing(b);
+    const all = upgradeIdsFor(b.type, hasInterior(b.type), hasCashUpgrade(b.type));
+    const ready = !miss.length;
+    const reqs = all.map((id) => {
+      const u = upgOf(b.type, id);
+      const lv = upg(b, id);
+      return `<div class="row between small evo-req"><span>${u.icon} ${u.name}</span><span>${lv >= u.max ? '✅' : `${lv}/${u.max}`}</span></div>`;
+    }).join('');
+    const targets = evolvesOf(b.type);
+    const cards = targets.map((t) => {
+      const d = bizType(t);
+      const lots = evolveLots(s, t);
+      const from = lots.length ? Math.min(...lots.map((l) => evolvePrice(l, t))) : 0;
+      const next = evolvesOf(t).map((x) => `${bizType(x).icon} ${bizType(x).name}`).join(' o ');
+      return `<div class="card evo-card" style="--sc:${d.color}"><div class="row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div>
+          <div style="flex:1"><h3 style="margin:0">${d.name}</h3><div class="small">${d.products.map((p) => PRODUCTS[p].icon).join(' ')} · ${(d.tier ?? 1)}ª evoluzione</div></div></div>
+        <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
+        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button></div>`;
+    }).join('');
+    return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
+        <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
+        ${reqs}</div>
+      <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}`;
+  }
+
+  /** Locali liberi dove aprire l'attività evoluta, con il prezzo unico (locale + ristrutturazione). */
+  openEvolveLots(bizId: string, target: BusinessType) {
+    const s = this.s;
+    const d = bizType(target);
+    this.open({
+      money: true,
+      title: `🏗️ Scegli il locale`,
+      color: d.color,
+      render: () => {
+        const b = s.businesses.find((x) => x.id === bizId);
+        if (!b) return '<p>Attività non trovata.</p>';
+        const lots = evolveLots(s, target).sort((x, y) => evolvePrice(x, target) - evolvePrice(y, target));
+        return `<div class="card row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div><div style="flex:1"><b>${d.name}</b><div class="small">🏗️ ristrutturazione ${euro(d.evolveCost ?? 0)} + locale</div></div></div>` + explain(`Il prezzo comprende il locale e la ristrutturazione (${euro(d.evolveCost ?? 0)}). In centro ci sono più clienti ma costa di più.`) +
+          lots.map((l) => {
+            const lot = lotDef(l);
+            const price = evolvePrice(l, target);
+            return `<div class="card row"><div style="flex:1"><b>${esc(lot.name)}</b><div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div></div>
+              <button class="btn sm good" data-a="go:${l}" ${s.money < price ? 'disabled' : ''}>Evolvi qui · ${euro(price)}</button></div>`;
+          }).join('');
+      },
+      actions: {
+        go: (lotId) => {
+          const b = s.businesses.find((x) => x.id === bizId);
+          if (!b) return;
+          const old = b.lotId;
+          const nb = evolveBusiness(s, b, target, lotId);
+          if (!nb) return;
+          this.game.setupLot(old);
+          this.game.setupLot(lotId);
+          this.game.save();
+          this.close();
+          this.openBusiness(nb.id, 'ordini');
+        },
+      },
     });
   }
 
@@ -1376,7 +1445,7 @@ export class UI {
     if (!t.length) return '';
     const cost = groupUpgradeCost(bizs, id);
     const to = upg(t[0], id) + 1;
-    return `<button class="btn sm blue" data-a="upg:${id}" ${this.s.money < cost ? 'disabled' : ''}>${UPGRADES[id].icon} ${UPGRADES[id].name} → Liv. ${to} (${t.length === bizs.length ? 'tutti' : t.length}) · ${euro(cost)}</button>`;
+    return `<button class="btn sm blue" data-a="upg:${id}" ${this.s.money < cost ? 'disabled' : ''}>${upgOf(t[0].type, id).icon} ${upgOf(t[0].type, id).name} → Liv. ${to} (${t.length === bizs.length ? 'tutti' : t.length}) · ${euro(cost)}</button>`;
   }
 
   private chainReport(bizs: Business[]) {
@@ -1482,12 +1551,11 @@ export class UI {
         [...same].map(([k, bs]) => `${k} <span class="muted">— ${bs.length === bizs.length ? 'in tutti' : bs.map(name).join(', ')}</span>`), '<button class="btn sm" data-a="tab:prodotti">🍔 Prodotti della catena</button>'));
     }
     // 7) migliorie a livelli diversi tra i negozi: si pareggiano dal gruppo
-    const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
-    const uneven = UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(type)) && (id !== 'cassa' || hasCashUpgrade(type)))
+    const uneven = upgradeIdsFor(type, hasInterior(type), hasCashUpgrade(type))
       .filter((id) => groupUpgradeTargets(bizs, id).length && groupUpgradeTargets(bizs, id).length < bizs.length);
     if (uneven.length) blocks.push(block('info', '⚖️', 'Migliorie a livelli diversi tra i negozi: pareggiale', uneven.map((id) => {
       const lv = bizs.map((b) => upg(b, id));
-      return `${UPGRADES[id].icon} ${UPGRADES[id].name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
+      return `${upgOf(type, id).icon} ${upgOf(type, id).name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
     }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
     const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3><div class="small muted" style="margin-bottom:4px">I problemi di tutti i negozi raggruppati: dove si può, un tasto lo sistema in tutto il gruppo.</div>${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta, magazzini pieni e migliorie pari</span></div>'}</div>`;
     // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
@@ -1537,10 +1605,9 @@ export class UI {
                 <div class="row" style="gap:6px"><button class="btn sm sec" data-a="prod:${p}|0" ${n ? '' : 'disabled'}>Togli</button><button class="btn sm good" data-a="prod:${p}|1" ${n === g.bizs.length ? 'disabled' : ''}>Metti</button></div></div>`;
             }).join('');
         } else if (tab === 'migliorie') {
-          const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
           body = `<p class="muted small explain">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
-            UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(type)) && (id !== 'cassa' || hasCashUpgrade(type))).map((id) => {
-              const u = UPGRADES[id];
+            upgradeIdsFor(type, hasInterior(type), hasCashUpgrade(type)).map((id) => {
+              const u = upgOf(type, id);
               const lv = g.bizs.map((b) => upg(b, id));
               const lo = Math.min(...lv);
               const hi = Math.max(...lv);
@@ -1599,7 +1666,7 @@ export class UI {
         upg: (id) => {
           const r = groupUpgrade(s, sel().bizs, id as UpgradeId);
           for (const b of sel().bizs) this.game.setupLot(b.lotId);
-          report(`${UPGRADES[id as UpgradeId].icon} ${r.done === 1 ? 'Migliorato 1 negozio' : `Migliorati ${r.done} negozi`} · ${euro(r.spent)}${r.skipped ? ` (${r.skipped} senza soldi abbastanza)` : ''}`, r.done > 0);
+          report(`${upgOf(type, id as UpgradeId).icon} ${r.done === 1 ? 'Migliorato 1 negozio' : `Migliorati ${r.done} negozi`} · ${euro(r.spent)}${r.skipped ? ` (${r.skipped} senza soldi abbastanza)` : ''}`, r.done > 0);
         },
         fill: () => {
           const r = groupFill(s, sel().bizs);
@@ -1718,6 +1785,7 @@ export class UI {
       }).join('');
       return `<div class="card tint small">🛠️ <b>Lavori su richiesta</b>: li fai tu, a mano, in prima persona, e pagano più dei lavoretti. <b>🏺 Vasi in ceramica</b>: prendi l'argilla, mettila sul tornio e modellala finché somiglia alla foto (dito verso il centro stringe, verso i lati allarga), falla essiccare, dipingila, incartala e lasciala sul ripiano delle consegne. Nuovi lavori ogni giorno; con l'esperienza diventano più difficili e pagati meglio.</div>${cards}`;
     }
+    if (tab === 'evoluzione') return this.evolveTab(b);
     if (tab === 'ordini') {
       if (isAutonomous(b)) {
         return `<div class="card center"><div class="hero"><div class="emoji">✅</div></div><p>I tuoi dipendenti eseguono gli ordini da soli.</p>
@@ -1728,12 +1796,14 @@ export class UI {
           const pr = PRODUCTS[o.pid];
           const left = Math.max(0, (o.expires - s.minutes) / 60);
           const noStock = (b.stock[o.pid] ?? 0) <= 0;
+          // i servizi dei trasporti si fanno giocando il lavoretto della linea
+          const game = pr.job ? jobInfo(pr.job.line, pr.job.rung ? pr.job.rung * EVOLVE_EVERY : 1) : null;
           return `<div class="card row"><div class="icon-bubble">${pr.icon}</div>
-            <div style="flex:1"><b>${pr.name}</b><div class="muted small">💰 ~${euro(pr.price)} · ⏳ scade tra ${left.toFixed(0)} h${noStock ? ' · <span class="bad">materiali finiti</span>' : ''}</div></div>
+            <div style="flex:1"><b>${pr.name}</b><div class="muted small">💰 ~${euro(pr.price)} · ⏳ scade tra ${left.toFixed(0)} h${noStock ? ' · <span class="bad">materiali finiti</span>' : ''}</div>${game ? `<div class="small">🎮 ${game.icon} ${game.name}</div>` : ''}</div>
             <button class="btn sm good" data-a="exec:${o.id}" ${noStock || this.game.run ? 'disabled' : ''}>Esegui</button></div>`;
         })
         .join('');
-      return `<div class="card tint small">Gli ordini arrivano nelle ore di apertura (${BUSINESS.OPEN_HOUR}–${BUSINESS.CLOSE_HOUR}). Puoi eseguirli tu (più stelle = paga più alta) oppure assumere staff e un manager per farli fare a loro.</div>
+      return `<div class="card tint small explain">Gli ordini arrivano nelle ore di apertura (${BUSINESS.OPEN_HOUR}–${BUSINESS.CLOSE_HOUR}). Puoi eseguirli tu (più stelle = paga più alta) oppure assumere staff e un manager per farli fare a loro.</div>
         <h3 class="sec-title">📋 Ordini in attesa (${b.orders.length}/${MAX_ORDERS})</h3>
         ${list || '<p class="muted small">Nessun ordine al momento. Torna più tardi!</p>'}`;
     }
@@ -1850,9 +1920,8 @@ export class UI {
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40${s.money < 40 ? ' (non hai abbastanza soldi)' : ''}</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
-    const kitchenOnly = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
-    return UPGRADE_IDS.filter((id) => (!kitchenOnly.includes(id) || hasInterior(b.type)) && (id !== 'cassa' || hasCashUpgrade(b.type))).map((id) => {
-      const u = UPGRADES[id];
+    return upgradeIdsFor(b.type, hasInterior(b.type), hasCashUpgrade(b.type)).map((id) => {
+      const u = upgOf(b.type, id);
       const lvl = upg(b, id);
       const cost = u.cost(lvl);
       // fuochi e banchi extra hanno bisogno di spazio libero nel locale
@@ -1871,7 +1940,7 @@ export class UI {
   /** Prova gratis di una miglioria: una copia del locale con un livello in più. */
   private previewUpgrade(b: Business, id: UpgradeId) {
     const s = this.s;
-    const u = UPGRADES[id];
+    const u = upgOf(b.type, id);
     const lvl = upg(b, id);
     const cur = () => s.businesses.find((x) => x.id === b.id);
     this.game.previewBusiness(b.id, (c) => {

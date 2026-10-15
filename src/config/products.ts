@@ -6,11 +6,23 @@ export type ProductId =
   // impresa di pulizie (servizi)
   | 'pulizia_casa' | 'pulizia_uffici' | 'vetri'
   // ditta traslochi (servizi)
-  | 'trasloco_piccolo' | 'trasloco_grande' | 'sgombero';
+  | 'trasloco_piccolo' | 'trasloco_grande' | 'sgombero'
+  // trasporti e logistica: le altre attività (servizi, vedi config/business.ts)
+  | 'consegna_quartiere' | 'consegna_pasti' | 'consegna_citta' | 'pacchi_giornata' | 'consegna_urgente' | 'contratto_corriere'
+  | 'ritiro_pacchi' | 'spedizione' | 'imballaggio' | 'armadietto'
+  | 'pianoforte' | 'opere_arte' | 'trasloco_ufficio'
+  | 'custodia_box' | 'stoccaggio' | 'preparazione_ordini' | 'smistamento'
+  | 'carico_camion' | 'carico_fresco' | 'trasporto_eccezionale'
+  | 'corsa_navetta' | 'corsa_vip' | 'matrimonio' | 'giro_turistico' | 'linea_urbana';
 
 export interface Product {
   name: string;
   icon: string;
+  /**
+   * Servizi di Trasporti e logistica: il lavoretto che si gioca quando il titolare esegue l'ordine di persona
+   * (linea e gradino, vedi config/careers.ts). Senza: casa del cliente (pulizie, traslochi).
+   */
+  job?: { line: 'consegna' | 'magazzino' | 'autista'; rung: number };
   /** modello 3D tenuto in mano/sul bancone (i servizi non ne hanno) */
   model?: string;
   /** costo materia prima (o materiali/carburante) per porzione o servizio */
@@ -24,7 +36,7 @@ export interface Product {
 
 const FLAT = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
 
-export const PRODUCTS: Record<ProductId, Product> = {
+export const PRODUCTS = {
   // ---- food truck ----
   panini: {
     name: 'Panini', icon: '🥪', model: 'food/sandwich.glb', cost: 1.5, price: 6.5, baseDemand: 1.55,
@@ -82,6 +94,39 @@ export const PRODUCTS: Record<ProductId, Product> = {
     name: 'Sgombero cantina', icon: '🗑️', cost: 12, price: 130, baseDemand: 0.05,
     season: [0.8, 0.8, 1.2, 1.3, 1.2, 1, 0.9, 0.9, 1, 1, 0.9, 0.8],
   },
-};
+} as Record<ProductId, Product>;
+
+// ---- trasporti e logistica: servizi delle attività (prezzi più alti salendo nell'albero) ----
+const SUMMER = [0.9, 0.9, 1, 1, 1.1, 1.2, 1.3, 1.2, 1.1, 1, 0.9, 0.9];
+const WINTER = [1.2, 1.1, 1, 1, 0.95, 0.9, 0.85, 0.85, 1, 1, 1.1, 1.3];
+const svc = (name: string, icon: string, cost: number, price: number, baseDemand: number, line: 'consegna' | 'magazzino' | 'autista', rung: number, season = FLAT): Product =>
+  ({ name, icon, cost, price, baseDemand, season, job: { line, rung } });
+Object.assign(PRODUCTS, {
+  consegna_quartiere: svc('Consegne nel quartiere', '🚲', 2, 38, 0.2, 'consegna', 0),
+  consegna_pasti: svc('Pasti a domicilio', '🍱', 2, 32, 0.24, 'consegna', 0, WINTER),
+  consegna_citta: svc('Consegne in città', '🛵', 4, 85, 0.18, 'consegna', 0),
+  pacchi_giornata: svc('Pacchi in giornata', '📦', 8, 160, 0.16, 'consegna', 0, WINTER),
+  consegna_urgente: svc('Consegne urgenti', '⚡', 10, 230, 0.1, 'consegna', 0),
+  contratto_corriere: svc('Contratti con le aziende', '🌍', 30, 520, 0.12, 'consegna', 0),
+  ritiro_pacchi: svc('Ritiro pacchi', '📮', 3, 70, 0.2, 'magazzino', 0, WINTER),
+  spedizione: svc('Spedizioni', '✉️', 5, 110, 0.14, 'magazzino', 3),
+  imballaggio: svc('Imballaggio e spedizione', '📦', 12, 240, 0.14, 'magazzino', 3, WINTER),
+  armadietto: svc('Armadietti in città', '🗄️', 25, 480, 0.15, 'magazzino', 0),
+  pianoforte: svc('Trasporto pianoforti', '🎹', 40, 620, 0.04, 'consegna', 3),
+  opere_arte: svc("Opere d'arte", '🖼️', 35, 540, 0.05, 'consegna', 3),
+  trasloco_ufficio: svc("Trasloco d'ufficio", '🏢', 90, 1300, 0.04, 'consegna', 4, SUMMER),
+  custodia_box: svc('Custodia nei box', '🏬', 10, 180, 0.12, 'magazzino', 0),
+  stoccaggio: svc('Stoccaggio merci', '🏭', 30, 450, 0.1, 'magazzino', 1),
+  preparazione_ordini: svc('Preparazione ordini', '📋', 25, 380, 0.12, 'magazzino', 2, WINTER),
+  smistamento: svc('Smistamento per la città', '🔀', 70, 1100, 0.09, 'magazzino', 4),
+  carico_camion: svc('Trasporto merci', '🚚', 25, 360, 0.11, 'magazzino', 1),
+  carico_fresco: svc('Trasporto refrigerato', '❄️', 45, 720, 0.09, 'magazzino', 1, SUMMER),
+  trasporto_eccezionale: svc('Trasporti eccezionali', '🚛', 120, 1900, 0.04, 'magazzino', 1),
+  corsa_navetta: svc('Corse in navetta', '🚐', 4, 60, 0.22, 'autista', 0),
+  corsa_vip: svc('Corse con conducente', '🚕', 15, 260, 0.13, 'autista', 3),
+  matrimonio: svc('Matrimoni ed eventi', '🎩', 60, 900, 0.05, 'autista', 4, SUMMER),
+  giro_turistico: svc('Giri turistici', '🚌', 15, 240, 0.14, 'autista', 2, SUMMER),
+  linea_urbana: svc('Linee urbane', '🚏', 40, 560, 0.1, 'autista', 1),
+} satisfies Partial<Record<ProductId, Product>>);
 
 export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];

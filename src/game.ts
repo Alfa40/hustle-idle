@@ -13,7 +13,7 @@ import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
-import { readyJobTypes } from './config/careers';
+import { EVOLVE_EVERY, readyJobTypes } from './config/careers';
 import {
   day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot,
   type GameState, type JobOffer,
@@ -759,6 +759,26 @@ export class Game {
         label: slot.kind === 'truck' ? 'Posteggio in vendita' : 'Locale in vendita', icon: '🏷️',
         action: () => this.ui.openLot(lotId),
       });
+    } else if (slot.kind === 'truck' && bizType(biz.type).kind === 'service') {
+      // attività di servizio su un posteggio (consegne in bici, navetta): mezzi parcheggiati e cartello
+      const def = bizType(biz.type);
+      const post = this.buildServicePost(biz.type);
+      post.rotation.y = DIR_ROT[slot.dir];
+      g.add(post);
+      const sign = label(`${def.icon} ${def.name}`, { bg: def.color, scale: 0.6 });
+      sign.position.set(0, 3.4, 0);
+      g.add(sign);
+      const lg = logoSprite(this.state.logo, 0.9);
+      lg.position.set(0, 4.5, 0);
+      g.add(lg);
+      const hw = dx !== 0 ? 1.3 : 2.3;
+      const hd = dz !== 0 ? 1.3 : 2.3;
+      this.city.colliders.push(Object.assign({ minX: slot.center.x - hw, maxX: slot.center.x + hw, minZ: slot.center.z - hd, maxZ: slot.center.z + hd }, { lot: lotId }));
+      inter = this.addInteractable({
+        pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2,
+        label: `${def.name}: ordini`, icon: '📋',
+        action: () => this.ui.openBusiness(biz.id, 'ordini'),
+      });
     } else if (slot.kind === 'truck') {
       // il tuo furgone: lato di servizio verso la strada, aperto solo in orario
       const icons = biz.products.map((p) => PRODUCTS[p].icon).join(' ');
@@ -821,6 +841,41 @@ export class Game {
       });
     }
     this.trucks.set(lotId, { lotId, slot, group: g, inter, extra, built: !!biz, open: isOpenHour(this.state) });
+  }
+
+  /** Posteggio di un'attività di servizio: bici nella rastrelliera o il pulmino della navetta. */
+  private buildServicePost(type: BusinessType) {
+    const g = new THREE.Group();
+    if (type === 'navetta') {
+      const van = model('cars/van.glb', 1.6);
+      van.rotation.y = Math.PI / 2;
+      g.add(van);
+      return g;
+    }
+    const mat = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+    // rastrelliera con tre bici colorate
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.08, 0.08), mat(0x6b7080));
+    rack.position.y = 0.55;
+    g.add(rack);
+    [0x2fb36b, 0xff8a3d, 0x2d9cdb].forEach((c, i) => {
+      const bike = new THREE.Group();
+      for (const z of [-0.45, 0.45]) {
+        const w = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 6, 16), mat(0x22222a));
+        w.rotation.y = Math.PI / 2;
+        w.position.set(0, 0.32, z);
+        bike.add(w);
+      }
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.9), mat(c));
+      frame.position.y = 0.55;
+      bike.add(frame);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.35), mat(c));
+      box.position.set(0, 0.85, -0.35);
+      bike.add(box);
+      bike.position.x = -1.1 + i * 1.1;
+      g.add(bike);
+    });
+    g.traverse((o) => (o.castShadow = true));
+    return g;
   }
 
   /** All'apertura e alla chiusura i tuoi furgoni alzano o abbassano la serranda. */
@@ -987,37 +1042,37 @@ export class Game {
     this.runOffer = offer;
     const slot = this.slotsFor(offer.type)[offer.slot];
     const def = jobInfo(offer.type, offer.level);
+    this.run = this.buildRun(offer, slot);
+    if (tutorial && this.run) this.tutorial.start(def.key, this.run);
+    this.ui.jobBar(true);
+  }
+
+  /** Prepara il minigioco giusto per un lavoretto (tipo e livello della linea) nel posto indicato. */
+  private buildRun(offer: Pick<JobOffer, 'type' | 'level'> & Partial<JobOffer>, slot: Slot): JobRun | null {
+    const def = jobInfo(offer.type, offer.level);
     if (!def.vehicleOk) this.dismount();
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     // Trasporti e logistica: magazzino, autista e i gradini alti delle consegne (minigames/logistics.ts)
-    const logi = startLogisticsJob(this, offer, slot, title);
-    if (logi) {
-      this.run = logi;
-      if (tutorial) this.tutorial.start(def.key, logi);
-      this.ui.jobBar(true);
-      return;
-    }
+    const logi = startLogisticsJob(this, offer as JobOffer, slot, title);
+    if (logi) return logi;
     switch (offer.type) {
       case 'giardino': {
         const arena = this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed }));
         // dal Liv. 10 di manualità: potatura di siepi e alberi
-        this.run = def.variant >= 1 ? pruneArenaJob(this, lv, arena, title) : gardenArenaJob(this, lv, arena, title);
-        break;
+        return def.variant >= 1 ? pruneArenaJob(this, lv, arena, title) : gardenArenaJob(this, lv, arena, title);
       }
-      case 'consegna': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package', offer.level); break;
-      case 'volantini': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer'); break;
+      case 'consegna': return routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package', offer.level);
+      case 'volantini': return routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer');
       case 'piatti': {
         // si va al ristorante (chiuso) e si lavora nella sua cucina
         const run: VisitRun = new VisitRun(this, lv, slot, title, () => this.enterKitchen(lv, slot.pos, run), 'al ristorante', 'Entra in cucina');
-        this.run = run;
-        break;
+        return run;
       }
-      case 'lavaggio': this.run = carWashArenaJob(this, lv, this.enterArena(new Arena({ size: carWashLot(lv), slot, placed: this.city.placed })), title); break;
-      case 'imbianchino': this.run = paintArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title); break;
+      case 'lavaggio': return carWashArenaJob(this, lv, this.enterArena(new Arena({ size: carWashLot(lv), slot, placed: this.city.placed })), title);
+      case 'imbianchino': return paintArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title);
     }
-    if (tutorial && this.run) this.tutorial.start(def.key, this.run);
-    this.ui.jobBar(true);
+    return null;
   }
 
   /** minigioco in corso in una scena separata (lontano dalla città) e dove tornare dopo */
@@ -1076,6 +1131,23 @@ export class Game {
     const pr = PRODUCTS[order.pid];
     const title = `${pr.icon} ${pr.name}`;
     this.runOrder = { bizId: biz.id, order };
+    if (pr.job) {
+      // servizi dei trasporti: si gioca il lavoretto della linea, al gradino del servizio e con la tua
+      // esperienza di quella linea (dentro il gradino: più sei bravo, più è difficile e pagato)
+      const { line, rung } = pr.job;
+      const start = rung === 0 ? 1 : rung * EVOLVE_EVERY;
+      const level = Math.max(start, Math.min(start + EVOLVE_EVERY - 1, lineLevel(this.state, line)));
+      const run = this.buildRun({ type: line, level }, slot);
+      if (!run) {
+        this.runOrder = null;
+        return;
+      }
+      this.run = run;
+      const key = jobInfo(line, level).key;
+      if (!this.tutorial.isDone(key)) this.tutorial.start(key, run);
+      this.ui.jobBar(true);
+      return;
+    }
     const run = new VisitRun(this, lv, slot, title, () => this.enterHouse(order.pid, lv, slot.pos, run));
     this.run = run;
     this.ui.jobBar(true);
@@ -1267,6 +1339,9 @@ export class Game {
     const xp = stars ? Math.round(PRODUCTS[order.pid].price / 6 + 8) : 0;
     if (stars) {
       for (const k of def.skills) addXp(s, k, Math.round(xp / def.skills.length));
+      // i servizi dei trasporti si giocano coi lavoretti: sale anche la linea di quel lavoretto
+      const job = PRODUCTS[order.pid].job;
+      if (job) addJobXp(s, job.line, Math.round(xp / 2));
       missionProgress(s, 'served');
     } else addFame(s, def.skills[0], -1);
     if (stars > 0) playStats(this.state).orders++;

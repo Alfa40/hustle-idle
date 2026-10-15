@@ -1,4 +1,4 @@
-import { bizType, UPGRADES, type BusinessType, type UpgradeId } from '../config/business';
+import { bizType, upgOf, type BusinessType, type UpgradeId } from '../config/business';
 import { ZONES, type ZoneId } from '../config/map';
 import type { ProductId } from '../config/products';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
@@ -87,7 +87,7 @@ export function groupProduct(s: GameState, bizs: Business[], pid: ProductId, add
 
 /** Il prossimo livello di una miglioria si può comprare in questo negozio (spazio sul muro compreso)? */
 export function canUpgrade(b: Business, id: UpgradeId) {
-  if (upg(b, id) >= UPGRADES[id].max) return false;
+  if (upg(b, id) >= upgOf(b.type, id).max) return false;
   if ((id === 'fuochi' || id === 'banco') && hasInterior(b.type)) {
     return extraRoom(b.type, Math.min(2, upg(b, 'ampliamento')), upg(b, 'fuochi'), upg(b, 'banco')) > 0;
   }
@@ -108,14 +108,14 @@ export function groupUpgradeTargets(bizs: Business[], id: UpgradeId) {
 
 /** Costo della prossima miglioria del gruppo (solo i negozi a cui tocca). */
 export const groupUpgradeCost = (bizs: Business[], id: UpgradeId) =>
-  groupUpgradeTargets(bizs, id).reduce((a, b) => a + UPGRADES[id].cost(upg(b, id)), 0);
+  groupUpgradeTargets(bizs, id).reduce((a, b) => a + upgOf(b.type, id).cost(upg(b, id)), 0);
 
 /** Migliora di un livello i negozi a cui tocca (prima i più indietro), finché bastano i soldi. */
 export function groupUpgrade(s: GameState, bizs: Business[], id: UpgradeId) {
   const r = { done: 0, skipped: 0, spent: 0 };
   const targets = groupUpgradeTargets(bizs, id);
   for (const b of targets) {
-    const cost = UPGRADES[id].cost(upg(b, id));
+    const cost = upgOf(b.type, id).cost(upg(b, id));
     if (s.money < cost) {
       r.skipped++;
       continue;

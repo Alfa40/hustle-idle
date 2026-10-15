@@ -98,6 +98,19 @@ export interface BusinessTypeDef {
   stations?: { stock: string; work: string; counter: string };
   /** colore dell'insegna */
   color: string;
+  /** settore (per i settori accesi in config/careers.ts: FOCUS_SECTORS) */
+  sector?: SkillId;
+  /**
+   * Gradino nell'albero delle evoluzioni: 0 = attività base (si compra), 1–3 = si ottiene solo evolvendo.
+   * Senza: attività "di prima" (food truck, panificio…), si compra e non si evolve (per ora).
+   */
+  tier?: number;
+  /** in cosa si può evolvere (bivio: se ce n'è più di una, se ne sceglie una); id di BUSINESS_TYPES */
+  evolvesTo?: string[];
+  /** ristrutturazione per diventare questa attività (si aggiunge al prezzo del locale scelto) */
+  evolveCost?: number;
+  /** migliorie con il nome e il massimo di questa attività (es. "Bici elettriche" al posto di Attrezzatura) */
+  upgrades?: Partial<Record<UpgradeId, { name?: string; icon?: string; desc?: string; max?: number }>>;
 }
 
 export const BUSINESS_TYPES = {
@@ -105,37 +118,218 @@ export const BUSINESS_TYPES = {
     name: 'Food truck', icon: '🚚', desc: 'Cibo di strada: economico da aprire, si lavora al bancone.',
     kind: 'truck', lot: 'truck', setupCost: 0, products: ['panini', 'hotdog', 'tacos', 'gelati'],
     roles: ['cucina', 'cassa'], roleNames: { cucina: 'Cuoco', cassa: 'Cassiere' }, skills: ['cucina', 'clientela'],
-    rateMul: 1, wall: 0xe8590c, color: '#e8590c',
+    rateMul: 1, wall: 0xe8590c, color: '#e8590c', sector: 'cucina',
     stations: { stock: '🧊 Frigo', work: '🔥 Piastra', counter: '🪟 Servi qui' },
   },
   panificio: {
     name: 'Panificio', icon: '🥖', desc: 'Pane e dolci: tanti clienti, prodotti economici.',
     kind: 'shop', lot: 'shop', setupCost: 2500, products: ['pane', 'cornetti', 'pizza', 'torte'],
     roles: ['cucina', 'cassa'], roleNames: { cucina: 'Fornaio', cassa: 'Commesso' }, skills: ['cucina', 'clientela'],
-    rateMul: 1.1, wall: 0xd4a373, color: '#b5793d',
+    rateMul: 1.1, wall: 0xd4a373, color: '#b5793d', sector: 'cucina',
     stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
   },
   artigianato: {
     name: "Laboratorio dell'artigiano", icon: '🎨', desc: 'Lavori manuali su richiesta, fatti da te a mano in prima persona: pagano più dei lavoretti. Si parte dai vasi in ceramica; con l\'esperienza arrivano lavori più difficili e pagati meglio.',
     kind: 'craft', lot: 'shop', setupCost: 3500, products: [],
     roles: [], roleNames: {}, skills: ['artigianato'],
-    rateMul: 0, color: '#c0603a',
+    rateMul: 0, color: '#c0603a', sector: 'artigianato',
   },
   pulizie: {
     name: 'Impresa di pulizie', icon: '🧽', desc: 'Servizi a domicilio: esegui gli ordini nelle case.',
     kind: 'service', lot: 'shop', setupCost: 2000, products: ['pulizia_casa', 'pulizia_uffici', 'vetri'],
     roles: ['cucina'], roleNames: { cucina: 'Addetto pulizie' }, skills: ['manualita', 'clientela'],
-    rateMul: 0.12, color: '#2d9cdb',
+    rateMul: 0.12, color: '#2d9cdb', sector: 'manualita',
   },
   traslochi: {
     name: 'Ditta traslochi', icon: '🚛', desc: 'Lavori grossi e ben pagati, serve un furgone.',
     kind: 'service', lot: 'shop', setupCost: 7000, products: ['trasloco_piccolo', 'trasloco_grande', 'sgombero'],
     roles: ['cucina', 'cassa'], roleNames: { cucina: 'Facchino', cassa: 'Autista' }, skills: ['logistica', 'manualita'],
-    rateMul: 0.08, color: '#6a3cb0',
+    rateMul: 0.08, color: '#6a3cb0', sector: 'logistica', tier: 0, evolvesTo: ['trasporti_delicati', 'deposito_mobili', 'autotrasporti'],
+    upgrades: { attrezzatura: { name: 'Carrelli e cinghie', icon: '🛒', max: 3 }, look: { name: 'Furgone con la scritta', icon: '🚛', max: 3 }, marketing: { name: 'Volantini e passaparola', max: 2 }, frigo: { name: 'Scatoloni di scorta', icon: '📦', max: 2 } },
+  },
+  // ---------------- 🚚 Trasporti e logistica: alberi delle evoluzioni (CARRIERE.md) ----------------
+  bici: {
+    name: 'Consegne in bici', icon: '🚲', desc: 'Consegne nel quartiere coi rider in bici: costa poco, si parte subito.',
+    kind: 'service', lot: 'truck', setupCost: 1500, products: ['consegna_quartiere', 'consegna_pasti'],
+    roles: ['cucina'], roleNames: { cucina: 'Rider' }, skills: ['logistica'], rateMul: 0.12, color: '#2fb36b', sector: 'logistica',
+    tier: 0, evolvesTo: ['consegne_veloci', 'punto_ritiro'],
+    upgrades: { attrezzatura: { name: 'Bici elettriche', icon: '⚡', desc: 'I rider consegnano più in fretta (+15% per livello).', max: 3 }, look: { name: 'Borse termiche e divise', icon: '🎒', desc: 'Clienti più contenti e più ordini (+15% per livello).', max: 3 }, marketing: { name: 'App degli ordini', icon: '📱', desc: 'Più ordini dai negozi del quartiere (+10% per livello).', max: 2 }, frigo: { name: 'Rastrelliera più grande', icon: '🚲', desc: '+40 consegne di scorta (borse, nastro, sacchetti).', max: 2 }, menu: { name: 'Zona di consegna più grande', icon: '🗺️', desc: 'Un servizio in più: i pasti a domicilio.' } },
+  },
+  consegne_veloci: {
+    name: 'Consegne veloci', icon: '🛵', desc: 'Scooter in tutta la città: pacchi e pasti, anche dai tuoi locali.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['consegna_citta', 'consegna_pasti'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Rider in scooter', cassa: 'Centralinista' }, skills: ['logistica'], rateMul: 0.12, color: '#2d9cdb', sector: 'logistica',
+    tier: 1, evolveCost: 22000, evolvesTo: ['corriere_espresso'],
+    upgrades: { attrezzatura: { name: 'Scooter nuovi', icon: '🛵', max: 4 }, look: { name: 'Divise e caschi', icon: '⛑️', max: 4 }, marketing: { name: 'Turni di pranzo e cena', icon: '🕐', max: 3 }, frigo: { name: 'Borse termiche di scorta', icon: '🎒', max: 3 }, menu: { name: 'Zone di consegna', icon: '🗺️' } },
+  },
+  corriere_espresso: {
+    name: 'Corriere espresso', icon: '🚐', desc: 'Furgoni e pacchi consegnati in giornata, anche urgenti.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['pacchi_giornata', 'consegna_urgente'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Autista di furgone', cassa: 'Smistatore' }, skills: ['logistica'], rateMul: 0.1, color: '#ff8a3d', sector: 'logistica',
+    tier: 2, evolveCost: 70000, evolvesTo: ['compagnia_corrieri'],
+    upgrades: { attrezzatura: { name: 'Furgoni nuovi', icon: '🚐', max: 5 }, look: { name: 'Deposito di smistamento', icon: '🏗️', max: 5 }, marketing: { name: 'Consegne serali', icon: '🌙', max: 4 }, frigo: { name: 'Scatole e buste', icon: '📦', max: 3 }, menu: { name: 'Servizio urgente', icon: '⚡' } },
+  },
+  compagnia_corrieri: {
+    name: 'Compagnia di corrieri', icon: '🌍', desc: 'Contratti con tutta la città: il traguardo delle consegne.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['contratto_corriere', 'pacchi_giornata'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Corriere', cassa: 'Responsabile clienti' }, skills: ['logistica'], rateMul: 0.1, color: '#5b4bb7', sector: 'logistica',
+    tier: 3, evolveCost: 200000,
+    upgrades: { attrezzatura: { name: 'Flotta di furgoni', icon: '🚐', max: 6 }, look: { name: 'Filiali in città', icon: '🏢', max: 6 }, marketing: { name: 'Servizio aeroporto', icon: '✈️', max: 5 }, frigo: { name: 'Magazzino centrale', icon: '📦', max: 4 }, menu: { name: 'Pacchi in giornata', icon: '📦' } },
+  },
+  punto_ritiro: {
+    name: 'Punto ritiro pacchi', icon: '📮', desc: 'La gente ritira e spedisce i pacchi: tu li tieni in ordine sugli scaffali.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['ritiro_pacchi', 'spedizione'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Magazziniere', cassa: 'Commesso' }, skills: ['logistica', 'clientela'], rateMul: 0.14, color: '#e5484d', sector: 'logistica',
+    tier: 1, evolveCost: 20000, evolvesTo: ['centro_spedizioni'],
+    upgrades: { attrezzatura: { name: 'Scaffali più grandi', icon: '🗄️', max: 4 }, look: { name: 'Orario prolungato', icon: '🕐', max: 4 }, marketing: { name: 'Insegna e app', icon: '📱', max: 3 }, frigo: { name: 'Etichette e buste', icon: '🏷️', max: 3 }, menu: { name: 'Spedizioni', icon: '✉️' } },
+  },
+  centro_spedizioni: {
+    name: 'Centro spedizioni', icon: '📦', desc: 'Imballa e spedisce per privati e negozi.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['imballaggio', 'ritiro_pacchi'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Imballatore', cassa: 'Commesso' }, skills: ['logistica'], rateMul: 0.12, color: '#c8935a', sector: 'logistica',
+    tier: 2, evolveCost: 65000, evolvesTo: ['armadietti'],
+    upgrades: { attrezzatura: { name: 'Bilance e nastri', icon: '⚖️', max: 5 }, look: { name: 'Imballaggi speciali', icon: '🫧', max: 5 }, marketing: { name: 'Ritiro a domicilio', icon: '🚐', max: 4 }, frigo: { name: 'Scatole di ogni misura', icon: '📦', max: 3 }, menu: { name: 'Ritiro pacchi', icon: '📮' } },
+  },
+  armadietti: {
+    name: 'Armadietti in città', icon: '🗄️', desc: 'Armadietti per i pacchi in tutta la città: un incasso per ognuno.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['armadietto', 'imballaggio'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Autista', cassa: 'Tecnico' }, skills: ['logistica'], rateMul: 0.1, color: '#2fb3a3', sector: 'logistica',
+    tier: 3, evolveCost: 180000,
+    upgrades: { attrezzatura: { name: 'Più armadietti', icon: '🗄️', max: 6 }, look: { name: 'Armadietti refrigerati', icon: '❄️', max: 6 }, marketing: { name: 'App con lo sblocco', icon: '📱', max: 5 }, frigo: { name: 'Ricambi', icon: '🔧', max: 4 }, menu: { name: 'Imballaggio', icon: '📦' } },
+  },
+  trasporti_delicati: {
+    name: 'Trasporti delicati', icon: '🎹', desc: "Pianoforti, opere d'arte e antiquariato: pochi ordini, pagati molto.",
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['pianoforte', 'opere_arte'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Facchino specializzato', cassa: 'Autista' }, skills: ['logistica'], rateMul: 0.06, color: '#3a2f55', sector: 'logistica',
+    tier: 1, evolveCost: 30000, evolvesTo: ['traslochi_azienda'],
+    upgrades: { attrezzatura: { name: 'Montacarichi', icon: '🏗️', max: 4 }, look: { name: 'Casse imbottite', icon: '🫧', max: 4 }, marketing: { name: 'Assicurazione sul carico', icon: '🛡️', max: 3 }, frigo: { name: 'Imballaggi di scorta', icon: '📦', max: 3 }, menu: { name: "Opere d'arte", icon: '🖼️' } },
+  },
+  traslochi_azienda: {
+    name: "Traslochi d'azienda", icon: '🏢', desc: 'Uffici e negozi interi, con le squadre di facchini.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['trasloco_ufficio', 'pianoforte'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Facchino', cassa: 'Caposquadra' }, skills: ['logistica'], rateMul: 0.06, color: '#6a3cb0', sector: 'logistica',
+    tier: 2, evolveCost: 90000,
+    upgrades: { attrezzatura: { name: 'Più squadre', icon: '👷', max: 5 }, look: { name: 'Camion grandi', icon: '🚛', max: 5 }, marketing: { name: 'Lavori di notte', icon: '🌙', max: 4 }, frigo: { name: 'Scatoloni e coperte', icon: '📦', max: 3 }, menu: { name: 'Pianoforti', icon: '🎹' } },
+  },
+  deposito_mobili: {
+    name: 'Deposito mobili', icon: '🏬', desc: 'Custodia dei mobili nei box: un incasso al mese per ogni box.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['custodia_box', 'trasloco_piccolo'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Magazziniere', cassa: 'Autista' }, skills: ['logistica'], rateMul: 0.1, color: '#8a5a2b', sector: 'logistica',
+    tier: 1, evolveCost: 25000, evolvesTo: ['deposito_merci'],
+    upgrades: { attrezzatura: { name: 'Più box', icon: '🏬', max: 4 }, look: { name: 'Allarme e sorveglianza', icon: '🚨', max: 4 }, marketing: { name: 'Box climatizzati', icon: '❄️', max: 3 }, frigo: { name: 'Lucchetti e coperte', icon: '🔒', max: 3 }, menu: { name: 'Traslochi piccoli', icon: '📦' } },
+  },
+  deposito_merci: {
+    name: 'Deposito merci', icon: '🏭', desc: 'Tiene le merci dei negozi e prepara i loro ordini.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['stoccaggio', 'preparazione_ordini'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Carrellista', cassa: 'Preparatore' }, skills: ['logistica'], rateMul: 0.08, color: '#6b7080', sector: 'logistica',
+    tier: 2, evolveCost: 75000, evolvesTo: ['centro_distribuzione'],
+    upgrades: { attrezzatura: { name: 'Muletti', icon: '🚜', max: 5 }, look: { name: 'Scaffali alti', icon: '🗄️', max: 5 }, marketing: { name: 'Spazio affittato ad altri', icon: '🤝', max: 4 }, frigo: { name: 'Bancali', icon: '🪵', max: 3 }, menu: { name: 'Preparazione ordini', icon: '📋' } },
+  },
+  centro_distribuzione: {
+    name: 'Centro di distribuzione', icon: '🔀', desc: 'Nastri e smistamento: rifornisce tutta la città.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['smistamento', 'stoccaggio'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Addetto ai nastri', cassa: 'Carrellista' }, skills: ['logistica'], rateMul: 0.08, color: '#ff5d73', sector: 'logistica',
+    tier: 3, evolveCost: 220000,
+    upgrades: { attrezzatura: { name: 'Nastri trasportatori', icon: '🔀', max: 6 }, look: { name: 'Smistatori automatici', icon: '🤖', max: 6 }, marketing: { name: 'Banchine di carico', icon: '🚛', max: 5 }, frigo: { name: 'Ricambi dei nastri', icon: '🔧', max: 4 }, menu: { name: 'Stoccaggio', icon: '🏭' } },
+  },
+  autotrasporti: {
+    name: 'Autotrasporti', icon: '🚚', desc: 'Camion con contratti fissi con i negozi della città.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['carico_camion'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Camionista', cassa: 'Meccanico' }, skills: ['logistica'], rateMul: 0.08, color: '#2d6cdb', sector: 'logistica',
+    tier: 1, evolveCost: 28000, evolvesTo: ['trasporti_refrigerati'],
+    upgrades: { attrezzatura: { name: 'Camion nuovi', icon: '🚚', max: 4 }, look: { name: 'Manutenzione dei mezzi', icon: '🔧', max: 4 }, marketing: { name: 'Contratti coi negozi', icon: '🤝', max: 3 }, frigo: { name: 'Gasolio', icon: '⛽', max: 3 } },
+  },
+  trasporti_refrigerati: {
+    name: 'Trasporti refrigerati', icon: '❄️', desc: 'Cibo fresco per ristoranti e supermercati.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['carico_fresco', 'carico_camion'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Camionista', cassa: 'Meccanico' }, skills: ['logistica'], rateMul: 0.08, color: '#2d9cdb', sector: 'logistica',
+    tier: 2, evolveCost: 80000, evolvesTo: ['trasporti_eccezionali'],
+    upgrades: { attrezzatura: { name: 'Celle frigorifere', icon: '❄️', max: 5 }, look: { name: 'Consegne all\'alba', icon: '🌅', max: 5 }, marketing: { name: 'Contratti coi ristoranti', icon: '🤝', max: 4 }, frigo: { name: 'Gasolio', icon: '⛽', max: 3 }, menu: { name: 'Trasporto merci', icon: '🚚' } },
+  },
+  trasporti_eccezionali: {
+    name: 'Trasporti eccezionali', icon: '🚛', desc: 'Carichi enormi e bisarche per le concessionarie.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['trasporto_eccezionale', 'carico_fresco'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Camionista', cassa: 'Auto di scorta' }, skills: ['logistica'], rateMul: 0.06, color: '#ffc21a', sector: 'logistica',
+    tier: 3, evolveCost: 210000,
+    upgrades: { attrezzatura: { name: 'Bisarche', icon: '🚛', max: 6 }, look: { name: 'Permessi speciali', icon: '📜', max: 6 }, marketing: { name: 'Auto di scorta', icon: '🚓', max: 5 }, frigo: { name: 'Gasolio', icon: '⛽', max: 4 }, menu: { name: 'Trasporti refrigerati', icon: '❄️' } },
+  },
+  navetta: {
+    name: 'Navetta', icon: '🚐', desc: 'Un pulmino tra hotel, stazione e centro.',
+    kind: 'service', lot: 'truck', setupCost: 6000, products: ['corsa_navetta'],
+    roles: ['cucina'], roleNames: { cucina: 'Autista' }, skills: ['logistica'], rateMul: 0.12, color: '#2fb36b', sector: 'logistica',
+    tier: 0, evolvesTo: ['ncc', 'bus_turistici'],
+    upgrades: { attrezzatura: { name: 'Pulmini in più', icon: '🚐', max: 3 }, look: { name: 'Aria condizionata', icon: '❄️', max: 3 }, marketing: { name: 'Fermate in più', icon: '🚏', max: 2 }, frigo: { name: 'Carburante', icon: '⛽', max: 2 } },
+  },
+  ncc: {
+    name: 'Noleggio con conducente', icon: '🚕', desc: 'Corse prenotate per clienti importanti.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['corsa_vip', 'corsa_navetta'],
+    roles: ['cucina'], roleNames: { cucina: 'Autista' }, skills: ['logistica', 'clientela'], rateMul: 0.1, color: '#ffc21a', sector: 'logistica',
+    tier: 1, evolveCost: 26000, evolvesTo: ['limousine'],
+    upgrades: { attrezzatura: { name: 'Auto di lusso', icon: '🚘', max: 4 }, look: { name: 'Autisti in divisa', icon: '🎩', max: 4 }, marketing: { name: 'Prenotazioni dall\'app', icon: '📱', max: 3 }, frigo: { name: 'Carburante', icon: '⛽', max: 3 }, menu: { name: 'Navette', icon: '🚐' } },
+  },
+  limousine: {
+    name: 'Limousine ed eventi', icon: '🎩', desc: 'Matrimoni, prime e ospiti importanti.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['matrimonio', 'corsa_vip'],
+    roles: ['cucina'], roleNames: { cucina: 'Autista' }, skills: ['logistica', 'clientela'], rateMul: 0.08, color: '#1c1c22', sector: 'logistica',
+    tier: 2, evolveCost: 85000,
+    upgrades: { attrezzatura: { name: 'Limousine', icon: '🎩', max: 5 }, look: { name: 'Tappeto rosso', icon: '🟥', max: 5 }, marketing: { name: 'Pacchetti matrimonio', icon: '💍', max: 4 }, frigo: { name: 'Fiori e champagne', icon: '🍾', max: 3 }, menu: { name: 'Corse con conducente', icon: '🚕' } },
+  },
+  bus_turistici: {
+    name: 'Bus turistici', icon: '🚌', desc: "Giri della città per i turisti, di più d'estate.",
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['giro_turistico', 'corsa_navetta'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Autista', cassa: 'Guida turistica' }, skills: ['logistica', 'clientela'], rateMul: 0.1, color: '#e5484d', sector: 'logistica',
+    tier: 1, evolveCost: 30000, evolvesTo: ['linee_urbane'],
+    upgrades: { attrezzatura: { name: 'Bus scoperto', icon: '🚌', max: 4 }, look: { name: 'Giri a tema', icon: '🏛️', max: 4 }, marketing: { name: 'Biglietti online', icon: '🎟️', max: 3 }, frigo: { name: 'Carburante', icon: '⛽', max: 3 }, menu: { name: 'Navette', icon: '🚐' } },
+  },
+  linee_urbane: {
+    name: 'Linee urbane in appalto', icon: '🚏', desc: 'Gli autobus della città: appalti del comune, con penali se fai tardi.',
+    kind: 'service', lot: 'shop', setupCost: 0, products: ['linea_urbana', 'giro_turistico'],
+    roles: ['cucina', 'cassa'], roleNames: { cucina: 'Autista di autobus', cassa: 'Controllore' }, skills: ['logistica'], rateMul: 0.08, color: '#2d6cdb', sector: 'logistica',
+    tier: 2, evolveCost: 90000,
+    upgrades: { attrezzatura: { name: 'Autobus nuovi', icon: '🚌', max: 5 }, look: { name: 'Fermate coperte', icon: '🚏', max: 5 }, marketing: { name: 'Più linee', icon: '🗺️', max: 4 }, frigo: { name: 'Carburante', icon: '⛽', max: 3 }, menu: { name: 'Giri turistici', icon: '🚌' } },
   },
 } satisfies Record<string, BusinessTypeDef>;
 
 export type BusinessType = keyof typeof BUSINESS_TYPES;
+
+/** Migliorie che hanno senso in questa attività (le attività di servizio non hanno cucina né cassa). */
+export function upgradeIdsFor(t: BusinessType, hasInterior: boolean, cash: boolean): UpgradeId[] {
+  const kitchenOnly: UpgradeId[] = ['ampliamento', 'fuochi', 'banco', 'ripiano'];
+  const def = BUSINESS_TYPES[t] as BusinessTypeDef;
+  return UPGRADE_IDS.filter((id) => {
+    if (kitchenOnly.includes(id) && !hasInterior) return false;
+    if (id === 'cassa' && !cash) return false;
+    // "più prodotti" solo se c'è più di un prodotto da mettere
+    if (id === 'menu' && def.products.length < 2) return false;
+    return true;
+  });
+}
+
+/** In cosa si può evolvere questa attività (vuoto: è l'ultima del suo ramo, o non si evolve). */
+export const evolvesOf = (t: BusinessType) => ((BUSINESS_TYPES[t] as BusinessTypeDef).evolvesTo ?? []) as BusinessType[];
+
+/** Da quale attività si arriva a questa evolvendo (null per le attività base). */
+export function evolvesFrom(t: BusinessType): BusinessType | null {
+  for (const k of Object.keys(BUSINESS_TYPES) as BusinessType[]) if (evolvesOf(k).includes(t)) return k;
+  return null;
+}
+
+/** Gradino nell'albero: costa di più migliorare un'attività più grande. */
+const TIER_COST = [1, 3, 8, 20];
+
+/**
+ * La miglioria com'è in questa attività: nome, icona, descrizione e massimo propri (se ne ha) e costo che
+ * cresce col gradino dell'albero. "Più prodotti" arriva al massimo a tutti i prodotti dell'attività.
+ */
+export function upgOf(t: BusinessType, id: UpgradeId): UpgradeDef {
+  const base = UPGRADES[id];
+  const def = BUSINESS_TYPES[t] as BusinessTypeDef;
+  const o = def.upgrades?.[id];
+  const k = TIER_COST[def.tier ?? 0] ?? 1;
+  const max = id === 'menu' ? Math.min(base.max, def.products.length - 1) : o?.max ?? base.max;
+  if (!o && k === 1 && max === base.max) return base;
+  return { name: o?.name ?? base.name, icon: o?.icon ?? base.icon, desc: o?.desc ?? base.desc, max, cost: (l) => Math.round((base.cost(l) * k) / 10) * 10 };
+}
 export const BUSINESS_TYPE_IDS = Object.keys(BUSINESS_TYPES) as BusinessType[];
 export const bizType = (t: BusinessType): BusinessTypeDef => BUSINESS_TYPES[t];
 export const roleName = (t: BusinessType, r: Role) => bizType(t).roleNames[r] ?? ROLES[r].name;

@@ -92,3 +92,9 @@ Misure da provare sempre, in verticale e in orizzontale: 360×640, 390×844, 430
 Le spiegazioni non occupano spazio: hanno la classe `explain` e compaiono solo toccando il tasto **?**
 nell'intestazione della finestra (accanto a ✕). Il tasto si vede solo se la finestra ha spiegazioni; aperte,
 hanno uno sfondo azzurro con la riga blu a sinistra e restano aperte finché la finestra resta aperta.
+
+## Minigiochi col dito
+I minigiochi che si giocano su un "tavolo" disegnato (furgone a incastri, pianoforte, quadri, smistamento:
+`OverlayRun` in src/minigames/overlay.ts) occupano un riquadro nella zona libera (`layout.freeRect` senza barra
+del lavoretto, fumetto del tutorial, messaggi e colonna dei pulsanti) e si ridisegnano solo se la misura
+cambia. Finché durano, joystick, pulsante azione, minimappa e camera spariscono (`body.overlay-job`).
