@@ -194,7 +194,7 @@ export class VanPuzzleRun extends OverlayRun {
   }
 
   private build() {
-    this.root.innerHTML = `<div class="van-box"><div class="van-cab">🚛</div><div class="van-grid"></div></div>
+    this.root.innerHTML = `<div class="van-box"><div class="van-grid"></div><div class="van-cab">🚛</div></div>
       <div class="van-legend"><span>🏋️ pesante: sul fondo</span><span>🔔 fragile: niente sopra</span><span>👆 tocca per girare</span></div>
       <div class="van-tray"></div><button class="btn good full van-close" disabled>🔒 Chiudi il furgone</button>`;
     this.grid = this.root.querySelector('.van-grid')!;
@@ -215,8 +215,8 @@ export class VanPuzzleRun extends OverlayRun {
 
   protected resized(w: number, h: number) {
     // il cassone in alto (grande quanto si può), il vassoio dei pezzi sotto
-    const trayH = Math.max(110, h * 0.34);
-    this.cell = Math.floor(Math.min((w - 70) / this.W, (h - trayH - 90) / this.H, 70));
+    const trayH = Math.max(120, h * 0.3);
+    this.cell = Math.floor(Math.min((w - 30) / this.W, (h - trayH - 110) / this.H, 74));
     if (!this.grid) return;
     this.grid.style.width = `${this.cell * this.W}px`;
     this.grid.style.height = `${this.cell * this.H}px`;
@@ -228,7 +228,7 @@ export class VanPuzzleRun extends OverlayRun {
   private layoutPieces() {
     const c = this.cell;
     const trayW = this.tray.clientWidth || 300;
-    const k = 0.62; // nel vassoio i pezzi sono un po' più piccoli
+    const k = 0.8; // nel vassoio i pezzi sono un po' più piccoli
     let x = 6;
     let y = 6;
     let rowH = 0;

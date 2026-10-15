@@ -646,7 +646,11 @@ export class PhasedRun extends BaseRun {
 
   onAction() {
     const p = this.game.player.root.position;
-    const t = this.pending().find((x) => x.kind === 'tap' && Math.hypot(x.pos.x - p.x, x.pos.z - p.z) < this.reach());
+    // il punto più vicino (quello illuminato e indicato), non il primo della lista: con le scelte vicine
+    // (i due ripiani dello stesso scaffale) si fa sempre quella che stai guardando
+    const t = this.nearTask && this.nearOk && this.nearTask.kind === 'tap' ? this.nearTask
+      : this.pending().filter((x) => x.kind === 'tap' && Math.hypot(x.pos.x - p.x, x.pos.z - p.z) < this.reach())
+        .sort((a, b) => Math.hypot(a.pos.x - p.x, a.pos.z - p.z) - Math.hypot(b.pos.x - p.x, b.pos.z - p.z))[0];
     if (!t || (t.onFoot && this.game.riding)) return;
     if (!this.game.riding) this.game.player.once('interact-right');
     this.complete(t);
@@ -1350,8 +1354,8 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   // numeri civici su ogni casa della via
   if (civici) {
     for (const h of street.houses) {
-      const t = label(String(civico(h)), { bg: '#2d6cdb', scale: 0.5 });
-      t.position.set(h.door.x, 2.4, h.door.z);
+      const t = label(String(civico(h)), { bg: '#2d6cdb', scale: 0.95 });
+      t.position.set(h.door.x, 2.7, h.door.z);
       t.userData.noGlow = true;
       run.prop(t, t.position.clone(), 0, 1);
     }

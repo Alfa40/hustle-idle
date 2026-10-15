@@ -1443,6 +1443,8 @@ export class Game {
   /** Sali sul mezzo da lavoro del lavoretto (o scendi con `null`): sostituisce il veicolo tuo. */
   setJobRide(r: JobRide | null) {
     if (r) this.dismount();
+    // le parti nascoste in prima persona tornano visibili quando si scende
+    for (const o of this.jobRide?.fpHide ?? []) o.visible = true;
     this.jobRide = r;
     this.rideVel.set(0, 0, 0);
     this.applyRide();
@@ -1775,6 +1777,8 @@ export class Game {
     this.player.body.visible = false;
     if (this.player.held) this.player.held.visible = false;
     if (this.rideObj && !this.jobRide) this.rideObj.visible = false;
+    // mezzo da lavoro: in prima persona si vede solo ciò che sta davanti (es. le forche del muletto)
+    for (const o of this.jobRide?.fpHide ?? []) o.visible = false;
     // etichette: più piccole e nascoste se troppo vicine agli occhi
     if (++this.fpScan % 45 === 1) {
       this.fpSprites = [];

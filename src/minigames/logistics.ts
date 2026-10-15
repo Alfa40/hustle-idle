@@ -208,7 +208,7 @@ export function forkliftJob(game: Game, lineLevel: number, wh: Warehouse, title:
           lift.position.set(0, 0, 0);
           lift.rotation.set(0, 0, 0);
           lift.scale.setScalar(1);
-          game.setJobRide({ obj: lift, speed: 4.6, radius: 0.85, fpHide: [lift.userData.body], showDriver: true, driverY: 0.55 });
+          game.setJobRide({ obj: lift, speed: 4.6, radius: 0.85, fpHide: [lift.userData.body, lift.userData.mast], showDriver: true, driverY: 0.55 });
         },
       }],
     },
@@ -309,8 +309,9 @@ export function pickingJob(game: Game, lineLevel: number, wh: Warehouse, title: 
     const c = run.prop(crate(0.42, 0xd9b48a), a.pos.clone().setY(a.y), 0, 1);
     c.name = 'art' + a.icon;
     c.userData.solid = false;
-    const tg = label(a.icon, { bg: '#ffffff', scale: 0.42 });
-    tg.position.set(0, 0.6, 0.1);
+    // l'icona grande sopra la scatola: si legge anche da qualche metro
+    const tg = label(a.icon, { bg: '#ffffff', scale: 0.9 });
+    tg.position.set(0, 0.75, 0.15);
     c.add(tg);
   }
   run.extraStatus = () => `📋 ${order.map((x) => (got.has(x) ? '✅' : x)).join(' ')}`;
@@ -333,12 +334,13 @@ const SIZES = [
 export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title: string) {
   const t = rungProgress('magazzino', lineLevel);
   const n = t < 0.4 ? 2 : 3;
-  const C = wh.corner.clone().add(new THREE.Vector3(-3, 0, -2.5));
-  const arrivals = C.clone().add(new THREE.Vector3(-3.2, 0, 0));
+  // banchi in fila con passaggi larghi: arrivi → scatole → banco del nastro → etichette; i pronti dietro
+  const C = wh.corner.clone().add(new THREE.Vector3(-4, 0, -3));
+  const arrivals = C.clone().add(new THREE.Vector3(-4.4, 0, 0));
   const bench = C.clone();
-  const printer = C.clone().add(new THREE.Vector3(1.9, 0, 0));
-  const ready = C.clone().add(new THREE.Vector3(0, 0, -2.6));
-  const boxesAt = SIZES.map((_, i) => C.clone().add(new THREE.Vector3(-2.2 + i * 1.1, 0, 1.9)));
+  const printer = C.clone().add(new THREE.Vector3(2.4, 0, 0));
+  const ready = C.clone().add(new THREE.Vector3(-2.2, 0, -3.2));
+  const boxesAt = SIZES.map((_, i) => C.clone().add(new THREE.Vector3(-3.4 + i * 1.3, 0, 2.2)));
   const shapes = ['🧸', '🏺', '📚', '🎸', '💻', '🪴'];
   type Parcel = { num: number; size: (typeof SIZES)[number]; icon: string; pos: THREE.Vector3; obj?: THREE.Object3D; packed?: THREE.Object3D };
   const parcels: Parcel[] = [];
@@ -361,7 +363,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
           onDone: () => {
             hold(game);
             busy = null;
-            const o = run.prop(crate(p.size.size, 0xc8935a, 0xffffff), ready.clone().add(new THREE.Vector3((packedN - (n - 1) / 2) * 1.0, 0, 0)), 0, 1);
+            const o = run.prop(crate(p.size.size, 0xc8935a, 0xffffff), ready.clone().add(new THREE.Vector3((packedN - (n - 1) / 2) * 1.0, 0.94, 0)), 0, 1);
             o.userData.solid = false;
             const tg = label(`${p.num}`, { bg: '#2d6cdb', scale: 0.4 });
             tg.position.y = p.size.size + 0.3;
@@ -380,7 +382,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     const want = Math.max(...left.map((p) => p.num));
     const g = 'load' + want;
     return left.map((p) => ({
-      pos: p.packed!.position.clone(), kind: 'tap' as const, label: `Prendi il pacco ${p.num}`, icon: '📦', markerText: String(p.num), group: g, decoy: p.num !== want,
+      pos: p.packed!.position.clone().setY(0), kind: 'tap' as const, label: `Prendi il pacco ${p.num}`, icon: '📦', markerText: String(p.num), group: g, decoy: p.num !== want,
       wrongText: `❌ Prima il pacco ${want}: va caricato per primo chi riceve per ultimo`,
       onDone: () => {
         p.packed!.visible = false;

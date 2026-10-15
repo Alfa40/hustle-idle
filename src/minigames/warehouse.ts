@@ -283,11 +283,14 @@ export function forklift() {
     body.add(w);
   }
   const front = new THREE.Group();
+  // montante: in prima persona si nasconde (davanti agli occhi coprirebbe la vista), restano le forche
+  const mast = new THREE.Group();
   for (const x of [-0.35, 0.35]) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.3, 0.1), dark);
     m.position.set(x, 1.15, 0.7);
-    front.add(m);
+    mast.add(m);
   }
+  front.add(mast);
   const forks = new THREE.Group();
   for (const x of [-0.3, 0.3]) {
     const f = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 1.1), mat(0x9aa0aa));
@@ -303,6 +306,7 @@ export function forklift() {
   g.traverse((o) => (o.castShadow = true));
   g.userData.forks = forks;
   g.userData.body = body;
+  g.userData.mast = mast;
   return g;
 }
 
