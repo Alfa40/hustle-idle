@@ -113,7 +113,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### 🥂 Sala
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Cameriere a una festa | festa in giardino: prendi i bicchieri al buffet e servi gli ospiti che chiamano; correndo il vassoio si rovescia | da 5 a 8 ospiti | 2 min |
+| 1 | Cameriere a una festa | festa in giardino: prendi i bicchieri al buffet e servi gli ospiti (tutti alzano la mano, nell'ordine che vuoi); correndo il vassoio si rovescia | da 5 a 8 ospiti | 2 min |
 | 10 | Catering | col dito sistemi i vassoi del buffet uguali allo schema | da 6 a 9 vassoi | 1½–2 min |
 | 20 | Cameriere al ristorante | per ogni tavolo: ordinazione, piatto giusto dal passe, servizio, conto | da 2 a 4 tavoli | 2½–3½ min |
 | 30 | Maître | col dito fai sedere i gruppi ai tavoli giusti (posti, finestra, tranquillità) | da 4 a 6 gruppi | 2 min |

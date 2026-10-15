@@ -87,7 +87,7 @@ const cookWord = (k: number) => (k < 1 ? '🥩 Era ancora crudo' : k <= 1.4 ? '�
 
 /** Fumetto sopra un personaggio (cosa vuole): uno sprite che si può cambiare. */
 function bubble(run: PhasedRun, ch: Character, text: string) {
-  const s = label(text, { bg: '#ffffff', fg: '#3a2f55', scale: 0.42 });
+  const s = label(text, { bg: '#ffffff', fg: '#3a2f55', scale: 0.75 });
   s.position.set(0, 2.25, 0);
   s.userData.noGlow = true;
   ch.root.add(s);
@@ -415,7 +415,7 @@ export function gardenPartyJob(game: Game, lineLevel: number, slot: Slot, placed
   const guests: { c: Character; pos: THREE.Vector3; served: boolean; hand?: THREE.Sprite }[] = [];
   const callNext = () => {
     const wait = guests.map((_g, i) => i).filter((i) => !guests[i].served && !calling.includes(i));
-    while (calling.length < 2 && wait.length) {
+    while (wait.length) {
       const i = wait.splice(Math.floor(Math.random() * wait.length), 1)[0];
       calling.push(i);
       guests[i].hand!.visible = true;
