@@ -14,44 +14,54 @@ di un passo (massimo 1–2 per partita), mai fasi in più una dopo l'altra.
 
 ---
 
-## 🚚 Trasporti e logistica
+## 🚚 Trasporti e logistica ✔️ (discussa il 15/10)
+
+Tutti i gradini sono lavori "con le mani"; tra parentesi la durata per chi gioca bene (massimo sempre sotto i 5 minuti).
 
 ### 📦 Consegne ✅
-| Liv. | Lavoro | Idea di minigioco |
+| Liv. | Lavoro | Minigioco |
 |---|---|---|
-| 1 | Consegna pacchi ✅ | porta i pacchi alle case giuste |
-| 10 | Trasporto mobili 🟡 | carrello su scale e porte, senza urtare |
-| 20 | Traslochi 🟡 | incastra gli scatoloni nel furgone (tipo Tetris) |
-| 30 | Trasporti delicati 🆕 | pianoforte o quadri: tieni in equilibrio il carico |
-| 40 | Allestimento eventi 🆕 | monta palco e luci seguendo la piantina |
+| 1 | Consegna pacchi ✅ | ritira, consegna agli indirizzi, ricevuta; al massimo 5 consegne. Dal Liv. 2 al 9 arrivano, **al posto** di una consegna normale (max 1–2 a partita): firma al citofono (se non c'è nessuno: vicino o avviso), contrassegno col resto giusto, pacco fragile (non correre), pacco grande (si cammina piano, niente veicolo), cane in giardino, pioggia, reso da ritirare. Dal Liv. 5 la linea tratteggiata porta solo al primo indirizzo, poi si cercano i numeri civici (1½–3 min) |
+| 10 | Trasporto mobili | un mobile (due ai livelli alti) sul carrello: vialetto, rampa sui gradini, porta stretta (tocca per girare), barra dei danni, lo lasci nella stanza giusta (casa del cliente) (2–3 min) |
+| 20 | Traslochi | solo il carico: furgone visto dall'alto "a Tetris", 8–12 pezzi da trascinare e ruotare, pesanti sotto e fragili sopra; lo scarico lo fa il gioco (2–3 min) |
+| 30 | Trasporti delicati | un oggetto prezioso: pianoforte col montacarichi dalla finestra (equilibrio col dito) oppure quadri nelle casse imbottite (2–3 min) |
+| 40 | Traslochi d'azienda | un ufficio, al massimo 3 stanze, con 2–3 aiutanti a cui dici cosa portare: accorciano il lavoro (3–4 min) |
 
 ### 🛵 Corriere 🟡
-| Liv. | Lavoro | Idea di minigioco |
+| Liv. | Lavoro | Minigioco |
 |---|---|---|
-| 1 | Rider di cibo 🟡 | ritira al locale, consegna caldo entro il tempo |
-| 10 | Corriere espresso 🟡 | più consegne insieme, scegli il percorso |
-| 20 | Consegne urgenti 🟡 | farmaci e documenti, tempi strettissimi |
-| 30 | Coordinatore dei rider 🆕 | assegna le consegne a più rider sulla mappa |
-| 40 | Capo della flotta 🆕 | gestisci mezzi e turni dei corrieri |
+| 1 | Rider di cibo | un ordine: ritiro al locale, borsa termica che si raffredda, bibite che si rovesciano a frenate e curve brusche, mancia se veloce (1–2 min) |
+| 10 | Corriere espresso | ordini che arrivano mentre guidi, al massimo 3 insieme: accetti o rifiuti, fasce orarie, scegli l'ordine (2–3 min) |
+| 20 | Consegne urgenti | 1–2 consegne (farmaci, documenti), tempi strettissimi, semafori, scorciatoie in bici per parchi e vicoli (1½–2½ min) |
+| 30 | Corriere aeroportuale 🆕 | un plico da portare prima che parta l'aereo, un cambio di mezzo (2–3 min) |
+| 40 | Portavalori 🆕 | furgone blindato, 3 tappe, al massimo un inseguimento da seminare cambiando strada (3–4 min) |
 
 ### 🏭 Magazzino 🟡
-| Liv. | Lavoro | Idea di minigioco |
+| Liv. | Lavoro | Minigioco |
 |---|---|---|
-| 1 | Magazziniere 🟡 | metti ogni scatola sullo scaffale del suo colore |
-| 10 | Carrellista 🟡 | muletto: carica i bancali sul camion |
-| 20 | Capo magazzino 🟡 | prepara gli ordini con la lista |
-| 30 | Responsabile logistica 🆕 | organizza gli scaffali per spedire più in fretta |
-| 40 | Centro di distribuzione 🆕 | nastri e smistamento automatico |
+| 1 | Magazziniere | scarica il camion, 6–10 scatole sullo scaffale del loro colore, pesanti in basso (1½–2 min) |
+| 10 | Carrellista | muletto col joystick, tieni premuto per alzare le forche, 3–4 bancali sul camion senza urtare (2–3 min) |
+| 20 | Preparatore ordini | lista di 5–6 articoli, carrello e scanner, conta il giro più corto (2–3 min) |
+| 30 | Addetto spedizioni 🆕 | 3 pacchi: scatola giusta, riempitivo, nastro, etichetta; carica in ordine (ultimo dentro = prima consegna) (2–3 min) |
+| 40 | Centro di smistamento 🆕 | nastri: tocca i deviatori al momento giusto per mandare ogni pacco alla sua zona; turno fisso di 2 minuti che accelera (2 min) |
 
 ### 🚌 Autista 🆕
-| Liv. | Lavoro | Idea di minigioco |
+| Liv. | Lavoro | Minigioco |
 |---|---|---|
-| 1 | Autista di navetta 🆕 | porta i passeggeri alle fermate |
-| 10 | Autista di autobus 🆕 | linea con orari da rispettare |
-| 20 | Autista turistico 🆕 | giro della città, fermate ai monumenti |
-| 30 | Autista privato 🆕 | clienti importanti, guida dolce |
-| 40 | Noleggio con limousine 🆕 | eventi e matrimoni |
+| 1 | Autista di navetta | 2 fermate: accosta dentro la zona segnata, i passeggeri salgono, portali a destinazione (1½–2 min) |
+| 10 | Autista di autobus | linea corta di 4 fermate, orari, fermate prenotate da non saltare (2½–3½ min) |
+| 20 | Bus turistico | 3 monumenti, guida dolce: le frenate brusche tolgono gradimento (3 min) |
+| 30 | Autista privato | una corsa, bicchiere d'acqua sul cruscotto da non rovesciare, al massimo un cambio di destinazione (2–3 min) |
+| 40 | Limousine per eventi | matrimonio: ritiro puntuale, corteo, arrivo col tappeto rosso, 3 tappe (3–4 min) |
 
+### 🚛 Camionista 🆕
+| Liv. | Lavoro | Minigioco |
+|---|---|---|
+| 1 | Furgoncino per i negozi | rifornisci 3 negozi della città, anche i tuoi (2–3 min) |
+| 10 | Camion | una manovra in retromarcia fino alla banchina di carico (1–2 min) |
+| 20 | Camion frigo | 2 consegne con la temperatura da tenere sotto controllo (2–3 min) |
+| 30 | Trasporti eccezionali | un percorso breve con carico lunghissimo: curve larghe, auto di scorta (3 min) |
+| 40 | Bisarca | carica 4–6 auto sui due piani nell'ordine giusto e portale alla concessionaria (3 min) |
 ---
 
 ## 🍳 Ristorazione
@@ -234,10 +244,36 @@ di un passo (massimo 1–2 per partita), mai fasi in più una dopo l'altra.
 
 ## 🏪 Attività
 
-Le evoluzioni delle attività oggi sono gli **ampliamenti** (0 → 1 magazziniere → 2 sala con camerieri)
-e le **catene**. Proposta: altri due ampliamenti (3 e 4) per le attività già fatte, e attività nuove
-che si sbloccano col livello del settore. Le linee collegate sono quelle che danno esperienza
-e che si giocano dentro l'attività.
+**Regola (decisa il 15/10):** le attività **non si sbloccano col livello**. Si compra solo un'**attività base**
+(come il food truck) e, ampliandola e migliorandola, si **evolve** in un'attività nuova (es. food truck → bar).
+Ogni attività base ha un albero con dei **bivi**: a un certo punto scegli in quale ramo evolverla.
+La gestione (dipendenti, mezzi, turni, zone) esiste **solo nelle attività**, mai nei lavoretti.
+Le linee collegate sono quelle che danno esperienza e che si giocano dentro l'attività.
+Gli ordini fatti di persona dal titolare seguono la regola dei 5 minuti.
+
+### 🚚 Alberi di Trasporti e logistica
+
+```
+🚲 Consegne in bici (base, economica, posteggio)            — Corriere
+ ├─ 🛵 Consegne veloci (scooter, app) → 🚐 Corriere espresso (furgoni) → 🌍 Compagnia di corrieri
+ └─ 📮 Punto ritiro pacchi (locale, bancone) → 📦 Centro spedizioni → 🗄️ Armadietti in tutta la città
+
+🚛 Ditta traslochi (base, c'è già)                          — Consegne
+ ├─ 🎹 Trasporti delicati (pianoforti, arte) → 🏢 Traslochi d'azienda
+ ├─ 🏬 Deposito mobili (custodia, entrata mensile) → 🏭 Deposito merci (muletti) → 🔀 Centro di distribuzione (nastri)   — Magazzino
+ └─ 🚚 Autotrasporti (camion) → ❄️ Trasporti refrigerati → 🚛 Trasporti eccezionali e bisarche                         — Camionista
+
+🚐 Navetta (base, un pulmino)                                — Autista
+ ├─ 🚕 Noleggio con conducente → 🎩 Limousine ed eventi
+ └─ 🚌 Bus turistici → 🚏 Linee urbane in appalto
+```
+
+Agganci con il resto del gioco: le consegne veloci portano a domicilio i prodotti delle tue attività di
+ristorazione (più clienti); i tuoi negozi riordinano dal deposito merci a prezzo d'ingrosso; il deposito
+affitta spazio ad altri (entrata fissa); gli autotrasporti hanno contratti fissi con i negozi della città;
+le linee urbane sono appalti di qualche mese con penali per i ritardi.
+
+### Altri settori (da rifare ad albero quando li discutiamo)
 
 | Attività | Settore | Linee collegate | Evoluzioni (ampliamenti) | Stato |
 |---|---|---|---|---|
@@ -271,5 +307,5 @@ e che si giocano dentro l'attività.
 ## Da decidere
 - Quante linee per settore all'inizio (oggi 3, qui ne propongo 4–5)
 - Se le linee arrivano a 5 gradini (Liv. 40) o restano a 3
-- Con quale livello del settore si sblocca ogni attività nuova
+- Condizioni esatte per evolvere un'attività (ampliamenti e migliorie al massimo? costo?) e cosa succede alla vecchia forma
 - Quali righe fare per prime

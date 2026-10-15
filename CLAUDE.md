@@ -33,6 +33,9 @@
   carriera, `ready`); le versioni giocabili sono in `src/config/jobs.ts` (`JOBS` gradino base,
   `JOB_VARIANTS` ogni 10 livelli, `jobInfo()`). Livello del settore = somma dell'esperienza delle sue linee
   + lavoro nelle attività (`sectorXp` in src/sim/progress.ts). Nuovi lavori: si aggiungono lì, non altrove.
+- **Lavoretti sempre "con le mani"** a ogni gradino (guidare, caricare, consegnare…): la gestione di persone,
+  mezzi e turni sta **solo nelle attività**. Le attività nuove **non si sbloccano col livello**: si compra
+  un'attività base e, ampliandola e migliorandola, si evolve in un'altra (albero con bivi, vedi `CARRIERE.md`).
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push
   va chiesto di nuovo. Dopo il push si aspetta che la GitHub Action finisca e si conferma il link.
