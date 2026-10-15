@@ -98,3 +98,7 @@ I minigiochi che si giocano su un "tavolo" disegnato (furgone a incastri, pianof
 `OverlayRun` in src/minigames/overlay.ts) occupano un riquadro nella zona libera (`layout.freeRect` senza barra
 del lavoretto, fumetto del tutorial, messaggi e colonna dei pulsanti) e si ridisegnano solo se la misura
 cambia. Finché durano, joystick, pulsante azione, minimappa e camera spariscono (`body.overlay-job`).
+Il riquadro si ricalcola a tempo vero ogni 250 ms (la barra del lavoretto entra con un'animazione); i messaggi a
+comparsa (toast) non gli tolgono spazio. Dentro, il contenuto si adatta all'altezza (`--ovw`/`--ovh` sul riquadro):
+il furgone a incastri si rimpicciolisce finché il pulsante si vede, il piatto dei minigiochi a trascinamento non
+supera lo spazio lasciato da vassoio, pulsante e foto. Provati a 360×640, 390×844, 430×932, 768×1024 e in orizzontale.
