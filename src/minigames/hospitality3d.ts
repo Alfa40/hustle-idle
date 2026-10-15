@@ -129,7 +129,7 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
   const qs: number[] = [];
   let holding: { dish: (typeof DISHES)[number]; k: number | null } | null = null;
   let run: PhasedRun;
-  const fridge = room.furn('kitchenFridgeLarge', -3.6, -2.9, 0);
+  const fridge = room.furn('kitchenFridgeLarge', -3.6, -2.9, 0, 1.5);
   const stoves = Array.from({ length: nStoves }, (_, i) => {
     const f = room.furn('kitchenStove', -1.6 + i * 1.3, -3.0, 0);
     return { pos: room.at(-1.6 + i * 1.3, -2.5), obj: f.obj, top: f.top, dish: null as (typeof DISHES)[number] | null, time: 0, bar: null as ReturnType<typeof cookBar> | null };
@@ -683,7 +683,8 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     run.prop(g, d.pos.clone(), 0, 1).userData.noGlow = true;
     tag(run, String(d.num), d.pos.clone().add(new THREE.Vector3(-d.side * 0.1, 0, 0)), 2.45, '#3a2f55');
   }
-  room.furn('desk', 0, D / 2 - 1.0, Math.PI);
+  // banco della reception di lato, non davanti alla porta
+  room.furn('desk', -1.9, D / 2 - 1.6, Math.PI / 2);
   for (const b of bags) {
     const o = crate(0.5, 0x2d6cdb);
     const lb = label(String(b.door.num), { bg: '#ffc21a', fg: '#3a2f55', scale: 0.32 });
@@ -713,12 +714,13 @@ export function housekeepingJob(game: Game, lineLevel: number, slot: Slot, place
   for (let r = 0; r < rooms; r++) {
     const cx = -W / 2 + 2.2 + r * 4.4;
     if (r) walls.push({ x: -W / 2 + r * 4.4 });
-    const bed = room.furn('bedDouble', cx - 0.4, -2.4, 0);
+    // letto in scala vera (circa 2 m): resta il passaggio verso il bagno
+    const bed = room.furn('bedDouble', cx - 0.6, -2.7, 0, 1.2);
     const bin = room.furn('trashcan', cx + 1.5, -0.4, 0, 1.3);
     const sink = room.furn('bathroomSink', cx + 1.6, -3.2, 0);
     const side = room.furn('sideTable', cx - 1.7, -0.6, 0);
     jobs.push(
-      { pos: room.at(cx - 0.4, -0.6), kind: 'hold', sec: 2, quiet: true, label: 'Rifai il letto', icon: '🛏️', obj: bed.obj, enabled: () => holding === 'lenzuola', onDone: () => { holding = null; hold(game); } },
+      { pos: room.at(cx - 0.6, -1.2), kind: 'hold', sec: 2, quiet: true, label: 'Rifai il letto', icon: '🛏️', obj: bed.obj, enabled: () => holding === 'lenzuola', onDone: () => { holding = null; hold(game); } },
       { pos: room.at(cx + 1.6, -2.4), kind: 'tap', quiet: true, label: 'Asciugamani puliti', icon: '🧺', obj: sink.obj, enabled: () => holding === 'asciugamani', onDone: () => { holding = null; hold(game); } },
       {
         pos: room.at(cx + 1.5, 0.3), kind: 'tap', quiet: true, label: 'Svuota il cestino', icon: '🗑️', obj: bin.obj, enabled: () => !holding,
@@ -785,8 +787,9 @@ export function conciergeJob(game: Game, lineLevel: number, slot: Slot, placed: 
   let doneN = 0;
   const qs: number[] = [];
   let run: PhasedRun;
-  room.furn('desk', -1, -2.0, 0);
-  room.furn('desk', 1, -2.0, 0);
+  // il banco più avanti: dietro resta il passaggio verso gli scaffali
+  room.furn('desk', -1, -1.0, 0);
+  room.furn('desk', 1, -1.0, 0);
   const guests = reqs.map((r, i) => ({ r, pos: room.at(-3.4 + (i % 3) * 3.4, -0.2 + Math.floor(i / 3) * 1.7), c: null as unknown as Character, b: null as unknown as THREE.Sprite, done: false, asked: false }));
   const itemAt = (k: number) => room.at(-3.75 + k * 1.5, -3.2);
   const phases: Phase[] = [{
@@ -899,8 +902,8 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
       tip: 'In suite: <b>apparecchia</b> il tavolo (tieni premuto), metti i <b>fiori</b> nel vaso, accendi le <b>candele</b> e apri le <b>tende</b>',
       tasks: () => [
         { pos: room.at(2.4, -0.4), kind: 'hold', sec: 2, label: 'Apparecchia il tavolo', icon: '🍽️' },
-        { pos: room.at(4.4, -2.6), kind: 'tap', label: 'Metti i fiori nel vaso', icon: '💐' },
-        { pos: room.at(1.0, -1.8), kind: 'tap', label: 'Accendi le candele', icon: '🕯️', fx: 'spark' },
+        { pos: room.at(4.4, -2.2), kind: 'tap', label: 'Metti i fiori nel vaso', icon: '💐' },
+        { pos: room.at(1.0, -2.0), kind: 'tap', label: 'Accendi le candele', icon: '🕯️', fx: 'spark' },
         { pos: room.at(4.6, 1.2), kind: 'hold', sec: 1.4, label: 'Apri le tende', icon: '🪟' },
       ],
     },
@@ -915,7 +918,31 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
   run.prop(cart, cartAt.clone().add(new THREE.Vector3(0, 0, 0.6)), 0, 1);
   tag(run, '🛒 Carrello', cartAt, 1.7, '#8e5bd6');
   room.furn('table', 2.4, -1.2, 0);
-  room.furn('bedDouble', 3.5, 2.6, Math.PI);
+  room.furn('bedDouble', 3.5, 2.4, Math.PI, 1.2);
+  // vaso (per i fiori), candelabro e tende alla finestra: gli oggetti dei punti della suite
+  const m = (c: number) => new THREE.MeshLambertMaterial({ color: c });
+  const vase = new THREE.Group();
+  const vb = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.5, 12), m(0x8fd3ff));
+  vb.position.y = 0.95;
+  const vt = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.5), m(0xd9cbb0));
+  vt.position.y = 0.35;
+  vase.add(vb, vt);
+  run.prop(vase, room.at(4.4, -2.9), 0, 1).userData.solid = true;
+  const cand = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8), m(0xfff3d6));
+    c.position.set(-0.12 + i * 0.12, 1.0, 0);
+    cand.add(c);
+  }
+  const ct = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.85, 0.5), m(0x8a5a2b));
+  ct.position.y = 0.42;
+  cand.add(ct);
+  run.prop(cand, room.at(1.0, -2.6), 0, 1).userData.solid = true;
+  const curtain = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.2, 1.8), m(0xc0392b));
+  curtain.position.y = 1.2;
+  const cg = new THREE.Group();
+  cg.add(curtain);
+  run.prop(cg, room.at(5.35, 1.2), 0, 1);
   room.furn('loungeSofa', -3.6, 2.6, Math.PI);
   // a fine lavoro: quante cose giuste sul carrello
   const wanted = want.map((w) => w.icon);

@@ -13,7 +13,6 @@ import { BaseRun, starsFor, type RunGuide } from './jobs';
 export abstract class OverlayRun extends BaseRun {
   protected root: HTMLDivElement;
   private offLayout: () => void;
-  private placeT = 0;
   /** fase attuale per il tutorial */
   protected phaseIdx = 0;
   protected abstract phaseList: { name: string; icon: string; tip: string }[];
@@ -27,22 +26,32 @@ export abstract class OverlayRun extends BaseRun {
     document.body.classList.add('overlay-job');
     this.offLayout = layout.on(() => this.place(), false);
     requestAnimationFrame(() => this.place());
+    // a tempo vero (non coi fotogrammi del gioco): la barra del lavoretto entra con un'animazione e il
+    // fumetto del tutorial cambia altezza; il riquadro si risistema subito anche sui telefoni lenti
+    this.placeTimer = window.setInterval(() => this.place(), 250);
   }
+
+  private placeTimer = 0;
 
   /** Il riquadro occupa la zona libera dai riquadri in alto e dalla colonna dei pulsanti. */
   protected place() {
     const dock = layout.panelDock;
     const r = layout.freeRect([
-      { sel: '.jobbar.on', dock }, { sel: '.tut-bubble', dock }, { sel: '.toasts', dock },
+      // i messaggi a comparsa (toast) durano pochi secondi: il riquadro non si sposta per loro
+      { sel: '.jobbar.on', dock }, { sel: '.tut-bubble', dock },
       { sel: '.hud-right .hud-btns', dock: 'right' },
     ]);
     const s = this.root.style;
     s.left = `${r.x + 6}px`;
     s.top = `${r.y + 4}px`;
-    const w = Math.max(200, Math.round(r.w - 12));
-    const h = Math.max(200, Math.round(r.h - 10));
+    // mai più grande dello spazio libero (anche se è poco): meglio un riquadro piccolo che sopra i pulsanti
+    const w = Math.max(140, Math.round(r.w - 12));
+    const h = Math.max(160, Math.round(r.h - 10));
     s.width = `${w}px`;
     s.height = `${h}px`;
+    // misure per il CSS dei minigiochi (es. il piatto non più alto dello spazio che c'è)
+    s.setProperty('--ovw', `${w}px`);
+    s.setProperty('--ovh', `${h}px`);
     // si ridisegna solo se la misura cambia davvero
     if (w === this.lastW && h === this.lastH) return;
     this.lastW = w;
@@ -59,12 +68,6 @@ export abstract class OverlayRun extends BaseRun {
   protected abstract step(dt: number): void;
 
   update(dt: number) {
-    // il riquadro si riadatta se cambiano i riquadri sopra (tutorial, messaggi)
-    this.placeT += dt;
-    if (this.placeT > 0.5) {
-      this.placeT = 0;
-      this.place();
-    }
     if (!this.tick(dt)) return;
     this.step(dt);
     const ph = this.phaseList[this.phaseIdx];
@@ -89,6 +92,7 @@ export abstract class OverlayRun extends BaseRun {
   }
 
   dispose() {
+    window.clearInterval(this.placeTimer);
     this.offLayout();
     this.root.remove();
     document.body.classList.remove('overlay-job');
@@ -222,6 +226,14 @@ export class VanPuzzleRun extends OverlayRun {
     this.grid.style.height = `${this.cell * this.H}px`;
     this.grid.style.backgroundSize = `${this.cell}px ${this.cell}px`;
     this.layoutPieces();
+    // sugli schermi bassi: si rimpicciolisce il cassone finché tutto (vassoio e pulsante) sta nel riquadro
+    for (let k = 0; k < 20 && this.root.scrollHeight > this.root.clientHeight + 1 && this.cell > 18; k++) {
+      this.cell -= 2;
+      this.grid.style.width = `${this.cell * this.W}px`;
+      this.grid.style.height = `${this.cell * this.H}px`;
+      this.grid.style.backgroundSize = `${this.cell}px ${this.cell}px`;
+      this.layoutPieces();
+    }
   }
 
   /** Mette ogni pezzo al suo posto: nel cassone o in fila nel vassoio (che va a capo). */
@@ -261,7 +273,8 @@ export class VanPuzzleRun extends OverlayRun {
         rowH = Math.max(rowH, ph);
       }
     }
-    this.tray.style.minHeight = `${y + rowH + 10}px`;
+    // i pezzi nel vassoio stanno in un riquadro che scorre (mai più alto dello spazio: il pulsante resta visibile)
+    this.tray.style.setProperty('--tray-h', `${y + rowH + 10}px`);
     this.check();
   }
 
@@ -491,7 +504,7 @@ export class PianoLiftRun extends OverlayRun {
     g.fillStyle = '#ffd21a';
     g.font = `${Math.round(h * 0.035)}px Fredoka, sans-serif`;
     g.textAlign = 'center';
-    g.fillText('🏠 qui', w / 2, wy + h * 0.08);
+    g.fillText('🏠 qui', w / 2, wy + h * 0.08, bw * 0.38);
     // le funi e la piattaforma che sale
     const py = h * 0.88 - (h * 0.88 - (wy + h * 0.17)) * this.rise;
     g.strokeStyle = '#555';
@@ -520,14 +533,16 @@ export class PianoLiftRun extends OverlayRun {
     if (this.finger === null && this.phaseIdx === 0) {
       g.fillStyle = 'rgba(58,47,85,.85)';
       g.font = `600 ${Math.round(h * 0.032)}px Fredoka, sans-serif`;
-      g.fillText('👆 Tieni il dito e spostalo dalla parte opposta', w / 2, h - 44);
+      g.font = `600 ${Math.round(Math.min(h * 0.032, w / 18))}px Fredoka, sans-serif`;
+      g.fillText('👆 Tieni il dito e spostalo', w / 2, h - 58, w - 12);
+      g.fillText('dalla parte opposta', w / 2, h - 40, w - 12);
     }
     if (this.phaseIdx === 1) {
       g.fillStyle = 'rgba(53,196,106,.9)';
       g.fillRect(w * 0.15, h * 0.45, w * 0.7, h * 0.1);
       g.fillStyle = '#fff';
       g.font = `700 ${Math.round(h * 0.04)}px Fredoka, sans-serif`;
-      g.fillText('👆 Tocca: spingilo dentro', w / 2, h * 0.52);
+      g.fillText('👆 Tocca: spingilo dentro', w / 2, h * 0.52, w * 0.66);
     }
   }
 

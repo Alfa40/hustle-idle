@@ -86,7 +86,8 @@ abstract class CanvasRun extends OverlayRun {
     g.font = `${weight} ${Math.round(size)}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(t, x, y);
+    // mai più largo del riquadro (si stringe un po' invece di uscire)
+    g.fillText(t, x, y, this.w - 16);
   }
 
   /** Riquadro quadrato più grande che sta sotto la riga del titolo (per i disegni). */
@@ -598,6 +599,8 @@ export class DragRun extends OverlayRun {
     this.root.innerHTML = `${opts.ref ? `<div class="dg-ref">${opts.ref}</div>` : ''}<div class="dg-board dg-${opts.board}"></div><div class="dg-tray"></div>
       <button class="btn good full dg-done" disabled>✅ Fatto</button><div class="dg-cook" hidden><div class="dg-cook-l"></div><div class="dg-bar"><i class="dg-green"></i><b class="dg-cur"></b></div><button class="btn good dg-stop">🔥 Ferma la cottura</button></div>`;
     this.board = this.root.querySelector('.dg-board')!;
+    // spazio da lasciare sotto il piatto: vassoio e pulsante, più la foto se c'è
+    this.root.style.setProperty('--refh', opts.ref ? '96px' : '0px');
     this.tray = this.root.querySelector('.dg-tray')!;
     this.doneBtn = this.root.querySelector('.dg-done')!;
     this.doneBtn.addEventListener('click', () => this.done2());

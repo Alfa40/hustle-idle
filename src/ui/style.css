@@ -1089,7 +1089,8 @@ body.overlay-job .hud-right .minimap, body.overlay-job .edge-ptr, body.overlay-j
   background-image: linear-gradient(to right, rgba(0,0,0,.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,.08) 1px, transparent 1px);
 }
 .van-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; justify-content: center; font-size: 12px; font-weight: 600; color: var(--ink-2); }
-.van-tray { position: relative; width: 100%; flex: 1 1 auto; background: #efe6d6; border-radius: 12px; overflow-y: auto; }
+.van-tray { position: relative; width: 100%; flex: 1 1 0; min-height: 60px; background: #efe6d6; border-radius: 12px; overflow-y: auto; }
+.van-tray::after { content: ''; display: block; height: var(--tray-h, 0); }
 .van-piece {
   position: absolute; box-sizing: border-box; background: #ffd9a8; border: 3px solid #b0773e; border-radius: 8px;
   display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; transition: left .12s, top .12s;
@@ -1131,7 +1132,9 @@ body.dev-game #h-money::before { content: '🛠️ '; }
 .dg-photo { position: relative; width: 92px; height: 92px; border-radius: 50%; flex: none; }
 .dg-photo.dg-schema { border-radius: 10px; background: #fff; border: 3px solid #d9cbb0; }
 .dg-photo span { position: absolute; transform: translate(-50%, -50%); font-size: 18px; }
-.dg-board { position: relative; width: min(100%, 52vh); aspect-ratio: 1; flex: none; }
+.dg-board { position: relative; width: min(100%, max(120px, calc(var(--ovh, 500px) - 150px - var(--refh, 96px)))); aspect-ratio: 1; flex: none; }
+body.is-short .dg-photo { width: 64px; height: 64px; }
+body.is-short .dg-photo span { font-size: 13px; }
 .dg-board.dg-plate { background: radial-gradient(circle, #fff 60%, #e9e9e9 61%, #fff 68%); border-radius: 50%; box-shadow: 0 4px 0 rgba(0,0,0,.1); }
 .dg-board.dg-cake { background: radial-gradient(circle, #f7c6d9 62%, #f2a7c3 63%, transparent 64%); border-radius: 50%; }
 .dg-board.dg-table { background: #fff; border: 4px solid #d9cbb0; border-radius: 14px; }
@@ -1144,7 +1147,7 @@ body.dev-game #h-money::before { content: '🛠️ '; }
 .dg-floor .dg-slot, .dg-rooms .dg-slot, .dg-table .dg-slot { border-radius: 12px; background: rgba(255,255,255,.75); }
 .dg-slot small { position: absolute; bottom: -2px; left: 50%; transform: translate(-50%, 100%); white-space: nowrap; font-size: 11px; font-weight: 700; color: var(--ink); background: #fff; border-radius: 6px; padding: 0 4px; }
 .dg-rooms .dg-slot small, .dg-floor .dg-slot small { position: static; transform: none; font-size: 10px; white-space: normal; text-align: center; background: none; }
-.dg-tray { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; flex: 1 1 auto; overflow-y: auto; align-content: flex-start; width: 100%; }
+.dg-tray { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; flex: 1 1 0; min-height: 50px; overflow-y: auto; align-content: flex-start; width: 100%; }
 .dg-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; border: 2px solid #d9cbb0; border-radius: 12px;
   min-width: 52px; padding: 4px 6px; touch-action: none; font-size: 26px; line-height: 1;
@@ -1159,3 +1162,6 @@ body.dev-game #h-money::before { content: '🛠️ '; }
 .dg-cook-l { font-size: 20px; font-weight: 700; color: var(--ink); }
 .dg-bar { position: relative; width: 90%; height: 26px; background: linear-gradient(90deg, #ffe08a, #ffc21a 40%, #35c46a 42%, #35c46a 58%, #e5484d 60%, #a3242c); border-radius: 13px; }
 .dg-cur { position: absolute; top: -8px; width: 6px; height: 42px; margin-left: -3px; background: var(--ink); border-radius: 3px; }
+
+.dg-rooms .dg-slot, .dg-floor .dg-slot { overflow: hidden; }
+.dg-rooms .dg-slot small, .dg-floor .dg-slot small { font-size: 9px; line-height: 1.15; }

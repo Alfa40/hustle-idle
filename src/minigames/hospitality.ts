@@ -126,7 +126,7 @@ function reception(game: Game, t: number, title: string) {
   const pos = (i: number): [number, number] => [0.18 + (i % 3) * 0.32, 0.18 + Math.floor(i / 3) * 0.3];
   const ask = (g: (typeof guests)[number]) => g.asks.map((a) => (a === 'bed' ? g.r.bed : a === 'view' ? g.r.view : g.r.high ? '⬆️' : '⬇️')).join(' ');
   return new DragRun(game, title, {
-    slots: rooms.map((r, i) => ({ id: r.id, x: pos(i)[0], y: pos(i)[1], size: 0.26, label: `${r.num} ${r.bed} ${r.view} ${r.high ? '⬆️' : '⬇️'}` })),
+    slots: rooms.map((r, i) => ({ id: r.id, x: pos(i)[0], y: pos(i)[1], size: 0.28, label: `${r.num}<br>${r.bed}${r.view}${r.high ? '⬆️' : '⬇️'}` })),
     items: guests.map((g) => ({
       id: g.id, icon: '🧳', label: ask(g),
       ok: (s) => {
