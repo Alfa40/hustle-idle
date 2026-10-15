@@ -9,6 +9,11 @@ import type { Box } from './arena';
  * Scena separata dei lavoretti al chiuso di Ristorazione e ospitalità (cucina, sala, hotel, bar, forno): un
  * locale senza tetto (si vede il cielo e, oltre i muri, il quartiere vero dove si è accettato il lavoro), con
  * muri bassi, pavimento e mobili Kenney. Grande quanto serve per le cose da fare.
+ *
+ * Le coordinate dei lavoretti (at, furn) sono quelle del progetto (`w` × `d`); il locale vero è più grande
+ * (SPREAD) e le cose si allargano: in mezzo le distanze crescono, vicino ai muri resta la stessa distanza dal
+ * muro (i mobili contro il muro restano contro il muro, ma più distanti tra loro). Così c'è spazio per
+ * camminare, girare la visuale e toccare la cosa giusta.
  */
 export const ROOM_ORIGIN = new THREE.Vector3(0, 0, 4800);
 
@@ -22,6 +27,19 @@ export const ROOM_ASSETS = [
 
 /** Scala dei mobili Kenney (come nella casa del cliente): un bancone arriva a circa 1 m. */
 export const FURN = 2.3;
+
+/** Quanto è più grande il locale vero rispetto alle misure del progetto (per lato). */
+export const SPREAD = 1.5;
+/** fascia vicino al muro (m) che resta alla stessa distanza dal muro */
+const WALL_BAND = 1.0;
+
+/** coordinata del progetto (mezza misura h) → locale vero (mezza misura H) */
+function spread(a: number, h: number, H: number) {
+  const m = Math.min(WALL_BAND, h / 2);
+  const k = Math.abs(a);
+  const v = k >= h - m ? H - (h - k) : (k * (H - m)) / (h - m);
+  return Math.sign(a) * v;
+}
 
 const mat = (c: number) => new THREE.MeshLambertMaterial({ color: c });
 
@@ -47,14 +65,20 @@ export class Room {
   entry: THREE.Vector3;
   /** centro del pavimento */
   center: THREE.Vector3;
+  /** misure vere del locale */
   readonly w: number;
   readonly d: number;
+  /** misure del progetto (quelle delle coordinate dei lavoretti) */
+  private w0: number;
+  private d0: number;
 
   constructor(opts: RoomOpts) {
     const O = ROOM_ORIGIN;
     const g = this.group;
-    const W = (this.w = opts.w);
-    const D = (this.d = opts.d);
+    this.w0 = opts.w;
+    this.d0 = opts.d;
+    const W = (this.w = opts.w * SPREAD);
+    const D = (this.d = opts.d * SPREAD);
     this.center = O.clone();
     this.bounds = { minX: O.x - W / 2 + 0.35, maxX: O.x + W / 2 - 0.35, minZ: O.z - D / 2 + 0.35, maxZ: O.z + D / 2 - 0.35 };
     const plane = (w: number, d: number, m: THREE.Material, x: number, y: number, z: number) => {
@@ -121,6 +145,32 @@ export class Room {
    * se `solid` non si attraversa. Restituisce l'oggetto e il suo ingombro.
    */
   furn(path: string, x: number, z: number, rot = 0, scale = FURN, solid = true) {
+    return this.place(path, this.sx(x), this.sz(z), rot, scale, solid);
+  }
+
+  /**
+   * Bancone fatto di più pezzi uno accanto all'altro, da `a` a `b` (coordinate del progetto, lungo x se
+   * `alongX`, altrimenti lungo z; l'altra coordinata è `c`): resta intero anche nel locale allargato.
+   */
+  furnRow(path: string, a: number, b: number, c: number, alongX: boolean, rot = 0, scale = FURN) {
+    const A = alongX ? this.sx(a) : this.sz(a);
+    const B = alongX ? this.sx(b) : this.sz(b);
+    const C = alongX ? this.sz(c) : this.sx(c);
+    // larghezza di un pezzo (lungo la fila)
+    const probe = new THREE.Box3().setFromObject(model(`furniture/${path}.glb`, scale));
+    const along = Math.abs(Math.cos(rot)) > 0.5 === alongX ? probe.max.x - probe.min.x : probe.max.z - probe.min.z;
+    const k = Math.max(1, Math.round(Math.abs(B - A) / along));
+    const step = (B - A) / k;
+    const out = [];
+    for (let i = 0; i < k; i++) {
+      const v = A + step * (i + 0.5);
+      out.push(alongX ? this.place(path, v, C, rot, scale) : this.place(path, C, v, rot, scale));
+    }
+    return out;
+  }
+
+  /** Mette un mobile nel punto (x, z) del locale vero (rispetto al centro). */
+  private place(path: string, x: number, z: number, rot = 0, scale = FURN, solid = true) {
     const O = ROOM_ORIGIN;
     const inner = model(`furniture/${path}.glb`, scale);
     const box = new THREE.Box3().setFromObject(inner);
@@ -142,7 +192,15 @@ export class Room {
 
   /** Punto del locale (coordinate rispetto al centro). */
   at(x: number, z: number, y = 0) {
-    return new THREE.Vector3(ROOM_ORIGIN.x + x, y, ROOM_ORIGIN.z + z);
+    return new THREE.Vector3(ROOM_ORIGIN.x + this.sx(x), y, ROOM_ORIGIN.z + this.sz(z));
+  }
+
+  /** coordinate del progetto → locale vero (rispetto al centro) */
+  sx(x: number) {
+    return spread(x, this.w0 / 2, this.w / 2);
+  }
+  sz(z: number) {
+    return spread(z, this.d0 / 2, this.d / 2);
   }
 
   collide(p: THREE.Vector3, r = 0.35) {

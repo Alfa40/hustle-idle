@@ -134,8 +134,8 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
     const f = room.furn('kitchenStove', -1.6 + i * 1.3, -3.0, 0);
     return { pos: room.at(-1.6 + i * 1.3, -2.5), obj: f.obj, top: f.top, dish: null as (typeof DISHES)[number] | null, time: 0, bar: null as ReturnType<typeof cookBar> | null };
   });
-  const pass = room.furn('kitchenCabinet', 3.4, -1.2, -Math.PI / 2);
-  room.furn('kitchenCabinet', 3.4, -0.2, -Math.PI / 2);
+  const passRow = room.furnRow('kitchenCabinet', -1.7, 0.3, 3.4, false, -Math.PI / 2);
+  const pass = passRow[Math.floor(passRow.length / 2)];
   room.furn('kitchenSink', 2.2, -3.0, 0);
   const fridgeAt = room.at(-3.6, -2.2);
   const passAt = room.at(2.7, -0.7);
@@ -334,7 +334,7 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   const qs: number[] = [];
   let run: PhasedRun;
   // bancone in mezzo: dietro (−z) le macchine, davanti (+z) i clienti
-  for (let i = 0; i < 4; i++) room.furn('kitchenBar', -2.25 + i * 1.0, -0.6, 0);
+  room.furnRow('kitchenBar', -2.75, 1.25, -0.6, true);
   const cupsAt = room.at(-3.4, -2.2);
   const cups = room.furn('kitchenCabinet', -3.4, -3.0, 0);
   const machine = room.furn('kitchenCoffeeMachine', -1.2, -3.0, 0, 3);
@@ -499,8 +499,7 @@ export function restaurantJob(game: Game, lineLevel: number, slot: Slot, placed:
   let holding: { what: 'dish'; table: number } | { what: 'bill' } | null = null;
   let run: PhasedRun;
   const passAt = room.at(0, -3.0);
-  room.furn('kitchenCabinet', -0.5, -3.6, 0);
-  room.furn('kitchenCabinet', 0.5, -3.6, 0);
+  room.furnRow('kitchenCabinet', -1, 1, -3.6, true);
   const regAt = room.at(4.0, -3.0);
   room.furn('desk', 4.0, -3.6, 0);
   const tpos: [number, number][] = [[-3, -0.6], [3, -0.6], [-3, 2.2], [3, 2.2]];
@@ -574,7 +573,7 @@ export function restaurantJob(game: Game, lineLevel: number, slot: Slot, placed:
   }
   run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 45 });
   for (const tb of tables) {
-    room.furn('table', tb.pos.x - room.center.x, tb.pos.z - room.center.z, 0);
+    room.furn('table', tpos[tb.num - 1][0], tpos[tb.num - 1][1], 0);
     tb.cust = npc(run, tb.pos.clone().add(new THREE.Vector3(0, 0, -0.9)), tb.num + 3, 0);
     tb.bub = bubble(run, tb.cust, '🙋 ordiniamo');
     tag(run, `${tb.num}`, tb.pos, 1.5, '#2d6cdb');
@@ -673,7 +672,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
       }],
     },
   ];
-  run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 18 + doorsPerSide * 3 });
+  run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 22 + doorsPerSide * 4 });
   // porte con il numero, e le valigie con l'etichetta
   for (const d of doors) {
     const door = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.1, 1.0), new THREE.MeshLambertMaterial({ color: 0x8a5a2b }));
@@ -743,15 +742,16 @@ export function housekeepingJob(game: Game, lineLevel: number, slot: Slot, place
     ],
   }];
   run = new PhasedRun(game, 1, title, phases, { time: 30 + rooms * 55 });
-  // muretti tra le camere (con il passaggio sul davanti)
+  // muretti tra le camere (dal muro di fondo, con il passaggio sul davanti)
+  const zBack = room.sz(-4), zFront = room.sz(1);
   for (const w of walls) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.6, 5), new THREE.MeshLambertMaterial({ color: 0xf1e6d2 }));
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, 2.6, zFront - zBack), new THREE.MeshLambertMaterial({ color: 0xf1e6d2 }));
     m.position.y = 1.3;
     const g = new THREE.Group();
     g.add(m);
     g.userData.solid = true;
     g.userData.noGlow = true;
-    run.prop(g, room.at(w.x, -1.5), 0, 1);
+    run.prop(g, room.center.clone().add(new THREE.Vector3(room.sx(w.x), 0, (zBack + zFront) / 2)), 0, 1);
   }
   const cart = crate(0.8, 0x8e5bd6, 0xffffff);
   cart.userData.solid = true;
@@ -840,7 +840,7 @@ export function conciergeJob(game: Game, lineLevel: number, slot: Slot, placed: 
     g.b.visible = false;
   });
   shelfItems.forEach((it, k) => {
-    const sh = room.furn('kitchenCabinet', itemAt(k).x - room.center.x, -3.6, 0, 2);
+    const sh = room.furn('kitchenCabinet', -3.75 + k * 1.5, -3.6, 0, 2);
     void sh;
     tag(run, it.icon, itemAt(k), 1.4);
   });
@@ -913,8 +913,8 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
   run = new PhasedRun(game, 1, title, phases, { time: 50 + n * 22 });
   pantry.forEach((icon, k) => {
     const at = pantryAt(k);
-    if (k < 6) room.furn('kitchenCabinet', at.x - room.center.x, -3.7, 0, 2);
-    else room.furn('kitchenCabinet', -5.2, at.z - room.center.z, Math.PI / 2, 2);
+    if (k < 6) room.furn('kitchenCabinet', -4.4 + k * 1.5, -3.7, 0, 2);
+    else room.furn('kitchenCabinet', -5.2, -1.4 + (k - 6) * 1.4, Math.PI / 2, 2);
     tag(run, icon, at, 1.35);
   });
   const cart = crate(0.7, 0xc0c4cc);
