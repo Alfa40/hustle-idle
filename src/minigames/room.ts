@@ -195,6 +195,27 @@ export class Room {
     return new THREE.Vector3(ROOM_ORIGIN.x + this.sx(x), y, ROOM_ORIGIN.z + this.sz(z));
   }
 
+  /**
+   * Punto accanto a un oggetto: l'oggetto in (x, z) (coordinate del progetto) e il punto spostato di (dx, dz)
+   * metri veri. La distanza tra un oggetto e il suo punto da toccare resta quella del progetto.
+   */
+  near(x: number, z: number, dx: number, dz: number) {
+    return this.at(x, z).add(new THREE.Vector3(dx, 0, dz));
+  }
+
+  /**
+   * Un accessorio piccolo (macchina del caffè, frullatore…) appoggiato sopra un mobile (`base`), mai a terra.
+   * Restituisce l'accessorio (è lui che si accende e si tocca).
+   */
+  furnOn(base: string, path: string, x: number, z: number, rot = 0, scale = FURN) {
+    const b = this.furn(base, x, z, rot);
+    const a = this.furn(path, x, z, rot, scale, false);
+    a.obj.position.y = b.top;
+    a.obj.updateMatrixWorld(true);
+    const bb = new THREE.Box3().setFromObject(a.obj);
+    return { obj: a.obj, top: bb.max.y, box: bb };
+  }
+
   /** coordinate del progetto → locale vero (rispetto al centro) */
   sx(x: number) {
     return spread(x, this.w0 / 2, this.w / 2);

@@ -980,15 +980,9 @@ export class UI {
             ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">Lotto ${euro(lot.price)} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
           </div>`;
         }
-        const est = estimateLot(s, lotId, t);
-        const unit = def.kind === 'service' ? 'ordini' : 'clienti';
         return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
             <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small explain">${def.desc}</div></div></div>
-          <div class="grid3" style="margin-top:8px">
-            <div class="stat s-purple"><b>${est.demand.toFixed(1)}/h</b><span>${unit} (${PRODUCTS[est.best].icon})</span></div>
-            <div class="stat s-green"><b class="money-t">${euro(est.revenue)}</b><span>incasso/mese*</span></div>
-            <div class="stat ${est.profit >= 0 ? 's-yellow' : 's-red'}"><b class="${est.profit >= 0 ? 'good' : 'bad'}">${euro(est.profit)}</b><span>utile/mese*</span></div>
-          </div>
+          ${this.estStats(lotId, t)}
           <button class="btn good full" style="margin-top:10px" data-a="buy:${lotId}|${t}" ${!canBuy || s.money < price ? 'disabled' : ''}>🛒 Apri per ${euro(price)}</button>
           ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">Lotto ${euro(lot.price)} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
         </div>`;
@@ -1001,7 +995,22 @@ export class UI {
       ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>
         <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
       <h3 class="sec-title">Cosa puoi aprire qui</h3>${opts}
-      ${explain(`* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.`)}`;
+      ${this.estNote()}`;
+  }
+
+  /** Anteprima di un'attività in un lotto: clienti all'ora, incasso e utile al mese (stimati). */
+  private estStats(lotId: string, t: BusinessType) {
+    const est = estimateLot(this.s, lotId, t);
+    const unit = bizType(t).kind === 'service' ? 'ordini' : 'clienti';
+    return `<div class="grid3" style="margin-top:8px">
+        <div class="stat s-purple"><b>${est.demand.toFixed(1)}/h</b><span>${unit} (${PRODUCTS[est.best].icon})</span></div>
+        <div class="stat s-green"><b class="money-t">${euro(est.revenue)}</b><span>incasso/mese*</span></div>
+        <div class="stat ${est.profit >= 0 ? 's-yellow' : 's-red'}"><b class="${est.profit >= 0 ? 'good' : 'bad'}">${euro(est.profit)}</b><span>utile/mese*</span></div>
+      </div>`;
+  }
+
+  private estNote() {
+    return explain(`* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.`);
   }
 
   private buyActions() {
@@ -1317,16 +1326,19 @@ export class UI {
       const d = bizType(t);
       const lots = evolveLots(s, t);
       const from = lots.length ? Math.min(...lots.map((l) => evolvePrice(l, t))) : 0;
+      // anteprima nel locale libero che rende di più (come all'acquisto)
+      const bestLot = lots.map((l) => ({ l, p: estimateLot(s, l, t).profit })).sort((x, y) => y.p - x.p)[0]?.l;
       const next = evolvesOf(t).map((x) => `${bizType(x).icon} ${bizType(x).name}`).join(' o ');
       return `<div class="card evo-card" style="--sc:${d.color}"><div class="row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div>
           <div style="flex:1"><h3 style="margin:0">${d.name}</h3><div class="small">${d.products.map((p) => PRODUCTS[p].icon).join(' ')} · ${(d.tier ?? 1)}ª evoluzione</div></div></div>
         <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
+        ${bestLot ? `${this.estStats(bestLot, t)}<div class="muted small center" style="margin:4px 0 8px">nel locale libero migliore: ${esc(lotDef(bestLot).name)}</div>` : ''}
         <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button></div>`;
     }).join('');
     return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
         <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
         ${reqs}</div>
-      <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}`;
+      <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}${this.estNote()}`;
   }
 
   /** Locali liberi dove aprire l'attività evoluta, con il prezzo unico (locale + ristrutturazione). */
@@ -1345,9 +1357,11 @@ export class UI {
           lots.map((l) => {
             const lot = lotDef(l);
             const price = evolvePrice(l, target);
-            return `<div class="card row"><div style="flex:1"><b>${esc(lot.name)}</b><div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div></div>
-              <button class="btn sm good" data-a="go:${l}" ${s.money < price ? 'disabled' : ''}>Evolvi qui · ${euro(price)}</button></div>`;
-          }).join('');
+            return `<div class="card"><b>${esc(lot.name)}</b><div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div>
+              ${this.estStats(l, target)}
+              <button class="btn good full" style="margin-top:10px" data-a="go:${l}" ${s.money < price ? 'disabled' : ''}>🏗️ Evolvi qui per ${euro(price)}</button>
+              <div class="muted small center" style="margin-top:4px">Locale ${euro(price - (d.evolveCost ?? 0))} + ristrutturazione ${euro(d.evolveCost ?? 0)}</div></div>`;
+          }).join('') + this.estNote();
       },
       actions: {
         go: (lotId) => {
