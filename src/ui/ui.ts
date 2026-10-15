@@ -3124,7 +3124,7 @@ export class UI {
   /** Comandi rapidi della partita developer: soldi, lavoretti a ogni gradino, attività, tempo. */
   private devHtml() {
     const s = this.s;
-    const lines = linesOf('logistica').map((l) => `<div class="card"><h3>${l.icon} ${l.name} <span class="tag">Liv. ${lineLevel(s, l.id)}</span></h3>
+    const lines = [...linesOf('logistica'), ...linesOf('cucina')].map((l) => `<div class="card"><h3>${l.icon} ${l.name} <span class="tag">Liv. ${lineLevel(s, l.id)}</span></h3>
         <div class="dev-grid">${l.ladder.map((name, r) => `<button class="btn sm" data-a="devJob:${l.id}|${r}">▶ ${r + 1}. ${name}</button>`).join('')}</div>
         <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello della linea: ${[1, 10, 20, 30, 40].map((v) => `<button class="btn sm sec" data-a="devLvl:${l.id}|${v}">${v}</button>`).join('')}</div></div>`).join('');
     return `<div class="card hl"><h3>🛠️ Partita developer</h3><p class="small" style="margin:0">Non va in classifica e non risulta "sta giocando" agli amici. 💰 ${euro(s.money)}</p>
