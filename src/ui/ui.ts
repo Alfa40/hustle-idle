@@ -249,7 +249,8 @@ export class UI {
     const job = document.createElement('div');
     job.className = 'jobbar';
     job.innerHTML = `<div class="row"><span id="j-title"></span><span id="j-time"></span><button class="quit" id="j-pause">⏸ Pausa</button></div>
-      <div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>`;
+      <div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>
+      <div class="j-gauge" id="j-gauge" hidden><span class="jg-l"></span><div class="jg-bar"><i class="jg-fill"></i><b class="jg-mark"></b></div></div>`;
     this.root.appendChild(job);
     // "Rinuncia" sta nella finestra della pausa (così nella barra resta spazio per il nome del lavoretto)
     job.querySelector('#j-pause')!.addEventListener('click', () => this.openJobPause());
@@ -426,6 +427,20 @@ export class UI {
       (this.jobEl.querySelector('#j-title') as HTMLElement).textContent = run.title;
       (this.jobEl.querySelector('#j-time') as HTMLElement).textContent = run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`;
       (this.jobEl.querySelector('#j-status') as HTMLElement).textContent = run.status;
+      // tachimetro (o altra barra del lavoretto): verde, arancione oltre la tacca della guida dolce
+      const gEl = this.jobEl.querySelector('#j-gauge') as HTMLElement;
+      const gv = run.gauge?.() ?? null;
+      gEl.hidden = !gv;
+      if (gv) {
+        const k = Math.max(0, Math.min(1, gv.value / gv.max));
+        (gEl.querySelector('.jg-l') as HTMLElement).textContent = `${gv.icon} ${gv.text}`;
+        const f = gEl.querySelector('.jg-fill') as HTMLElement;
+        f.style.width = `${k * 100}%`;
+        f.classList.toggle('over', gv.mark !== undefined && k > gv.mark);
+        const m = gEl.querySelector('.jg-mark') as HTMLElement;
+        m.hidden = gv.mark === undefined;
+        if (gv.mark !== undefined) m.style.left = `${gv.mark * 100}%`;
+      }
       const fill = this.jobEl.querySelector('#j-fill') as HTMLElement;
       fill.style.width = `${f * 100}%`;
       fill.className = 'fill' + (f < 0.2 ? ' danger' : f < 0.45 ? ' warn' : '');

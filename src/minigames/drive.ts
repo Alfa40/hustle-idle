@@ -444,6 +444,18 @@ export class DriveRun extends BaseRun {
     } else this.corteoOut = 0;
   }
 
+  /**
+   * Tachimetro: velocità adesso rispetto alla massima del mezzo. La tacca (dove serve guidare dolce) è la
+   * velocità oltre la quale una curva diventa brusca: col tempo si impara quando rallentare prima di girare
+   * o di arrivare alla fermata.
+   */
+  gauge() {
+    if (!this.boarded || !this.game.jobRide) return null;
+    const max = this.game.jobRide.speed;
+    const smooth = this.kind === 'turistico' || this.kind === 'privato' || this.kind === 'limousine';
+    return { icon: '🏎️', value: this.speed, max, text: `${Math.round(this.speed * 3.6)} km/h`, mark: smooth ? 0.55 : undefined };
+  }
+
   onAction() {
     if (this.boarded) return;
     const p = this.game.player.root.position;
@@ -469,11 +481,11 @@ export class DriveRun extends BaseRun {
 
   guide(): RunGuide | null {
     const tips: Record<DriveKind, string> = {
-      navetta: 'Guida fino al <b>cerchio della fermata</b> e <b>fermati dentro</b>: i passeggeri salgono da soli. Poi portali a destinazione',
+      navetta: 'Guida fino al <b>cerchio della fermata</b> e <b>fermati dentro</b>: i passeggeri salgono da soli. Il mezzo frena piano: guarda il <b>tachimetro</b> e lascia il comando un po\' prima di arrivare',
       autobus: 'Fermati a ogni fermata della linea <b>in orario</b>: se sei in anticipo aspetta, se arrivi tardi perdi stelle. 🔔 = prenotata',
-      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: niente frenate o curve brusche (il gradimento 😊 scende)',
-      privato: 'Guida <b>dolce</b>: il bicchiere d\'acqua 🥛 non deve rovesciarsi. Il cliente può <b>cambiare destinazione</b>',
-      limousine: 'Prendi la sposa, poi <b>segui l\'auto dello sposo</b> né troppo vicino né troppo lontano, e fermati sul <b>tappeto rosso</b>',
+      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: niente frenate o curve brusche (il gradimento 😊 scende). Sul <b>tachimetro</b>, oltre la <b>tacca</b> (barra arancione) le curve sono brusche: rallenta prima di girare',
+      privato: 'Guida <b>dolce</b>: il bicchiere d\'acqua 🥛 non deve rovesciarsi. Il cliente può <b>cambiare destinazione</b>. Oltre la <b>tacca</b> del tachimetro le curve sono brusche',
+      limousine: 'Prendi la sposa, poi <b>segui l\'auto dello sposo</b> né troppo vicino né troppo lontano, e fermati sul <b>tappeto rosso</b>. Oltre la <b>tacca</b> del tachimetro le curve sono brusche',
     };
     const p = this.game.player.root.position;
     if (!this.boarded) {

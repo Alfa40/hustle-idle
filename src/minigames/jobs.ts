@@ -32,6 +32,11 @@ export interface JobRun {
   speedMul?: number;
   /** in questo momento non si può salire sul veicolo (es. pacco grande in mano) */
   noVehicle?: boolean;
+  /**
+   * Barra in più nella barra del lavoretto (es. il tachimetro nelle guide): valore e massimo, scritta, e
+   * `mark` (0–1) = tacca oltre la quale si va troppo forte (curve brusche).
+   */
+  gauge?(): { icon: string; value: number; max: number; text: string; mark?: number } | null;
   dispose(): void;
 }
 
