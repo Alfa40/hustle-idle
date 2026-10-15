@@ -154,5 +154,6 @@ export class Street {
 
 /** Quante consegne secondo il livello: poche all'inizio (via corta), di più salendo. */
 export function routeStops(level: number, mode: 'package' | 'flyer') {
-  return mode === 'package' ? Math.min(6, 2 + Math.floor(level / 2)) : Math.min(10, 3 + Math.floor(level * 0.8));
+  // pacchi: da 2 a 5 consegne nei primi 9 livelli (gli imprevisti ne prendono il posto, non si aggiungono)
+  return mode === 'package' ? Math.min(5, 2 + Math.floor((level - 1) / 2)) : Math.min(10, 3 + Math.floor(level * 0.8));
 }

@@ -138,7 +138,7 @@ export class JobTutorial {
     let gesture: 'tap' | 'hold' | null = null;
     let aimAt: THREE.Vector3 | null = null;
     const tips = TIPS[this.type];
-    const tip = tips?.[g.phase] ?? (g.task ? PIATTI[g.task.label] ?? g.task.label : g.phaseName);
+    const tip = g.tip ?? tips?.[g.phase] ?? (g.task ? PIATTI[g.task.label] ?? g.task.label : g.phaseName);
     if (!g.arrived) {
       body = '🚶 Segui le <b>frecce bianche</b> a terra fino alla <b>zona di lavoro</b> (quella con i coni)';
     } else if (!g.inZone) {

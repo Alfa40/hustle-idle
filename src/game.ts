@@ -33,6 +33,8 @@ import { TruckInterior, INTERIOR_ASSETS, type PreviewOpts } from './world/interi
 import { hasInterior } from './config/recipes';
 import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, pruneArenaJob, routeStreetJob, IndoorRun, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
+import { startLogisticsJob } from './minigames/logistics';
+import { LOGISTICS_ASSETS } from './minigames/warehouse';
 import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { PotteryStudio } from './world/pottery';
@@ -129,6 +131,34 @@ interface TruckSite {
 }
 
 /** Attività di un amico su un posto della tua città. */
+/** Scena separata di un minigioco (lotto col giardino, via delle consegne, magazzino…). */
+export interface JobScene {
+  group: THREE.Group;
+  entry: THREE.Vector3;
+  collide(p: THREE.Vector3, r?: number): void;
+  blocked(x: number, z: number): boolean;
+}
+
+/**
+ * Mezzo da lavoro di un lavoretto (muletto, pulmino, autobus, limousine): si guida solo durante il lavoro,
+ * non è nel garage. `inertia`: accelera e frena piano (si misura la guida dolce).
+ */
+export interface JobRide {
+  obj: THREE.Object3D;
+  speed: number;
+  radius: number;
+  /** parti da nascondere in prima persona (la carrozzeria attorno agli occhi) */
+  fpHide?: THREE.Object3D[];
+  /** il personaggio si vede seduto (muletto) o sparisce dentro (auto, bus) */
+  showDriver?: boolean;
+  driverY?: number;
+  inertia?: boolean;
+  /** accelerazione massima (m/s²) con l'inerzia */
+  accel?: number;
+  /** camera più lontana (mezzi grandi: si vede la strada davanti) */
+  camZoom?: number;
+}
+
 export interface FriendBiz {
   friend: FriendEntry;
   type: BusinessType;
@@ -165,6 +195,10 @@ export class Game {
   /** lavoro su richiesta del laboratorio dell'artigiano in corso */
   runSpecial: { bizId: string; order: SpecialOrder } | null = null;
   private rideObj: THREE.Object3D | null = null;
+  /** mezzo da lavoro del lavoretto in corso (vedi JobRide) */
+  jobRide: JobRide | null = null;
+  /** velocità attuale col mezzo da lavoro (con l'inerzia) */
+  rideVel = new THREE.Vector3();
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
   private nextJobSpawn = 3;
@@ -249,7 +283,7 @@ export class Game {
     const assets = [
       ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...KITCHEN_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
       'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model && !p.model.startsWith('proc:') ? [p.model] : [])),
-      'furniture/cardboardBoxClosed.glb',
+      'furniture/cardboardBoxClosed.glb', ...LOGISTICS_ASSETS,
     ];
     await preload([...new Set(assets)], onProgress);
 
@@ -363,7 +397,9 @@ export class Game {
     this.applyRide();
 
     // NPC dei lavori già offerti
-    this.state.jobs = this.state.jobs.filter((j) => this.slotsFor(j.type)[j.slot]);
+    // solo i lavoretti dei settori accesi (config/careers.ts: FOCUS_SECTORS)
+    const ready = readyJobTypes();
+    this.state.jobs = this.state.jobs.filter((j) => ready.includes(j.type) && this.slotsFor(j.type)[j.slot]);
     for (const j of this.state.jobs) this.spawnNpc(j);
 
   }
@@ -954,6 +990,14 @@ export class Game {
     if (!def.vehicleOk) this.dismount();
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
+    // Trasporti e logistica: magazzino, autista e i gradini alti delle consegne (minigames/logistics.ts)
+    const logi = startLogisticsJob(this, offer, slot, title);
+    if (logi) {
+      this.run = logi;
+      if (tutorial) this.tutorial.start(def.key, logi);
+      this.ui.jobBar(true);
+      return;
+    }
     switch (offer.type) {
       case 'giardino': {
         const arena = this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed }));
@@ -961,7 +1005,7 @@ export class Game {
         this.run = def.variant >= 1 ? pruneArenaJob(this, lv, arena, title) : gardenArenaJob(this, lv, arena, title);
         break;
       }
-      case 'consegna': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package'); break;
+      case 'consegna': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package', offer.level); break;
       case 'volantini': this.run = routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer'); break;
       case 'piatti': {
         // si va al ristorante (chiuso) e si lavora nella sua cucina
@@ -977,14 +1021,14 @@ export class Game {
   }
 
   /** minigioco in corso in una scena separata (lontano dalla città) e dove tornare dopo */
-  arena: Arena | Street | null = null;
+  arena: JobScene | null = null;
   private arenaBack: { pos: THREE.Vector3; rot: number } | null = null;
 
   /**
    * Si entra nella scena del minigioco: lotto grande con casa e giardino, prima persona.
    * La città resta lontana (non si vede); a fine lavoretto si torna dove si era.
    */
-  private enterArena<A extends Arena | Street>(a: A): A {
+  enterArena<A extends JobScene>(a: A): A {
     this.arenaBack = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y };
     // nella via delle consegne si può andare in veicolo (ma per consegnare si scende)
     if (!(a instanceof Street)) this.dismount();
@@ -1149,6 +1193,7 @@ export class Game {
     const tutorial = this.tutorial.active;
     this.tutorial.finish(stars);
     this.exitHouse();
+    if (this.jobRide) this.setJobRide(null);
     this.run?.dispose();
     this.exitArena();
     this.run = null;
@@ -1320,6 +1365,14 @@ export class Game {
     return this.state.riding;
   }
 
+  /** Sali sul mezzo da lavoro del lavoretto (o scendi con `null`): sostituisce il veicolo tuo. */
+  setJobRide(r: JobRide | null) {
+    if (r) this.dismount();
+    this.jobRide = r;
+    this.rideVel.set(0, 0, 0);
+    this.applyRide();
+  }
+
   /** Aggancia al personaggio il modello del veicolo in uso (o lo toglie). */
   private applyRide() {
     if (this.rideObj) this.player.root.remove(this.rideObj);
@@ -1328,6 +1381,16 @@ export class Game {
     this.player.body.visible = true;
     this.player.body.position.y = 0;
     if (this.playerMarker) this.playerMarker.position.y = 2.05;
+    const jr = this.jobRide;
+    if (jr) {
+      this.rideObj = jr.obj;
+      this.player.root.add(jr.obj);
+      this.player.body.position.y = jr.driverY ?? 0;
+      this.player.body.visible = !!jr.showDriver && !this.firstPerson;
+      this.player.play('idle');
+      if (this.playerMarker && !jr.showDriver) this.playerMarker.position.y = 2.6;
+      return;
+    }
     if (!id) {
       this.player.play('idle');
       return;
@@ -1342,9 +1405,13 @@ export class Game {
   }
 
   mount(id: VehicleId) {
-    if (!this.state.vehicles.includes(id) || this.interior || this.house) return;
-    if (this.run && !this.runOrder && !(this.runOffer && JOBS[this.runOffer.type].vehicleOk)) {
+    if (!this.state.vehicles.includes(id) || this.interior || this.house || this.jobRide) return;
+    if (this.run && !this.runOrder && !(this.runOffer && jobInfo(this.runOffer.type, this.runOffer.level).vehicleOk)) {
       toast('Per questo lavoro devi stare a piedi', 'bad');
+      return;
+    }
+    if (this.run?.noVehicle) {
+      toast('Con questo carico non puoi salire sul veicolo', 'bad');
       return;
     }
     this.state.riding = id;
@@ -1362,6 +1429,10 @@ export class Game {
   /** Pulsante veicolo: sali sull'ultimo mezzo o scendi. */
   toggleRide() {
     const s = this.state;
+    if (this.jobRide) {
+      toast('Stai guidando il mezzo del lavoro: scendi alla fine', 'info');
+      return;
+    }
     if (s.riding) {
       this.dismount();
       return;
@@ -1541,9 +1612,10 @@ export class Game {
       this.fpPitch = -0.45;
       this.fpIdle = 99;
     }
-    this.player.body.visible = !on && !(this.state.riding && riderPose(this.state.riding).hidden);
+    this.player.body.visible = !on && !(this.state.riding && riderPose(this.state.riding).hidden) && (!this.jobRide || !!this.jobRide.showDriver);
     if (this.player.held) this.player.held.visible = !on;
-    if (this.rideObj) this.rideObj.visible = !on;
+    if (this.rideObj) this.rideObj.visible = !on || !!this.jobRide;
+    for (const o of this.jobRide?.fpHide ?? []) o.visible = !on;
     if (this.playerMarker) this.playerMarker.visible = !on;
     // in prima persona non si disegna ciò che è attaccato agli occhi
     this.camera.near = on ? 0.2 : 0.5;
@@ -1627,7 +1699,7 @@ export class Game {
     this.player.root.rotation.y = Math.PI - this.fpYaw;
     this.player.body.visible = false;
     if (this.player.held) this.player.held.visible = false;
-    if (this.rideObj) this.rideObj.visible = false;
+    if (this.rideObj && !this.jobRide) this.rideObj.visible = false;
     // etichette: più piccole e nascoste se troppo vicine agli occhi
     if (++this.fpScan % 45 === 1) {
       this.fpSprites = [];
@@ -1673,9 +1745,27 @@ export class Game {
     const mx = v.x;
     const mz = v.y;
     const len = Math.hypot(mx, mz);
-    if (len > 0.05) {
-      const ride = this.state.riding ? VEHICLES[this.state.riding] : null;
-      const speed = (ride ? ride.speed : WALK_SPEED) * Math.min(1, len);
+    const jr = this.jobRide;
+    if (jr?.inertia) {
+      // mezzo da lavoro con l'inerzia: la velocità va verso quella voluta senza scatti
+      const want = new THREE.Vector3(mx, 0, mz).multiplyScalar(jr.speed * Math.min(1, len));
+      const dv = want.sub(this.rideVel);
+      const maxDv = (jr.accel ?? 6) * dt;
+      if (dv.length() > maxDv) dv.setLength(maxDv);
+      this.rideVel.add(dv);
+      const v = this.rideVel;
+      if (v.length() > 0.05) {
+        p.x += v.x * dt;
+        p.z += v.z * dt;
+        if (!this.arena) this.city.collide(p, jr.radius);
+        this.run?.collide?.(p, jr.radius);
+        this.arena?.collide(p, jr.radius);
+        if (!this.arena) this.traffic.pushOut(p, jr.radius);
+        this.player.faceTowards(p.x + v.x, p.z + v.z, dt, 5);
+      }
+    } else if (len > 0.05) {
+      const ride = jr ?? (this.state.riding ? VEHICLES[this.state.riding] : null);
+      const speed = (ride ? ride.speed : WALK_SPEED * (this.run?.speedMul ?? 1)) * Math.min(1, len);
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
       // nel minigioco valgono solo i suoi ostacoli: quelli della città (confini compresi) lo
@@ -1686,8 +1776,9 @@ export class Game {
       // nel minigioco: dentro il lotto, fuori dalla casa
       this.arena?.collide(p, 0.35);
       if (!this.arena) this.traffic.pushOut(p, ride ? ride.radius : 0.38);
-      this.player.faceTowards(p.x + mx, p.z + mz, dt, ride?.kind === 'car' ? 7 : 12);
-      if (ride) this.player.play(riderPose(this.state.riding!).anim);
+      this.player.faceTowards(p.x + mx, p.z + mz, dt, jr ? 6 : ride && 'kind' in ride && ride.kind === 'car' ? 7 : 12);
+      if (jr) this.player.play('idle');
+      else if (ride) this.player.play(riderPose(this.state.riding!).anim);
       else if (!this.prompt?.progress) this.player.play(len > 0.6 ? 'sprint' : 'walk', 0.15, len > 0.6 ? 0.85 : 1);
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'sprint') {
       this.player.play('idle');
@@ -1773,7 +1864,7 @@ export class Game {
   }
 
   private camDist() {
-    return (this.camera.aspect < 1 ? 33 : 25) * CAMERA_MULT[settings.camera];
+    return (this.camera.aspect < 1 ? 33 : 25) * CAMERA_MULT[settings.camera] * (this.jobRide?.camZoom ?? 1);
   }
 
   private camTarget = new THREE.Vector3();

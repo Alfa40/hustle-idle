@@ -34,6 +34,10 @@ export const JOB = {
   /** frazione di tempo rimasto per 3 e 2 stelle */
   STAR3: 0.45,
   STAR2: 0.2,
+  /** regola dei 5 minuti: il tempo di un lavoretto non supera mai questo (secondi) */
+  MAX_SEC: 300,
+  /** secondi persi con una scelta sbagliata (scaffale, scatola, pacco sbagliato…) */
+  WRONG_PENALTY: 5,
 };
 
 export const BUSINESS = {

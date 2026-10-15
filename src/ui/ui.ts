@@ -31,7 +31,7 @@ import {
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
-import { careerLine, EVOLVE_EVERY, linesOf } from '../config/careers';
+import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
@@ -2246,7 +2246,7 @@ export class UI {
               m.claimed ? '<span class="tag g">Riscossa</span>' : done ? `<button class="btn sm good" data-a="claim:${m.id}">Riscuoti</button>` : ''
             }</div>
             <div class="bar green"><i style="width:${(m.progress / m.target) * 100}%"></i></div>
-            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${JOB_TYPES.map((t) => { const n = m.types?.filter((x) => x === t).length ?? 0; return `<span style="opacity:${n ? 1 : 0.35}">${JOBS[t].icon} ${n}/3</span>`; }).join(' · ')}</div>` : ''}
+            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${readyJobTypes().map((t) => { const n = m.types?.filter((x) => x === t).length ?? 0; return `<span style="opacity:${n ? 1 : 0.35}">${JOBS[t].icon} ${n}/3</span>`; }).join(' · ')}</div>` : ''}
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(m.progress)}/${m.target}</span><span>Premio ${euro(m.reward)} · +${m.fame.toFixed(0)} fama ${SKILLS[m.fameSkill].icon}</span></div></div>`;
         };
         const ms = s.missions.map(card).join('');

@@ -1,7 +1,8 @@
 import { BUSINESS, TIME } from '../config/balance';
 import { EVENTS, WEATHER } from '../config/events';
 import { ensureWeather, sureEvents, weatherOf } from './effects';
-import { JOBS, JOB_TYPES } from '../config/jobs';
+import { JOBS } from '../config/jobs';
+import { readyJobTypes } from '../config/careers';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
@@ -97,7 +98,7 @@ export function genMissions(s: GameState) {
   const chosen = new Set<string>(list.map((m) => (m.kind === 'jobType' ? m.kind + m.jobType : m.kind)));
   while (list.length < DAILY_MISSIONS) {
     const kind = pick(kinds);
-    const jt = pick(JOB_TYPES);
+    const jt = pick(readyJobTypes());
     const key = kind === 'jobType' ? kind + jt : kind;
     if (chosen.has(key)) continue;
     chosen.add(key);
@@ -175,7 +176,7 @@ export function ensureWeekly(s: GameState) {
         break;
       }
       case 'variety':
-        m = { kind, text: '🗓️ Fai almeno 3 lavoretti di ogni tipo (tutti e 6)', target: JOB_TYPES.length * 3, reward: 30 * JOB_TYPES.length * 3 * scale };
+        m = { kind, text: `🗓️ Fai almeno 3 lavoretti di ogni tipo (tutti e ${readyJobTypes().length})`, target: readyJobTypes().length * 3, reward: 30 * readyJobTypes().length * 3 * scale };
         break;
       case 'served': {
         const n = randInt(120, 180);

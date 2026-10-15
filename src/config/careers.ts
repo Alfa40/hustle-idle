@@ -26,10 +26,10 @@ export interface CareerLine {
 }
 
 export const CAREER_LINES: CareerLine[] = [
-  // 🚚 Trasporti e logistica
-  { id: 'consegna', sector: 'logistica', name: 'Consegne', icon: '📦', ready: true, ladder: ['Consegna pacchi', 'Trasporto mobili', 'Traslochi'] },
-  { id: 'rider', sector: 'logistica', name: 'Corriere', icon: '🛵', ready: false, ladder: ['Rider di cibo', 'Corriere espresso', 'Consegne urgenti'] },
-  { id: 'magazzino', sector: 'logistica', name: 'Magazzino', icon: '🏭', ready: false, ladder: ['Magazziniere', 'Carrellista', 'Capo magazzino'] },
+  // 🚚 Trasporti e logistica (tabella completa in CARRIERE.md)
+  { id: 'consegna', sector: 'logistica', name: 'Consegne', icon: '📦', ready: true, ladder: ['Consegna pacchi', 'Trasporto mobili', 'Traslochi', 'Trasporti delicati', "Traslochi d'azienda"] },
+  { id: 'magazzino', sector: 'logistica', name: 'Magazzino', icon: '🏭', ready: true, ladder: ['Magazziniere', 'Carrellista', 'Preparatore ordini', 'Addetto spedizioni', 'Centro di smistamento'] },
+  { id: 'autista', sector: 'logistica', name: 'Autista', icon: '🚌', ready: true, ladder: ['Autista di navetta', 'Autista di autobus', 'Bus turistico', 'Autista privato', 'Limousine per eventi'] },
   // 🍳 Ristorazione
   { id: 'piatti', sector: 'cucina', name: 'Cucina', icon: '🍽️', ready: true, ladder: ['Lavapiatti', 'Aiuto cuoco', 'Cuoco di linea'] },
   { id: 'festa', sector: 'cucina', name: 'Sala ed eventi', icon: '🥂', ready: false, ladder: ['Cameriere a una festa', 'Catering', 'Banchetti'] },
@@ -48,9 +48,30 @@ export const CAREER_LINES: CareerLine[] = [
   { id: 'montaggio', sector: 'manualita', name: 'Lavori in casa', icon: '🔧', ready: false, ladder: ['Montaggio mobili', 'Riparazioni in casa', 'Ristrutturazioni'] },
 ];
 
+/**
+ * Settori attivi per ora: si sviluppa un settore alla volta e, finché non è completo, gli altri restano spenti
+ * (niente offerte di lavoretti né attività da comprare di quei settori). `null` = tutti accesi.
+ * Le attività che una partita ha già restano sue e continuano a lavorare.
+ */
+export const FOCUS_SECTORS: SkillId[] | null = ['logistica'];
+export const sectorOn = (k: SkillId) => !FOCUS_SECTORS || FOCUS_SECTORS.includes(k);
+
 export const careerLine = (id: string) => CAREER_LINES.find((l) => l.id === id);
-export const linesOf = (sector: SkillId, onlyReady = true) => CAREER_LINES.filter((l) => l.sector === sector && (!onlyReady || l.ready));
+export const linesOf = (sector: SkillId, onlyReady = true) => CAREER_LINES.filter((l) => l.sector === sector && (!onlyReady || (l.ready && sectorOn(l.sector))));
 /** ogni quanti livelli una linea si evolve nel lavoro successivo */
 export const EVOLVE_EVERY = 10;
-/** i tipi di lavoretto giocabili (le linee pronte) */
-export const readyJobTypes = () => CAREER_LINES.filter((l) => l.ready).map((l) => l.id as JobType);
+/** i tipi di lavoretto giocabili (le linee pronte dei settori accesi) */
+export const readyJobTypes = () => CAREER_LINES.filter((l) => l.ready && sectorOn(l.sector)).map((l) => l.id as JobType);
+
+/** Gradino della carriera (0 = base) per un livello della linea: uno ogni EVOLVE_EVERY livelli, fino all'ultimo. */
+export const rungOf = (line: string, level: number) => Math.min(Math.floor(level / EVOLVE_EVERY), (careerLine(line)?.ladder.length ?? 1) - 1);
+/**
+ * Quanto sei avanti dentro il gradino (0 al primo livello del gradino, 1 al nono): decide cosa cresce
+ * (quante consegne, quanti pezzi…) come nella colonna "Cosa sale" di CARRIERE.md. All'ultimo gradino
+ * si arriva a 1 dopo 9 livelli e poi resta lì: il lavoro non si allunga più (regola dei 5 minuti).
+ */
+export function rungProgress(line: string, level: number) {
+  const r = rungOf(line, level);
+  const start = r === 0 ? 1 : r * EVOLVE_EVERY;
+  return Math.max(0, Math.min(1, (level - start) / (EVOLVE_EVERY - 1 - (r === 0 ? 1 : 0))));
+}

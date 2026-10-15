@@ -4,6 +4,7 @@ import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import type { Slot } from '../world/city';
 import { WS } from '../config/map';
+import { toast } from '../sim/bus';
 import type { ParticleKind } from '../world/particles';
 import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
 import type { Arena, FenceSide } from './arena';
@@ -27,6 +28,10 @@ export interface JobRun {
   onAction?(): void;
   /** spinge il personaggio fuori dagli oggetti grandi del lavoretto */
   collide?(p: THREE.Vector3, r?: number): void;
+  /** velocità a piedi (1 = normale): con un carico pesante si va più piano */
+  speedMul?: number;
+  /** in questo momento non si può salire sul veicolo (es. pacco grande in mano) */
+  noVehicle?: boolean;
   dispose(): void;
 }
 
@@ -46,6 +51,8 @@ export interface RunGuide {
   arrived: boolean;
   /** punti ancora da toccare direttamente sull'oggetto (macchie sull'auto) */
   aims?: THREE.Vector3[];
+  /** cosa fare in questa fase, per il fumetto del tutorial (se il lavoretto lo scrive da sé) */
+  tip?: string;
 }
 
 export function starsFor(timeLeft: number, total: number) {
@@ -55,13 +62,32 @@ export function starsFor(timeLeft: number, total: number) {
   return 1;
 }
 
-abstract class BaseRun implements JobRun {
+export abstract class BaseRun implements JobRun {
   title = '';
   status = '';
   timeLeft = 0;
   timeTotal = 0;
   target?: THREE.Vector3;
   frozen = false;
+  speedMul = 1;
+  noVehicle = false;
+  /** stelle massime (es. mobile rovinato, passeggeri scontenti): il tempo da solo non basta */
+  starCap = 3;
+
+  /** Regola dei 5 minuti: il tempo a disposizione non supera mai JOB.MAX_SEC. */
+  protected setTime(sec: number) {
+    this.timeTotal = this.timeLeft = Math.min(JOB.MAX_SEC, sec);
+  }
+
+  /** Scelta sbagliata o urto: si perdono secondi (mai sotto 1). */
+  penalty(sec: number, text: string) {
+    if (this.frozen) {
+      toast(`${text} · nel tutorial non conta`, 'bad');
+      return;
+    }
+    this.timeLeft = Math.max(1, this.timeLeft - sec);
+    toast(`${text} · -${sec} s`, 'bad');
+  }
   protected objs: THREE.Object3D[] = [];
   constructor(protected game: Game, protected level: number) {}
 
@@ -69,6 +95,12 @@ abstract class BaseRun implements JobRun {
     this.game.scene.add(o);
     this.objs.push(o);
     return o;
+  }
+
+  /** Toglie un oggetto dalla scena del lavoretto senza buttarlo (es. il muletto su cui sali, il bancale sulle forche). */
+  objsRemove(o: THREE.Object3D) {
+    this.game.scene.remove(o);
+    this.objs = this.objs.filter((x) => x !== o);
   }
 
   /** ingombro a terra degli oggetti solidi (calcolato una volta: non si spostano) */
@@ -116,7 +148,7 @@ abstract class BaseRun implements JobRun {
   }
 
   protected done() {
-    this.game.finishJob(starsFor(this.timeLeft, this.timeTotal));
+    this.game.finishJob(Math.max(1, Math.min(this.starCap, starsFor(this.timeLeft, this.timeTotal))));
   }
 
   abstract update(dt: number): void;
@@ -168,6 +200,23 @@ export interface Task {
   progress?: number;
   /** dove mettere l'indicatore se sopra il punto coprirebbe un oggetto grande (edicola, negozio…) */
   markerAt?: THREE.Vector3;
+  /**
+   * Scelta sbagliata (es. lo scaffale di un altro colore): si illumina come le altre ma toccarla costa
+   * secondi (JOB.WRONG_PENALTY) e non conta. La fase finisce quando sono fatte tutte quelle giuste.
+   */
+  decoy?: boolean;
+  /** messaggio quando si tocca la scelta sbagliata */
+  wrongText?: string;
+  /** gruppo di scelte: quando si fa quella giusta, le altre del gruppo spariscono */
+  group?: string;
+  /** dopo averla fatta arrivano altri punti nella stessa fase (es. prendi la scatola → mettila sullo scaffale) */
+  then?: () => Task[];
+  /** per ora non si può fare (es. hai già una scatola in mano): non si illumina */
+  enabled?: () => boolean;
+  /** niente indicatore né freccette: il punto va cercato (es. il numero civico); si accende solo da vicino */
+  quiet?: boolean;
+  /** scritta grande sull'indicatore al posto dell'icona (es. il codice dello scaffale) */
+  markerText?: string;
   /** oggetto da far pulsare quando sei vicino, se il punto non ha oggetti che si accendono (es. l'auto) */
   obj?: THREE.Object3D;
   /**
@@ -201,6 +250,10 @@ function meshTop(root: THREE.Object3D) {
 export interface Phase {
   name: string;
   icon: string;
+  /** cosa fare, per il fumetto del tutorial */
+  tip?: string;
+  /** quanto è fatto della fase (al posto del conto dei punti, quando i punti arrivano man mano) */
+  count?: () => [number, number];
   /** crea le attività quando la fase inizia (così possono dipendere da quelle prima) */
   tasks: () => Task[];
   /** true = le attività vanno fatte nell'ordine dato (es. prendi → lava → appoggia) */
@@ -220,13 +273,18 @@ export class PhasedRun extends BaseRun {
   private outTimer = 0;
   private wasInZone = false;
 
+  /** meccaniche in più del lavoretto, a ogni fotogramma (carichi, cani, danni…) */
+  onTick?: (dt: number) => void;
+  /** testo in più nella barra (es. "🛋️ danni 20%") */
+  extraStatus?: () => string;
+
   constructor(game: Game, level: number, title: string, phases: Phase[], opts: { zone?: Zone; time: number; keep?: THREE.Vector3 }) {
     super(game, level);
     this.title = title;
     this.phases = phases;
     this.zone = opts.zone ?? null;
     // con la città più grande nella zona di lavoro si cammina un po' di più
-    this.timeTotal = this.timeLeft = opts.time * (opts.zone ? 1 + (WS - 1) * 0.5 : 1) * Math.max(0.75, 1 - level * 0.02);
+    this.setTime(opts.time * (opts.zone ? 1 + (WS - 1) * 0.5 : 1) * Math.max(0.75, 1 - level * 0.02));
     if (this.zone) {
       this.drawZone(this.zone);
       // niente palazzi o alberi davanti alla zona di lavoro
@@ -395,7 +453,7 @@ export class PhasedRun extends BaseRun {
     const soft = 0.05 + 0.3 * (0.5 + 0.5 * Math.sin(now / 260));
     const strong = 0.2 + 0.75 * (0.5 + 0.5 * Math.sin(now / 140));
     for (const [t, g] of this.glows) {
-      const on = pend.has(t) && !t.done;
+      const on = pend.has(t) && !t.done && (!t.quiet || t === this.nearTask && this.nearOk);
       const k = !on ? 0 : t === this.nearTask && this.nearOk ? strong : soft;
       for (const { m } of g.meshes) {
         const mats = Array.isArray(m.material) ? m.material : [m.material];
@@ -414,18 +472,22 @@ export class PhasedRun extends BaseRun {
       return;
     }
     this.tasks = this.phases[this.idx].tasks();
-    for (const t of this.tasks) {
-      this.addGlow(t);
-      if (t.aim) continue; // i punti sull'oggetto si vedono già (macchie): niente indicatori sopra
-      // indicatore grande (si vede bene anche da lontano), appena sopra l'oggetto più alto lì vicino
-      // (mai sovrapposto a cassette, giochi…): vicino a ciò che indica, non in cielo
-      const m = label(t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 * MARKER_SIZE });
-      const mp = t.markerAt ?? t.pos;
-      this.placeMarker(m, t);
-      m.position.set(mp.x, m.userData.baseY, mp.z);
-      this.game.scene.add(m);
-      this.markers.set(t, m);
-    }
+    for (const t of this.tasks) this.addTask(t);
+  }
+
+  /** Un punto nuovo nella fase: si illumina e ha il suo indicatore. */
+  private addTask(t: Task) {
+    if (!this.tasks.includes(t)) this.tasks.push(t);
+    this.addGlow(t);
+    if (t.aim || t.quiet) return; // i punti sull'oggetto si vedono già (macchie), quelli da cercare no
+    // indicatore grande (si vede bene anche da lontano), appena sopra l'oggetto più alto lì vicino
+    // (mai sovrapposto a cassette, giochi…): vicino a ciò che indica, non in cielo
+    const m = label(t.markerText ?? t.icon, { bg: '#ffffff', fg: '#000', scale: 0.45 * MARKER_SIZE });
+    const mp = t.markerAt ?? t.pos;
+    this.placeMarker(m, t);
+    m.position.set(mp.x, m.userData.baseY, mp.z);
+    this.game.scene.add(m);
+    this.markers.set(t, m);
   }
 
   /** Mette l'indicatore 15 cm sopra la parte più alta dell'oggetto (rifatto se l'oggetto arriva dopo, es. l'edicola). */
@@ -452,12 +514,17 @@ export class PhasedRun extends BaseRun {
 
 
   private pending() {
-    const p = this.tasks.filter((t) => !t.done);
+    const p = this.tasks.filter((t) => !t.done && (!t.enabled || t.enabled()));
     return this.phases[this.idx]?.ordered ? p.slice(0, 1) : p;
   }
 
+  /** Punti giusti ancora da fare nella fase (le scelte sbagliate non contano). */
+  private left() {
+    return this.tasks.filter((t) => !t.done && !t.decoy).length;
+  }
+
   private reach() {
-    return this.game.riding ? 3 : 1.6;
+    return this.game.jobRide ? 2.4 : this.game.riding ? 3 : 1.6;
   }
 
   private nearTask: Task | null = null;
@@ -472,7 +539,8 @@ export class PhasedRun extends BaseRun {
       phases: this.phases.length,
       phaseName: ph.name,
       phaseIcon: ph.icon,
-      left: this.tasks.filter((t) => !t.done).length,
+      left: ph.count ? ph.count()[1] - ph.count()[0] : this.left(),
+      tip: ph.tip,
       task: this.nearTask,
       // i punti da toccare sull'oggetto si raggiungono anche da più lontano (basta vederli)
       near: this.nearTask?.aim ? Math.hypot(this.nearTask.pos.x - p.x, this.nearTask.pos.z - p.z) < 4.5 : this.nearOk,
@@ -486,6 +554,8 @@ export class PhasedRun extends BaseRun {
     if (!this.tick(dt)) return;
     const ph = this.phases[this.idx];
     if (!ph) return;
+    this.onTick?.(dt);
+    if (this.phases[this.idx] !== ph) return;
     const p = this.game.player.root.position;
     const pend = this.pending();
     this.pulseGlows();
@@ -506,12 +576,26 @@ export class PhasedRun extends BaseRun {
         near = t;
       }
     }
-    this.target = near?.pos;
+    // i punti da cercare (numeri civici) non hanno freccette: si va al più vicino tra quelli segnati
+    let guide: Task | null = null;
+    let gd = Infinity;
+    for (const t of pend) {
+      if (t.quiet || t.decoy) continue;
+      const d = Math.hypot(t.pos.x - p.x, t.pos.z - p.z);
+      if (d < gd) {
+        gd = d;
+        guide = t;
+      }
+    }
+    this.target = (guide ?? (near && !near.quiet ? near : null))?.pos;
     this.nearTask = near;
     this.nearOk = !!near && nd <= this.reach();
     this.placeStand(near, p);
-    const done = this.tasks.filter((t) => t.done).length;
-    let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${this.tasks.length > 1 ? ` ${done}/${this.tasks.length}` : ''}`;
+    const real = this.tasks.filter((t) => !t.decoy);
+    const [done, all] = ph.count?.() ?? [real.filter((t) => t.done).length, real.length];
+    let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${all > 1 ? ` ${done}/${all}` : ''}`;
+    const extra = this.extraStatus?.();
+    if (extra) status += ` · ${extra}`;
     // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla
     if (this.zone && !inZone(this.zone, p, 1.2)) {
       this.outTimer += dt;
@@ -609,16 +693,40 @@ export class PhasedRun extends BaseRun {
     this.game.prompt = close && t ? { label: t.label, icon: t.icon, progress: hit?.progress ?? 0, at: t.pos.clone(), obj: t.obj } : null;
   }
 
-  private complete(t: Task) {
+  /** Fa un punto anche senza il giocatore (es. un aiutante porta un oggetto al camion). */
+  completeTask(t: Task) {
+    if (!t.done && this.tasks.includes(t)) this.complete(t, true);
+  }
+
+  private complete(t: Task, external = false) {
+    if (t.decoy) {
+      // scelta sbagliata: costa secondi, resta lì
+      t.progress = 0;
+      this.penalty(JOB.WRONG_PENALTY, t.wrongText ?? '❌ Posto sbagliato');
+      return;
+    }
     t.done = true;
     this.removeGlow(t);
     this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.8), t.fx ? 8 : 5, t.fxColor);
-    this.game.player.play('idle');
+    if (!external) this.game.player.play('idle');
+    const before = this.game.player.held;
     t.onDone?.();
-    this.heldIcon = this.game.player.held ? t.icon : '';
+    // l'icona di ciò che hai in mano cambia solo se il punto ti ha dato (o tolto) qualcosa
+    if (!external && this.game.player.held !== before) this.heldIcon = this.game.player.held ? t.icon : '';
     const m = this.markers.get(t);
     if (m) m.visible = false;
-    if (this.tasks.every((x) => x.done)) this.nextPhase();
+    // le altre scelte dello stesso gruppo non servono più
+    if (t.group) {
+      for (const x of this.tasks) {
+        if (x === t || x.group !== t.group || x.done) continue;
+        x.done = true;
+        this.removeGlow(x);
+        const mx = this.markers.get(x);
+        if (mx) mx.visible = false;
+      }
+    }
+    for (const n of t.then?.() ?? []) this.addTask(n);
+    if (this.tasks.every((x) => x.done || x.decoy)) this.nextPhase();
   }
 
   dispose() {
@@ -1062,8 +1170,55 @@ export function pruneArenaJob(game: Game, level: number, arena: Arena, title: st
  * Consegne e giornali come minigioco (scena separata, prima persona): una via del quartiere con le
  * case sui due lati. Ritira all'inizio della via (negozio dei pacchi o edicola) → consegna a ogni
  * cassetta segnata, in qualsiasi ordine → torna per la ricevuta. Più consegne = via più lunga.
+ *
+ * Pacchi, dal Liv. 2 della linea: alcune consegne normali diventano **imprevisti** (mai in più: al posto di
+ * una consegna, 1 dal Liv. 2 e 2 dal Liv. 6): firma al citofono, nessuno in casa (al vicino), contrassegno,
+ * pacco fragile (non correre), pacco grande (si va piano e niente veicolo), cane in giardino, reso da
+ * ritirare. Dal Liv. 5 la guida porta solo al primo indirizzo: gli altri si cercano col numero civico.
  */
-export function routeStreetJob(game: Game, level: number, street: Street, title: string, mode: 'package' | 'flyer') {
+export type DeliverySpecial = 'firma' | 'vicino' | 'contrassegno' | 'fragile' | 'grande' | 'cane' | 'reso';
+export const DELIVERY_SPECIALS: Record<DeliverySpecial, { icon: string; name: string }> = {
+  firma: { icon: '✍️', name: 'firma al citofono' },
+  vicino: { icon: '🚪', name: 'nessuno in casa' },
+  contrassegno: { icon: '💶', name: 'contrassegno' },
+  fragile: { icon: '🔔', name: 'pacco fragile' },
+  grande: { icon: '🛋️', name: 'pacco grande' },
+  cane: { icon: '🐕', name: 'cane in giardino' },
+  reso: { icon: '↩️', name: 'reso da ritirare' },
+};
+
+/** Imprevisti di una partita secondo il livello della linea (al posto di consegne normali). */
+export function deliverySpecials(lineLevel: number): DeliverySpecial[] {
+  const n = lineLevel >= 6 ? 2 : lineLevel >= 2 ? 1 : 0;
+  const pool: DeliverySpecial[] = lineLevel >= 4 ? ['firma', 'vicino', 'contrassegno', 'fragile', 'grande', 'cane', 'reso'] : ['firma', 'vicino', 'contrassegno'];
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
+/** Cane da giardino fatto di blocchi (corpo, testa, orecchie, coda e zampe). */
+function dogModel() {
+  const g = new THREE.Group();
+  const brown = new THREE.MeshLambertMaterial({ color: 0x9a6a3c });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x5a3b20 });
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number, m = brown) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+    b.position.set(x, y, z);
+    b.castShadow = true;
+    g.add(b);
+    return b;
+  };
+  box(0.32, 0.28, 0.62, 0, 0.42, 0);
+  box(0.26, 0.26, 0.3, 0, 0.62, 0.4);
+  box(0.12, 0.1, 0.14, 0, 0.56, 0.6, dark);
+  box(0.07, 0.14, 0.06, -0.1, 0.8, 0.36, dark);
+  box(0.07, 0.14, 0.06, 0.1, 0.8, 0.36, dark);
+  const tail = box(0.06, 0.06, 0.26, 0, 0.6, -0.4, dark);
+  tail.rotation.x = 0.6;
+  for (const [x, z] of [[-0.11, 0.22], [0.11, 0.22], [-0.11, -0.22], [0.11, -0.22]]) box(0.08, 0.3, 0.08, x, 0.15, z, dark);
+  g.userData.tail = tail;
+  return g;
+}
+
+export function routeStreetJob(game: Game, level: number, street: Street, title: string, mode: 'package' | 'flyer', lineLevel = 1) {
   const flyer = mode === 'flyer';
   const n = routeStops(level, mode);
   // indirizzi distanti tra loro (mai una cassetta dopo l'altra): almeno ~2 case di distanza
@@ -1076,6 +1231,20 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
       stops.push(h);
     }
   }
+  stops.sort((a, b) => a.x - b.x);
+  const specials = flyer ? [] : deliverySpecials(lineLevel);
+  // gli imprevisti prendono il posto di consegne normali (mai la prima, che resta guidata)
+  const kindOf = new Map<StreetHouse, DeliverySpecial>();
+  specials.forEach((k, i) => {
+    const h = stops[stops.length - 1 - i];
+    if (h && h !== stops[0]) kindOf.set(h, k);
+  });
+  // dal Liv. 5: si cercano i numeri civici (la guida porta solo al primo)
+  const civici = !flyer && lineLevel >= 5;
+  const civico = (h: StreetHouse) => {
+    const k = Math.round((h.x - street.houses[0].x) / 5);
+    return h.side < 0 ? 1 + k * 2 : 2 + k * 2;
+  };
   const box = () => {
     const b = model('furniture/cardboardBoxClosed.glb', 2.2);
     b.position.x = -0.23;
@@ -1096,17 +1265,68 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   const counterMark = street.counter.clone().add(new THREE.Vector3(1.6, 0, 0));
   // il negozio / l'edicola: si tocca lui per ritirare e per firmare
   let shopObj: THREE.Object3D | undefined;
+  /** pacchi delicati o ingombranti ancora da consegnare */
+  const carrying = new Set<DeliverySpecial>();
+  let fragileHits = 0;
+  let broken = false;
+  const leaveBox = (at: THREE.Vector3, h: StreetHouse) => {
+    run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), at.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true;
+  };
+  const deliverTask = (h: StreetHouse): Task => {
+    const k = kindOf.get(h);
+    const quiet = civici && h !== stops[0];
+    const base = { pos: h.door, onFoot: true, quiet, markerText: undefined as string | undefined };
+    const ico = k && k !== 'cane' && k !== 'reso' ? DELIVERY_SPECIALS[k].icon : '📦';
+    const done = () => {
+      leaveBox(h.door, h);
+      if (k === 'fragile' || k === 'grande') carrying.delete(k);
+    };
+    switch (k) {
+      case 'firma':
+        return { ...base, kind: 'hold', sec: 2.2, label: 'Suona e aspetta la firma', icon: ico, onDone: done };
+      case 'contrassegno':
+        return { ...base, kind: 'hold', sec: 2, label: 'Incassa e dai il resto', icon: ico, fx: 'spark', onDone: done };
+      case 'vicino': {
+        // nessuno risponde: il pacco va alla casa accanto (la più vicina che non è una consegna)
+        const nb = street.houses.filter((x) => x !== h && !stops.includes(x)).sort((a, b) => Math.abs(a.x - h.x) - Math.abs(b.x - h.x))[0] ?? h;
+        return {
+          ...base, kind: 'tap', label: 'Suona il campanello', icon: '🔔',
+          then: () => {
+            toast('🚪 Non c\'è nessuno: lascia il pacco al vicino di casa', 'info');
+            return [{ pos: nb.door, kind: 'tap', label: 'Lascia il pacco al vicino', icon: '🏠', onFoot: true, onDone: () => leaveBox(nb.door, nb) }];
+          },
+        };
+      }
+      case 'reso':
+        return {
+          ...base, kind: 'tap', label: 'Lascia il pacco alla porta', icon: '📦', onDone: done,
+          then: () => [{ pos: h.door.clone().add(new THREE.Vector3(-0.6, 0, 0)), kind: 'hold', sec: 1.2, label: 'Ritira il reso', icon: '↩️', onFoot: true }],
+        };
+      default:
+        return { ...base, kind: 'tap', label: k === 'fragile' ? 'Consegna il pacco fragile' : k === 'grande' ? 'Consegna il pacco grande' : 'Lascia il pacco alla porta', icon: ico, onDone: done };
+    }
+  };
+  const nums = stops.map((h) => civico(h)).join(' · ');
+  const specialNote = specials.length ? ` · ${specials.map((k) => DELIVERY_SPECIALS[k].icon).join('')}` : '';
   const phases: Phase[] = [
     {
       name: flyer ? "Prendi i giornali all'edicola" : 'Ritira i pacchi al negozio', icon: flyer ? '📰' : '📦',
-      tasks: () => [{ pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', get obj() { return shopObj; }, onDone: () => hold(game, flyer ? papers() : box()) }],
+      tasks: () => [{
+        pos: counter, markerAt: counterMark, kind: 'tap', label: flyer ? 'Prendi i giornali' : 'Ritira i pacchi', icon: flyer ? '📰' : '📦', get obj() { return shopObj; },
+        onDone: () => {
+          hold(game, flyer ? papers() : box());
+          for (const k of specials) if (k === 'fragile' || k === 'grande') carrying.add(k);
+          if (specials.length) toast(`Oggi: ${specials.map((k) => `${DELIVERY_SPECIALS[k].icon} ${DELIVERY_SPECIALS[k].name}`).join(' · ')}`, 'info');
+        },
+      }],
     },
     {
-      name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
+      name: flyer ? 'Imbuca un giornale in ogni cassetta' : civici ? `Consegna ai civici ${nums}` : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
+      tip: civici ? `Consegna ai <b>numeri civici ${nums}</b>: la freccia porta solo al primo, gli altri cercali leggendo i <b>numeri sulle case</b> (dispari a sinistra, pari a destra)${specialNote}` : undefined,
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
         ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬', onFoot: true }
-        : { pos: h.door, kind: 'tap' as const, label: 'Lascia il pacco alla porta', icon: '📦', onFoot: true, onDone: () => { run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), h.door.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true; } })),
+        : deliverTask(h))),
     },
     {
       name: flyer ? "Torna all'edicola per la ricevuta" : 'Torna al negozio per la ricevuta', icon: '🧾',
@@ -1114,19 +1334,77 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
   ];
   // tempo: andata e ritorno lungo la via fino all'ultima casa, più un attimo per ogni cassetta
-  // (per i pacchi anche il vialetto fino alla porta e ritorno)
+  // (per i pacchi anche il vialetto fino alla porta e ritorno; un po' di più per imprevisti e civici)
   const far = Math.max(...stops.map((h) => h.x)) - counter.x;
-  const run: PhasedRun = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * (flyer ? 3 : 6) + 12 });
+  const run: PhasedRun = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * (flyer ? 3 : 6) + 12 + specials.length * 8 + (civici ? 15 : 0) });
   shopObj = run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1);
   shopObj.userData.noGlow = true;
-  // giornali: cassette blu agli indirizzi da servire; pacchi: zerbino davanti alla porta
+  // giornali: cassette blu agli indirizzi da servire; pacchi: zerbino davanti alla porta (coi civici solo il primo)
   for (const h of stops) {
     if (flyer) run.prop(postbox(0x2d6cdb), h.box, h.rot, 1);
-    else {
+    else if (!civici || h === stops[0]) {
       const mat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.04, 0.7), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
       run.prop(mat, h.door.clone().setY(0.02), 0, 1);
     }
   }
+  // numeri civici su ogni casa della via
+  if (civici) {
+    for (const h of street.houses) {
+      const t = label(String(civico(h)), { bg: '#2d6cdb', scale: 0.5 });
+      t.position.set(h.door.x, 2.4, h.door.z);
+      t.userData.noGlow = true;
+      run.prop(t, t.position.clone(), 0, 1);
+    }
+  }
+  // il cane gira nel giardino della sua casa, tra il vialetto e la cassetta
+  const dogHouse = [...kindOf].find(([, k]) => k === 'cane')?.[0];
+  let dog: THREE.Object3D | null = null;
+  let dogT = 0;
+  let dogCool = 0;
+  if (dogHouse) {
+    dog = run.prop(dogModel(), dogHouse.door.clone(), 0, 1);
+    dog.userData.noGlow = true;
+  }
+  run.onTick = (dt) => {
+    const p = game.player.root.position;
+    // pacco grande: si va piano e niente veicolo finché non è consegnato
+    const big = carrying.has('grande');
+    run.speedMul = big ? 0.65 : 1;
+    run.noVehicle = big;
+    if (big && game.riding) {
+      game.dismount();
+      toast('🛋️ Col pacco grande si va a piedi', 'info');
+    }
+    // pacco fragile: correndo o in veicolo si ammacca
+    if (carrying.has('fragile') && !broken) {
+      const v = game.input.vector;
+      if (Math.hypot(v.x, v.y) > 0.75 || game.riding) {
+        fragileHits += dt;
+        if (fragileHits > 2.5) {
+          broken = true;
+          run.starCap = 2;
+          toast('💥 Il pacco fragile si è ammaccato: massimo 2 stelle', 'bad');
+        } else if (fragileHits - dt <= 0.05) toast('🔔 Pacco fragile: cammina piano, senza correre!', 'info');
+      }
+    }
+    // il cane: avanti e indietro nel giardino; se ti prende ti fa scappare
+    if (dog && dogHouse) {
+      dogT += dt;
+      dogCool = Math.max(0, dogCool - dt);
+      const off = Math.sin(dogT * 1.3) * 2.2;
+      const z = dogHouse.door.z + dogHouse.side * -1.6;
+      dog.position.set(dogHouse.door.x + off, 0, z);
+      dog.rotation.y = Math.cos(dogT * 1.3) > 0 ? Math.PI / 2 : -Math.PI / 2;
+      (dog.userData.tail as THREE.Object3D | undefined)?.rotation.set(0.6, Math.sin(dogT * 14) * 0.5, 0);
+      if (!dogCool && Math.hypot(p.x - dog.position.x, p.z - dog.position.z) < 1.1) {
+        dogCool = 3;
+        run.penalty(4, '🐕 Il cane ti ha fatto scappare');
+        // un balzo indietro verso la strada
+        p.z -= dogHouse.side * 2.2;
+      }
+    }
+  };
+  run.extraStatus = () => [carrying.has('grande') ? '🛋️ pacco grande' : '', carrying.has('fragile') ? (broken ? '💥 ammaccato' : '🔔 fragile') : ''].filter(Boolean).join(' · ');
   return run;
 }
 
@@ -1170,7 +1448,7 @@ export class VisitRun extends BaseRun {
     super(game, level);
     const p = game.player.root.position;
     const dist = Math.abs(dest.pos.x - p.x) + Math.abs(dest.pos.z - p.z);
-    this.timeTotal = this.timeLeft = (dist / 5.2) * 2 + 25;
+    this.setTime((dist / 5.2) * 2 + 25);
     this.title = title;
     this.target = dest.pos;
     this.marker = this.add(arrow(0x2d9cdb));
