@@ -488,6 +488,13 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
   - 🥐 Forno e pasticceria: panettiere (farina → impasto → forma → forni con la barra → scaffale), pasticcere (sac à poche col dito), torte su ordinazione (decorazioni come nella foto), torte nuziali (piani che dondolano da centrare), cioccolatiere (temperatura nel verde, poi stampi fino alla tacca)
 - Scena nuova per i lavori al chiuso: **locale senza tetto** (`minigames/room.ts`) con i mobili Kenney e il quartiere vero fuori; postazioni da usare più volte (`Task.repeat`, `finishPhase`); motori col dito riusabili (`minigames/finger.ts`: TraceRun, RhythmRun, DragRun, PourRun, StackRun)
 
+### Tocco degli oggetti in prima persona (15/10/2026)
+- **Si fa la cosa toccata**: toccando un oggetto si fa proprio il suo punto (`PhasedRun.taskAt`), non il più vicino al personaggio; tutti gli oggetti a portata sono toccabili insieme. Prima, con due postazioni vicine (frigo e fuoco, due ripiani) il tocco andava sempre alla più vicina
+- **Ogni punto ha qualcosa da toccare**: se non ha un oggetto che si accende (porte, persone, mobili del locale) riceve una zona invisibile lì dov'è (`Task.hitObj`); prima alcuni punti (porte del facchino, ospiti, tavoli, banconi) non si potevano toccare col dito
+- **Tenere premuto resta sull'oggetto iniziato** finché non si alza il dito (`holdTarget`), e il dito su un oggetto da tenere premuto non fa mai partire un "tocca" su un altro vicino
+- Dopo il tutorial di un lavoretto in città (guide, lavapiatti) si torna dove lo si è accettato: "Fallo adesso" riparte da lì
+- Controllo automatico: per ogni lavoretto 3D, punto per punto, il personaggio va vicino, guarda l'oggetto e lo tocca sullo schermo (o lo tiene premuto) come col dito
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero

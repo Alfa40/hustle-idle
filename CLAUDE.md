@@ -60,7 +60,9 @@
   errori `[scroll]`. Mai ridisegnare a mano un contenitore scorrevole senza salvare e rimettere lo scorrimento.
 - Prove: headless con Chrome (puppeteer-core) che pilota `window.game` con script di prova
   usa-e-getta (non si salvano nel progetto). Prima di consegnare: giocare fino alla fine tutti i lavoretti
-  dei settori accesi (ogni gradino), e per le schermate le misure di `LAYOUT.md`.
+  dei settori accesi (ogni gradino), e per le schermate le misure di `LAYOUT.md`. Per i lavoretti 3D non basta
+  completare i punti da codice: va provato il **tocco vero sullo schermo** (touchscreen) su ogni punto, la
+  **raggiungibilità** camminando (griglia con le collisioni del gioco) e una foto dall'alto per le sovrapposizioni.
 
 - **Partita developer** (src/dev.ts): solo sul telefono dello sviluppatore, acceso col link segreto
   `?dev=<chiave>` oppure scrivendo la chiave in Crediti dopo 7 tocchi su "Versione" (serve nell'app sulla Home,

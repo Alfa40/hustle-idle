@@ -79,6 +79,8 @@ export class Input {
   onTargetHit: ((x: number, y: number) => boolean) | null = null;
   /** dove sta il dito nella metà delle azioni (pixel), null se non c'è */
   actionPos: { x: number; y: number } | null = null;
+  /** dove è stato fatto l'ultimo tocco d'azione (per capire quale oggetto è stato toccato) */
+  pressPos: { x: number; y: number } | null = null;
   private actClaimed = false;
   /** l'azione in corso è partita toccando l'oggetto (prima persona) */
   private onTarget = false;
@@ -118,6 +120,7 @@ export class Input {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
       this.keys.add(e.code);
       if ((e.code === 'KeyE' || e.code === 'Space') && !e.repeat) {
+        this.pressPos = null;
         this.actionPressed = true;
         this.actionHeld = true;
       }
@@ -170,6 +173,7 @@ export class Input {
       if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
+      this.pressPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = false;
       this.actionPressed = true;
       this.actionHeld = true;
@@ -211,6 +215,7 @@ export class Input {
       if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
+      this.pressPos = { x: e.clientX, y: e.clientY };
       this.actClaimed = true;
       this.actionPressed = true;
       this.actionHeld = true;

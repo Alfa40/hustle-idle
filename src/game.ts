@@ -1936,7 +1936,7 @@ export class Game {
     if (this.run) {
       this.updateInterRings(null);
       this.ui.setAction(this.prompt);
-      if (this.prompt && this.input.consumeAction()) this.run.onAction?.();
+      if (this.prompt && this.input.consumeAction()) this.run.onAction?.(this.input.pressPos ?? undefined);
       return;
     }
     const p = this.player.root.position;

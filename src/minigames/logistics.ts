@@ -511,9 +511,10 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   SIZES.forEach((sz, i) => {
     const st = new THREE.Group();
     for (let k = 0; k < 3; k++) {
+      // scatole piatte (da montare) una sull'altra, senza vuoti
       const c = crate(sz.size, 0xc8935a);
-      c.position.y = k * sz.size * 0.82;
       c.scale.y = 0.4;
+      c.position.y = k * sz.size * 0.8 * 0.4;
       st.add(c);
     }
     run.prop(st, boxesAt[i], 0, 1);

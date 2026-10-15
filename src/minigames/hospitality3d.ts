@@ -680,7 +680,8 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     door.position.y = 1.05;
     const g = new THREE.Group();
     g.add(door);
-    run.prop(g, d.pos.clone(), 0, 1).userData.noGlow = true;
+    // la porta si illumina quando ci sei davanti (ed è lei che si tocca)
+    run.prop(g, d.pos.clone(), 0, 1);
     tag(run, String(d.num), d.pos.clone().add(new THREE.Vector3(-d.side * 0.1, 0, 0)), 2.45, '#3a2f55');
   }
   // banco della reception di lato, non davanti alla porta
@@ -872,7 +873,8 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
   let holding: string | null = null;
   let run: PhasedRun;
   const cartAt = room.at(-1.5, 1.8);
-  const pantryAt = (k: number) => room.at(-4.6 + (k % 6) * 1.0, -3.2 + Math.floor(k / 6) * 0.01);
+  // dispensa: fino a 6 sulla parete di fondo, le altre sulla parete di sinistra (mai una sopra l'altra)
+  const pantryAt = (k: number) => (k < 6 ? room.at(-4.4 + k * 1.5, -3.2) : room.at(-4.7, -1.4 + (k - 6) * 1.4));
   const phases: Phase[] = [
     {
       name: 'Prepara il carrello', icon: '🛒', count: () => [onCart.length, n],
@@ -910,8 +912,10 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
   ];
   run = new PhasedRun(game, 1, title, phases, { time: 50 + n * 22 });
   pantry.forEach((icon, k) => {
-    room.furn('kitchenCabinet', pantryAt(k).x - room.center.x, -3.7, 0, 2);
-    tag(run, icon, pantryAt(k), 1.35);
+    const at = pantryAt(k);
+    if (k < 6) room.furn('kitchenCabinet', at.x - room.center.x, -3.7, 0, 2);
+    else room.furn('kitchenCabinet', -5.2, at.z - room.center.z, Math.PI / 2, 2);
+    tag(run, icon, at, 1.35);
   });
   const cart = crate(0.7, 0xc0c4cc);
   cart.userData.solid = true;

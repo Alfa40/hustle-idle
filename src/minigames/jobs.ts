@@ -25,7 +25,8 @@ export interface JobRun {
   /** cosa sta succedendo, per il tutorial contestuale */
   guide?(): RunGuide | null;
   update(dt: number): void;
-  onAction?(): void;
+  /** azione del giocatore; `at`: dove ha toccato lo schermo (in prima persona si fa la cosa toccata) */
+  onAction?(at?: { x: number; y: number }): void;
   /** spinge il personaggio fuori dagli oggetti grandi del lavoretto */
   collide?(p: THREE.Vector3, r?: number): void;
   /** velocità a piedi (1 = normale): con un carico pesante si va più piano */
@@ -217,6 +218,8 @@ export interface Task {
    * (si accende quando `enabled`). La fase finisce quando sono fatti i punti normali, o con `finishPhase`.
    */
   repeat?: boolean;
+  /** zona invisibile da toccare, se il punto non ha un oggetto che si accende (la mette il lavoretto) */
+  hitObj?: THREE.Object3D;
   /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
   right?: boolean;
   /** gruppo di scelte: quando si fa quella giusta, le altre del gruppo spariscono */
@@ -450,7 +453,9 @@ export class PhasedRun extends BaseRun {
   /** Le parti da toccare per fare il punto: quelle che pulsano, o l'oggetto del punto. */
   private hitObjs(t: Task) {
     const g = this.glows.get(t);
-    return g?.meshes.length ? g.meshes.map((x) => x.m) : t.obj ? [t.obj] : [];
+    if (g?.meshes.length) return g.meshes.map((x) => x.m);
+    // l'oggetto del punto e, in più, la zona invisibile (si tocca anche lì attorno)
+    return [t.obj, t.hitObj].filter((o): o is THREE.Object3D => !!o);
   }
 
   private ownGlow(t: Task) {
@@ -492,6 +497,16 @@ export class PhasedRun extends BaseRun {
   private addTask(t: Task) {
     if (!this.tasks.includes(t)) this.tasks.push(t);
     this.addGlow(t);
+    // in prima persona si tocca l'oggetto: se il punto non ne ha uno che si accende (persone, mobili del
+    // locale, porte…), gli si dà una zona invisibile da toccare proprio lì (alta come una persona)
+    // (in un campo a parte: `obj` può essere di sola lettura, es. il negozio che arriva dopo)
+    if (!t.aim && !this.glows.get(t)?.meshes.length && !t.hitObj) {
+      const hit = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.8, 0.8), new THREE.MeshBasicMaterial({ visible: false }));
+      hit.position.set(t.pos.x, 0.9, t.pos.z);
+      hit.userData.noGlow = true;
+      this.add(hit);
+      t.hitObj = hit;
+    }
     if (t.aim || t.quiet) return; // i punti sull'oggetto si vedono già (macchie), quelli da cercare no
     // indicatore grande (si vede bene anche da lontano), appena sopra l'oggetto più alto lì vicino
     // (mai sovrapposto a cassette, giochi…): vicino a ciò che indica, non in cielo
@@ -638,6 +653,14 @@ export class PhasedRun extends BaseRun {
     const mk = this.markers.get(near);
     const mp = near.markerAt ?? near.pos;
     const at = new THREE.Vector3(mp.x, Math.min(1.6, Math.max(0.5, (mk?.userData.top ?? 1.55) * 0.55)), mp.z);
+    // si fa la cosa che il dito sta toccando (se tra quelle a portata), non per forza la più vicina
+    // e una volta iniziato a tenere premuto un oggetto si continua su quello finché non si alza il dito
+    const inp = this.game.input;
+    if (!inp.actionHeld) this.holdTarget = null;
+    else if (this.holdTarget && !(pend.includes(this.holdTarget) && !this.holdTarget.done)) this.holdTarget = null;
+    const fingerOn = !this.holdTarget && inp.actionPos ? this.taskAt(inp.actionPos.x, inp.actionPos.y) : null;
+    if (fingerOn && fingerOn.kind === 'hold' && inp.actionHeld) this.holdTarget = fingerOn;
+    if (this.holdTarget) near = this.holdTarget;
     if (near.kind === 'hold') {
       if (this.game.input.actionHeld) {
         near.progress = (near.progress ?? 0) + dt / (near.sec ?? 1.2);
@@ -651,14 +674,64 @@ export class PhasedRun extends BaseRun {
         this.game.player.play('interact-right', 0.1, 1.6);
         if (near.progress >= 1) this.complete(near);
       } else if (this.game.player.currentName === 'interact-right') this.game.player.play('idle');
-      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitObjs(near) };
+      this.game.prompt = { label: `Tieni premuto: ${near.label}`, icon: near.icon, progress: near.progress ?? 0, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitNear() };
     } else {
-      this.game.prompt = { label: near.label, icon: near.icon, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitObjs(near) };
+      this.game.prompt = { label: near.label, icon: near.icon, at, obj: this.ownGlow(near), stand: this.standPt, hit: this.hitNear() };
     }
   }
 
-  onAction() {
+  /** Punti a portata (da toccare o tenere premuti, non quelli sull'oggetto) con i loro oggetti da toccare. */
+  private reachable() {
     const p = this.game.player.root.position;
+    return this.pending().filter((t) => !t.aim && Math.hypot(t.pos.x - p.x, t.pos.z - p.z) <= this.reach());
+  }
+
+  /** Tutti gli oggetti toccabili a portata: toccandone uno si fa il suo punto. */
+  private hitNear() {
+    return this.reachable().flatMap((t) => this.hitObjs(t));
+  }
+
+  /** l'oggetto che si sta tenendo premuto (resta lui finché il dito è giù) */
+  private holdTarget: Task | null = null;
+  private tapRay = new THREE.Raycaster();
+  /** Il punto (a portata) il cui oggetto è sotto il dito in (x, y) sullo schermo, se c'è. */
+  private taskAt(x: number, y: number) {
+    const cam = this.game.activeCamera;
+    cam.updateMatrixWorld();
+    const { w, h } = layout.info;
+    this.tapRay.far = 8;
+    let best: Task | null = null;
+    let bd = Infinity;
+    for (const t of this.reachable()) {
+      const objs = this.hitObjs(t);
+      if (!objs.length) continue;
+      // il punto toccato o poco attorno (la punta del dito), come per il pulsante azione
+      for (let i = -1; i < 8; i++) {
+        const px = i < 0 ? x : x + Math.cos((i * Math.PI) / 4) * 14;
+        const py = i < 0 ? y : y + Math.sin((i * Math.PI) / 4) * 14;
+        this.tapRay.setFromCamera(new THREE.Vector2((px / w) * 2 - 1, -(py / h) * 2 + 1), cam);
+        const hit = this.tapRay.intersectObjects(objs, true)[0];
+        if (hit && hit.distance < bd) {
+          bd = hit.distance;
+          best = t;
+        }
+        if (hit) break;
+      }
+    }
+    return best;
+  }
+
+  onAction(at?: { x: number; y: number }) {
+    const p = this.game.player.root.position;
+    // toccato un oggetto preciso: si fa proprio quello
+    const tapped = at ? this.taskAt(at.x, at.y) : null;
+    if (tapped && tapped.kind === 'tap' && !(tapped.onFoot && this.game.riding)) {
+      if (!this.game.riding) this.game.player.once('interact-right');
+      this.complete(tapped);
+      return;
+    }
+    // il dito è su un oggetto da tenere premuto: lo gestisce update (mai un "tocca" su un altro oggetto vicino)
+    if (tapped) return;
     // il punto più vicino (quello illuminato e indicato), non il primo della lista: con le scelte vicine
     // (i due ripiani dello stesso scaffale) si fa sempre quella che stai guardando
     const t = this.nearTask && this.nearOk && this.nearTask.kind === 'tap' ? this.nearTask
