@@ -95,43 +95,56 @@ il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della li
 
 ---
 
-## 🍳 Ristorazione
+## 🍳 Ristorazione e ospitalità (lavoretti in costruzione dal 15/10)
 
-### 🍽️ Cucina ✅
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Lavapiatti ✅ | lava, asciuga, impila |
-| 10 | Aiuto cuoco 🟡 | taglia e prepara gli ingredienti |
-| 20 | Cuoco di linea 🟡 | più piatti sui fuochi insieme |
-| 30 | Capo partita 🆕 | guida altri cuochi, controlla i piatti |
-| 40 | Chef 🆕 | crea il piatto della foto (impiattamento) |
+Cinque linee scelte dall'utente: Cucina, Sala, Ospitalità, Bar, Forno e pasticceria (Pizza no). Regole come
+sempre: lavori con le mani, sotto i 5 minuti, si cresce in difficoltà e non in lunghezza, gli errori si possono
+fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per chi gioca bene.
 
-### 🥂 Sala ed eventi 🟡
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Cameriere a una festa 🟡 | vassoio tra gli ospiti, senza far cadere niente |
-| 10 | Catering 🟡 | prepara il buffet secondo lo schema |
-| 20 | Banchetti 🟡 | servi i tavoli in ordine, portata per portata |
-| 30 | Maître 🆕 | fai sedere i gruppi ai tavoli giusti |
-| 40 | Organizzatore di banchetti 🆕 | matrimonio: tavoli, menù, tempi |
+### 🍽️ Cucina
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Lavapiatti ✅ | prendi la pila, lava, appoggia sullo scolapiatti | pile e piatti | 1½–2½ min |
+| 10 | Aiuto cuoco | col dito tagli gli ingredienti lungo le linee tratteggiate, poi ognuno nella sua ciotola | da 3 a 4 ingredienti, tagli più fini | 2 min |
+| 20 | Cuoco di linea | cucina con i fuochi: frigo → padella → togli al momento giusto (prima è crudo, dopo brucia) → passe; più comande insieme | da 3 a 5 piatti, fino a 3 fuochi | 2½–3 min |
+| 30 | Cuoco dal vivo | a ritmo: salta la padella quando il segno arriva sul cerchio, flambé tenendo premuto | 3 piatti, ritmo più veloce | 2 min |
+| 40 | Chef | cottura a tempo, poi impiatti uguale alla foto (somiglianza in %) | elementi da 4 a 6 | 3 min |
 
-### 🥐 Forno e pasticceria 🟡
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Panettiere notturno 🟡 | impasta, forma, inforna al momento giusto |
-| 10 | Pasticcere 🟡 | farcisci e decora i dolci |
-| 20 | Torte su ordinazione 🟡 | torta uguale alla foto (come i vasi) |
-| 30 | Torte nuziali 🆕 | piani da impilare in equilibrio e decorare |
-| 40 | Maestro pasticcere 🆕 | sculture di zucchero e cioccolato |
+### 🥂 Sala
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Cameriere a una festa | festa in giardino: prendi i bicchieri al buffet e servi gli ospiti che chiamano; correndo il vassoio si rovescia | da 5 a 8 ospiti | 2 min |
+| 10 | Catering | col dito sistemi i vassoi del buffet uguali allo schema | da 6 a 9 vassoi | 1½–2 min |
+| 20 | Cameriere al ristorante | per ogni tavolo: ordinazione, piatto giusto dal passe, servizio, conto | da 2 a 4 tavoli | 2½–3½ min |
+| 30 | Maître | col dito fai sedere i gruppi ai tavoli giusti (posti, finestra, tranquillità) | da 4 a 6 gruppi | 2 min |
+| 40 | Cena di gala | tutti i camerieri servono insieme al segnale: tocca a tempo, 3 portate | ritmo più stretto | 2 min |
 
-### ☕ Bar 🆕
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Barista al bancone 🆕 | caffè e cappuccini in ordine di arrivo |
-| 10 | Latte art 🆕 | disegna sul cappuccino come nella foto |
-| 20 | Barman 🆕 | cocktail: dosi giuste nell'ordine giusto |
-| 30 | Barman agli eventi 🆕 | tanti ordini insieme, tempi stretti |
-| 40 | Sommelier 🆕 | abbina il vino giusto a ogni piatto |
+### 🛎️ Ospitalità (hotel)
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Facchino d'albergo | porta ogni valigia alla porta col numero della sua etichetta | da 4 a 7 valigie, più piani | 2 min |
+| 10 | Cameriera ai piani | rifai le camere: letto, asciugamani puliti, cestino, polvere | da 2 a 3 camere | 2½–3 min |
+| 20 | Receptionist | col dito dai a ogni ospite la camera giusta (letti, vista, piano) | da 4 a 6 ospiti | 2 min |
+| 30 | Concierge | nella hall gli ospiti chiedono cose: prendi quella giusta e portala a chi l'ha chiesta | da 4 a 6 richieste | 2½ min |
+| 40 | Suite VIP | servizio in camera come sulla scheda del cliente: carrello, tavola, fiori, tende | richieste più precise | 3 min |
+
+### ☕ Bar
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Barista | al bancone: tazza → macchina del caffè → (latte montato) → servi i clienti in ordine di arrivo | da 4 a 7 ordini | 2 min |
+| 10 | Latte art | col dito disegni sulla schiuma come nella foto (cuore, foglia, cigno) | da 2 a 3 tazze, disegni più difficili | 1½ min |
+| 20 | Barman | cocktail: versi tenendo premuto fino alla tacca, nell'ordine della ricetta | da 2 a 3 cocktail | 2 min |
+| 30 | Barman acrobatico | a ritmo: lancia e riprendi la bottiglia | ritmo più veloce | 1½ min |
+| 40 | Sommelier | scegli il vino giusto per ogni piatto e versalo fino al segno senza traboccare | 3 piatti, vini simili | 2 min |
+
+### 🥐 Forno e pasticceria
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Panettiere notturno | farina → impastatrice (tieni premuto) → forma → forno (togli al momento giusto) → scaffale | da 3 a 5 pani, 2 forni | 2–2½ min |
+| 10 | Pasticcere | col dito segui il disegno con la sac à poche sui dolci | da 3 a 4 dolci | 1½ min |
+| 20 | Torte su ordinazione | decora la torta uguale alla foto (somiglianza in %) | decorazioni da 4 a 6 | 2 min |
+| 30 | Torte nuziali | impila i piani che dondolano, ben centrati | 3 piani, dondolano più in fretta | 1½ min |
+| 40 | Maestro cioccolatiere | tieni il cioccolato alla temperatura giusta, poi versalo negli stampi fino al segno | più stampi, finestra più stretta | 2 min |
 
 ---
 
