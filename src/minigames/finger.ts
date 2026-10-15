@@ -948,8 +948,10 @@ export class StackRun extends CanvasRun {
     return Math.min(this.w * 0.7, 240) * (1 - i * 0.22);
   }
 
+  /** quanto dondola: mai fuori dal riquadro (il piano resta tutto visibile) */
   private get offNow() {
-    return Math.sin(this.swing) * this.w * 0.28;
+    const amp = Math.max(20, (this.w - this.tierW(this.tiers.length)) / 2 - 8);
+    return Math.sin(this.swing) * amp;
   }
 
   protected down() {
