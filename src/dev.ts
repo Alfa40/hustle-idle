@@ -20,6 +20,22 @@ export function isDevDevice() {
   }
 }
 
+/**
+ * Prova una chiave scritta a mano (Crediti → tocca 7 volte "Versione"): serve nell'app installata sulla
+ * schermata Home, che su iPhone ha la sua memoria separata da Safari e non può aprire il link con la chiave.
+ */
+export async function tryDevKey(key: string) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key.trim()));
+    const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    if (hex !== DEV_HASH) return false;
+    localStorage.setItem(DEV_KEY, '1');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** All'avvio: legge `?dev=` dall'indirizzo, accende o spegne la modalità e lo toglie dall'indirizzo. */
 export async function checkDevLink() {
   const url = new URL(location.href);

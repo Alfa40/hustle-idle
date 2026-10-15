@@ -2,7 +2,7 @@ import { rank } from '../sim/progress';
 import { euro, lastSlot, listSlots, SLOT_COUNT, wipeSave, type GameState } from '../sim/state';
 import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
-import { DEV_SLOT, isDevDevice } from '../dev';
+import { DEV_SLOT, isDevDevice, tryDevKey } from '../dev';
 import { loadState } from '../sim/state';
 
 type View = 'main' | 'slots' | 'new' | 'settings' | 'credits';
@@ -29,6 +29,8 @@ export class TitleScreen {
   private confirm = '';
   private newSlot = 1;
   private newName = 'La mia partita';
+  private verTaps = 0;
+  private devMsg = '';
 
   constructor(private onStart: (slot: number, newName?: string) => void) {
     this.el = document.createElement('div');
@@ -103,7 +105,9 @@ export class TitleScreen {
       html = this.panel('ℹ️ Crediti', `
         <div class="card"><h3>Hustle Idle</h3><p class="muted small" style="margin:0">Un gioco gestionale in cui parti dai lavoretti e costruisci il tuo impero di attività.</p></div>
         <div class="card"><h3>Grafica</h3><p class="muted small" style="margin:0">Modelli 3D di <b>Kenney.nl</b> (licenza CC0): Mini Characters, City Kit, Car Kit, Food Kit, Furniture Kit.<br>Font: Fredoka.</p></div>
-        <div class="card"><h3>Versione</h3><p class="muted small" style="margin:0">Prototipo 0.5</p></div>`);
+        <div class="card" data-t="ver"><h3>Versione</h3><p class="muted small" style="margin:0">Prototipo 0.5</p></div>
+        ${this.verTaps >= 7 ? `<div class="card"><h3>🛠️ Codice developer</h3><input class="t-input" name="devkey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Codice" />
+          <button class="btn good full" data-t="devkey" style="margin-top:8px">Attiva</button>${this.devMsg ? `<p class="small center" style="margin:6px 0 0">${this.devMsg}</p>` : ''}</div>` : ''}`);
     }
     this.el.innerHTML = html;
   }
@@ -135,6 +139,19 @@ export class TitleScreen {
       case 'play':
         this.onStart(+arg);
         return;
+      case 'ver':
+        // 7 tocchi su "Versione": compare il campo per il codice developer
+        this.verTaps++;
+        if (this.verTaps < 7) return;
+        break;
+      case 'devkey': {
+        const v = (this.el.querySelector('input[name="devkey"]') as HTMLInputElement | null)?.value ?? '';
+        void tryDevKey(v).then((ok) => {
+          this.devMsg = ok ? '✅ Attivata: torna indietro, trovi 🛠️ Partita developer' : '❌ Codice sbagliato';
+          this.render();
+        });
+        return;
+      }
       case 'dev':
         // partita developer: slot a parte, si crea la prima volta
         if (loadState(DEV_SLOT)) this.onStart(DEV_SLOT);

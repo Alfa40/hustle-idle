@@ -63,7 +63,8 @@
   dei settori accesi (ogni gradino), e per le schermate le misure di `LAYOUT.md`.
 
 - **Partita developer** (src/dev.ts): solo sul telefono dello sviluppatore, acceso col link segreto
-  `?dev=<chiave>` (nel codice c'è solo l'impronta SHA-256; `?dev=off` la spegne). Slot a parte (9), un
+  `?dev=<chiave>` oppure scrivendo la chiave in Crediti dopo 7 tocchi su "Versione" (serve nell'app sulla Home,
+  che su iPhone ha la memoria separata da Safari); nel codice c'è solo l'impronta SHA-256, `?dev=off` la spegne. Slot a parte (9), un
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; non va mai in classifica né in "sto giocando".
   Ogni comando nuovo utile ai test va aggiunto lì.
 
