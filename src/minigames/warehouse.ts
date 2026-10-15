@@ -51,6 +51,10 @@ export interface WarehouseOpts {
   tall?: boolean;
   /** camion col cassone aperto (scatole e bancali si vedono) */
   flatbed?: boolean;
+  /** larghezza degli scaffali (m) */
+  shelfW?: number;
+  /** scaffali tutti del loro colore (montanti compresi) e senza cartello col codice: si riconoscono dal colore */
+  colorOnly?: boolean;
   slot?: Slot;
   placed?: { path: string; m: THREE.Matrix4 }[];
 }
@@ -72,7 +76,7 @@ export class Warehouse {
     const O = WAREHOUSE_ORIGIN;
     const g = this.group;
     const aisle = opts.aisle ?? 3.4;
-    const SH_W = 2.6;
+    const SH_W = opts.shelfW ?? 2.6;
     const SH_D = 0.9;
     // grande quanto serve: le file di scaffali con i corridoi, più lo spazio davanti alla banchina
     this.w = Math.max(16, opts.perRow * (SH_W + 0.6) + 6);
@@ -146,13 +150,15 @@ export class Warehouse {
         const x = O.x - ((opts.perRow - 1) * (SH_W + 0.6)) / 2 + i * (SH_W + 0.6);
         const color = SHELF_COLORS[k % SHELF_COLORS.length];
         const code = String.fromCharCode(65 + k);
-        const rack = shelfRack(SH_W, SH_D, opts.tall ? 4 : 3, color.hex);
+        const rack = shelfRack(SH_W, SH_D, opts.tall ? 4 : 3, color.hex, opts.colorOnly);
         rack.obj.position.set(x, 0, z);
         rack.obj.userData.noGlow = true;
         g.add(rack.obj);
-        const tag = label(`${color.icon} ${code}`, { bg: '#ffffff', fg: '#222', scale: 0.4 });
-        tag.position.set(x, rack.height + 0.35, z);
-        g.add(tag);
+        if (!opts.colorOnly) {
+          const tag = label(`${color.icon} ${code}`, { bg: '#ffffff', fg: '#222', scale: 0.4 });
+          tag.position.set(x, rack.height + 0.35, z);
+          g.add(tag);
+        }
         this.blocks.push({ minX: x - SH_W / 2, maxX: x + SH_W / 2, minZ: z - SH_D / 2, maxZ: z + SH_D / 2 });
         this.shelves.push({ pos: new THREE.Vector3(x, 0, z), front: new THREE.Vector3(0, 0, 1), side: new THREE.Vector3(1, 0, 0), obj: rack.obj, boards: rack.boards, color, code });
         k++;
@@ -192,10 +198,11 @@ export class Warehouse {
 }
 
 /** Scaffale metallico: montanti blu, ripiani arancioni, fascia del colore in basso. */
-export function shelfRack(w: number, d: number, levels: number, color: number) {
+export function shelfRack(w: number, d: number, levels: number, color: number, colored = false) {
   const g = new THREE.Group();
   const H = levels * 0.62 + 0.2;
-  const up = mat(0x2d4f8a);
+  // `colored`: montanti del colore dello scaffale, così si riconosce da lontano
+  const up = mat(colored ? color : 0x2d4f8a);
   for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) for (const z of [-d / 2 + 0.05, d / 2 - 0.05]) {
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.08, H, 0.08), up);
     p.position.set(x, H / 2, z);

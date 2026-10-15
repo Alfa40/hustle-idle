@@ -2,7 +2,7 @@ import { gltf, model } from '../assets';
 import * as THREE from 'three';
 import { ceramicProduct } from './ceramics';
 
-function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
+export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;

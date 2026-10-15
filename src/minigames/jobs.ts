@@ -207,6 +207,8 @@ export interface Task {
   decoy?: boolean;
   /** messaggio quando si tocca la scelta sbagliata */
   wrongText?: string;
+  /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
+  right?: boolean;
   /** gruppo di scelte: quando si fa quella giusta, le altre del gruppo spariscono */
   group?: string;
   /** dopo averla fatta arrivano altri punti nella stessa fase (es. prendi la scatola → mettila sullo scaffale) */
@@ -360,7 +362,8 @@ export class PhasedRun extends BaseRun {
     if (Math.hypot(o.position.x - t.pos.x, o.position.z - t.pos.z) > 1.05) return;
     o.traverse((c) => {
       const m = c as THREE.Mesh;
-      if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite || g.meshes.some((x) => x.m === m)) return;
+      // parti che non si accendono (sticker, scritte disegnate): il loro materiale resta com'è
+      if (!m.isMesh || (m as unknown as THREE.Sprite).isSprite || c.userData.noGlow || g.meshes.some((x) => x.m === m)) return;
       const orig = m.material;
       // nessuna luce esterna: il colore dell'oggetto stesso si accende
       const glowMat = (mat: THREE.Material) => {

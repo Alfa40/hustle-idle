@@ -5,7 +5,7 @@ import { rungOf, rungProgress } from '../config/careers';
 import type { JobOffer } from '../sim/state';
 import type { Slot } from '../world/city';
 import { toast } from '../sim/bus';
-import { label } from '../world/props';
+import { canvasTexture, label } from '../world/props';
 import { bigPlanter, patioSet, roundShrub } from '../world/jobprops';
 import { Character } from '../world/character';
 import { CHAR_MODELS } from '../sim/economy';
@@ -50,25 +50,68 @@ function bumpTracker(game: Game, onBump: () => void) {
   };
 }
 
-/** Lastrina che si accende su un ripiano: il posto dove appoggiare la scatola. */
-function shelfSpot(color: number) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.5), new THREE.MeshLambertMaterial({ color }));
+// ---------------- Magazziniere (Magazzino, gradino 1) ----------------
+
+/** Scatola pesante o fragile: lo sticker sulla parte alta dice il ripiano (pesante in basso, fragile in alto). */
+type BoxKind = 'normal' | 'heavy' | 'fragile';
+/** posti per ripiano (metà scaffale ciascuno): le scatole vanno in un posto libero, mai una sopra l'altra */
+const PER_SPOT = 3;
+
+const stickerTex = new Map<string, THREE.Texture>();
+/** Sticker quadrato ben visibile: 🏋️ su grigio scuro (pesante) o 🍷 su bianco col bordo rosso (fragile). */
+function sticker(kind: 'heavy' | 'fragile', size: number) {
+  let tex = stickerTex.get(kind);
+  if (!tex) {
+    tex = canvasTexture(128, 128, (g) => {
+      // colori che nessuno scaffale usa: non si confondono col nastro
+      g.fillStyle = kind === 'heavy' ? '#33333d' : '#ffffff';
+      g.beginPath();
+      g.roundRect(4, 4, 120, 120, 18);
+      g.fill();
+      g.strokeStyle = kind === 'heavy' ? '#ffffff' : '#e5484d';
+      g.lineWidth = 8;
+      g.stroke();
+      g.font = '78px sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(kind === 'heavy' ? '🏋️' : '🍷', 64, 70);
+    });
+    stickerTex.set(kind, tex);
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  m.rotation.x = -Math.PI / 2;
+  m.userData.noGlow = true;
   return m;
 }
 
-// ---------------- Magazziniere (Magazzino, gradino 1) ----------------
+/** Scatola col nastro del colore dello scaffale e, se è pesante o fragile, lo sticker sopra. */
+function shelfBox(size: number, color: number, kind: BoxKind) {
+  const g = crate(size, kind === 'heavy' ? 0x9c6b3e : 0xc8935a, color);
+  if (kind !== 'normal') {
+    const st = sticker(kind, size * 0.7);
+    st.position.y = size * 0.8 + 0.006;
+    g.add(st);
+  }
+  return g;
+}
 
 /**
- * Magazziniere: le scatole scaricate dal camion stanno davanti alla banchina. Si prende una scatola
- * (le pesanti tenendo premuto, e si cammina più piano) e si appoggia sullo scaffale giusto: per colore
- * fino al Liv. 4, per codice dal Liv. 5. Le pesanti vanno sul ripiano in basso, le leggere in alto.
- * Lo scaffale sbagliato costa secondi. Alla fine si firma la bolla al camion.
+ * Magazziniere: le scatole scaricate dal camion stanno davanti alla banchina. Niente cartelli né frecce: si
+ * va a colori. Il **nastro** della scatola è del colore dello scaffale dove va. Dal Liv. 4 arrivano le
+ * scatole con lo **sticker** ben visibile sopra: 🏋️ pesante = ripiano in basso (si solleva tenendo premuto e
+ * si cammina più piano), 🍷 fragile = ripiano in alto; le lastrine dei ripiani hanno lo stesso sticker. Le
+ * scatole senza sticker vanno su qualsiasi ripiano del loro scaffale. Ogni scatola va nel primo posto libero
+ * del ripiano, accanto a quelle che ci sono già. Si può appoggiare anche nel posto sbagliato: il gioco lo
+ * lascia fare, ma alla fine (firmando la bolla) ogni scatola fuori posto toglie stelle e quindi paga
+ * (una sbagliata: massimo 2 stelle, due o più: 1). Salendo: più scatole e più colori.
  */
 export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title: string) {
   const t = rungProgress('magazzino', lineLevel);
   const n = Math.round(6 + 4 * t);
-  const codes = lineLevel >= 5;
-  const nHeavy = t < 0.2 ? 0 : t < 0.6 ? 1 : 2;
+  /** pesanti e fragili (e quindi il ripiano giusto), dal Liv. 4 */
+  const levels = lineLevel >= 4;
+  const nHeavy = !levels ? 0 : t < 0.6 ? 1 : 2;
+  const nFragile = !levels ? 0 : t < 0.7 ? 1 : 2;
   const O = wh.truck.rear;
   // scatole a terra davanti al camion, in due file
   const spots: THREE.Vector3[] = [];
@@ -77,32 +120,64 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     const col = Math.floor(i / 2);
     spots.push(new THREE.Vector3(O.x - 2.6 + col * 1.3 - (row ? 0.65 : 0), 0, O.z - 1.6 - row * 1.3));
   }
-  type Item = { pos: THREE.Vector3; shelf: Shelf; heavy: boolean; top: boolean; obj?: THREE.Object3D };
-  const items: Item[] = spots.map((pos, i) => {
-    const shelf = wh.shelves[(i * 7 + Math.floor(Math.random() * 3)) % wh.shelves.length];
-    const heavy = i < nHeavy;
-    return { pos, shelf, heavy, top: !heavy };
-  });
+  // posti sui ripiani: ogni metà scaffale ne ha PER_SPOT; alcune scatole ci sono già
+  const key = (s: Shelf, top: boolean) => `${wh.shelves.indexOf(s)}${top ? 't' : 'b'}`;
+  const used = new Map<string, number>();
+  const pre: { s: Shelf; top: boolean }[] = [];
+  for (const s of wh.shelves) for (const top of [false, true]) if (Math.random() < 0.5) {
+    used.set(key(s, top), 1);
+    pre.push({ s, top });
+  }
+  type Item = { pos: THREE.Vector3; shelf: Shelf; kind: BoxKind; top: boolean; obj?: THREE.Object3D };
+  const want = new Map<string, number>();
+  const room = (s: Shelf, top: boolean) => PER_SPOT - (used.get(key(s, top)) ?? 0) - (want.get(key(s, top)) ?? 0);
+  const items: Item[] = [];
+  for (let i = 0; i < n; i++) {
+    const kind: BoxKind = i < nHeavy ? 'heavy' : i < nHeavy + nFragile ? 'fragile' : 'normal';
+    // uno scaffale con ancora posto sul ripiano che serve (le normali: su uno dei due)
+    let shelf = wh.shelves[0];
+    let top = false;
+    for (let guard = 0; guard < 100; guard++) {
+      shelf = wh.shelves[Math.floor(Math.random() * wh.shelves.length)];
+      top = kind === 'fragile' ? true : kind === 'heavy' ? false : room(shelf, true) >= room(shelf, false);
+      if (room(shelf, top) > 0) break;
+    }
+    want.set(key(shelf, top), (want.get(key(shelf, top)) ?? 0) + 1);
+    items.push({ pos: spots[i], shelf, kind, top });
+  }
   items.sort(() => Math.random() - 0.5);
   let carrying: Item | null = null;
-  const tagOf = (shelf: Shelf, top: boolean) => (codes ? `${shelf.code}${top ? 2 : 1}` : `${shelf.color.icon}${top ? '⬆️' : '⬇️'}`);
+  /** scatole appoggiate nel posto sbagliato (si scopre alla fine) */
+  let wrong = 0;
   let run: PhasedRun;
-  // le lastrine sui ripiani: in basso a sinistra, in alto a destra
-  const spotAt = (s: Shelf, top: boolean) => s.pos.clone().addScaledVector(s.front, 0.25).addScaledVector(s.side, top ? 0.65 : -0.65);
+  // le lastrine: ripiano in basso a sinistra, ripiano in alto a destra (metà scaffale ciascuna)
+  const spotAt = (s: Shelf, top: boolean) => s.pos.clone().addScaledVector(s.front, 0.25).addScaledVector(s.side, top ? 0.85 : -0.85);
+  // il prossimo posto libero sul ripiano: da sinistra a destra, accanto alle scatole che ci sono già
+  const slotAt = (s: Shelf, top: boolean, k: number) => spotAt(s, top).addScaledVector(s.side, (k - (PER_SPOT - 1) / 2) * 0.52).setY(s.boards[top ? 2 : 0]);
   const placeTasks = (it: Item): Task[] => {
     const g = `place${items.indexOf(it)}`;
     const out: Task[] = [];
     for (const s of wh.shelves) {
       for (const top of [false, true]) {
-        const ok = s === it.shelf && top === it.top;
+        // le normali vanno su un ripiano qualsiasi del loro scaffale; pesanti e fragili sul loro
+        const ok = s === it.shelf && (it.kind === 'normal' || top === it.top);
+        // ogni ripiano con posto si può scegliere: quello sbagliato si paga alla fine
         out.push({
-          pos: spotAt(s, top), kind: 'tap', label: `Appoggia sul ripiano ${top ? 'in alto' : 'in basso'}`, icon: top ? '⬆️' : '⬇️', markerText: tagOf(s, top),
-          group: g, decoy: !ok, wrongText: it.heavy && top ? '❌ Le scatole pesanti vanno in basso' : '❌ Scaffale sbagliato: guarda il colore e la freccia',
+          pos: spotAt(s, top), kind: 'tap', label: `Appoggia sul ripiano ${top ? 'in alto' : 'in basso'}`, icon: '📦', quiet: true,
+          group: g, right: ok,
+          // un ripiano pieno non si sceglie (si usa l'altro dello stesso scaffale)
+          enabled: () => (used.get(key(s, top)) ?? 0) < PER_SPOT,
           onDone: () => {
             carrying = null;
             run.speedMul = 1;
             hold(game);
-            const c = run.prop(crate(0.5, 0xc8935a, codes ? 0x777777 : s.color.hex), spotAt(s, top).setY(s.boards[top ? 2 : 0]), Math.random() * 0.4, 1);
+            const k = used.get(key(s, top)) ?? 0;
+            used.set(key(s, top), k + 1);
+            if (!ok) {
+              wrong++;
+              run.starCap = wrong >= 2 ? 1 : 2;
+            }
+            const c = run.prop(shelfBox(0.42, s.color.hex, it.kind), slotAt(s, top, Math.min(PER_SPOT - 1, k)), 0, 1);
             c.userData.noGlow = true;
           },
         });
@@ -113,42 +188,51 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   const phases: Phase[] = [
     {
       name: 'Sistema le scatole sugli scaffali', icon: '📦', count: () => [items.filter((x) => x.obj && !x.obj.visible && x !== carrying).length, n],
-      tip: codes
-        ? 'Prendi una scatola e appoggiala sul ripiano col suo <b>codice</b> (la lettera è lo scaffale, <b>1 = in basso, 2 = in alto</b>). Le pesanti si sollevano tenendo premuto'
-        : 'Prendi una scatola e appoggiala sullo scaffale del suo <b>colore</b>: la freccia dice il ripiano (<b>⬇️ in basso</b> per le pesanti, <b>⬆️ in alto</b> per le leggere)',
+      tip: levels
+        ? 'Il <b>nastro</b> è del colore dello <b>scaffale</b>. Lo <b>sticker</b> sopra la scatola dice il ripiano: <b>🏋️ pesante = in basso</b> (si solleva tenendo premuto), <b>🍷 fragile = in alto</b>, come sulle lastrine. Senza sticker: un ripiano qualsiasi del suo scaffale. Le scatole fuori posto alla fine tolgono stelle'
+        : 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> dove va: appoggiala su un ripiano libero di quello scaffale. Le scatole fuori posto alla fine tolgono stelle',
       tasks: () => items.map((it) => ({
-        pos: it.pos, kind: it.heavy ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.heavy ? 'Solleva la scatola pesante' : 'Prendi la scatola', icon: it.heavy ? '🏋️' : '📦',
-        markerText: tagOf(it.shelf, it.top), enabled: () => !carrying, obj: it.obj,
+        pos: it.pos, kind: it.kind === 'heavy' ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.kind === 'heavy' ? 'Solleva la scatola pesante' : it.kind === 'fragile' ? 'Prendi la scatola fragile' : 'Prendi la scatola', icon: it.kind === 'heavy' ? '🏋️' : it.kind === 'fragile' ? '🍷' : '📦',
+        quiet: true, enabled: () => !carrying, obj: it.obj,
         onDone: () => {
           carrying = it;
           if (it.obj) it.obj.visible = false;
-          hold(game, crate(it.heavy ? 0.6 : 0.45, 0xc8935a, codes ? 0x777777 : it.shelf.color.hex));
-          run.speedMul = it.heavy ? 0.6 : 1;
+          hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind));
+          run.speedMul = it.kind === 'heavy' ? 0.6 : 1;
         },
         then: () => placeTasks(it),
       })),
     },
     {
       name: 'Firma la bolla al camion', icon: '🧾',
-      tasks: () => [{ pos: O.clone().add(new THREE.Vector3(1.6, 0, -0.6)), kind: 'tap', label: 'Firma la bolla di consegna', icon: '🧾', obj: wh.truck.obj }],
+      tasks: () => [{
+        pos: O.clone().add(new THREE.Vector3(1.6, 0, -0.6)), kind: 'tap', label: 'Firma la bolla di consegna', icon: '🧾', obj: wh.truck.obj,
+        // il controllo del capo magazzino: le scatole fuori posto si contano adesso
+        onDone: () => toast(wrong ? `📋 Controllo: ${wrong} ${wrong === 1 ? 'scatola fuori posto' : 'scatole fuori posto'} · massimo ${run.starCap} ${run.starCap === 1 ? 'stella' : 'stelle'}` : '📋 Controllo: tutte le scatole al posto giusto!', wrong ? 'bad' : 'good'),
+      }],
     },
   ];
   run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 15 + nHeavy * 5 });
   for (const it of items) {
-    it.obj = run.prop(crate(it.heavy ? 0.75 : 0.55, it.heavy ? 0x9c6b3e : 0xc8935a, codes ? 0x777777 : it.shelf.color.hex), it.pos, Math.random() * 0.5, 1);
+    it.obj = run.prop(shelfBox(it.kind === 'heavy' ? 0.75 : 0.55, it.shelf.color.hex, it.kind), it.pos, Math.random() * 0.5, 1);
     it.obj.userData.solid = false;
-    const tg = label(codes ? tagOf(it.shelf, it.top) : it.heavy ? '🏋️' : '📦', { bg: '#ffffff', fg: '#222', scale: 0.3 });
-    tg.position.set(0, it.heavy ? 1.0 : 0.8, 0);
-    it.obj.add(tg);
   }
-  // le lastrine colorate dove si appoggia (si accendono quando sono da usare)
+  // le lastrine dei ripiani (bordo del colore dello scaffale, centro bianco o nero) e le scatole già lì
   for (const s of wh.shelves) {
     for (const top of [false, true]) {
-      const pl = run.prop(shelfSpot(codes ? 0xdddddd : s.color.hex), spotAt(s, top).setY(s.boards[top ? 2 : 0] + 0.01), 0, 1);
-      pl.userData.solid = false;
+      const at = spotAt(s, top).setY(s.boards[top ? 2 : 0] + 0.01);
+      const rim = run.prop(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.03, 0.6), new THREE.MeshLambertMaterial({ color: s.color.hex })), at, 0, 1);
+      rim.userData.solid = false;
+      // dal Liv. 4: lo sticker del ripiano (🏋️ in basso, 🍷 in alto), come quello sulle scatole
+      if (levels) {
+        const st = sticker(top ? 'fragile' : 'heavy', 0.36);
+        run.prop(st, at.clone().add(new THREE.Vector3(0, 0.03, 0.12)), 0, 1).rotation.set(-Math.PI / 2, 0, 0);
+      }
     }
   }
-  run.extraStatus = () => (carrying ? `➡️ ${tagOf(carrying.shelf, carrying.top)}` : '');
+  for (const p of pre) run.prop(shelfBox(0.42, p.s.color.hex, 'normal'), slotAt(p.s, p.top, 0), 0, 1).userData.noGlow = true;
+  // in mano: il colore dello scaffale e il bollino (⚪ in alto, ⚫ in basso)
+  run.extraStatus = () => (carrying ? `📦 ${carrying.shelf.color.icon}${carrying.kind === 'heavy' ? '🏋️' : carrying.kind === 'fragile' ? '🍷' : ''}` : '');
   return run;
 }
 
@@ -476,7 +560,7 @@ export function startLogisticsJob(game: Game, offer: JobOffer, slot: Slot, title
   if (offer.type === 'autista') return driveJob(game, lv, slot, title);
   if (offer.type === 'magazzino') {
     switch (r) {
-      case 0: return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: t < 0.4 ? 3 : 4, slot, placed })), title);
+      case 0: return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: t < 0.4 ? 3 : t < 0.7 ? 4 : 5, shelfW: 3.4, colorOnly: true, slot, placed })), title);
       case 1: return forkliftJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: 3, tall: t >= 0.3, aisle: 4.4 - 1.1 * t, slot, placed })), title);
       case 2: return pickingJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: t < 0.5 ? 3 : 4, slot, placed })), title);
       case 3: return shippingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: 3, flatbed: false, slot, placed })), title);
