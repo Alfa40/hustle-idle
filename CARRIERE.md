@@ -95,7 +95,7 @@ il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della li
 
 ---
 
-## 🍳 Ristorazione e ospitalità (lavoretti in costruzione dal 15/10)
+## 🍳 Ristorazione e ospitalità (lavoretti ✅ nel gioco dal 15/10; attività da rifare ad albero)
 
 Cinque linee scelte dall'utente: Cucina, Sala, Ospitalità, Bar, Forno e pasticceria (Pizza no). Regole come
 sempre: lavori con le mani, sotto i 5 minuti, si cresce in difficoltà e non in lunghezza, gli errori si possono

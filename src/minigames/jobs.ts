@@ -207,6 +207,11 @@ export interface Task {
   decoy?: boolean;
   /** messaggio quando si tocca la scelta sbagliata */
   wrongText?: string;
+  /**
+   * Postazione da usare più volte (frigo, forno, macchina del caffè): facendola non sparisce, resta lì
+   * (si accende quando `enabled`). La fase finisce quando sono fatti i punti normali, o con `finishPhase`.
+   */
+  repeat?: boolean;
   /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
   right?: boolean;
   /** gruppo di scelte: quando si fa quella giusta, le altre del gruppo spariscono */
@@ -700,6 +705,12 @@ export class PhasedRun extends BaseRun {
     this.game.prompt = close && t ? { label: t.label, icon: t.icon, progress: hit?.progress ?? 0, at: t.pos.clone(), obj: t.obj } : null;
   }
 
+  /** Chiude la fase in corso subito (es. tutti i piatti consegnati: le postazioni restano lì ma non servono più). */
+  finishPhase() {
+    for (const t of this.tasks) t.done = true;
+    this.nextPhase();
+  }
+
   /** Fa un punto anche senza il giocatore (es. un aiutante porta un oggetto al camion). */
   completeTask(t: Task) {
     if (!t.done && this.tasks.includes(t)) this.complete(t, true);
@@ -710,6 +721,18 @@ export class PhasedRun extends BaseRun {
       // scelta sbagliata: costa secondi, resta lì
       t.progress = 0;
       this.penalty(JOB.WRONG_PENALTY, t.wrongText ?? '❌ Posto sbagliato');
+      return;
+    }
+    if (t.repeat) {
+      // postazione: si usa e resta lì (pronta per la prossima volta)
+      t.progress = 0;
+      this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.9), 5, t.fxColor);
+      if (!external) this.game.player.play('idle');
+      const before = this.game.player.held;
+      t.onDone?.();
+      if (!external && this.game.player.held !== before) this.heldIcon = this.game.player.held ? t.icon : '';
+      for (const n of t.then?.() ?? []) this.addTask(n);
+      if (this.tasks.every((x) => x.done || x.decoy || x.repeat) && this.tasks.some((x) => !x.repeat)) this.nextPhase();
       return;
     }
     t.done = true;
@@ -733,7 +756,7 @@ export class PhasedRun extends BaseRun {
       }
     }
     for (const n of t.then?.() ?? []) this.addTask(n);
-    if (this.tasks.every((x) => x.done || x.decoy)) this.nextPhase();
+    if (this.tasks.every((x) => x.done || x.decoy || x.repeat) && this.tasks.some((x) => !x.repeat && !x.decoy)) this.nextPhase();
   }
 
   dispose() {

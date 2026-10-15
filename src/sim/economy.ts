@@ -5,7 +5,7 @@ import {
 } from '../config/business';
 import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
-import { sectorOn } from '../config/careers';
+import { bizSectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
@@ -385,7 +385,7 @@ export const lotPrice = (lotId: string, type: BusinessType) => lotDef(lotId).pri
 export const typesForLot = (lotId: string) =>
   (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => {
     const d = bizType(t);
-    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || sectorOn(d.sector));
+    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || bizSectorOn(d.sector));
   });
 
 // ---------------- evoluzione delle attività ----------------

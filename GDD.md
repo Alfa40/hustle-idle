@@ -478,6 +478,16 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **Attività ad albero** (config/business.ts: `tier`, `evolvesTo`, `evolveCost`, `upgrades`): si comprano solo le basi 🚲 Consegne in bici (posteggio), 🚐 Navetta (posteggio) e 🚛 Ditta traslochi; le altre 16 si ottengono **evolvendo** (scheda 🌱 Evoluzione): tutte le migliorie al massimo + ristrutturazione, si sceglie un locale libero e si paga un solo prezzo (locale + ristrutturazione), la vecchia si trasforma e il suo posto torna libero, i dipendenti passano alla nuova. Ogni attività ha le sue migliorie con nome e massimo propri (es. "Bici elettriche") e costi che crescono col gradino. Gli ordini fatti di persona si giocano col lavoretto della linea giusta (`Product.job`), e fanno salire anche quella linea
 - **Spiegazioni dietro il "?"** in ogni finestra (classe `explain`)
 
+### Ristorazione e ospitalità: i lavoretti (15/10/2026)
+- Il settore si chiama ora **🍳 Ristorazione e ospitalità** ed è acceso per i lavoretti (`FOCUS_SECTORS`); le sue attività non si comprano ancora (`BIZ_SECTORS`: aspettano di essere rifatte ad albero)
+- **5 linee × 5 gradini = 25 lavoretti** (tabella in CARRIERE.md), sempre con le mani e sotto i 5 minuti; gli errori si possono fare e contano alla fine (qualità → stelle → paga)
+  - 🍽️ Cucina: lavapiatti, aiuto cuoco (tagli col dito + ciotola giusta), cuoco di linea (frigo → fuochi con la barra di cottura → passe, più padelle insieme), cuoco dal vivo (ritmo e flambé), chef (cottura sul verde + impiattamento uguale alla foto)
+  - 🥂 Sala: festa in giardino (vassoio, correndo si rovescia), catering (buffet uguale allo schema), cameriere al ristorante (ordinazione → piatto col numero del tavolo → conto), maître (gruppi ai tavoli giusti), cena di gala (ritmo)
+  - 🛎️ Ospitalità: facchino (valigie alle porte numerate), cameriera ai piani (letti, asciugamani, cestini, polvere col carrello), receptionist (camere giuste per letti, vista e piano), concierge (la cosa giusta all'ospite giusto), suite VIP (carrello come sulla scheda, attenti ai "gemelli", poi la suite)
+  - ☕ Bar: barista (tazza → macchina → latte o bollitore, in ordine di fila), latte art (disegno col dito), barman (versa fino alla tacca), barman acrobatico (ritmo), sommelier (vino giusto + versare)
+  - 🥐 Forno e pasticceria: panettiere (farina → impasto → forma → forni con la barra → scaffale), pasticcere (sac à poche col dito), torte su ordinazione (decorazioni come nella foto), torte nuziali (piani che dondolano da centrare), cioccolatiere (temperatura nel verde, poi stampi fino alla tacca)
+- Scena nuova per i lavori al chiuso: **locale senza tetto** (`minigames/room.ts`) con i mobili Kenney e il quartiere vero fuori; postazioni da usare più volte (`Task.repeat`, `finishPhase`); motori col dito riusabili (`minigames/finger.ts`: TraceRun, RhythmRun, DragRun, PourRun, StackRun)
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero

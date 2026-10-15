@@ -6,7 +6,7 @@ export type SkillId = 'cucina' | 'manualita' | 'clientela' | 'logistica' | 'arti
  */
 export const SKILLS: Record<SkillId, { name: string; icon: string }> = {
   logistica: { name: 'Trasporti e logistica', icon: '🚚' },
-  cucina: { name: 'Ristorazione', icon: '🍳' },
+  cucina: { name: 'Ristorazione e ospitalità', icon: '🍳' },
   clientela: { name: 'Commercio e pubbliche relazioni', icon: '🤝' },
   artigianato: { name: 'Design e arte', icon: '🎨' },
   manualita: { name: 'Costruzione e manualità', icon: '🔨' },

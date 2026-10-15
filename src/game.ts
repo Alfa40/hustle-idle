@@ -36,6 +36,8 @@ import { Arena } from './minigames/arena';
 import { startLogisticsJob } from './minigames/logistics';
 import { DEV_SLOT, setDevGame } from './dev';
 import { LOGISTICS_ASSETS } from './minigames/warehouse';
+import { startHospitalityJob } from './minigames/hospitality';
+import { ROOM_ASSETS } from './minigames/room';
 import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
 import { PotteryStudio } from './world/pottery';
@@ -284,7 +286,7 @@ export class Game {
     const assets = [
       ...CITY_ASSETS, ...INTERIOR_ASSETS, ...HOUSE_ASSETS, ...KITCHEN_ASSETS, ...chars, 'cars/van.glb', 'cars/delivery.glb', ...VEHICLE_ASSETS, ...TRAFFIC_ASSETS,
       'commercial/detail-awning-wide.glb', ...Object.values(PRODUCTS).flatMap((p) => (p.model && !p.model.startsWith('proc:') ? [p.model] : [])),
-      'furniture/cardboardBoxClosed.glb', ...LOGISTICS_ASSETS,
+      'furniture/cardboardBoxClosed.glb', ...LOGISTICS_ASSETS, ...ROOM_ASSETS,
     ];
     await preload([...new Set(assets)], onProgress);
 
@@ -1057,7 +1059,7 @@ export class Game {
     const title = `${def.icon} ${def.name}`;
     const lv = jobDifficulty(offer.level);
     // Trasporti e logistica: magazzino, autista e i gradini alti delle consegne (minigames/logistics.ts)
-    const logi = startLogisticsJob(this, offer as JobOffer, slot, title);
+    const logi = startLogisticsJob(this, offer as JobOffer, slot, title) ?? startHospitalityJob(this, offer as JobOffer, slot, title);
     if (logi) return logi;
     switch (offer.type) {
       case 'giardino': {

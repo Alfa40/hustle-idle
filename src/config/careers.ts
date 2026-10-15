@@ -30,10 +30,12 @@ export const CAREER_LINES: CareerLine[] = [
   { id: 'consegna', sector: 'logistica', name: 'Consegne', icon: '📦', ready: true, ladder: ['Consegna pacchi', 'Trasporto mobili', 'Traslochi', 'Trasporti delicati', "Traslochi d'azienda"] },
   { id: 'magazzino', sector: 'logistica', name: 'Magazzino', icon: '🏭', ready: true, ladder: ['Magazziniere', 'Carrellista', 'Preparatore ordini', 'Addetto spedizioni', 'Centro di smistamento'] },
   { id: 'autista', sector: 'logistica', name: 'Autista', icon: '🚌', ready: true, ladder: ['Autista di navetta', 'Autista di autobus', 'Bus turistico', 'Autista privato', 'Limousine per eventi'] },
-  // 🍳 Ristorazione
-  { id: 'piatti', sector: 'cucina', name: 'Cucina', icon: '🍽️', ready: true, ladder: ['Lavapiatti', 'Aiuto cuoco', 'Cuoco di linea'] },
-  { id: 'festa', sector: 'cucina', name: 'Sala ed eventi', icon: '🥂', ready: false, ladder: ['Cameriere a una festa', 'Catering', 'Banchetti'] },
-  { id: 'forno', sector: 'cucina', name: 'Forno e pasticceria', icon: '🥐', ready: false, ladder: ['Panettiere notturno', 'Pasticcere', 'Torte su ordinazione'] },
+  // 🍳 Ristorazione e ospitalità (tabella in CARRIERE.md)
+  { id: 'piatti', sector: 'cucina', name: 'Cucina', icon: '🍽️', ready: true, ladder: ['Lavapiatti', 'Aiuto cuoco', 'Cuoco di linea', 'Cuoco dal vivo', 'Chef'] },
+  { id: 'festa', sector: 'cucina', name: 'Sala', icon: '🥂', ready: true, ladder: ['Cameriere a una festa', 'Catering', 'Cameriere al ristorante', 'Maître', 'Cena di gala'] },
+  { id: 'hotel', sector: 'cucina', name: 'Ospitalità', icon: '🛎️', ready: true, ladder: ["Facchino d'albergo", 'Cameriera ai piani', 'Receptionist', 'Concierge', 'Suite VIP'] },
+  { id: 'bar', sector: 'cucina', name: 'Bar', icon: '☕', ready: true, ladder: ['Barista', 'Latte art', 'Barman', 'Barman acrobatico', 'Sommelier'] },
+  { id: 'forno', sector: 'cucina', name: 'Forno e pasticceria', icon: '🥐', ready: true, ladder: ['Panettiere notturno', 'Pasticcere', 'Torte su ordinazione', 'Torte nuziali', 'Maestro cioccolatiere'] },
   // 🤝 Commercio e pubbliche relazioni
   { id: 'volantini', sector: 'clientela', name: 'Porta a porta', icon: '📰', ready: true, ladder: ['Consegna giornali', 'Sondaggi porta a porta', 'Vendita porta a porta'] },
   { id: 'promoter', sector: 'clientela', name: 'Pubbliche relazioni', icon: '📣', ready: false, ladder: ['Promoter in piazza', 'Hostess agli eventi', 'Relazioni pubbliche'] },
@@ -53,8 +55,14 @@ export const CAREER_LINES: CareerLine[] = [
  * (niente offerte di lavoretti né attività da comprare di quei settori). `null` = tutti accesi.
  * Le attività che una partita ha già restano sue e continuano a lavorare.
  */
-export const FOCUS_SECTORS: SkillId[] | null = ['logistica'];
+export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina'];
 export const sectorOn = (k: SkillId) => !FOCUS_SECTORS || FOCUS_SECTORS.includes(k);
+/**
+ * Settori di cui si possono comprare le attività: Ristorazione e ospitalità ha già i lavoretti accesi, ma le sue
+ * attività aspettano di essere rifatte ad albero (come i trasporti).
+ */
+export const BIZ_SECTORS: SkillId[] | null = ['logistica'];
+export const bizSectorOn = (k: SkillId) => !BIZ_SECTORS || BIZ_SECTORS.includes(k);
 
 export const careerLine = (id: string) => CAREER_LINES.find((l) => l.id === id);
 export const linesOf = (sector: SkillId, onlyReady = true) => CAREER_LINES.filter((l) => l.sector === sector && (!onlyReady || (l.ready && sectorOn(l.sector))));

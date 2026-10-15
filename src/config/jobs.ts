@@ -1,6 +1,6 @@
 import type { SkillId } from './skills';
 
-export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista';
+export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista' | 'festa' | 'hotel' | 'bar' | 'forno';
 
 export interface JobDef {
   name: string;
@@ -58,6 +58,26 @@ export const JOBS: Record<JobType, JobDef> = {
     intro: 'Guida il pulmino: fermati dentro la zona della fermata, aspetta che i passeggeri salgano e portali a destinazione. Accosta bene: fuori dalla zona non sale nessuno!',
     steps: [['🚐', 'Sali sul pulmino', 'tap'], ['🚏', 'Fermati dentro la zona della fermata', 'walk'], ['🧍', 'Aspetta che i passeggeri salgano', 'hold'], ['🏁', 'Portali a destinazione', 'walk']],
   },
+  festa: {
+    name: 'Cameriere a una festa', icon: '🥂', skill: 'cucina', basePay: 28, xp: 13, fame: 1, where: 'house',
+    intro: 'Festa in giardino: prendi i bicchieri al buffet e porta da bere agli ospiti che alzano la mano. Cammina: correndo il vassoio si rovescia!',
+    steps: [['🍹', 'Prendi i bicchieri al buffet', 'tap'], ['🙋', 'Servi gli ospiti che chiamano', 'tap'], ['🚶', 'Cammina, non correre', 'walk']],
+  },
+  hotel: {
+    name: "Facchino d'albergo", icon: '🛎️', skill: 'cucina', basePay: 27, xp: 13, fame: 1, where: 'shop',
+    intro: "All'hotel sono arrivati gli ospiti: porta ogni valigia alla porta della camera col numero scritto sulla sua etichetta.",
+    steps: [['🧳', 'Prendi una valigia alla reception', 'tap'], ['🔢', "Leggi il numero sull'etichetta", 'walk'], ['🚪', 'Lasciala alla porta di quella camera', 'tap']],
+  },
+  bar: {
+    name: 'Barista', icon: '☕', skill: 'cucina', basePay: 27, xp: 13, fame: 1, where: 'restaurant',
+    intro: 'Al bancone del bar i clienti ordinano: prendi la tazza, falla alla macchina del caffè (e monta il latte per il cappuccino) e servi i clienti in ordine di arrivo.',
+    steps: [['☕', 'Prendi una tazza', 'tap'], ['⚙️', 'Fai il caffè alla macchina', 'hold'], ['🥛', 'Per il cappuccino monta il latte', 'hold'], ['🙋', 'Servi il cliente', 'tap']],
+  },
+  forno: {
+    name: 'Panettiere notturno', icon: '🥖', skill: 'cucina', basePay: 28, xp: 13, fame: 1, where: 'shop',
+    intro: "Di notte al forno: prendi la farina, impastala, dai la forma al pane, infornalo e toglilo quando è dorato (prima è crudo, dopo brucia). Poi sullo scaffale.",
+    steps: [['🌾', 'Prendi la farina', 'tap'], ['🌀', "Impasta all'impastatrice", 'hold'], ['🥖', 'Dai la forma al pane', 'hold'], ['🔥', 'Inforna e togli quando è dorato', 'tap']],
+  },
   imbianchino: {
     name: 'Dipingere la recinzione', icon: '🖌️', skill: 'artigianato', basePay: 34, xp: 15, fame: 1.2, where: 'house',
     intro: 'Copri con i teloni tutto quello che c\'è in giardino (cespugli, aiuole, giochi…), prendi la vernice, dipingi ogni tratto del muretto di recinzione e alla fine togli i teloni.',
@@ -84,6 +104,36 @@ export interface JobVariant {
 }
 
 export const JOB_VARIANTS: Partial<Record<JobType, JobVariant[]>> = {
+  piatti: [
+    { minLevel: 10, name: 'Aiuto cuoco', icon: '🔪', intro: 'Taglia gli ingredienti: trascina il dito lungo le linee tratteggiate, più sei preciso più stelle prendi. Poi ogni ingrediente va nella sua ciotola.', steps: [['🔪', 'Trascina il dito lungo la linea', 'hold'], ['🥣', 'Metti il tagliato nella ciotola giusta', 'tap']] },
+    { minLevel: 20, name: 'Cuoco di linea', icon: '🍳', intro: 'Le comande arrivano: prendi dal frigo, metti in padella, togli quando la barra è verde (prima è crudo, dopo brucia) e porta il piatto al passe. Più padelle insieme!', steps: [['🧊', 'Prendi dal frigo', 'tap'], ['🍳', 'Metti in padella', 'tap'], ['✅', 'Togli quando è verde', 'tap'], ['🛎️', 'Porta il piatto al passe', 'tap']] },
+    { minLevel: 30, name: 'Cuoco dal vivo', icon: '🔥', intro: 'Cucini davanti ai clienti, a ritmo: tocca quando il segno arriva sul cerchio per saltare la padella, tieni premuto per il flambé.', steps: [['👆', 'Tocca a tempo per saltare la padella', 'tap'], ['🔥', 'Tieni premuto per il flambé', 'hold']] },
+    { minLevel: 40, name: 'Chef', icon: '👨‍🍳', intro: 'Cuoci il piatto fermando la cottura nel punto giusto, poi impiatta trascinando gli elementi come nella foto.', steps: [['🔥', 'Ferma la cottura sul verde', 'tap'], ['🍽️', 'Impiatta come nella foto', 'tap']] },
+  ],
+  festa: [
+    { minLevel: 10, name: 'Catering', icon: '🍱', intro: 'Prepara il buffet: trascina ogni vassoio al suo posto sul tavolo, uguale allo schema.', steps: [['📋', 'Guarda lo schema', 'tap'], ['✋', 'Trascina i vassoi al loro posto', 'tap']] },
+    { minLevel: 20, name: 'Cameriere al ristorante', icon: '🍽️', intro: 'Per ogni tavolo: prendi l\'ordinazione, porta il piatto giusto dal passe (guarda il numero del tavolo) e alla fine il conto.', steps: [['📝', "Prendi l'ordinazione", 'tap'], ['🛎️', 'Prendi il piatto al passe', 'tap'], ['🍽️', 'Servilo al tavolo', 'tap'], ['🧾', 'Porta il conto', 'tap']] },
+    { minLevel: 30, name: 'Maître', icon: '🎩', intro: 'Fai sedere ogni gruppo al tavolo giusto: abbastanza posti, e se lo chiedono vicino alla finestra o in un angolo tranquillo.', steps: [['👥', 'Guarda il gruppo', 'tap'], ['✋', 'Trascinalo al tavolo giusto', 'tap']] },
+    { minLevel: 40, name: 'Cena di gala', icon: '🎻', intro: 'Tutti i camerieri servono insieme al segnale: tocca quando il segno arriva sul cerchio. Tre portate.', steps: [['👆', 'Tocca a tempo col segnale', 'tap']] },
+  ],
+  hotel: [
+    { minLevel: 10, name: 'Cameriera ai piani', icon: '🛏️', intro: 'Rifai le camere: prendi le lenzuola e gli asciugamani puliti dal carrello, rifai il letto, cambia gli asciugamani, svuota il cestino e togli la polvere.', steps: [['🧺', 'Prendi dal carrello', 'tap'], ['🛏️', 'Rifai il letto', 'hold'], ['🗑️', 'Svuota il cestino', 'tap'], ['🧹', 'Togli la polvere', 'hold']] },
+    { minLevel: 20, name: 'Receptionist', icon: '🗝️', intro: 'Dai a ogni ospite la camera giusta: guarda cosa chiede (letti, vista, piano) e trascinalo sulla camera adatta.', steps: [['🙋', 'Leggi cosa chiede', 'tap'], ['✋', 'Trascinalo sulla camera', 'tap']] },
+    { minLevel: 30, name: 'Concierge', icon: '🛎️', intro: 'Gli ospiti nella hall chiedono qualcosa: prendi la cosa giusta (ombrello, biglietti, mappa…) e portala a chi l\'ha chiesta.', steps: [['🙋', 'Senti cosa chiede', 'tap'], ['📦', 'Prendi la cosa giusta', 'tap'], ['🤝', 'Portala all\'ospite', 'tap']] },
+    { minLevel: 40, name: 'Suite VIP', icon: '👑', intro: 'Servizio in camera per un ospite importante: prepara il carrello come sulla sua scheda, apparecchia, metti i fiori e apri le tende.', steps: [['📋', 'Leggi la scheda', 'tap'], ['🛒', 'Prepara il carrello', 'tap'], ['🍽️', 'Apparecchia', 'tap']] },
+  ],
+  bar: [
+    { minLevel: 10, name: 'Latte art', icon: '🎨', intro: 'Disegna sulla schiuma del cappuccino col dito, come nella foto: cuore, foglia o cigno.', steps: [['👆', 'Trascina il dito sul disegno', 'hold']] },
+    { minLevel: 20, name: 'Barman', icon: '🍸', intro: 'Prepara i cocktail: tieni premuto sulla bottiglia per versare e lascia quando arrivi alla tacca. Segui l\'ordine della ricetta.', steps: [['📋', 'Leggi la ricetta', 'tap'], ['🍾', 'Tieni premuto per versare', 'hold'], ['📏', 'Lascia alla tacca', 'hold']] },
+    { minLevel: 30, name: 'Barman acrobatico', icon: '🤹', intro: 'Lancia e riprendi la bottiglia a ritmo: tocca quando il segno arriva sul cerchio.', steps: [['👆', 'Tocca a tempo', 'tap']] },
+    { minLevel: 40, name: 'Sommelier', icon: '🍷', intro: 'Scegli il vino giusto per ogni piatto e versalo fino al segno senza farlo traboccare.', steps: [['🍽️', 'Guarda il piatto', 'tap'], ['🍷', 'Scegli il vino adatto', 'tap'], ['📏', 'Versa fino al segno', 'hold']] },
+  ],
+  forno: [
+    { minLevel: 10, name: 'Pasticcere', icon: '🧁', intro: 'Decora i dolci con la sac à poche: trascina il dito seguendo il disegno.', steps: [['👆', 'Segui il disegno col dito', 'hold']] },
+    { minLevel: 20, name: 'Torte su ordinazione', icon: '🎂', intro: 'Decora la torta uguale alla foto: trascina ogni decorazione al suo posto.', steps: [['🖼️', 'Guarda la foto', 'tap'], ['✋', 'Trascina le decorazioni', 'tap']] },
+    { minLevel: 30, name: 'Torte nuziali', icon: '💒', intro: 'Il piano della torta dondola appeso: tocca per lasciarlo cadere ben centrato sopra quello di sotto.', steps: [['👆', 'Tocca quando è centrato', 'tap']] },
+    { minLevel: 40, name: 'Maestro cioccolatiere', icon: '🍫', intro: 'Tieni il cioccolato alla temperatura giusta (tieni premuto per scaldare), poi versalo negli stampi fino al segno.', steps: [['🌡️', 'Tieni la temperatura nel verde', 'hold'], ['🍫', 'Versa fino al segno', 'hold']] },
+  ],
   consegna: [
     {
       minLevel: 10, name: 'Trasporto mobili', icon: '🛋️', vehicleOk: false,
