@@ -1036,6 +1036,9 @@ export class Game {
     this.state.jobs = this.state.jobs.filter((j) => j.id !== offerId);
   }
 
+  /** dove era il giocatore quando ha accettato il lavoretto (per tornarci dopo il tutorial) */
+  private jobStart: { pos: THREE.Vector3; rot: number } | null = null;
+
   /** tutorial contestuale dei lavoretti */
   tutorial!: JobTutorial;
 
@@ -1045,6 +1048,8 @@ export class Game {
     const npc = this.npcs.get(offer.id);
     if (npc) npc.char.root.visible = false;
     this.runOffer = offer;
+    // dove comincia il lavoretto: finito il tutorial si torna qui (anche dopo aver guidato in giro per la città)
+    this.jobStart = { pos: this.player.root.position.clone(), rot: this.player.root.rotation.y };
     const slot = this.slotsFor(offer.type)[offer.slot];
     const def = jobInfo(offer.type, offer.level);
     this.run = this.buildRun(offer, slot);
@@ -1288,9 +1293,15 @@ export class Game {
     this.runOffer = null;
     const def = JOBS[offer.type];
     if (tutorial) {
-      // il cliente torna al suo posto: il lavoretto si può fare subito "sul serio"
+      // il cliente torna al suo posto: il lavoretto si può fare subito "sul serio", e il giocatore torna dove
+      // il lavoretto comincia (nelle guide e nei lavori in città il tutorial lo porta in giro per la mappa)
       const npc = this.npcs.get(offer.id);
       if (npc) npc.char.root.visible = true;
+      if (this.jobStart) {
+        this.player.root.position.copy(this.jobStart.pos);
+        this.player.root.rotation.y = this.jobStart.rot;
+        this.snapCamera();
+      }
       this.player.hold();
       this.player.play('idle');
       if (stars > 0) this.ui.openTutorialDone(offer);
