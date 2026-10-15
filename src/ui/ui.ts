@@ -24,14 +24,15 @@ import { shiftText } from '../sim/shifts';
 import { chainGroups, groupUpgradeTargets, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
-import { canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
+import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
+import { devGame } from '../dev';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
@@ -3067,13 +3068,15 @@ export class UI {
 
   openSettings() {
     let confirm = false;
-    let tab = 'impostazioni';
+    // nella partita developer si apre subito sui comandi rapidi
+    let tab = devGame ? 'dev' : 'impostazioni';
     this.open({
       title: '⚙️ Opzioni',
       color: 'var(--gray)',
       render: () => {
-        const tabs = `<div class="tabs">${[['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
+        const tabs = `<div class="tabs">${[...(devGame ? [['dev', '🛠️ Developer']] : []), ['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
           .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        if (tab === 'dev') return tabs + this.devHtml();
         if (tab === 'impostazioni') return tabs + settingsHtml();
         if (tab === 'partita') {
           return tabs + `
@@ -3093,6 +3096,7 @@ export class UI {
           <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
       },
       actions: {
+        ...this.devActions(),
         tab: (k) => (tab = k),
         set: (v) => settingsAction('set:' + v),
         tog: (v) => settingsAction('tog:' + v),
@@ -3113,6 +3117,80 @@ export class UI {
         },
       },
     });
+  }
+
+  // ---------------- partita developer (src/dev.ts) ----------------
+
+  /** Comandi rapidi della partita developer: soldi, lavoretti a ogni gradino, attività, tempo. */
+  private devHtml() {
+    const s = this.s;
+    const lines = linesOf('logistica').map((l) => `<div class="card"><h3>${l.icon} ${l.name} <span class="tag">Liv. ${lineLevel(s, l.id)}</span></h3>
+        <div class="dev-grid">${l.ladder.map((name, r) => `<button class="btn sm" data-a="devJob:${l.id}|${r}">▶ ${r + 1}. ${name}</button>`).join('')}</div>
+        <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello della linea: ${[1, 10, 20, 30, 40].map((v) => `<button class="btn sm sec" data-a="devLvl:${l.id}|${v}">${v}</button>`).join('')}</div></div>`).join('');
+    return `<div class="card hl"><h3>🛠️ Partita developer</h3><p class="small" style="margin:0">Non va in classifica e non risulta "sta giocando" agli amici. 💰 ${euro(s.money)}</p>
+        <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
+      <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
+      <h3 class="sec-title">🏢 Attività</h3>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button></div>
+      <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
+  }
+
+  private devActions(): Actions {
+    const s = this.s;
+    const xpFor = (l: number) => LEVEL.xpForLevel(Math.max(1, l)) + 1;
+    return {
+      devMoney: () => addMoney(s, 1_000_000_000),
+      devHour: () => advance(s, 60),
+      devMorning: () => this.game.sleep(),
+      devTut: () => {
+        s.jobTutorials = [];
+        toast('🎓 I tutorial dei lavoretti ripartono', 'info');
+      },
+      devLvl: (arg) => {
+        const [line, v] = arg.split('|');
+        s.jobXp ??= {};
+        s.jobXp[line] = xpFor(+v);
+      },
+      devJob: (arg) => {
+        const [line, r] = arg.split('|');
+        const level = +r === 0 ? 1 : +r * EVOLVE_EVERY;
+        s.jobXp ??= {};
+        if (lineLevel(s, line) < level || lineLevel(s, line) >= level + EVOLVE_EVERY) s.jobXp[line] = xpFor(level);
+        const type = line as JobOffer['type'];
+        const offer: JobOffer = { id: s.jobSeq++, type, slot: 0, level, pay: this.game.offerPay(type, level) };
+        s.jobs.push(offer);
+        while (this.isOpen) this.close();
+        this.game.startJob(offer, !this.game.tutorial.isDone(jobInfo(type, level).key));
+      },
+      devUpg: () => {
+        for (const b of s.businesses) {
+          for (const id of upgradeIdsFor(b.type, hasInterior(b.type), hasCashUpgrade(b.type))) b.upgrades[id] = upgOf(b.type, id).max;
+          this.game.setupLot(b.lotId);
+        }
+        toast('⬆️ Migliorie al massimo in tutte le attività', 'good');
+      },
+      devOrders: () => {
+        for (const b of s.businesses) {
+          if (bizType(b.type).kind !== 'service') continue;
+          for (const p of b.products) {
+            b.orders.push({ id: s.orderSeq++, pid: p, expires: s.minutes + 24 * 60, house: Math.floor(Math.random() * 999) });
+            b.stock[p] = Math.max(b.stock[p] ?? 0, 10);
+          }
+        }
+        toast('📋 Ordini arrivati in tutte le attività di servizio', 'good');
+      },
+      devStaff: () => {
+        for (const b of s.businesses) {
+          for (const r of [...(bizType(b.type).roles as Role[]), 'manager' as Role]) {
+            if (b.staff.some((e) => e.role === r)) continue;
+            const e = makeCandidate(s, r);
+            e.hiredDay = Math.floor(s.minutes / 1440);
+            b.staff.push(e);
+          }
+        }
+        toast('👥 Personale completo in tutte le attività', 'good');
+      },
+    };
   }
 
   // ---------------- offline / benvenuto ----------------

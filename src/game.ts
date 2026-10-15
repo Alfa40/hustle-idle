@@ -34,6 +34,7 @@ import { hasInterior } from './config/recipes';
 import { carWashArenaJob, carWashLot, gardenArenaJob, paintArenaJob, pruneArenaJob, routeStreetJob, IndoorRun, VisitRun, type JobRun } from './minigames/jobs';
 import { Arena } from './minigames/arena';
 import { startLogisticsJob } from './minigames/logistics';
+import { DEV_SLOT, setDevGame } from './dev';
 import { LOGISTICS_ASSETS } from './minigames/warehouse';
 import { routeStops, Street } from './minigames/street';
 import { DishKitchen, KITCHEN_ASSETS } from './world/dishkitchen';
@@ -304,6 +305,8 @@ export class Game {
   /** Avvia la partita di uno slot: nuova (con nome) oppure caricata. */
   begin(slot: number, newName?: string) {
     setCurrentSlot(slot);
+    setDevGame(slot === DEV_SLOT);
+    if (slot === DEV_SLOT) document.body.classList.add('dev-game');
     const saved = newName === undefined ? loadState(slot) : null;
     this.state = saved ?? newState();
     if (newName !== undefined) this.state.saveName = newName.trim() || `Partita ${slot}`;

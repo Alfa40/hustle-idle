@@ -1,3 +1,4 @@
+import { devGame } from '../dev';
 import { day, playStats, type GameState } from './state';
 import { rank, totalFame, totalLevel } from './progress';
 import { estimateMonthlyProfit, isAutonomous } from './economy';
@@ -118,7 +119,8 @@ const automated = typeof navigator !== 'undefined' && navigator.webdriver === tr
 
 export async function submit(s: GameState, force = false) {
   const nick = nickname();
-  if (!nick || automated) return;
+  // la partita developer non va mai in classifica
+  if (!nick || automated || devGame || s.dev) return;
   const fame = Math.round(totalFame(s) * 10) / 10;
   const best = parseFloat(get(BEST_KEY)) || 0;
   if (fame < best) return;
@@ -156,7 +158,7 @@ export async function fetchBoard(limit = 50, kind: BoardKind = 'fame'): Promise<
 
 /** "Sto giocando": i tuoi amici vedono aperto il tuo furgone (e accese le luci del tuo piano). */
 export async function ping() {
-  if (!nickname() || document.hidden || automated) return;
+  if (!nickname() || document.hidden || automated || devGame) return;
   try {
     await fetch(API + '/leaderboard/ping', {
       method: 'POST',

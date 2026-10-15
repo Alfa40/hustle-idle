@@ -2,6 +2,8 @@ import { rank } from '../sim/progress';
 import { euro, lastSlot, listSlots, SLOT_COUNT, wipeSave, type GameState } from '../sim/state';
 import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
+import { DEV_SLOT, isDevDevice } from '../dev';
+import { loadState } from '../sim/state';
 
 type View = 'main' | 'slots' | 'new' | 'settings' | 'credits';
 
@@ -62,6 +64,7 @@ export class TitleScreen {
           ${ls ? `<button class="t-btn t-main" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
           <button class="t-btn ${ls ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
+          ${isDevDevice() ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
           <div class="t-row">
             <button class="t-btn t-small" data-t="view:settings"><span class="t-ico">⚙️</span><b>Impostazioni</b></button>
             <button class="t-btn t-small" data-t="view:credits"><span class="t-ico">ℹ️</span><b>Crediti</b></button>
@@ -131,6 +134,11 @@ export class TitleScreen {
         break;
       case 'play':
         this.onStart(+arg);
+        return;
+      case 'dev':
+        // partita developer: slot a parte, si crea la prima volta
+        if (loadState(DEV_SLOT)) this.onStart(DEV_SLOT);
+        else this.onStart(DEV_SLOT, '🛠️ Developer');
         return;
       case 'del':
         if (prevConfirm === `del:${arg}`) wipeSave(+arg);

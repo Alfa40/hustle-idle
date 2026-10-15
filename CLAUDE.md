@@ -62,6 +62,11 @@
   usa-e-getta (non si salvano nel progetto). Prima di consegnare: giocare fino alla fine tutti i lavoretti
   dei settori accesi (ogni gradino), e per le schermate le misure di `LAYOUT.md`.
 
+- **Partita developer** (src/dev.ts): solo sul telefono dello sviluppatore, acceso col link segreto
+  `?dev=<chiave>` (nel codice c'è solo l'impronta SHA-256; `?dev=off` la spegne). Slot a parte (9), un
+  miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; non va mai in classifica né in "sto giocando".
+  Ogni comando nuovo utile ai test va aggiunto lì.
+
 ## Pubblicazione e servizi
 
 - Gioco: repo pubblico `github.com/Alfa40/hustle-idle`, online su https://alfa40.github.io/hustle-idle/

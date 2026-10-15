@@ -1119,3 +1119,7 @@ body.overlay-job .hud-right .minimap, body.overlay-job .edge-ptr, body.overlay-j
 .art-crate::after { content: attr(data-label); }
 .art-crate.full { background: #9bd99b; }
 .art-crate .art-pic.packed { transform: scale(.8); }
+
+/* partita developer (src/dev.ts) */
+body.dev-game #h-money::before { content: '🛠️ '; }
+.dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

@@ -173,6 +173,8 @@ export interface CalEvent {
 
 export interface GameState {
   version: 1;
+  /** partita developer (src/dev.ts): mai in classifica */
+  dev?: boolean;
   money: number;
   /** minuti di gioco dall'inizio (giorno 0 alle 00:00) */
   minutes: number;
@@ -417,7 +419,8 @@ export function saveState(s: GameState, slot = currentSlot) {
   s.lastSeen = Date.now();
   try {
     localStorage.setItem(slotKey(slot), JSON.stringify(s));
-    localStorage.setItem(LAST_KEY, String(slot));
+    // la partita developer non diventa il "Continua" delle partite normali
+    if (slot <= SLOT_COUNT) localStorage.setItem(LAST_KEY, String(slot));
   } catch {
     /* spazio pieno o modalità privata: si continua senza salvare */
   }

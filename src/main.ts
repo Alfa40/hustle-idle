@@ -7,8 +7,11 @@ import { UI } from './ui/ui';
 import { TitleScreen } from './ui/title';
 import { showInstallTip } from './ui/install';
 import { preloadLogo } from './logo';
+import { checkDevLink, DEV_SLOT } from './dev';
 
 async function boot() {
+  // link segreto della modalità developer (solo sul telefono dello sviluppatore, vedi src/dev.ts)
+  await checkDevLink();
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const bar = document.getElementById('loadbar')!;
   // il font serve già per le scritte 3D disegnate su canvas
@@ -30,6 +33,13 @@ async function boot() {
   const title = new TitleScreen((slot, newName) => {
     title.hide();
     game.begin(slot, newName);
+    // partita developer nuova: un miliardo, niente tutorial di benvenuto
+    if (slot === DEV_SLOT && newName !== undefined) {
+      game.state.money = 1_000_000_000;
+      game.state.dev = true;
+      game.state.tutorialDone = true;
+      game.save();
+    }
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
     if (game.ui.needsIdentity()) game.ui.openLogoEditor(true);
