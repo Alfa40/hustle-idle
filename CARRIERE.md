@@ -14,54 +14,103 @@ di un passo (massimo 1–2 per partita), mai fasi in più una dopo l'altra.
 
 ---
 
-## 🚚 Trasporti e logistica ✔️ (discussa il 15/10)
+## 🚚 Trasporti e logistica ✔️ (tabella completa, 15/10)
 
-Tutti i gradini sono lavori "con le mani"; tra parentesi la durata per chi gioca bene (massimo sempre sotto i 5 minuti).
+**Regole rispettate:** lavori sempre "con le mani" (la gestione solo nelle attività) · ogni minigioco sotto i
+5 minuti anche al Liv. 40 (tra parentesi la durata per chi gioca bene) · salendo di livello cresce la difficoltà,
+non la quantità · imprevisti al posto di un passo, massimo 1–2 a partita · lo spazio cresce con le cose da fare ·
+i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le attività si evolvono da un'attività base.
 
-### 📦 Consegne ✅
-| Liv. | Lavoro | Minigioco |
-|---|---|---|
-| 1 | Consegna pacchi ✅ | ritira, consegna agli indirizzi, ricevuta; al massimo 5 consegne. Dal Liv. 2 al 9 arrivano, **al posto** di una consegna normale (max 1–2 a partita): firma al citofono (se non c'è nessuno: vicino o avviso), contrassegno col resto giusto, pacco fragile (non correre), pacco grande (si cammina piano, niente veicolo), cane in giardino, pioggia, reso da ritirare. Dal Liv. 5 la linea tratteggiata porta solo al primo indirizzo, poi si cercano i numeri civici (1½–3 min) |
-| 10 | Trasporto mobili | un mobile (due ai livelli alti) sul carrello: vialetto, rampa sui gradini, porta stretta (tocca per girare), barra dei danni, lo lasci nella stanza giusta (casa del cliente) (2–3 min) |
-| 20 | Traslochi | solo il carico: furgone visto dall'alto "a Tetris", 8–12 pezzi da trascinare e ruotare, pesanti sotto e fragili sopra; lo scarico lo fa il gioco (2–3 min) |
-| 30 | Trasporti delicati | un oggetto prezioso: pianoforte col montacarichi dalla finestra (equilibrio col dito) oppure quadri nelle casse imbottite (2–3 min) |
-| 40 | Traslochi d'azienda | un ufficio, al massimo 3 stanze, con 2–3 aiutanti a cui dici cosa portare: accorciano il lavoro (3–4 min) |
+### A. Lavoretti (5 linee × 5 gradini)
 
-### 🛵 Corriere 🟡
-| Liv. | Lavoro | Minigioco |
-|---|---|---|
-| 1 | Rider di cibo | un ordine: ritiro al locale, borsa termica che si raffredda, bibite che si rovesciano a frenate e curve brusche, mancia se veloce (1–2 min) |
-| 10 | Corriere espresso | ordini che arrivano mentre guidi, al massimo 3 insieme: accetti o rifiuti, fasce orarie, scegli l'ordine (2–3 min) |
-| 20 | Consegne urgenti | 1–2 consegne (farmaci, documenti), tempi strettissimi, semafori, scorciatoie in bici per parchi e vicoli (1½–2½ min) |
-| 30 | Corriere aeroportuale 🆕 | un plico da portare prima che parta l'aereo, un cambio di mezzo (2–3 min) |
-| 40 | Portavalori 🆕 | furgone blindato, 3 tappe, al massimo un inseguimento da seminare cambiando strada (3–4 min) |
+#### 📦 Consegne ✅
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
+|---|---|---|---|---|
+| 1 | Consegna pacchi ✅ | ritira al negozio dei pacchi, consegna alle porte segnate, torna per la ricevuta | consegne da 2 a 5; imprevisti al posto di una consegna (firma al citofono, contrassegno col resto, fragile, pacco grande che rallenta, cane, pioggia, reso); dal Liv. 5 la guida porta solo al primo indirizzo, poi numeri civici | 1½–3 min |
+| 10 | Trasporto mobili | mobile sul carrello: vialetto, rampa sui gradini, porta stretta (tocca per girare), barra dei danni, lo lasci nella stanza giusta della casa del cliente | da 1 a 2 mobili; porte più strette, scale col pianerottolo, mobili più fragili | 2–3 min |
+| 20 | Traslochi | furgone visto dall'alto "a Tetris": trascina e ruota i pezzi, pesanti sotto e fragili sopra; lo scarico lo fa il gioco | da 8 a 12 pezzi; forme più strane, più fragili da proteggere | 2–3 min |
+| 30 | Trasporti delicati | un oggetto prezioso: pianoforte col montacarichi dalla finestra (equilibrio col dito) o quadri nelle casse imbottite | oggetti più preziosi, piani più alti, vento | 2–3 min |
+| 40 | Traslochi d'azienda | un ufficio con aiutanti a cui dici cosa portare: accorciano il lavoro | da 2 a 3 stanze, da 2 a 3 aiutanti, oggetti speciali (server, acquario) | 3–4 min |
 
-### 🏭 Magazzino 🟡
-| Liv. | Lavoro | Minigioco |
-|---|---|---|
-| 1 | Magazziniere | scarica il camion, 6–10 scatole sullo scaffale del loro colore, pesanti in basso (1½–2 min) |
-| 10 | Carrellista | muletto col joystick, tieni premuto per alzare le forche, 3–4 bancali sul camion senza urtare (2–3 min) |
-| 20 | Preparatore ordini | lista di 5–6 articoli, carrello e scanner, conta il giro più corto (2–3 min) |
-| 30 | Addetto spedizioni 🆕 | 3 pacchi: scatola giusta, riempitivo, nastro, etichetta; carica in ordine (ultimo dentro = prima consegna) (2–3 min) |
-| 40 | Centro di smistamento 🆕 | nastri: tocca i deviatori al momento giusto per mandare ogni pacco alla sua zona; turno fisso di 2 minuti che accelera (2 min) |
+#### 🛵 Corriere 🟡
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
+|---|---|---|---|---|
+| 1 | Rider di cibo | un ordine: ritiro al locale, borsa termica che si raffredda, bibite che si rovesciano a frenate e curve brusche, mancia se veloce | distanze più lunghe, traffico, bibite più piene, a volte l'ordine non è ancora pronto | 1–2 min |
+| 10 | Corriere espresso | gli ordini arrivano mentre guidi: accetti o rifiuti, fasce orarie, scegli tu l'ordine | da 2 a 3 ordini insieme, fasce più strette | 2–3 min |
+| 20 | Consegne urgenti | farmaci e documenti, tempi strettissimi, semafori, scorciatoie in bici per parchi e vicoli | da 1 a 2 consegne, tempo che scende | 1½–2½ min |
+| 30 | Corriere aeroportuale | un plico da portare prima che parta l'aereo, con un cambio di mezzo | tempo più stretto, controlli all'arrivo | 2–3 min |
+| 40 | Portavalori | furgone blindato: tappe in banca, attese sicure, seminare chi ti segue cambiando strada | da 2 a 3 tappe, inseguimento dal Liv. 45 | 3–4 min |
 
-### 🚌 Autista 🆕
-| Liv. | Lavoro | Minigioco |
-|---|---|---|
-| 1 | Autista di navetta | 2 fermate: accosta dentro la zona segnata, i passeggeri salgono, portali a destinazione (1½–2 min) |
-| 10 | Autista di autobus | linea corta di 4 fermate, orari, fermate prenotate da non saltare (2½–3½ min) |
-| 20 | Bus turistico | 3 monumenti, guida dolce: le frenate brusche tolgono gradimento (3 min) |
-| 30 | Autista privato | una corsa, bicchiere d'acqua sul cruscotto da non rovesciare, al massimo un cambio di destinazione (2–3 min) |
-| 40 | Limousine per eventi | matrimonio: ritiro puntuale, corteo, arrivo col tappeto rosso, 3 tappe (3–4 min) |
+#### 🏭 Magazzino 🟡
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
+|---|---|---|---|---|
+| 1 | Magazziniere | scarica il camion, ogni scatola sullo scaffale del suo colore, pesanti in basso | da 6 a 10 scatole; dai colori ai codici | 1½–2 min |
+| 10 | Carrellista | muletto col joystick, tieni premuto per alzare le forche, bancali sul camion senza urtare | da 3 a 4 bancali, ripiani più alti, corsie più strette | 2–3 min |
+| 20 | Preparatore ordini | lista, carrello e scanner; conta il giro più corto | da 5 a 6 articoli, articoli simili tra loro | 2–3 min |
+| 30 | Addetto spedizioni | scatola giusta, riempitivo, nastro, etichetta; carica in ordine (ultimo dentro = prima consegna) | da 2 a 3 pacchi, oggetti dalle forme strane | 2–3 min |
+| 40 | Centro di smistamento | nastri: tocca i deviatori al momento giusto per mandare ogni pacco alla sua zona | turno sempre di 2 minuti: sale la velocità e le zone vanno da 3 a 5 | 2 min |
 
-### 🚛 Camionista 🆕
-| Liv. | Lavoro | Minigioco |
-|---|---|---|
-| 1 | Furgoncino per i negozi | rifornisci 3 negozi della città, anche i tuoi (2–3 min) |
-| 10 | Camion | una manovra in retromarcia fino alla banchina di carico (1–2 min) |
-| 20 | Camion frigo | 2 consegne con la temperatura da tenere sotto controllo (2–3 min) |
-| 30 | Trasporti eccezionali | un percorso breve con carico lunghissimo: curve larghe, auto di scorta (3 min) |
-| 40 | Bisarca | carica 4–6 auto sui due piani nell'ordine giusto e portale alla concessionaria (3 min) |
+#### 🚌 Autista 🆕
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
+|---|---|---|---|---|
+| 1 | Autista di navetta | accosta dentro la zona della fermata, i passeggeri salgono, portali a destinazione | 2 fermate, zona di accosto più piccola, traffico | 1½–2 min |
+| 10 | Autista di autobus | linea con orari, fermate prenotate da non saltare | da 3 a 4 fermate, orari più stretti | 2½–3½ min |
+| 20 | Bus turistico | giro ai monumenti, guida dolce (le frenate brusche tolgono gradimento) | da 2 a 3 monumenti, vie più strette | 3 min |
+| 30 | Autista privato | una corsa con un bicchiere d'acqua sul cruscotto da non rovesciare | richieste del cliente, un cambio di destinazione | 2–3 min |
+| 40 | Limousine per eventi | matrimonio: ritiro puntuale, corteo, arrivo col tappeto rosso | da 2 a 3 tappe, vie affollate | 3–4 min |
+
+#### 🚛 Camionista 🆕
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
+|---|---|---|---|---|
+| 1 | Furgoncino per i negozi | rifornisci i negozi della città (anche i tuoi) | da 2 a 3 negozi, vie strette | 2–3 min |
+| 10 | Camion | una manovra in retromarcia fino alla banchina di carico | rimorchio più lungo, ostacoli nel piazzale | 1–2 min |
+| 20 | Camion frigo | consegne con la temperatura da tenere sotto controllo | da 1 a 2 consegne, d'estate la temperatura sale più in fretta | 2–3 min |
+| 30 | Trasporti eccezionali | carico lunghissimo: curve larghe, auto di scorta | curve più strette, strade chiuse | 3 min |
+| 40 | Bisarca | carica le auto sui due piani nell'ordine giusto e portale alla concessionaria | da 4 a 6 auto | 3 min |
+
+### B. Attività (3 alberi)
+
+Per evolvere: **tutti gli ampliamenti e tutte le migliorie al massimo** + una **ristrutturazione costosa**.
+L'attività vecchia si trasforma e il suo posto torna libero; si sceglie un **locale libero** e si paga **un solo
+prezzo** (locale + ristrutturazione). Ai bivi si sceglie un ramo solo. "Di persona" = gli ordini o il bancone che
+il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della linea indicata.
+
+#### 🚲 Albero delle Consegne in bici
+| Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
+|---|---|---|---|---|---|
+| 🚲 Consegne in bici | base, posteggio | ordini di consegna dai negozi del quartiere, raggio piccolo | Rider di cibo | rider in bici | più bici e rastrelliera · borse termiche (mance) · zona più grande · bici elettriche (velocità) · app degli ordini (domanda) |
+| 🛵 Consegne veloci | 1ª, bivio A | ordini da tutta la città; porta a domicilio i prodotti delle tue attività di ristorazione (più clienti per loro) | Corriere espresso | rider in scooter, centralinista | più scooter · zone di consegna · turni di pranzo e cena · assicurazione (meno incidenti) · con la pioggia più ordini |
+| 🚐 Corriere espresso | 2ª | pacchi in giornata per negozi e privati | Consegne urgenti | autisti di furgone, smistatore | più furgoni · deposito di smistamento · consegne serali |
+| 🌍 Compagnia di corrieri | 3ª | contratti mensili con tutta la città | Corriere aeroportuale, Portavalori | come sopra + guardie del portavalori | servizio aeroporto · furgoni blindati · filiali (catena) |
+| 📮 Punto ritiro pacchi | 1ª, bivio B | bancone: la gente ritira e spedisce, tu cerchi il pacco sullo scaffale | al bancone (come il food truck) | commessi, magazziniere | scaffali più grandi · cassa veloce · orario prolungato |
+| 📦 Centro spedizioni | 2ª | imballa e spedisce per privati e negozi | Addetto spedizioni | imballatori, commessi | bilance e nastro · imballaggi speciali · ritiro a domicilio |
+| 🗄️ Armadietti in città | 3ª | armadietti sparsi per la città: un incasso per ogni armadietto più i pacchi | Corriere espresso (rifornisci gli armadietti) | autisti, tecnico | numero di armadietti (si piazzano sulla mappa) · armadietti refrigerati |
+
+#### 🚛 Albero della Ditta traslochi
+| Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
+|---|---|---|---|---|---|
+| 🚛 Ditta traslochi ✅ | base, locale | traslochi piccoli e grandi, sgomberi | Trasporto mobili, Traslochi | facchini, autisti | quelle che ci sono già |
+| 🎹 Trasporti delicati | 1ª, bivio A | pianoforti, opere d'arte, antiquariato: pochi ordini, pagati molto | Trasporti delicati | facchini specializzati | montacarichi · casse imbottite · assicurazione sul carico |
+| 🏢 Traslochi d'azienda | 2ª | uffici e negozi; sconto quando evolvi una tua attività | Traslochi d'azienda | squadre con caposquadra | più squadre · lavori di notte · furgoni grandi |
+| 🏬 Deposito mobili | 1ª, bivio B | custodia: un incasso al mese per ogni box occupato, più i traslochi | Magazziniere | magazzinieri | più box · allarme e sorveglianza · box climatizzati |
+| 🏭 Deposito merci | 2ª | tiene le merci per i negozi; i tuoi negozi riordinano da qui a prezzo d'ingrosso | Carrellista, Preparatore ordini | carrellisti, preparatori | muletti · scaffali alti · spazio affittato ad altri |
+| 🔀 Centro di distribuzione | 3ª | rifornisce tutta la città | Centro di smistamento | addetti ai nastri | nastri · smistatori automatici · banchine di carico |
+| 🚚 Autotrasporti | 1ª, bivio C | contratti fissi con i negozi della città | Furgoncino, Camion | camionisti, meccanico | più camion · gasolio · manutenzione dei mezzi |
+| ❄️ Trasporti refrigerati | 2ª | cibo fresco per ristoranti e supermercati (anche i tuoi) | Camion frigo | camionisti | celle frigorifere · consegne all'alba |
+| 🚛 Trasporti eccezionali | 3ª | carichi enormi; bisarche per la concessionaria | Trasporti eccezionali, Bisarca | camionisti, auto di scorta | bisarche · permessi speciali · scorte |
+
+#### 🚐 Albero della Navetta
+| Attività | Grado | Come guadagna | Di persona | Personale | Ampliamenti e migliorie proprie |
+|---|---|---|---|---|---|
+| 🚐 Navetta | base, posteggio | corse tra hotel, stazione e centro | Autista di navetta | autisti | più pulmini · aria condizionata (gradimento) · fermate in più |
+| 🚕 Noleggio con conducente | 1ª, bivio A | corse prenotate per clienti importanti | Autista privato | autisti | auto di lusso · prenotazioni dall'app |
+| 🎩 Limousine ed eventi | 2ª | matrimoni, prime, VIP | Limousine per eventi | autisti in divisa | limousine · tappeto rosso · pacchetti matrimonio |
+| 🚌 Bus turistici | 1ª, bivio B | giri turistici, di più d'estate e durante gli eventi | Bus turistico | autisti, guide | bus scoperto · giri a tema · biglietti online |
+| 🚏 Linee urbane in appalto | 2ª | appalti del comune di qualche mese, penali per i ritardi | Autista di autobus | autisti | più linee · fermate coperte · autobus nuovi |
+
+**Prezzi indicativi (da bilanciare):** basi — consegne in bici €1.500, navetta €6.000, ditta traslochi €7.000
+(+ il posto). Evoluzioni, locale compreso: 1ª ≈ €30.000, 2ª ≈ €90.000, 3ª ≈ €250.000.
+
 ---
 
 ## 🍳 Ristorazione
@@ -258,27 +307,7 @@ Gli ordini fatti di persona dal titolare seguono la regola dei 5 minuti.
 - Si **sceglie un locale libero** dove aprire la nuova attività e si paga **un solo prezzo** che comprende il
   locale nuovo e la ristrutturazione.
 
-### 🚚 Alberi di Trasporti e logistica
-
-```
-🚲 Consegne in bici (base, economica, posteggio)            — Corriere
- ├─ 🛵 Consegne veloci (scooter, app) → 🚐 Corriere espresso (furgoni) → 🌍 Compagnia di corrieri
- └─ 📮 Punto ritiro pacchi (locale, bancone) → 📦 Centro spedizioni → 🗄️ Armadietti in tutta la città
-
-🚛 Ditta traslochi (base, c'è già)                          — Consegne
- ├─ 🎹 Trasporti delicati (pianoforti, arte) → 🏢 Traslochi d'azienda
- ├─ 🏬 Deposito mobili (custodia, entrata mensile) → 🏭 Deposito merci (muletti) → 🔀 Centro di distribuzione (nastri)   — Magazzino
- └─ 🚚 Autotrasporti (camion) → ❄️ Trasporti refrigerati → 🚛 Trasporti eccezionali e bisarche                         — Camionista
-
-🚐 Navetta (base, un pulmino)                                — Autista
- ├─ 🚕 Noleggio con conducente → 🎩 Limousine ed eventi
- └─ 🚌 Bus turistici → 🚏 Linee urbane in appalto
-```
-
-Agganci con il resto del gioco: le consegne veloci portano a domicilio i prodotti delle tue attività di
-ristorazione (più clienti); i tuoi negozi riordinano dal deposito merci a prezzo d'ingrosso; il deposito
-affitta spazio ad altri (entrata fissa); gli autotrasporti hanno contratti fissi con i negozi della città;
-le linee urbane sono appalti di qualche mese con penali per i ritardi.
+Gli alberi completi di ogni settore sono nella sezione del settore (Trasporti e logistica: fatto).
 
 ### Altri settori (da rifare ad albero quando li discutiamo)
 
@@ -314,5 +343,6 @@ le linee urbane sono appalti di qualche mese con penali per i ritardi.
 ## Da decidere
 - Quante linee per settore all'inizio (oggi 3, qui ne propongo 4–5)
 - Se le linee arrivano a 5 gradini (Liv. 40) o restano a 3
-- Prezzi delle evoluzioni delle attività
+- Prezzi delle evoluzioni delle attività (indicativi in Trasporti e logistica)
+- Le evoluzioni nelle catene: si evolve un negozio alla volta o tutta la catena?
 - Quali righe fare per prime
