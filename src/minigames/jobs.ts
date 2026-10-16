@@ -632,7 +632,8 @@ export class PhasedRun extends BaseRun {
       this.outTimer = 0;
       this.wasInZone = true;
     }
-    this.status = status + (this.heldIcon && this.game.player.held ? ` · in mano ${this.heldIcon}` : '');
+    // (se il lavoretto dice già cosa hai in mano, non lo si ripete)
+    this.status = status + (this.heldIcon && this.game.player.held && !extra?.includes('in mano') ? ` · in mano ${this.heldIcon}` : '');
     const aimed = pend.filter((t) => t.aim);
     if (aimed.length) {
       this.updateAim(dt, aimed, near);

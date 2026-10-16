@@ -213,97 +213,105 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
 // Forno: panettiere notturno
 // ======================================================================================
 
+/** Impasti del panettiere notturno: forma, quanto si lavora al banco e se serve il burro (sfoglia). */
+const BREADS = {
+  pagnotta: { icon: '🍞', name: 'pagnotta', shape: 1.2, butter: false, color: 0xe2c08d },
+  filone: { icon: '🥖', name: 'filone', shape: 1.4, butter: false, color: 0xe8cf9f },
+  cornetti: { icon: '🥐', name: 'cornetti', shape: 1.8, butter: true, color: 0xf2d27a },
+} as const;
+type Bread = keyof typeof BREADS;
+
 /**
- * Panettiere: farina → impastatrice (tieni premuto) → banco (dai la forma, tieni premuto) → forno libero;
- * togli quando è dorato (prima crudo, dopo bruciato) → scaffale. Due forni: mentre uno cuoce, impasti l'altro.
+ * Panettiere notturno: si preparano gli impasti per la mattina, niente forno. Il foglio degli ordini dice cosa
+ * fare, uno dopo l'altro: farina → impastatrice (tieni premuto) → per i cornetti il burro dal frigo → banco
+ * (dai la forma, tieni premuto) → la cella di lievitazione, sul ripiano del suo tipo. Il ripiano sbagliato si
+ * può scegliere, ma conta alla fine (meno stelle e paga).
  */
 export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Placed, title: string) {
   const t = rungProgress('forno', lineLevel);
-  const n = Math.round(3 + 2 * t);
+  const n = Math.round(4 + 3 * t);
   const room = game.enterArena(new Room({ w: 9, d: 7, floor: 0xd9b48a, wall: 0xf6e7c8, sign: '🥖 Forno', slot, placed }));
-  type Stage = 'flour' | 'dough' | 'shaped' | 'baked';
-  let holding: { stage: Stage; k?: number } | null = null;
-  let started = 0;
+  const kinds: Bread[] = t < 0.4 ? ['pagnotta', 'filone'] : ['pagnotta', 'filone', 'cornetti'];
+  // il foglio della notte: mai due uguali di fila all'inizio, poi a caso
+  const orders: Bread[] = Array.from({ length: n }, (_, i) => kinds[i < kinds.length ? i : Math.floor(Math.random() * kinds.length)]);
+  for (let i = kinds.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [orders[i], orders[k]] = [orders[k], orders[i]]; }
+  type Stage = 'flour' | 'dough' | 'butter' | 'shaped';
+  let holding: { stage: Stage; b: Bread } | null = null;
+  let next = 0;
   let done = 0;
-  const qs: number[] = [];
+  let wrong = 0;
   let run: PhasedRun;
   const sack = crate(0.6, 0xf3ead7, 0xe8d3a8);
   const flourAt = room.at(-3.5, -2.3);
   const mixer = room.furn('kitchenCabinet', -1.8, -3.0, 0);
   const mixerAt = room.near(-1.8, -3.0, 0, 0.6);
+  const fridge = room.furn('kitchenFridge', 1.0, -3.0, 0);
+  const fridgeAt = room.near(1.0, -3.0, 0, 0.7);
   const table = room.furn('table', 0, -0.4, 0);
   const tableAt = room.near(0, -0.4, 0, 0.7);
-  const ovens = [0, 1].map((i) => {
-    const f = room.furn('kitchenStove', 1.6 + i * 1.3, -3.0, 0);
-    return { pos: room.near(1.6 + i * 1.3, -3.0, 0, 0.6), obj: f.obj, bread: false, time: 0, cook: 8 - 2 * t, bar: null as ReturnType<typeof cookBar> | null };
+  // cella di lievitazione: un ripiano per tipo, lungo la parete di destra
+  const racks = kinds.map((b, k) => {
+    const z = -1.6 + k * 1.4;
+    const f = room.furn('kitchenCabinet', 3.6, z, -Math.PI / 2);
+    return { b, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), count: 0 };
   });
-  const shelf = room.furn('kitchenCabinet', 3.6, 0.6, -Math.PI / 2);
-  const shelfAt = room.near(3.6, 0.6, -0.7, 0);
-  const loafM = () => {
-    const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.3, 4, 8), new THREE.MeshLambertMaterial({ color: 0xd9a05b }));
-    m.rotation.z = Math.PI / 2;
+  const doughM = (b: Bread) => {
+    const m = new THREE.Mesh(b === 'filone' ? new THREE.CapsuleGeometry(0.09, 0.32, 4, 8) : b === 'cornetti' ? new THREE.TorusGeometry(0.11, 0.05, 6, 10, Math.PI) : new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshLambertMaterial({ color: BREADS[b].color }));
+    if (b === 'filone') m.rotation.z = Math.PI / 2;
     const g = new THREE.Group();
     g.add(m);
     return g;
   };
+  const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
-    name: 'Fai il pane', icon: '🥖', count: () => [done, n],
-    tip: 'Prendi la <b>farina</b>, <b>impasta</b> (tieni premuto), dai la <b>forma</b> al banco (tieni premuto) e metti in un <b>forno</b> libero. Togli quando la barra è <b>verde</b> e metti sullo <b>scaffale</b>',
+    name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
+    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> (tieni premuto), per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco (tieni premuto) e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo',
     tasks: () => [
-      // solo se c'è un forno libero (col pane in mano e i forni pieni resteresti bloccato)
-      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && started < n && ovens.some((x) => !x.bread), onDone: () => { holding = { stage: 'flour' }; started++; hold(game, crate(0.3, 0xf3ead7)); } },
-      { pos: mixerAt, kind: 'hold', sec: 1.8, repeat: true, quiet: true, label: 'Impasta', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour', onDone: () => { holding = { stage: 'dough' }; hold(game, crate(0.28, 0xf6e7c8)); } },
-      { pos: tableAt, kind: 'hold', sec: 1.2, repeat: true, quiet: true, label: 'Dai la forma al pane', icon: '🥖', obj: table.obj, enabled: () => holding?.stage === 'dough', onDone: () => { holding = { stage: 'shaped' }; hold(game, loafM()); } },
-      ...ovens.map((ov, i): Task => ({
-        pos: ov.pos, kind: 'tap', repeat: true, quiet: true, label: `Forno ${i + 1}`, icon: '🔥', obj: ov.obj,
-        enabled: () => (holding?.stage === 'shaped' && !ov.bread) || (!holding && ov.bread),
-        onDone: () => {
-          if (holding?.stage === 'shaped' && !ov.bread) {
-            ov.bread = true;
-            ov.time = 0;
-            holding = null;
-            hold(game);
-          } else if (!holding && ov.bread) {
-            const k = ov.time / ov.cook;
-            ov.bread = false;
-            ov.bar?.hide();
-            holding = { stage: 'baked', k };
-            hold(game, loafM());
-            toast(k < 1 ? '🥖 Ancora crudo dentro' : k <= 1.4 ? '✨ Dorato al punto giusto' : '🔥 Bruciacchiato', k >= 1 && k <= 1.4 ? 'good' : 'bad');
-          }
-        },
-      })),
+      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur() }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
+      { pos: mixerAt, kind: 'hold', sec: 2.2, repeat: true, quiet: true, label: 'Impasta', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour', onDone: () => { holding = { stage: 'dough', b: holding!.b }; hold(game, crate(0.28, 0xf6e7c8)); } },
+      { pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi il burro per la sfoglia', icon: '🧈', obj: fridge.obj, enabled: () => holding?.stage === 'dough' && BREADS[holding.b].butter, onDone: () => { holding = { stage: 'butter', b: holding!.b }; } },
       {
-        pos: shelfAt, kind: 'tap', repeat: true, quiet: true, label: 'Metti sullo scaffale', icon: '🧺', obj: shelf.obj, enabled: () => holding?.stage === 'baked',
+        pos: tableAt, kind: 'hold', repeat: true, quiet: true, get label() { return holding ? `Dai la forma: ${BREADS[holding.b].icon} ${BREADS[holding.b].name}` : 'Dai la forma'; }, icon: '👐', obj: table.obj,
+        get sec() { return holding ? BREADS[holding.b].shape : 1.4; },
+        enabled: () => !!holding && (holding.stage === 'butter' || (holding.stage === 'dough' && !BREADS[holding.b].butter)),
+        onDone: () => { holding = { stage: 'shaped', b: holding!.b }; hold(game, doughM(holding.b)); },
+      },
+      ...racks.map((r): Task => ({
+        pos: r.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti a lievitare: ripiano ${BREADS[r.b].icon}`, icon: BREADS[r.b].icon, obj: r.obj,
+        enabled: () => holding?.stage === 'shaped',
+        get right() { return holding?.b === r.b; },
         onDone: () => {
-          qs.push(cookQuality(holding!.k!));
+          // il ripiano sbagliato si può scegliere: si paga alla fine
+          if (holding!.b !== r.b) wrong++;
+          const d = doughM(holding!.b);
+          d.userData.noGlow = true;
+          run.prop(d, r.at.clone().add(new THREE.Vector3(0, r.top + 0.12, -0.5 + (r.count % 4) * 0.33)), 0, 1);
+          r.count++;
           holding = null;
           hold(game);
           done++;
-          run.starCap = capFrom(qs);
-          if (done >= n) run.finishPhase();
+          run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+          if (done >= n) {
+            toast(wrong ? `🧺 ${wrong} ${wrong === 1 ? 'impasto sul ripiano sbagliato' : 'impasti sui ripiani sbagliati'}` : '🌙 Tutti gli impasti a lievitare: domattina si inforna!', wrong ? 'bad' : 'good');
+            run.finishPhase();
+          }
         },
-      },
+      })),
     ],
   }];
-  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 26 });
+  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 24 });
   run.prop(sack, flourAt.clone().add(new THREE.Vector3(0, 0, -0.5)), 0, 1);
   tag(run, '🌾 Farina', flourAt, 1.4);
   tag(run, '🌀 Impastatrice', mixerAt, 1.7);
-  tag(run, '🥖 Banco', tableAt, 1.5);
-  ovens.forEach((ov, i) => {
-    tag(run, `🔥 Forno ${i + 1}`, ov.pos, 1.6);
-    ov.bar = cookBar(run, ov.pos.clone().setY(1.95));
-  });
-  tag(run, '🧺 Scaffale', shelfAt, 1.7);
-  run.onTick = (dt) => {
-    for (const ov of ovens) {
-      if (!ov.bread) continue;
-      if (!run.frozen) ov.time += dt;
-      ov.bar!.set('🥖', ov.time / ov.cook);
-    }
+  if (kinds.includes('cornetti')) tag(run, '🧈 Burro', fridgeAt, 2.2);
+  tag(run, '👐 Banco', tableAt, 1.5);
+  for (const r of racks) tag(run, `${BREADS[r.b].icon} Lievitazione`, r.pos, 1.8, '#8e5bd6');
+  // il foglio degli ordini nella barra: fatti ✅, quello in mano, i prossimi
+  run.extraStatus = () => {
+    const sheet = orders.map((b, i) => (i < done ? '✅' : BREADS[b].icon)).join(' ');
+    const inHand = holding ? ` · in mano ${{ flour: '🌾', dough: '🫓', butter: '🫓🧈', shaped: BREADS[holding.b].icon }[holding.stage]} per ${BREADS[holding.b].icon}` : '';
+    return `📋 ${sheet}${inHand}`;
   };
-  run.extraStatus = () => (holding ? `in mano ${{ flour: '🌾', dough: '🫓', shaped: '🥖', baked: '🍞' }[holding.stage]}` : '');
   return run;
 }
 
@@ -344,10 +352,25 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   const milkAt = room.near(0.6, -3.0, 0, 0.8);
   const kettle = room.furnOn('kitchenCabinet', 'toaster', 2.2, -3.0, 0, 3);
   const kettleAt = room.near(2.2, -3.0, 0, 0.8);
-  const serveAt = room.near(0, -0.6, 0, -0.65);
-  // la fila: davanti al bancone
+  // si serve al centro del bancone: il primo della fila è lì davanti
+  const serveAt = room.near(-0.75, -0.6, 0, -0.65);
+  const headAt = room.near(-0.75, -0.6, 0, 0.8);
+  // la fila: uno dietro l'altro, un po' di sbieco verso sinistra (lontano dalla porta, e si vedono tutti i fumetti)
+  const spotAt = (k: number) => headAt.clone().add(new THREE.Vector3(-k * 0.65, 0, k * 0.7));
   const queue: Character[] = [];
   const bubbles: THREE.Sprite[] = [];
+  // fumetto: il primo della fila (giallo) dice cosa vuole per esteso, gli altri il numero e la bevanda
+  const setBubble = (i: number) => {
+    const c = queue[i];
+    if (bubbles[i]) c.root.remove(bubbles[i]);
+    const first = i === served;
+    const s = label(first ? `👉 ${DRINKS[orders[i]].icon} ${DRINKS[orders[i]].name}` : `${i - served + 1}° ${DRINKS[orders[i]].icon}`, { bg: first ? '#ffc21a' : '#ffffff', fg: '#3a2f55', scale: first ? 0.75 : 0.8 });
+    // chi è più indietro ha il fumetto più in alto: dal bancone si leggono uno sopra l'altro
+    s.position.set(0, 2.25 + (i - served) * 0.45, 0);
+    s.userData.noGlow = true;
+    c.root.add(s);
+    bubbles[i] = s;
+  };
   const phases: Phase[] = [{
     name: 'Servi i clienti in ordine', icon: '☕', count: () => [served, n],
     tip: 'Guarda cosa chiede il <b>primo della fila</b>: prendi una <b>tazza</b>, fai il caffè alla <b>macchina</b> (tieni premuto). Cappuccino: poi il <b>latte montato</b>. Tè: il <b>bollitore</b>. Poi servi al bancone',
@@ -371,7 +394,9 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
           run.starCap = capFrom(qs);
           // la fila avanza
           queue.forEach((c, i) => {
-            if (i >= served) c.root.position.copy(room.at(-0.2 + (i - served) * 0.75, 0.5));
+            if (i < served) return;
+            c.root.position.copy(spotAt(i - served));
+            setBubble(i);
           });
           if (served >= n) run.finishPhase();
         },
@@ -379,17 +404,20 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
     ],
   }];
   run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 20 });
-  orders.forEach((o, i) => {
-    const c = npc(run, room.at(-0.2 + i * 0.75, 0.5), i + 2, Math.PI);
-    queue.push(c);
-    bubbles.push(bubble(run, c, DRINKS[o].icon));
+  orders.forEach((_o, i) => {
+    queue.push(npc(run, spotAt(i), i + 2, Math.PI));
+    setBubble(i);
   });
   tag(run, '☕ Tazze', cupsAt, 1.6);
   tag(run, '⚙️ Macchina', machineAt, 1.9);
   tag(run, '🥛 Latte', milkAt, 1.7);
   if (kinds.includes('te')) tag(run, '🍵 Bollitore', kettleAt, 1.6);
   run.onTick = (dt) => queue.forEach((c) => c.update(dt));
-  run.extraStatus = () => (holding ? `in mano ${holding === 'cup' ? '🫖 tazza vuota' : DRINKS[holding as Drink]?.icon ?? ''}` : `🙋 vuole ${DRINKS[orders[Math.min(served, n - 1)]].icon}`);
+  // la fila in ordine nella barra: il primo (quello da servire) e i prossimi
+  run.extraStatus = () => {
+    const line = orders.slice(served, served + 4).map((d, i) => (i ? DRINKS[d].icon : `👉 ${DRINKS[d].icon} ${DRINKS[d].name}`)).join(' › ') + (n - served > 4 ? ' …' : '');
+    return `🧾 ${line}${holding ? ` · in mano ${holding === 'cup' ? '🫖 tazza vuota' : DRINKS[holding as Drink]?.icon ?? ''}` : ''}`;
+  };
   return run;
 }
 
