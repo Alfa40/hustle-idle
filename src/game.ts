@@ -1335,7 +1335,7 @@ export class Game {
       playStats(s).jobsFailed++;
     }
     this.removeNpc(offer.id);
-    this.nextJobSpawn = Math.min(this.nextJobSpawn, rand(JOB.RESPAWN_MIN_SEC, JOB.RESPAWN_MAX_SEC));
+    this.nextJobSpawn = Math.min(this.nextJobSpawn, rand(JOB.AFTER_JOB_MIN_SEC, JOB.AFTER_JOB_MAX_SEC));
     this.player.hold();
     this.player.play('idle');
     this.ui.openJobResult(offer, stars, pay, xp, fame);

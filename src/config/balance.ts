@@ -27,9 +27,13 @@ export const FAME = {
 };
 
 export const JOB = {
-  MAX_ACTIVE: 3,
-  RESPAWN_MIN_SEC: 12,
-  RESPAWN_MAX_SEC: 30,
+  /** lavoretti offerti insieme in città, e ogni quanto ne compare uno nuovo (secondi) */
+  MAX_ACTIVE: 6,
+  RESPAWN_MIN_SEC: 5,
+  RESPAWN_MAX_SEC: 12,
+  /** dopo un lavoretto il prossimo compare quasi subito (secondi) */
+  AFTER_JOB_MIN_SEC: 2,
+  AFTER_JOB_MAX_SEC: 4,
   STAR_PAY: [0, 0.7, 1.0, 1.35],
   /** frazione di tempo rimasto per 3 e 2 stelle */
   STAR3: 0.45,
