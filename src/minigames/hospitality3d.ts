@@ -10,7 +10,7 @@ import { Arena } from './arena';
 import { PhasedRun, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
-import { KneadStation, SHAPE_PATHS, ShapeStation } from './station';
+import { CutStation, KneadStation, SHAPE_PATHS, ShapeStation, VEGGIES, type Veggie } from './station';
 
 /**
  * Lavoretti in 3D di Ristorazione e ospitalità (prima persona, in un locale: vedi Room). Le postazioni da usare
@@ -102,6 +102,139 @@ function npc(run: PhasedRun, at: THREE.Vector3, k: number, face = 0) {
   c.root.rotation.y = face;
   run.prop(c.root, at.clone(), face, 1).userData.noGlow = true;
   return c;
+}
+
+// ======================================================================================
+// Cucina: aiuto cuoco
+// ======================================================================================
+
+/**
+ * Aiuto cuoco: il foglio delle preparazioni dice cosa tagliare, uno dopo l'altro. Frigo → tagliere (prendi il
+ * coltello col dito e muovilo su e giù sulle linee, vedi CutStation) → la ciotola con lo stesso ingrediente.
+ * La ciotola sbagliata si può scegliere, ma conta alla fine (meno stelle e paga).
+ */
+export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: Placed, title: string) {
+  const t = rungProgress('piatti', lineLevel);
+  const n = t < 0.5 ? 3 : 4;
+  // tagli più fini ai livelli alti: più linee, più vicine, più precise
+  const nLines = t < 0.4 ? 3 : t < 0.8 ? 4 : 5;
+  const strokes = 3 + Math.round(t);
+  const tol = 0.05 - 0.018 * t;
+  const room = game.enterArena(new Room({ w: 9, d: 7, tiles: true, sign: '🔪 Cucina', slot, placed }));
+  const kinds = pickN(Object.keys(VEGGIES) as Veggie[], n);
+  const orders = pickN(kinds, n);
+  let holding: { v: Veggie; cut: boolean; q: number } | null = null;
+  const qs: number[] = [];
+  let next = 0;
+  let done = 0;
+  let wrong = 0;
+  let run: PhasedRun;
+  const fridge = room.furn('kitchenFridgeLarge', -3.6, -2.9, 0, 1.5);
+  const fridgeAt = room.near(-3.6, -2.9, 0, 0.7);
+  // tagliere di legno sul bancone, col coltello accanto
+  const bench = room.furn('kitchenCabinet', -0.6, -3.0, 0);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.04, 0.4), new THREE.MeshLambertMaterial({ color: 0xd9a86a }));
+  const knife = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.015, 0.05), new THREE.MeshLambertMaterial({ color: 0xc9d0d8 }));
+  const benchAt = room.near(-0.6, -3.0, 0, 0.6);
+  // i fuochi spenti del cuoco, per far vedere che è una cucina
+  room.furn('kitchenStove', 1.2, -3.0, 0);
+  // ciotole: una per ingrediente, sul bancone lungo la parete di destra
+  const bowls = kinds.map((v, k) => {
+    const z = -2.0 + k * (4.2 / Math.max(1, n - 1));
+    const f = room.furn('kitchenCabinet', 3.6, z, -Math.PI / 2);
+    return { v, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), count: 0, fill: null as THREE.Mesh | null };
+  });
+  const piece = (v: Veggie, cut: boolean) => {
+    const c = new THREE.Color(VEGGIES[v].color);
+    const g = new THREE.Group();
+    if (!cut) {
+      const m = new THREE.Mesh(VEGGIES[v].long ? new THREE.CapsuleGeometry(0.06, 0.24, 4, 8) : new THREE.SphereGeometry(0.11, 10, 8), new THREE.MeshLambertMaterial({ color: c }));
+      if (VEGGIES[v].long) m.rotation.z = Math.PI / 2;
+      g.add(m);
+    } else {
+      // le fette in fila
+      for (let i = 0; i < 4; i++) {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.025, 10), new THREE.MeshLambertMaterial({ color: i % 2 ? c : new THREE.Color(VEGGIES[v].in) }));
+        m.rotation.z = Math.PI / 2;
+        m.position.x = (i - 1.5) * 0.04;
+        g.add(m);
+      }
+    }
+    return g;
+  };
+  const cur = () => orders[Math.min(next, n - 1)];
+  const phases: Phase[] = [{
+    name: 'Prepara le verdure', icon: '🔪', count: () => [done, n],
+    tip: 'Segui il <b>foglio delle preparazioni</b>: prendi l\'ingrediente dal <b>frigo</b>, al <b>tagliere</b> prendi il <b>coltello</b> col dito e muovilo <b>su e giù</b> sopra ogni linea finché la fetta si stacca, poi metti le fette nella <b>ciotola</b> con lo stesso ingrediente',
+    tasks: () => [
+      {
+        pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dal frigo: ${VEGGIES[cur()].icon} ${VEGGIES[cur()].name}`; }, icon: '🧊', obj: fridge.obj,
+        enabled: () => !holding && next < n,
+        onDone: () => {
+          holding = { v: orders[next++], cut: false, q: 1 };
+          hold(game, piece(holding.v, false));
+        },
+      },
+      {
+        pos: benchAt, kind: 'tap', repeat: true, quiet: true, get label() { return holding ? `Taglia: ${VEGGIES[holding.v].icon} ${VEGGIES[holding.v].name}` : 'Taglia'; }, icon: '🔪', obj: bench.obj,
+        enabled: () => !!holding && !holding.cut,
+        onDone: () => {
+          const v = holding!.v;
+          hold(game);
+          run.openStation(new CutStation(v, nLines, strokes, tol, (q) => {
+            if (!holding) return;
+            holding = { v, cut: true, q };
+            hold(game, piece(v, true));
+            if (q < 0.7) toast('🔪 Fette un po\' storte: taglia proprio sulle linee', 'bad');
+          }));
+        },
+      },
+      ...bowls.map((b): Task => ({
+        pos: b.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti nella ciotola ${VEGGIES[b.v].icon}`, icon: VEGGIES[b.v].icon, obj: b.obj,
+        enabled: () => !!holding?.cut,
+        get right() { return holding?.v === b.v; },
+        onDone: () => {
+          // la ciotola sbagliata si può scegliere: si paga alla fine
+          if (holding!.v !== b.v) wrong++;
+          qs.push(holding!.v === b.v ? holding!.q : holding!.q * 0.3);
+          // la ciotola si riempie del colore di quello che ci metti
+          if (!b.fill) {
+            b.fill = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.06, 14), new THREE.MeshLambertMaterial({ color: VEGGIES[holding!.v].color }));
+            b.fill.userData.noGlow = true;
+            run.prop(b.fill, b.at.clone().setY(b.top + 0.08), 0, 1);
+          }
+          b.count++;
+          holding = null;
+          hold(game);
+          done++;
+          run.starCap = capFrom(qs);
+          if (done >= n) {
+            toast(wrong ? `🥣 ${wrong} ${wrong === 1 ? 'ingrediente nella ciotola sbagliata' : 'ingredienti nelle ciotole sbagliate'}` : '🔪 Tutto tagliato: il cuoco può cucinare!', wrong ? 'bad' : 'good');
+            run.finishPhase();
+          }
+        },
+      })),
+    ],
+  }];
+  run = new PhasedRun(game, 1, title, phases, { time: Math.min(290, 40 + n * (30 + nLines * 4)) });
+  board.userData.noGlow = knife.userData.noGlow = true;
+  run.prop(board, room.at(-0.6, -3.0).setY(bench.top + 0.02), 0, 1);
+  run.prop(knife, room.at(-0.6, -3.0).add(new THREE.Vector3(0.12, bench.top + 0.05, 0.12)), 0.3, 1);
+  for (const b of bowls) {
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.14, 0.14, 16, 1, true), new THREE.MeshLambertMaterial({ color: 0xf4f1ea, side: THREE.DoubleSide }));
+    bowl.userData.noGlow = true;
+    run.prop(bowl, b.at.clone().setY(b.top + 0.07), 0, 1);
+    tag(run, `🥣 ${VEGGIES[b.v].icon}`, b.pos, 1.6, '#8e5bd6');
+  }
+  tag(run, '🧊 Frigo', fridgeAt, 2.9);
+  tag(run, '🔪 Tagliere', benchAt, 1.6);
+  // il foglio delle preparazioni nella barra: fatti ✅, quello in mano, i prossimi
+  run.extraStatus = () => {
+    const sheet = orders.map((v, i) => (i < done ? '✅' : VEGGIES[v].icon)).join(' ');
+    const inHand = holding ? ` · in mano ${VEGGIES[holding.v].icon}${holding.cut ? ' tagliato' : ' da tagliare'}` : '';
+    return `📋 ${sheet}${inHand}`;
+  };
+  return run;
 }
 
 // ======================================================================================

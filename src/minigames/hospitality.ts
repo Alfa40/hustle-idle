@@ -4,7 +4,7 @@ import type { JobOffer } from '../sim/state';
 import type { Slot } from '../world/city';
 import type { JobRun } from './jobs';
 import { beats, DragRun, PourRun, RhythmRun, SHAPES, StackRun, TraceRun, type DragItem, type DragSlot, type PourStep, type TraceItem } from './finger';
-import { barJob, conciergeJob, cookLineJob, facchinoJob, gardenPartyJob, housekeepingJob, ovenJob, restaurantJob, suiteJob } from './hospitality3d';
+import { barJob, conciergeJob, cookLineJob, facchinoJob, gardenPartyJob, housekeepingJob, ovenJob, prepCookJob, restaurantJob, suiteJob } from './hospitality3d';
 
 /**
  * Lavoretti di Ristorazione e ospitalità (tabella in CARRIERE.md): Cucina, Sala, Ospitalità, Bar, Forno e
@@ -15,19 +15,6 @@ import { barJob, conciergeJob, cookLineJob, facchinoJob, gardenPartyJob, houseke
 const pickN = <T>(a: T[], n: number) => [...a].sort(() => Math.random() - 0.5).slice(0, n);
 
 // ---------------- Cucina ----------------
-
-/** Aiuto cuoco: tagli lungo le linee, poi la ciotola giusta. */
-function prepCook(game: Game, t: number, title: string) {
-  const ingr = pickN([{ i: '🥕', n: 'Carota' }, { i: '🧅', n: 'Cipolla' }, { i: '🥒', n: 'Cetriolo' }, { i: '🍅', n: 'Pomodoro' }, { i: '🫑', n: 'Peperone' }, { i: '🍆', n: 'Melanzana' }], t < 0.5 ? 3 : 4);
-  const items: TraceItem[] = ingr.map((x) => ({
-    name: `Taglia: ${x.n}`, back: 'board', icon: x.i, paths: SHAPES.cuts(t < 0.4 ? 2 : 3), ink: '#ffffff',
-    bowl: { right: x.i, options: pickN([x.i, ...pickN(ingr.filter((y) => y !== x).map((y) => y.i), 2)], 3) },
-  }));
-  return new TraceRun(game, title, items, {
-    tol: 0.065 - 0.02 * t, time: 40 + items.length * 22, icon: '🔪', phase: 'Taglia gli ingredienti',
-    tip: '<b>Trascina il dito</b> lungo le linee tratteggiate per tagliare (più sei preciso, meglio è), poi tocca la <b>ciotola</b> con lo stesso ingrediente',
-  });
-}
 
 /** Cuoco dal vivo: tre piatti a ritmo, col flambé. */
 function liveCook(game: Game, t: number, title: string) {
@@ -253,7 +240,7 @@ export function startHospitalityJob(game: Game, offer: JobOffer, slot: Slot, tit
   const placed = game.city.placed;
   switch (offer.type) {
     case 'piatti':
-      return [null, () => prepCook(game, t, title), () => cookLineJob(game, lv, slot, placed, title), () => liveCook(game, t, title), () => chef(game, t, title)][r]?.() ?? null;
+      return [null, () => prepCookJob(game, lv, slot, placed, title), () => cookLineJob(game, lv, slot, placed, title), () => liveCook(game, t, title), () => chef(game, t, title)][r]?.() ?? null;
     case 'festa':
       return [() => gardenPartyJob(game, lv, slot, placed, title), () => catering(game, t, title), () => restaurantJob(game, lv, slot, placed, title), () => maitre(game, t, title), () => gala(game, t, title)][r]();
     case 'hotel':

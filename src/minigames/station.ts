@@ -366,6 +366,403 @@ export class ShapeStation extends Station {
   }
 }
 
+// ======================================================================================
+// Tagliare: prendi il coltello e muovilo su e giù sulle linee
+// ======================================================================================
+
+/** Ingredienti da tagliare: come si disegnano sul tagliere (lunghi o tondi) e di che colore sono. */
+export const VEGGIES = {
+  carota: { icon: '🥕', name: 'carota', long: true, color: '#f08a24', in: '#f7b25c' },
+  cetriolo: { icon: '🥒', name: 'cetriolo', long: true, color: '#3f8f3a', in: '#cfe8a4' },
+  melanzana: { icon: '🍆', name: 'melanzana', long: true, color: '#5b2a6e', in: '#efe3c0' },
+  cipolla: { icon: '🧅', name: 'cipolla', long: false, color: '#b8457a', in: '#f3d3e4' },
+  pomodoro: { icon: '🍅', name: 'pomodoro', long: false, color: '#e0402f', in: '#f58a6c' },
+  peperone: { icon: '🫑', name: 'peperone', long: false, color: '#3aa040', in: '#d9f0b8' },
+} as const;
+export type Veggie = keyof typeof VEGGIES;
+
+/**
+ * Tagliare: il coltello è appoggiato sul tagliere; lo prendi col dito (si alza in verticale e segue il dito)
+ * e lo muovi su e giù sopra una linea tratteggiata: a ogni passata la lama scende un po' nell'ingrediente,
+ * dopo `strokes` passate la fetta si stacca. Le passate vicino alla linea valgono di più; quelle fuori da
+ * ogni linea lasciano un taglio storto (vale meno). Finite le linee, `onEnd` riceve la qualità.
+ */
+export class CutStation extends Station {
+  private v: (typeof VEGGIES)[Veggie];
+  /** linee (0–1 lungo l'ingrediente), quante passate hanno avuto e lo spostamento della fetta a destra */
+  private lines: { u: number; n: number; shift: number }[];
+  private knife = { x: 0.82, y: 0.86, held: false, up: false, ox: 0, oy: 0 };
+  private dir = 0;
+  private lastY = 0;
+  private turnY = 0;
+  /** fin dove è arrivata la lama (in alto e in basso) nella passata in corso */
+  private sweep = { top: 9, bot: -9, x0: 9, x1: -9 };
+  private accs: number[] = [];
+  private misses: number[] = [];
+  private crumbs: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+  private flash = 0;
+  private bob = 0;
+  private finished = -1;
+
+  constructor(veg: Veggie, nLines: number, private strokes: number, private tol: number, onEnd: (q: number) => void) {
+    super(onEnd);
+    this.v = VEGGIES[veg];
+    this.lines = Array.from({ length: nLines }, (_, i) => ({ u: (i + 1) / (nLines + 1), n: 0, shift: 0 }));
+  }
+
+  /** Dove sta l'ingrediente nel riquadro (coordinate 0–1 del quadrato). */
+  private shape() {
+    return this.v.long ? { x0: 0.16, x1: 0.84, y0: 0.4, y1: 0.58 } : { x0: 0.28, x1: 0.72, y0: 0.27, y1: 0.71 };
+  }
+
+  private sq() {
+    return this.square(70, 34);
+  }
+
+  /** Dove sta adesso la linea `i` (0–1): le fette staccate si allargano un po' e le linee si spostano con loro. */
+  private lineX(i: number) {
+    const s = this.shape();
+    const tot = this.lines.reduce((a, l) => a + l.shift, 0);
+    let off = -tot / 2;
+    for (let j = 0; j < i; j++) off += this.lines[j].shift;
+    return s.x0 + (s.x1 - s.x0) * this.lines[i].u + off;
+  }
+
+  /** Lama in verticale: il dito tiene il manico, la lama va in su (coordinate 0–1). */
+  private blade() {
+    const s = this.shape();
+    const len = Math.max(0.3, (s.y1 - s.y0) * 1.15);
+    return { x: this.knife.x, top: this.knife.y - len, bot: this.knife.y };
+  }
+
+  protected down(x: number, y: number) {
+    const sq = this.sq();
+    const p = [(x - sq.x) / sq.s, (y - sq.y) / sq.s];
+    const k = this.knife;
+    // si prende toccando il coltello (lama o manico), con un po' di margine per il dito
+    const b = this.blade();
+    const onKnife = k.up
+      ? Math.abs(p[0] - k.x) < 0.09 && p[1] > b.top - 0.05 && p[1] < k.y + 0.2
+      : Math.abs(p[1] - k.y) < 0.09 && p[0] > k.x - 0.45 && p[0] < k.x + 0.2;
+    if (!onKnife) return;
+    if (!k.up) {
+      // si alza in verticale: il dito tiene il manico
+      k.up = true;
+      k.y = p[1] - 0.06;
+      k.x = p[0];
+    }
+    k.held = true;
+    k.ox = k.x - p[0];
+    k.oy = k.y - p[1];
+    this.lastY = this.turnY = k.y;
+    this.dir = 0;
+    this.resetSweep();
+  }
+
+  private resetSweep() {
+    const b = this.blade();
+    this.sweep = { top: b.top, bot: b.bot, x0: b.x, x1: b.x };
+  }
+
+  protected move(x: number, y: number) {
+    const k = this.knife;
+    if (!k.held) return;
+    const sq = this.sq();
+    k.x = Math.max(0.04, Math.min(0.96, (x - sq.x) / sq.s + k.ox));
+    k.y = Math.max(0.3, Math.min(1.05, (y - sq.y) / sq.s + k.oy));
+    this.sweep.x0 = Math.min(this.sweep.x0, k.x);
+    this.sweep.x1 = Math.max(this.sweep.x1, k.x);
+    const dy = k.y - this.lastY;
+    if (Math.abs(dy) < 0.006) return;
+    const d = Math.sign(dy);
+    // cambio di verso: la passata (su o giù) è finita
+    if (this.dir && d !== this.dir) {
+      this.stroke(Math.abs(this.lastY - this.turnY));
+      this.turnY = this.lastY;
+      this.resetSweep();
+    }
+    this.dir = d;
+    this.lastY = k.y;
+    const b = this.blade();
+    this.sweep.top = Math.min(this.sweep.top, b.top);
+    this.sweep.bot = Math.max(this.sweep.bot, b.bot);
+  }
+
+  protected up() {
+    if (this.knife.held) this.stroke(Math.abs(this.lastY - this.turnY));
+    this.turnY = this.lastY;
+    this.resetSweep();
+    this.knife.held = false;
+  }
+
+  /** Una passata della lama: taglia la linea sotto la lama (se c'è) o lascia un taglio storto. */
+  private stroke(len: number) {
+    if (len < 0.08 || this.finished >= 0) return;
+    // andata molto di lato: il coltello si sta spostando verso un'altra linea, non taglia
+    if (this.sweep.x1 - this.sweep.x0 > Math.max(0.045, this.tol * 1.2)) return;
+    const s = this.shape();
+    // la lama a metà della passata
+    const b = { ...this.blade(), x: (this.sweep.x0 + this.sweep.x1) / 2 };
+    // nella passata la lama deve attraversare l'ingrediente, non restare sopra o sotto
+    const cover = Math.min(this.sweep.bot, s.y1) - Math.max(this.sweep.top, s.y0);
+    if (cover < (s.y1 - s.y0) * 0.5) return;
+    if (b.x < s.x0 - 0.06 || b.x > s.x1 + 0.06) return;
+    let best: (typeof this.lines)[number] | null = null;
+    let bd = Infinity;
+    for (const [i, l] of this.lines.entries()) {
+      if (l.n >= this.strokes) continue;
+      const d = Math.abs(this.lineX(i) - b.x);
+      if (d < bd) {
+        bd = d;
+        best = l;
+      }
+    }
+    const tol = this.tol;
+    // ancora sopra una linea già tagliata: niente di male, non conta
+    if (this.lines.some((l, i) => l.n >= this.strokes && Math.abs(this.lineX(i) - b.x) < tol) && !(best && bd < tol)) return;
+    if (best && bd < tol) {
+      best.n++;
+      this.accs.push(1 - 0.6 * (bd / tol));
+      this.bob = 1;
+      for (let i = 0; i < 5; i++) this.crumbs.push({ x: b.x, y: s.y0 + (s.y1 - s.y0) * (best.n / this.strokes), vx: (Math.random() - 0.5) * 0.3, vy: -Math.random() * 0.25, life: 0.6 });
+      if (this.lines.every((l) => l.n >= this.strokes)) this.finished = 0;
+      return;
+    }
+    // fuori dalle linee: un taglio storto (ogni punto solo una volta)
+    if (best && !this.misses.some((m) => Math.abs(m - b.x) < tol)) this.misses.push(b.x);
+    this.flash = 1.2;
+  }
+
+  /** Il contorno dell'ingrediente (solo il percorso). */
+  private body(x: number, y: number, w: number, h: number) {
+    const g = this.g;
+    if (this.v.name === 'carota') {
+      g.moveTo(x, y + h * 0.1);
+      g.quadraticCurveTo(x + w * 0.55, y, x + w, y + h * 0.42);
+      g.lineTo(x + w, y + h * 0.58);
+      g.quadraticCurveTo(x + w * 0.55, y + h, x, y + h * 0.9);
+      g.closePath();
+    } else if (this.v.long) g.roundRect(x, y, w, h, h / 2);
+    else g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  }
+
+  /** Disegna l'ingrediente intero nel rettangolo (x, y, w, h) in pixel. */
+  private veggie(x: number, y: number, w: number, h: number) {
+    const g = this.g;
+    const v = this.v;
+    g.fillStyle = v.color;
+    g.beginPath();
+    this.body(x, y, w, h);
+    g.fill();
+    // riflesso e dettagli
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.beginPath();
+    if (v.long) g.roundRect(x + w * 0.08, y + h * 0.18, w * 0.7, h * 0.16, h * 0.08);
+    else g.ellipse(x + w * 0.36, y + h * 0.3, w * 0.14, h * 0.08, -0.5, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = v.name === 'cipolla' ? '#d9b07a' : '#2f8a3a';
+    if (v.name === 'carota') {
+      for (let i = 0; i < 3; i++) {
+        g.beginPath();
+        g.ellipse(x - h * 0.3, y + h * (0.3 + i * 0.2), h * 0.4, h * 0.1, (i - 1) * 0.5, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else if (v.name === 'melanzana') {
+      g.beginPath();
+      g.roundRect(x - h * 0.15, y + h * 0.15, h * 0.45, h * 0.7, h * 0.15);
+      g.fill();
+    } else if (!v.long) {
+      g.beginPath();
+      g.ellipse(x + w / 2, y + h * 0.03, w * 0.08, h * 0.05, 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+
+  step(dt: number) {
+    const g = this.g;
+    const { w, h } = this;
+    const sq = this.sq();
+    const P = (u: number, v: number) => [sq.x + u * sq.s, sq.y + v * sq.s] as const;
+    const s = this.shape();
+    const k = this.knife;
+    this.flash = Math.max(0, this.flash - dt);
+    this.bob = Math.max(0, this.bob - dt * 5);
+    for (const l of this.lines) l.shift += ((l.n >= this.strokes ? 0.022 : 0) - l.shift) * Math.min(1, dt * 10);
+    if (this.finished >= 0) {
+      this.finished += dt;
+      if (this.finished > 0.7) {
+        const acc = this.accs.reduce((a, b) => a + b, 0) / Math.max(1, this.accs.length);
+        this.end(Math.max(0.2, acc - 0.08 * this.misses.length));
+        return;
+      }
+    }
+    g.fillStyle = '#fff8ec';
+    g.fillRect(0, 0, w, h);
+    this.text(`🔪 Taglia: ${this.v.icon} ${this.v.name}`, w / 2, 24, 20);
+    this.text(k.up ? 'muovi il coltello su e giù sopra ogni linea' : 'prendi il coltello col dito', w / 2, 48, 13, '#7a6f8f', 500);
+    // tagliere
+    const [bx, by] = P(0.04, 0.12);
+    g.fillStyle = '#e9c48f';
+    g.beginPath();
+    g.roundRect(bx, by, sq.s * 0.92, sq.s * 0.84, 18);
+    g.fill();
+    g.fillStyle = '#dcb27a';
+    g.beginPath();
+    g.roundRect(bx + 8, by + 8, sq.s * 0.92 - 16, sq.s * 0.84 - 16, 14);
+    g.fill();
+    // fette: ogni pezzo tra due linee si sposta di quanto si sono staccate le linee alla sua sinistra
+    const xs = (u: number) => s.x0 + (s.x1 - s.x0) * u;
+    const tot = this.lines.reduce((a, l) => a + l.shift, 0);
+    const [x0, y0] = P(s.x0, s.y0);
+    const iw = (s.x1 - s.x0) * sq.s;
+    const ih = (s.y1 - s.y0) * sq.s;
+    const cuts = [-1, ...this.lines.map((l) => xs(l.u)), 2];
+    let off = -tot / 2;
+    for (let i = 0; i < cuts.length - 1; i++) {
+      if (i > 0) off += this.lines[i - 1].shift;
+      g.save();
+      g.translate(off * sq.s, 0);
+      g.beginPath();
+      g.rect(sq.x + cuts[i] * sq.s, 0, (cuts[i + 1] - cuts[i]) * sq.s, h);
+      g.clip();
+      this.veggie(x0, y0, iw, ih);
+      // la faccia tagliata (colore dell'interno) sui lati staccati della fetta
+      g.beginPath();
+      this.body(x0, y0, iw, ih);
+      g.clip();
+      g.fillStyle = this.v.in;
+      if (i > 0 && this.lines[i - 1].n >= this.strokes) g.fillRect(sq.x + cuts[i] * sq.s, y0, 4, ih);
+      if (i < this.lines.length && this.lines[i].n >= this.strokes) g.fillRect(sq.x + cuts[i + 1] * sq.s - 4, y0, 4, ih);
+      g.restore();
+    }
+    // linee da tagliare: tratteggiate; il taglio scende passata dopo passata
+    off = -tot / 2;
+    const b = this.blade();
+    this.lines.forEach((l, i) => {
+      off += i ? this.lines[i - 1].shift : 0;
+      const cx = sq.x + (xs(l.u) + off) * sq.s;
+      if (l.n >= this.strokes) return;
+      const near = k.up && Math.abs(b.x - this.lineX(i)) < this.tol;
+      g.strokeStyle = near ? '#ffc21a' : 'rgba(255,255,255,.95)';
+      g.lineWidth = near ? 4 : 3;
+      g.setLineDash([7, 6]);
+      g.beginPath();
+      g.moveTo(cx, y0 - 14);
+      g.lineTo(cx, y0 + ih + 14);
+      g.stroke();
+      g.setLineDash([]);
+      if (l.n) {
+        g.strokeStyle = 'rgba(40,20,20,.65)';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(cx, y0);
+        g.lineTo(cx, y0 + ih * (l.n / this.strokes));
+        g.stroke();
+      }
+    });
+    // tagli storti
+    g.strokeStyle = 'rgba(120,30,30,.6)';
+    g.lineWidth = 2;
+    for (const m of this.misses) {
+      const cx = sq.x + m * sq.s;
+      g.beginPath();
+      g.moveTo(cx - 4, y0 + ih * 0.2);
+      g.lineTo(cx + 4, y0 + ih * 0.8);
+      g.stroke();
+    }
+    // briciole
+    g.fillStyle = this.v.in;
+    this.crumbs = this.crumbs.filter((c) => (c.life -= dt) > 0);
+    for (const c of this.crumbs) {
+      c.x += c.vx * dt;
+      c.y += c.vy * dt;
+      c.vy += dt * 0.8;
+      const [px, py] = P(c.x, c.y);
+      g.beginPath();
+      g.arc(px, py, 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    this.drawKnife();
+    if (!k.up) {
+      // manina che dice di prendere il coltello
+      const [hx, hy] = P(k.x, k.y);
+      const pulse = 1 + 0.15 * Math.sin(performance.now() / 160);
+      g.strokeStyle = '#ffc21a';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(hx, hy, 26 * pulse, 0, Math.PI * 2);
+      g.stroke();
+      this.text('👆', hx + 10, hy + 26, 26);
+    } else if (this.lines.every((l) => !l.n) && !k.held) this.text('↕️', sq.x + b.x * sq.s + 30, sq.y + ((b.top + b.bot) / 2) * sq.s, 26);
+    if (this.flash > 0) this.text('Sulla linea!', w / 2, sq.y + sq.s * 0.2, 18, '#e5484d');
+    const doneN = this.lines.reduce((a, l) => a + Math.min(l.n, this.strokes), 0);
+    this.text(`${this.lines.filter((l) => l.n >= this.strokes).length}/${this.lines.length} tagli`, w / 2, h - 34, 14, '#7a6f8f', 500);
+    this.bar(doneN / (this.lines.length * this.strokes));
+  }
+
+  private drawKnife() {
+    const g = this.g;
+    const sq = this.sq();
+    const k = this.knife;
+    g.save();
+    if (!k.up) {
+      // appoggiato sul tagliere, in orizzontale: manico a destra
+      g.translate(sq.x + k.x * sq.s, sq.y + k.y * sq.s);
+      g.rotate(-Math.PI / 2);
+    } else {
+      // in verticale, il dito sul manico; dondola un po' a ogni passata
+      g.translate(sq.x + k.x * sq.s, sq.y + k.y * sq.s);
+      g.rotate(this.bob * 0.06);
+    }
+    const s = sq.s;
+    const len = (this.blade().bot - this.blade().top) * s;
+    const bw = s * 0.07;
+    // ombra
+    if (!k.up) {
+      g.fillStyle = 'rgba(0,0,0,.15)';
+      g.beginPath();
+      g.roundRect(-bw / 2 + 3, -len + 4, bw, len + s * 0.15, 6);
+      g.fill();
+    }
+    // lama: il filo sta sulla linea (x = 0), il dorso a destra
+    const grad = g.createLinearGradient(-bw / 2, 0, bw / 2, 0);
+    grad.addColorStop(0, '#f4f6f8');
+    grad.addColorStop(0.5, '#c9d0d8');
+    grad.addColorStop(1, '#9aa4ae');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.moveTo(-bw * 0.15, 0);
+    g.lineTo(-bw * 0.15, -len * 0.82);
+    g.quadraticCurveTo(-bw * 0.1, -len, bw * 0.15, -len);
+    g.lineTo(bw * 0.85, -len * 0.75);
+    g.lineTo(bw * 0.85, 0);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = 'rgba(60,70,80,.5)';
+    g.lineWidth = 1.5;
+    g.stroke();
+    // filo
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(-bw * 0.12, -2);
+    g.lineTo(-bw * 0.12, -len * 0.8);
+    g.stroke();
+    // manico con i rivetti
+    g.fillStyle = '#6b3d1f';
+    g.beginPath();
+    g.roundRect(-bw * 0.2, -2, bw * 1.1, s * 0.16, 6);
+    g.fill();
+    g.fillStyle = '#d9c9a8';
+    for (const f of [0.35, 0.7]) {
+      g.beginPath();
+      g.arc(bw * 0.35, s * 0.16 * f, 2.5, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.restore();
+  }
+}
+
 /** Il gioco ha un minigioco aperto? (per chi deve sapere che i tocchi sono suoi) */
 export function stationOpen(game: Game) {
   return !!(game.run as { station?: Station | null } | null)?.station;
