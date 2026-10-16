@@ -10,6 +10,7 @@ import { Arena } from './arena';
 import { PhasedRun, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
+import { BurgerStation, GrillStation, SAUCES, TOPPINGS, type Sauce, type Step, type Topping } from './kitchen';
 import { CutStation, KneadStation, SHAPE_PATHS, ShapeStation, VEGGIES, type Veggie } from './station';
 
 /**
@@ -36,55 +37,6 @@ function tag(run: PhasedRun, text: string, at: THREE.Vector3, y = 2.1, bg = '#ff
   s.userData.noGlow = true;
   return run.prop(s, at.clone().setY(y), 0, 1);
 }
-
-/**
- * Barra di cottura sopra una padella o un forno: si riempie col tempo; verde = pronto, poi rosso = bruciato.
- * Disegnata su un canvas che si aggiorna (niente sprite nuovi a ogni fotogramma).
- */
-function cookBar(run: PhasedRun, at: THREE.Vector3) {
-  const c = document.createElement('canvas');
-  c.width = 160;
-  c.height = 48;
-  const g = c.getContext('2d')!;
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
-  sp.scale.set(0.9, 0.27, 1);
-  sp.renderOrder = 11;
-  sp.userData.noGlow = true;
-  run.prop(sp, at.clone(), 0, 1);
-  sp.visible = false;
-  return {
-    sprite: sp,
-    /** k = tempo / tempo di cottura (1 = pronto); green fino a 1,4, poi bruciato */
-    set(icon: string, k: number) {
-      sp.visible = true;
-      g.clearRect(0, 0, 160, 48);
-      g.fillStyle = 'rgba(255,255,255,.95)';
-      g.beginPath();
-      g.roundRect(0, 0, 160, 48, 12);
-      g.fill();
-      g.font = '30px sans-serif';
-      g.textBaseline = 'middle';
-      g.fillText(icon, 6, 26);
-      g.fillStyle = '#ddd';
-      g.fillRect(46, 18, 104, 14);
-      // zona verde (pronto) tra 1 e 1,4 della barra lunga 1,7
-      g.fillStyle = 'rgba(53,196,106,.45)';
-      g.fillRect(46 + (104 * 1) / 1.7, 18, (104 * 0.4) / 1.7, 14);
-      g.fillStyle = k < 1 ? '#ffc21a' : k <= 1.4 ? '#35c46a' : '#e5484d';
-      g.fillRect(46, 18, Math.min(104, (104 * k) / 1.7), 14);
-      tex.needsUpdate = true;
-    },
-    hide() {
-      sp.visible = false;
-    },
-  };
-}
-
-/** Qualità di una cottura: crudo prima di 1, perfetto tra 1 e 1,4, poi bruciato. */
-const cookQuality = (k: number) => (k < 0.8 ? 0.2 : k < 1 ? 0.6 : k <= 1.4 ? 1 : k <= 1.7 ? 0.5 : 0.1);
-const cookWord = (k: number) => (k < 1 ? '🥩 Era ancora crudo' : k <= 1.4 ? '✨ Cottura perfetta' : '🔥 Un po\' bruciato');
 
 /** Fumetto sopra un personaggio (cosa vuole): uno sprite che si può cambiare. */
 function bubble(run: PhasedRun, ch: Character, text: string) {
@@ -241,83 +193,102 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
 // Cucina: cuoco di linea
 // ======================================================================================
 
-const DISHES = [
-  { icon: '🥩', name: 'bistecca', cook: 7 },
-  { icon: '🍳', name: 'frittata', cook: 5 },
-  { icon: '🍗', name: 'pollo', cook: 9 },
-  { icon: '🐟', name: 'pesce', cook: 6 },
-];
-
 /**
- * Cuoco di linea: le comande arrivano una dopo l'altra. Frigo → padella libera → quando la barra è verde la
- * togli (prima è crudo, dopo brucia) → passe. Più padelle cuociono insieme mentre prendi altro dal frigo.
+ * Cuoco di linea: le comande degli hamburger arrivano una dopo l'altra. Frigo (la carne) → piastra (col dito:
+ * sulla piastra, girala quando è verde, sul panino quando è cotta, vedi GrillStation) → bancone (componi il
+ * panino come sullo scontrino, salsa a zig-zag, vedi BurgerStation) → passe. Errori permessi: contano alla fine.
  */
 export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: Placed, title: string) {
   const t = rungProgress('piatti', lineLevel);
   const n = Math.round(3 + 2 * t);
-  const nStoves = t < 0.4 ? 2 : 3;
-  const room = game.enterArena(new Room({ w: 9, d: 7, tiles: true, sign: '🍳 Cucina', slot, placed }));
-  const orders = Array.from({ length: n }, () => DISHES[Math.floor(Math.random() * DISHES.length)]);
+  // ai livelli alti: cottura più veloce (finestra del verde più stretta) e panini più ricchi
+  const cookT = 5.5 - 1.8 * t;
+  const room = game.enterArena(new Room({ w: 9, d: 7, tiles: true, sign: '🍔 Cucina', slot, placed }));
+  const tops = Object.keys(TOPPINGS) as Topping[];
+  const sauces = Object.keys(SAUCES) as Sauce[];
+  const orders = Array.from({ length: n }, (): Step[] => [
+    ...pickN(tops, 1 + Math.round(t * 1.5) + (Math.random() < 0.4 ? 1 : 0)).map((k): Step => ({ t: 'top', k })),
+    ...pickN(sauces, t > 0.6 && Math.random() < 0.5 ? 2 : 1).map((k): Step => ({ t: 'sauce', k })),
+    { t: 'bun' },
+  ]);
+  type Stage = 'raw' | 'cooked' | 'ready';
+  let holding: { stage: Stage; q: number; q2: number } | null = null;
+  const qs: number[] = [];
   let next = 0;
   let served = 0;
-  const qs: number[] = [];
-  let holding: { dish: (typeof DISHES)[number]; k: number | null } | null = null;
   let run: PhasedRun;
   const fridge = room.furn('kitchenFridgeLarge', -3.6, -2.9, 0, 1.5);
-  const stoves = Array.from({ length: nStoves }, (_, i) => {
-    const f = room.furn('kitchenStove', -1.6 + i * 1.3, -3.0, 0);
-    return { pos: room.near(-1.6 + i * 1.3, -3.0, 0, 0.5), obj: f.obj, top: f.top, dish: null as (typeof DISHES)[number] | null, time: 0, bar: null as ReturnType<typeof cookBar> | null };
-  });
+  const fridgeAt = room.near(-3.6, -2.9, 0, 0.7);
+  const stove = room.furn('kitchenStove', -1.4, -3.0, 0);
+  const stoveAt = room.near(-1.4, -3.0, 0, 0.6);
+  const benchRow = room.furnRow('kitchenCabinet', 0.4, 2.2, -3.0, true);
+  const bench = benchRow[Math.floor(benchRow.length / 2)];
+  const benchAt = room.near(1.3, -3.0, 0, 0.6);
   const passRow = room.furnRow('kitchenCabinet', -1.7, 0.3, 3.4, false, -Math.PI / 2);
   const pass = passRow[Math.floor(passRow.length / 2)];
-  room.furn('kitchenSink', 2.2, -3.0, 0);
-  const fridgeAt = room.near(-3.6, -2.9, 0, 0.7);
   const passAt = room.near(3.4, -0.7, -0.7, 0);
+  const patty = (k: number) => new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.05, 14), new THREE.MeshLambertMaterial({ color: k ? 0x84492c : 0xd65c6e }));
+  const burger = () => {
+    const g = new THREE.Group();
+    const layer = (r: number, h: number, c: number, y: number) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 14), new THREE.MeshLambertMaterial({ color: c }));
+      m.position.y = y;
+      g.add(m);
+    };
+    layer(0.12, 0.04, 0xe7a956, 0);
+    layer(0.125, 0.04, 0x84492c, 0.04);
+    layer(0.13, 0.015, 0x5cb85c, 0.07);
+    layer(0.12, 0.06, 0xe39a45, 0.1);
+    return g;
+  };
+  const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
-    name: 'Cucina le comande', icon: '🍳', count: () => [served, n],
-    tip: 'Prendi dal <b>frigo</b>, metti su un <b>fuoco</b> libero e togli quando la barra è <b>verde</b> (prima è crudo, dopo brucia). Porta il piatto al <b>passe 🛎️</b>. Puoi cuocere più cose insieme',
+    name: 'Prepara le comande', icon: '🍔', count: () => [served, n],
+    tip: 'Prendi la <b>carne</b> dal frigo; alla <b>piastra</b> trascinala sulla piastra, <b>toccala per girarla</b> quando la barra è verde e trascinala sul <b>panino</b> quando è cotta. Al <b>bancone</b> componi il panino come sullo <b>scontrino</b> (la salsa a <b>zig-zag</b> con la bottiglia) e portalo al <b>passe 🛎️</b>',
     tasks: () => [
       {
-        pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi dal frigo', icon: '🧊', obj: fridge.obj,
-        // solo se c'è un fuoco libero: con l'ingrediente in mano e i fuochi pieni resteresti bloccato
-        enabled: () => !holding && next < n && stoves.some((x) => !x.dish),
+        pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la carne dal frigo', icon: '🥩', obj: fridge.obj,
+        enabled: () => !holding && next < n,
         onDone: () => {
-          const d = orders[next++];
-          holding = { dish: d, k: null };
-          hold(game, crate(0.3, 0xe5a0a0));
-          toast(`📝 Comanda: ${d.icon} ${d.name}`, 'info');
+          holding = { stage: 'raw', q: 1, q2: 1 };
+          hold(game, patty(0));
         },
       },
-      ...stoves.map((st, i): Task => ({
-        pos: st.pos, kind: 'tap', repeat: true, quiet: true, label: `Fuoco ${i + 1}`, icon: '🔥', obj: st.obj,
-        enabled: () => (!!holding && holding.k === null && !st.dish) || (!holding && !!st.dish),
-        onDone: () => {
-          if (holding && holding.k === null && !st.dish) {
-            // in padella
-            st.dish = holding.dish;
-            st.time = 0;
-            holding = null;
-            hold(game);
-            return;
-          }
-          if (!holding && st.dish) {
-            // tolto dal fuoco: com'è cotto?
-            const k = st.time / st.dish.cook;
-            holding = { dish: st.dish, k };
-            st.dish = null;
-            st.bar?.hide();
-            hold(game, crate(0.32, 0xffffff));
-            toast(cookWord(k), k >= 1 && k <= 1.4 ? 'good' : 'bad');
-          }
-        },
-      })),
       {
-        pos: passAt, kind: 'tap', repeat: true, quiet: true, label: 'Porta il piatto al passe', icon: '🛎️', obj: pass.obj,
-        enabled: () => !!holding && holding.k !== null,
+        pos: stoveAt, kind: 'tap', repeat: true, quiet: true, label: 'Cuoci sulla piastra', icon: '🔥', obj: stove.obj,
+        enabled: () => holding?.stage === 'raw',
         onDone: () => {
-          qs.push(cookQuality(holding!.k!));
+          hold(game);
+          run.openStation(new GrillStation(cookT, (q) => {
+            if (!holding) return;
+            holding = { stage: 'cooked', q, q2: 1 };
+            hold(game, patty(1));
+            toast(q >= 0.85 ? '✨ Cottura perfetta' : q >= 0.5 ? '🥩 Cottura così così' : '🔥 Cottura sbagliata', q >= 0.85 ? 'good' : 'bad');
+          }));
+        },
+      },
+      {
+        pos: benchAt, kind: 'tap', repeat: true, quiet: true, label: 'Componi il panino', icon: '🍔', obj: bench.obj,
+        enabled: () => holding?.stage === 'cooked',
+        onDone: () => {
+          hold(game);
+          const q1 = holding!.q;
+          run.openStation(new BurgerStation(cur(), q1, (q) => {
+            if (!holding) return;
+            holding = { stage: 'ready', q: q1, q2: q };
+            hold(game, burger());
+            if (q < 0.7) toast('🧾 Il panino non è come sullo scontrino', 'bad');
+          }));
+        },
+      },
+      {
+        pos: passAt, kind: 'tap', repeat: true, quiet: true, label: 'Porta il panino al passe', icon: '🛎️', obj: pass.obj,
+        enabled: () => holding?.stage === 'ready',
+        onDone: () => {
+          qs.push(holding!.q2);
           holding = null;
           hold(game);
+          next++;
           served++;
           run.starCap = capFrom(qs);
           if (served >= n) run.finishPhase();
@@ -325,21 +296,25 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
       },
     ],
   }];
-  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 22 });
-  tag(run, '🧊 Frigo', fridgeAt, 2.9);
-  stoves.forEach((st, i) => {
-    tag(run, `🔥 ${i + 1}`, st.pos, 1.6);
-    st.bar = cookBar(run, st.pos.clone().setY(1.95));
-  });
+  run = new PhasedRun(game, 1, title, phases, { time: Math.min(290, 40 + n * 48) });
+  tag(run, '🥩 Frigo', fridgeAt, 2.9);
+  tag(run, '🔥 Piastra', stoveAt, 1.6);
+  tag(run, '🍔 Bancone', benchAt, 1.6);
   tag(run, '🛎️ Passe', passAt, 1.7, '#e8590c');
-  run.onTick = (dt) => {
-    for (const st of stoves) {
-      if (!st.dish) continue;
-      if (!run.frozen) st.time += dt;
-      st.bar!.set(st.dish.icon, st.time / st.dish.cook);
-    }
+  // vaschette degli ingredienti sul bancone
+  tops.forEach((k, i) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.2), new THREE.MeshLambertMaterial({ color: new THREE.Color(TOPPINGS[k].color) }));
+    m.userData.noGlow = true;
+    run.prop(m, room.at(1.3, -3.0).add(new THREE.Vector3(-0.5 + i * 0.2, bench.top + 0.03, 0.05)), 0, 1);
+  });
+  // la comanda nella barra: panini fatti, quello in mano
+  run.extraStatus = () => {
+    const sheet = orders.map((_, i) => (i < served ? '✅' : '🍔')).join(' ');
+    const o = cur();
+    const what = next < n ? ` · 🧾 ${o.filter((s) => s.t !== 'bun').map((s) => (s.t === 'top' ? TOPPINGS[s.k].icon : `🧴${SAUCES[s.k].name}`)).join(' ')}` : '';
+    const inHand = holding ? ` · in mano ${{ raw: '🥩 cruda', cooked: '🥩 cotta', ready: '🍔 pronto' }[holding.stage]}` : '';
+    return `${sheet}${what}${inHand}`;
   };
-  run.extraStatus = () => (holding ? `in mano ${holding.dish.icon}${holding.k === null ? ' crudo' : ' cotto'}` : next < n ? `📝 prossima: ${orders[next].icon}` : '');
   return run;
 }
 
