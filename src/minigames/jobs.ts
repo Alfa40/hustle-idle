@@ -1,5 +1,8 @@
+import type { Station } from './station';
 import * as THREE from 'three';
 import { model } from '../assets';
+import { CHAR_MODELS } from '../sim/economy';
+import { Character } from '../world/character';
 import { JOB } from '../config/balance';
 import type { Game } from '../game';
 import type { Slot } from '../world/city';
@@ -578,10 +581,59 @@ export class PhasedRun extends BaseRun {
     };
   }
 
+  /** persone ferme del lavoretto (si animano da sole) */
+  private actors: Character[] = [];
+
+  /**
+   * Chi chiude il lavoretto (capo magazzino, receptionist…): una persona ferma in `at`, girata di `face`,
+   * con la bolla in mano e il fumetto sopra la testa. È lei che si tocca: va messa come `obj` del punto, che
+   * conviene `quiet` (l'indicatore coprirebbe il fumetto, che basta a farla trovare).
+   */
+  finisher(at: THREE.Vector3, face: number, text: string, k = 5) {
+    const c = new Character(CHAR_MODELS[k % CHAR_MODELS.length]);
+    c.root.position.copy(at);
+    c.root.rotation.y = face;
+    // la bolla: cartellina bianca con la molla, davanti al petto
+    const board = new THREE.Group();
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.03), new THREE.MeshLambertMaterial({ color: 0x8a5a2b }));
+    const sheet = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.01), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    sheet.position.z = 0.02;
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.03), new THREE.MeshLambertMaterial({ color: 0xb9bcc4 }));
+    clip.position.set(0, 0.16, 0.025);
+    board.add(pad, sheet, clip);
+    board.position.set(0.05, 0.5, 0.3);
+    board.rotation.x = -0.5;
+    c.root.add(board);
+    const b = label(text, { bg: '#ffc21a', fg: '#3a2f55', scale: 0.7 });
+    b.position.set(0, 2.2, 0);
+    b.userData.noGlow = true;
+    c.root.add(b);
+    this.add(c.root);
+    this.actors.push(c);
+    return c.root;
+  }
+
+  /** minigioco col dito aperto su una postazione (impastare, dare la forma…): finché c'è, si gioca solo quello */
+  station: Station | null = null;
+
+  /** Apre un minigioco col dito sulla postazione; alla fine si chiude da solo. */
+  openStation(st: Station) {
+    this.station?.close();
+    this.station = st;
+    this.game.prompt = null;
+  }
+
   update(dt: number) {
     if (!this.tick(dt)) return;
     const ph = this.phases[this.idx];
     if (!ph) return;
+    for (const c of this.actors) c.update(dt);
+    if (this.station?.closed) this.station = null;
+    if (this.station) {
+      this.station.step(dt);
+      this.game.prompt = null;
+      return;
+    }
     this.onTick?.(dt);
     if (this.phases[this.idx] !== ph) return;
     const p = this.game.player.root.position;
@@ -839,6 +891,8 @@ export class PhasedRun extends BaseRun {
   }
 
   dispose() {
+    this.station?.close();
+    this.station = null;
     this.game.input.onActionClaim = null;
     for (const m of this.markers.values()) this.game.scene.remove(m);
     for (const t of [...this.glows.keys()]) this.removeGlow(t);

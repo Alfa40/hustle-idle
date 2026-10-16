@@ -113,6 +113,9 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   const nHeavy = !levels ? 0 : t < 0.6 ? 1 : 2;
   const nFragile = !levels ? 0 : t < 0.7 ? 1 : 2;
   const O = wh.truck.rear;
+  // il capo magazzino: di fianco al retro del camion, girato verso il magazzino
+  const bossAt = O.clone().add(new THREE.Vector3(wh.truck.bedW / 2 + 0.6, 0, 0.2));
+  let boss: THREE.Object3D | undefined;
   // scatole a terra davanti al camion, in due file
   const spots: THREE.Vector3[] = [];
   for (let i = 0; i < n; i++) {
@@ -206,13 +209,15 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     {
       name: 'Firma la bolla al camion', icon: '🧾',
       tasks: () => [{
-        pos: O.clone().add(new THREE.Vector3(1.6, 0, -0.6)), kind: 'tap', label: 'Firma la bolla di consegna', icon: '🧾', obj: wh.truck.obj,
+        // il capo magazzino aspetta accanto al camion con la bolla in mano: si tocca lui
+        pos: bossAt.clone().add(new THREE.Vector3(0, 0, -0.9)), kind: 'tap', quiet: true, label: 'Firma la bolla di consegna', icon: '🧾', get obj() { return boss; },
         // il controllo del capo magazzino: le scatole fuori posto si contano adesso
         onDone: () => toast(wrong ? `📋 Controllo: ${wrong} ${wrong === 1 ? 'scatola fuori posto' : 'scatole fuori posto'} · massimo ${run.starCap} ${run.starCap === 1 ? 'stella' : 'stelle'}` : '📋 Controllo: tutte le scatole al posto giusto!', wrong ? 'bad' : 'good'),
       }],
     },
   ];
   run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 15 + nHeavy * 5 });
+  boss = run.finisher(bossAt, Math.PI, '🧾 Firma qui la bolla');
   for (const it of items) {
     it.obj = run.prop(shelfBox(it.kind === 'heavy' ? 0.75 : 0.55, it.shelf.color.hex, it.kind), it.pos, Math.random() * 0.5, 1);
     it.obj.userData.solid = false;

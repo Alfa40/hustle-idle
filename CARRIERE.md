@@ -140,7 +140,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### 🥐 Forno e pasticceria
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Panettiere notturno | niente forno: si preparano gli impasti per la mattina seguendo il foglio degli ordini. Farina → impastatrice (tieni premuto) → per i cornetti il burro dal frigo → forma al banco (tieni premuto) → cella di lievitazione sul ripiano del suo tipo (il ripiano sbagliato si può scegliere, conta alla fine) | da 4 a 7 impasti; pagnotta e filone, poi anche cornetti | 2–3 min |
+| 1 | Panettiere notturno | niente forno: si preparano gli impasti per la mattina seguendo il foglio degli ordini. Farina → impastatrice (minigioco col dito: avanti e indietro senza fermarsi, pieghe da 8 a 12) → per i cornetti il burro dal frigo → forma al banco (minigioco col dito: segui la sagoma, tonda, allungata o triangolo da arrotolare) → cella di lievitazione sul ripiano del suo tipo (il ripiano sbagliato si può scegliere, conta alla fine) | da 4 a 7 impasti; pagnotta e filone, poi anche cornetti | 2–3 min |
 | 10 | Pasticcere | col dito segui il disegno con la sac à poche sui dolci | da 3 a 4 dolci | 1½ min |
 | 20 | Torte su ordinazione | decora la torta uguale alla foto (somiglianza in %) | decorazioni da 4 a 6 | 2 min |
 | 30 | Torte nuziali | impila i piani che dondolano, ben centrati | 3 piani, dondolano più in fretta | 1½ min |

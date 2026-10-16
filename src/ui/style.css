@@ -1079,6 +1079,8 @@ body.overlay-job .hud-right .minimap, body.overlay-job .edge-ptr, body.overlay-j
   overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; display: flex; flex-direction: column; align-items: center;
 }
 .ovl canvas { display: block; touch-action: none; }
+/* minigioco col dito su una postazione di un lavoretto 3D: sotto, tutto lo schermo non si tocca */
+.st-back { position: fixed; inset: 0; z-index: 3; touch-action: none; }
 /* furgone a incastri */
 .ovl-van { padding: 10px; gap: 8px; }
 .van-box { display: flex; flex-direction: column; align-items: center; gap: 0; }

@@ -10,6 +10,7 @@ import { Arena } from './arena';
 import { PhasedRun, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
+import { KneadStation, SHAPE_PATHS, ShapeStation } from './station';
 
 /**
  * Lavoretti in 3D di Ristorazione e ospitalità (prima persona, in un locale: vedi Room). Le postazioni da usare
@@ -213,11 +214,11 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
 // Forno: panettiere notturno
 // ======================================================================================
 
-/** Impasti del panettiere notturno: forma, quanto si lavora al banco e se serve il burro (sfoglia). */
+/** Impasti del panettiere notturno: icona, nome, se serve il burro (sfoglia) e colore dell'impasto. */
 const BREADS = {
-  pagnotta: { icon: '🍞', name: 'pagnotta', shape: 1.2, butter: false, color: 0xe2c08d },
-  filone: { icon: '🥖', name: 'filone', shape: 1.4, butter: false, color: 0xe8cf9f },
-  cornetti: { icon: '🥐', name: 'cornetti', shape: 1.8, butter: true, color: 0xf2d27a },
+  pagnotta: { icon: '🍞', name: 'pagnotta', butter: false, color: 0xe2c08d },
+  filone: { icon: '🥖', name: 'filone', butter: false, color: 0xe8cf9f },
+  cornetti: { icon: '🥐', name: 'cornetti', butter: true, color: 0xf2d27a },
 } as const;
 type Bread = keyof typeof BREADS;
 
@@ -236,7 +237,12 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const orders: Bread[] = Array.from({ length: n }, (_, i) => kinds[i < kinds.length ? i : Math.floor(Math.random() * kinds.length)]);
   for (let i = kinds.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [orders[i], orders[k]] = [orders[k], orders[i]]; }
   type Stage = 'flour' | 'dough' | 'butter' | 'shaped';
-  let holding: { stage: Stage; b: Bread } | null = null;
+  // q: qualità dell'impasto (impastare e forma, col dito)
+  let holding: { stage: Stage; b: Bread; q: number } | null = null;
+  const qs: number[] = [];
+  // ai livelli alti più pieghe e sagoma più precisa
+  const folds = Math.round(8 + 4 * t);
+  const tol = 0.075 - 0.025 * t;
   let next = 0;
   let done = 0;
   let wrong = 0;
@@ -265,16 +271,33 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
-    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> (tieni premuto), per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco (tieni premuto) e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo',
+    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> col dito avanti e indietro senza fermarti, per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo',
     tasks: () => [
-      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur() }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
-      { pos: mixerAt, kind: 'hold', sec: 2.2, repeat: true, quiet: true, label: 'Impasta', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour', onDone: () => { holding = { stage: 'dough', b: holding!.b }; hold(game, crate(0.28, 0xf6e7c8)); } },
-      { pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi il burro per la sfoglia', icon: '🧈', obj: fridge.obj, enabled: () => holding?.stage === 'dough' && BREADS[holding.b].butter, onDone: () => { holding = { stage: 'butter', b: holding!.b }; } },
+      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1 }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
       {
-        pos: tableAt, kind: 'hold', repeat: true, quiet: true, get label() { return holding ? `Dai la forma: ${BREADS[holding.b].icon} ${BREADS[holding.b].name}` : 'Dai la forma'; }, icon: '👐', obj: table.obj,
-        get sec() { return holding ? BREADS[holding.b].shape : 1.4; },
+        // impastare è un minigioco col dito (avanti e indietro sull'impasto)
+        pos: mixerAt, kind: 'tap', repeat: true, quiet: true, label: 'Impasta', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour',
+        onDone: () => run.openStation(new KneadStation(folds, (q) => {
+          if (!holding) return;
+          holding = { stage: 'dough', b: holding.b, q };
+          hold(game, crate(0.28, 0xf6e7c8));
+          if (q < 0.7) toast('🌀 Impasto un po\' grumoso: non fermarti mentre impasti', 'bad');
+        })),
+      },
+      { pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi il burro per la sfoglia', icon: '🧈', obj: fridge.obj, enabled: () => holding?.stage === 'dough' && BREADS[holding.b].butter, onDone: () => { holding = { ...holding!, stage: 'butter' }; } },
+      {
+        // dare la forma: si segue col dito la sagoma del prodotto
+        pos: tableAt, kind: 'tap', repeat: true, quiet: true, get label() { return holding ? `Dai la forma: ${BREADS[holding.b].icon} ${BREADS[holding.b].name}` : 'Dai la forma'; }, icon: '👐', obj: table.obj,
         enabled: () => !!holding && (holding.stage === 'butter' || (holding.stage === 'dough' && !BREADS[holding.b].butter)),
-        onDone: () => { holding = { stage: 'shaped', b: holding!.b }; hold(game, doughM(holding.b)); },
+        onDone: () => {
+          const b = holding!.b;
+          run.openStation(new ShapeStation(BREADS[b].name, BREADS[b].icon, SHAPE_PATHS[b], tol, (q) => {
+            if (!holding) return;
+            holding = { stage: 'shaped', b, q: (holding.q + q) / 2 };
+            hold(game, doughM(b));
+            if (q < 0.7) toast(`👐 ${BREADS[b].icon} Forma un po' storta`, 'bad');
+          }));
+        },
       },
       ...racks.map((r): Task => ({
         pos: r.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti a lievitare: ripiano ${BREADS[r.b].icon}`, icon: BREADS[r.b].icon, obj: r.obj,
@@ -283,6 +306,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         onDone: () => {
           // il ripiano sbagliato si può scegliere: si paga alla fine
           if (holding!.b !== r.b) wrong++;
+          qs.push(holding!.b === r.b ? holding!.q : holding!.q * 0.3);
           const d = doughM(holding!.b);
           d.userData.noGlow = true;
           run.prop(d, r.at.clone().add(new THREE.Vector3(0, r.top + 0.12, -0.5 + (r.count % 4) * 0.33)), 0, 1);
@@ -290,7 +314,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
           holding = null;
           hold(game);
           done++;
-          run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+          run.starCap = capFrom(qs);
           if (done >= n) {
             toast(wrong ? `🧺 ${wrong} ${wrong === 1 ? 'impasto sul ripiano sbagliato' : 'impasti sui ripiani sbagliati'}` : '🌙 Tutti gli impasti a lievitare: domattina si inforna!', wrong ? 'bad' : 'good');
             run.finishPhase();
@@ -299,7 +323,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
       })),
     ],
   }];
-  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 24 });
+  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 30 });
   run.prop(sack, flourAt.clone().add(new THREE.Vector3(0, 0, -0.5)), 0, 1);
   tag(run, '🌾 Farina', flourAt, 1.4);
   tag(run, '🌀 Impastatrice', mixerAt, 1.7);
@@ -663,6 +687,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
   });
   const bags = pickN(doors, n).map((d, i) => ({ door: d, at: room.at(-1.6 + (i % 4) * 0.8, D / 2 - 2.6 - Math.floor(i / 4) * 0.8), obj: null as THREE.Object3D | null }));
   let holding: (typeof bags)[number] | null = null;
+  let desk: THREE.Object3D | undefined;
   let wrong = 0;
   let delivered = 0;
   let run: PhasedRun;
@@ -696,12 +721,15 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     {
       name: 'Torna alla reception', icon: '🛎️',
       tasks: () => [{
-        pos: room.near(-1.9, D / 2 - 1.6, 1.9, 0), kind: 'tap', label: 'Suona il campanello: fatto!', icon: '🛎️',
+        // la receptionist aspetta accanto al banco con la bolla in mano: si tocca lei
+        pos: room.near(-1.9, D / 2 - 1.6, 1.9, 0), kind: 'tap', quiet: true, label: 'Avvisa la reception: fatto!', icon: '🛎️', get obj() { return desk; },
         onDone: () => toast(wrong ? `🛎️ ${wrong} ${wrong === 1 ? 'valigia sbagliata' : 'valigie sbagliate'}: massimo ${run.starCap} stelle` : '🛎️ Tutte le valigie nella camera giusta!', wrong ? 'bad' : 'good'),
       }],
     },
   ];
   run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 22 + doorsPerSide * 4 });
+  // davanti al punto, verso la porta d'ingresso, girata verso il corridoio
+  desk = run.finisher(room.near(-1.9, D / 2 - 1.6, 1.9, 0.9), Math.PI, '🛎️ Tutto consegnato? Dimmelo qui', 1);
   // porte con il numero, e le valigie con l'etichetta
   for (const d of doors) {
     const door = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.1, 1.0), new THREE.MeshLambertMaterial({ color: 0x8a5a2b }));
