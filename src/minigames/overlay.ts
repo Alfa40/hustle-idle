@@ -71,7 +71,7 @@ export abstract class OverlayRun extends BaseRun {
     if (!this.tick(dt)) return;
     this.step(dt);
     const ph = this.phaseList[this.phaseIdx];
-    if (ph && !this.statusLocked) this.status = `Fase ${this.phaseIdx + 1}/${this.phaseList.length} · ${ph.icon} ${ph.name}${this.statusExtra()}`;
+    if (ph && !this.statusLocked) this.status = `${ph.icon} ${ph.name}${this.statusExtra()}`;
   }
 
   protected statusLocked = false;

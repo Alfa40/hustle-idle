@@ -255,7 +255,7 @@ export class DriveRun extends BaseRun {
     const p = this.game.player.root.position;
     if (!this.boarded) {
       const d = Math.hypot(this.carAt.x - p.x, this.carAt.z - p.z);
-      this.status = `Fase 1/${this.stops.length + 1} · 🔑 Sali sul ${RIDES[this.kind].name} · ${Math.round(d)} m`;
+      this.status = `🔑 Sali sul ${RIDES[this.kind].name} · ${Math.round(d)} m`;
       this.game.prompt = d < 3.2 ? { label: `Sali sul ${RIDES[this.kind].name}`, icon: '🔑', at: this.carAt.clone().setY(1.6) } : null;
       return;
     }
@@ -291,10 +291,9 @@ export class DriveRun extends BaseRun {
         }
       } else wait = '🛑 Fermati qui';
     } else this.dwellT = 0;
-    const n = this.stops.length + 1;
     const due = s.due !== undefined ? ` · 🕐 ${this.clockText(s.due)}` : '';
     const meter = this.kind === 'turistico' || this.kind === 'limousine' ? ` · 😊 ${Math.round(this.meter)}%` : this.kind === 'privato' ? ` · 🥛 ${Math.round(this.meter)}%` : '';
-    this.status = `Fase ${this.idx + 2}/${n} · ${s.icon} ${corteo ? 'Segui l\'auto dello sposo' : s.name}${due}${meter}${wait ? ` · ${wait}` : ` · ${Math.round(d)} m`}`;
+    this.status = `${s.icon} ${corteo ? 'Segui l\'auto dello sposo' : s.name}${due}${meter}${wait ? ` · ${wait}` : ` · ${Math.round(d)} m`}`;
     if (wait && wait !== this.lastWait && wait.startsWith('🛑')) this.lastWait = wait;
   }
 

@@ -29,6 +29,8 @@ export interface StreetHouse {
   rot: number;
   /** davanti alla porta di casa (dove si lasciano i pacchi) */
   door: THREE.Vector3;
+  /** dove sta la targa del civico: sul muro della casa, accanto alla porta (rivolta alla strada) */
+  plate: THREE.Vector3;
 }
 
 export class Street {
@@ -81,7 +83,8 @@ export class Street {
         const sc = 7 / size.x;
         const d = size.z * sc;
         const zc = S.z + side * (FRONT + d / 2);
-        inst.add(path, placeMatrix(x, zc, side < 0 ? 0 : Math.PI, sc));
+        const m = placeMatrix(x, zc, side < 0 ? 0 : Math.PI, sc);
+        inst.add(path, m);
         if (k >= 0 && k < perSide) {
           this.blocks.push({ minX: x - 3.5, maxX: x + 3.5, minZ: zc - d / 2, maxZ: zc + d / 2 });
           // cassetta della posta accanto al vialetto, sul bordo del giardino verso il marciapiede
@@ -90,12 +93,13 @@ export class Street {
           this.houses.push({
             side, x, box: new THREE.Vector3(bx, 0, bz), stand: new THREE.Vector3(bx, 0, S.z + side * (ROAD + WALK - 0.55)),
             rot: side < 0 ? 0 : Math.PI, door: new THREE.Vector3(x, 0, S.z + side * (FRONT - 0.7)),
+            plate: this.wallPoint(path, m, x + 1.25, 2.1, side),
           });
           // vialetto dal marciapiede alla porta
-          const path = new THREE.Mesh(new THREE.PlaneGeometry(1.4, FRONT - ROAD - WALK), new THREE.MeshLambertMaterial({ color: 0xd7c9a8 }));
-          path.rotation.x = -Math.PI / 2;
-          path.position.set(x, 0.012, S.z + side * (ROAD + WALK + (FRONT - ROAD - WALK) / 2));
-          g.add(path);
+          const walkway = new THREE.Mesh(new THREE.PlaneGeometry(1.4, FRONT - ROAD - WALK), new THREE.MeshLambertMaterial({ color: 0xd7c9a8 }));
+          walkway.rotation.x = -Math.PI / 2;
+          walkway.position.set(x, 0.012, S.z + side * (ROAD + WALK + (FRONT - ROAD - WALK) / 2));
+          g.add(walkway);
         }
         // alberi tra una casa e l'altra
         if (k % 2 === 0) inst.add(TREE_MODELS[(hi + k) & 1], placeMatrix(x + GAP / 2 - 0.5, S.z + side * (FRONT + 1), Math.random() * 6, 3.4));
@@ -117,6 +121,22 @@ export class Street {
     this.counter = new THREE.Vector3(S.x - 9, 0, S.z - (ROAD + 0.8));
     this.blocks.push({ minX: this.shop.x - 1.3, maxX: this.shop.x + 1.3, minZ: this.shop.z - 1.3, maxZ: this.shop.z + 0.6 });
     this.entry = new THREE.Vector3(S.x - 9, 0, S.z - 0.5);
+  }
+
+  /**
+   * Il punto del muro della casa visto dalla strada, all'altezza `y` (si cerca il muro vero del modello,
+   * non il suo ingombro: portici e gradini sporgono). La targa si attacca lì, appena fuori dal muro.
+   */
+  private wallPoint(path: string, m: THREE.Matrix4, x: number, y: number, side: -1 | 1) {
+    const S = STREET_ORIGIN;
+    const probe = gltf(path).scene.clone();
+    probe.applyMatrix4(m);
+    probe.updateMatrixWorld(true);
+    const dir = new THREE.Vector3(0, 0, side);
+    const from = new THREE.Vector3(x, y, S.z + side * (ROAD + WALK));
+    const hit = new THREE.Raycaster(from, dir, 0, 20).intersectObject(probe, true)[0];
+    const z = hit ? hit.point.z - side * 0.03 : S.z + side * FRONT;
+    return new THREE.Vector3(x, y, z);
   }
 
   /** Modelli delle case e degli altri edifici più vicini al posto del lavoretto, nella città vera. */

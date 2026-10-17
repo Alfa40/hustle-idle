@@ -5,7 +5,7 @@ import { toast } from '../sim/bus';
 import { CHAR_MODELS } from '../sim/economy';
 import { Character } from '../world/character';
 import type { Slot } from '../world/city';
-import { canvasTexture, label } from '../world/props';
+import { canvasTexture, label, numberPlate } from '../world/props';
 import { Arena } from './arena';
 import { PhasedRun, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
@@ -798,6 +798,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
   let desk: THREE.Object3D | undefined;
   let wrong = 0;
   let delivered = 0;
+  const done = new Set<(typeof bags)[number]>();
   let run: PhasedRun;
   const doorTasks = (b: (typeof bags)[number]): Task[] => doors.map((d) => ({
     pos: d.pos.clone().add(new THREE.Vector3(-d.side * 0.5, 0, 0)), kind: 'tap', quiet: true, label: `Lascia alla porta ${d.num}`, icon: '🚪',
@@ -805,6 +806,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     onDone: () => {
       if (d !== b.door) wrong++;
       run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+      done.add(b);
       holding = null;
       hold(game);
       delivered++;
@@ -846,7 +848,8 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     g.add(door);
     // la porta si illumina quando ci sei davanti (ed è lei che si tocca)
     run.prop(g, d.pos.clone(), 0, 1);
-    tag(run, String(d.num), d.pos.clone().add(new THREE.Vector3(-d.side * 0.1, 0, 0)), 2.45, '#3a2f55');
+    // il numero è una targa sulla porta, rivolta al corridoio (non un'etichetta che fluttua)
+    run.prop(numberPlate(String(d.num), 0.74, '#3a2f55', '#ffd76a'), d.pos.clone().add(new THREE.Vector3(-d.side * 0.075, 1.62, 0)), d.side < 0 ? Math.PI / 2 : -Math.PI / 2, 1);
   }
   // banco della reception di lato, non davanti alla porta
   room.furn('desk', -1.9, D / 2 - 1.6, Math.PI / 2);
@@ -857,7 +860,8 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     o.add(lb);
     b.obj = run.prop(o, b.at, 0, 1);
   }
-  run.extraStatus = () => (holding ? `🧳 camera ${holding.door.num}` : '');
+  // le camere in grande nel riquadro: quella della valigia in mano in giallo, le fatte in verde
+  run.chips = () => bags.map((b) => ({ t: `🚪 ${b.door.num}`, s: done.has(b) ? 'done' as const : holding === b ? 'next' as const : 'todo' as const }));
   return run;
 }
 

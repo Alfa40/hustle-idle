@@ -314,6 +314,37 @@ export function halo(color = 0xffe066) {
 }
 
 /** Cassetta della posta su palo, con sportello e bandierina: si riconosce da lontano. */
+/**
+ * Targa col numero (civico, camera) da attaccare a un muro o a una porta: una piastrina con il bordo e il
+ * numero grande, rivolta verso +z. Larga `w` metri; non è un'etichetta che fluttua, sta lì dov'è messa.
+ */
+export function numberPlate(text: string, w = 0.6, bg = '#1f4fae', fg = '#ffffff') {
+  const h = w * 0.62;
+  const tex = canvasTexture(256, 160, (g) => {
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.roundRect(0, 0, 256, 160, 22);
+    g.fill();
+    g.fillStyle = bg;
+    g.beginPath();
+    g.roundRect(10, 10, 236, 140, 16);
+    g.fill();
+    g.fillStyle = fg;
+    g.font = `700 ${text.length > 3 ? 92 : 112}px Fredoka, system-ui, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, 128, 86, 230);
+  });
+  const g = new THREE.Group();
+  const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), lamb(0xffffff));
+  back.position.z = -0.016;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));
+  face.position.z = 0.001;
+  g.add(back, face);
+  g.userData.noGlow = true;
+  return g;
+}
+
 export function mailbox(color: number) {
   const g = new THREE.Group();
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.95, 8), lamb(0x5b4636));

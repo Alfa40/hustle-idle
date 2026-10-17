@@ -249,7 +249,7 @@ export class UI {
     const job = document.createElement('div');
     job.className = 'jobbar';
     job.innerHTML = `<div class="row"><span id="j-title"></span><span id="j-time"></span><button class="quit" id="j-pause">⏸ Pausa</button></div>
-      <div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>
+      <div class="j-chips" id="j-chips" hidden></div><div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>
       <div class="j-gauge" id="j-gauge" hidden><span class="jg-l"></span><div class="jg-bar"><i class="jg-fill"></i><b class="jg-mark"></b></div></div>`;
     this.root.appendChild(job);
     // "Rinuncia" sta nella finestra della pausa (così nella barra resta spazio per il nome del lavoretto)
@@ -427,6 +427,15 @@ export class UI {
       (this.jobEl.querySelector('#j-title') as HTMLElement).textContent = run.title;
       (this.jobEl.querySelector('#j-time') as HTMLElement).textContent = run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`;
       (this.jobEl.querySelector('#j-status') as HTMLElement).textContent = run.status;
+      // caselle grandi (es. i civici delle consegne): si ridisegnano solo se cambiano
+      const chips = run.chips?.() ?? [];
+      const cEl = this.jobEl.querySelector('#j-chips') as HTMLElement;
+      const key = chips.map((c) => c.s + c.t).join('|');
+      if (cEl.dataset.k !== key) {
+        cEl.dataset.k = key;
+        cEl.hidden = !chips.length;
+        cEl.innerHTML = chips.map((c) => `<b class="jc ${c.s}">${c.s === 'done' ? '✅ ' : ''}${c.t}</b>`).join('');
+      }
       // tachimetro (o altra barra del lavoretto): verde, arancione oltre la tacca della guida dolce
       const gEl = this.jobEl.querySelector('#j-gauge') as HTMLElement;
       const gv = run.gauge?.() ?? null;

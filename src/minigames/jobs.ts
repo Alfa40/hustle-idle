@@ -9,7 +9,7 @@ import type { Slot } from '../world/city';
 import { WS } from '../config/map';
 import { toast } from '../sim/bus';
 import type { ParticleKind } from '../world/particles';
-import { arrow, boxProp, bush, cone, cylProp, label, leafPile, ring, trimmedBush } from '../world/props';
+import { arrow, boxProp, bush, cone, cylProp, label, leafPile, numberPlate, ring, trimmedBush } from '../world/props';
 import type { Arena, FenceSide } from './arena';
 import { layout } from '../ui/layout';
 import { routeStops, type Street, type StreetHouse } from './street';
@@ -27,6 +27,8 @@ export interface JobRun {
   frozen?: boolean;
   /** cosa sta succedendo, per il tutorial contestuale */
   guide?(): RunGuide | null;
+  /** caselle grandi nel riquadro del lavoretto (es. i civici delle consegne: fatti, il prossimo, gli altri) */
+  chips?(): { t: string; s: 'done' | 'next' | 'todo' }[];
   update(dt: number): void;
   /** azione del giocatore; `at`: dove ha toccato lo schermo (in prima persona si fa la cosa toccata) */
   onAction?(at?: { x: number; y: number }): void;
@@ -295,6 +297,7 @@ export class PhasedRun extends BaseRun {
   onTick?: (dt: number) => void;
   /** testo in più nella barra (es. "🛋️ danni 20%") */
   extraStatus?: () => string;
+  chips?: () => { t: string; s: 'done' | 'next' | 'todo' }[];
 
   constructor(game: Game, level: number, title: string, phases: Phase[], opts: { zone?: Zone; time: number; keep?: THREE.Vector3 }) {
     super(game, level);
@@ -673,7 +676,7 @@ export class PhasedRun extends BaseRun {
     this.placeStand(near, p);
     const real = this.tasks.filter((t) => !t.decoy);
     const [done, all] = ph.count?.() ?? [real.filter((t) => t.done).length, real.length];
-    let status = `Fase ${this.idx + 1}/${this.phases.length} · ${ph.icon} ${ph.name}${all > 1 ? ` ${done}/${all}` : ''}`;
+    let status = `${ph.icon} ${ph.name}${all > 1 ? ` ${done}/${all}` : ''}`;
     const extra = this.extraStatus?.();
     if (extra) status += ` · ${extra}`;
     // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla
@@ -685,7 +688,7 @@ export class PhasedRun extends BaseRun {
       this.wasInZone = true;
     }
     // (se il lavoretto dice già cosa hai in mano, non lo si ripete)
-    this.status = status + (this.heldIcon && this.game.player.held && !extra?.includes('in mano') ? ` · in mano ${this.heldIcon}` : '');
+    this.status = status + (this.heldIcon && this.game.player.held && !extra?.includes('in mano') && !this.chips ? ` · in mano ${this.heldIcon}` : '');
     const aimed = pend.filter((t) => t.aim);
     if (aimed.length) {
       this.updateAim(dt, aimed, near);
@@ -1432,7 +1435,10 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   const carrying = new Set<DeliverySpecial>();
   let fragileHits = 0;
   let broken = false;
+  /** case già servite (per le caselle dei civici nel riquadro) */
+  const served = new Set<StreetHouse>();
   const leaveBox = (at: THREE.Vector3, h: StreetHouse) => {
+    served.add(h);
     run.prop(model('furniture/cardboardBoxClosed.glb', 2.2), at.clone().add(new THREE.Vector3(0.7, 0, h.side * 0.1)), 0, 1).userData.noGlow = true;
   };
   const deliverTask = (h: StreetHouse): Task => {
@@ -1442,6 +1448,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     const ico = k && k !== 'cane' && k !== 'reso' ? DELIVERY_SPECIALS[k].icon : '📦';
     const done = () => {
       leaveBox(h.door, h);
+      served.add(h);
       if (k === 'fragile' || k === 'grande') carrying.delete(k);
     };
     switch (k) {
@@ -1456,7 +1463,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
           ...base, kind: 'tap', label: 'Suona il campanello', icon: '🔔',
           then: () => {
             toast('🚪 Non c\'è nessuno: lascia il pacco al vicino di casa', 'info');
-            return [{ pos: nb.door, kind: 'tap', label: 'Lascia il pacco al vicino', icon: '🏠', onFoot: true, onDone: () => leaveBox(nb.door, nb) }];
+            return [{ pos: nb.door, kind: 'tap', label: 'Lascia il pacco al vicino', icon: '🏠', onFoot: true, onDone: () => { leaveBox(nb.door, nb); served.add(h); } }];
           },
         };
       }
@@ -1484,7 +1491,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
       }],
     },
     {
-      name: flyer ? 'Imbuca un giornale in ogni cassetta' : civici ? `Consegna ai civici ${nums}` : 'Consegna a ogni indirizzo', icon: flyer ? '📬' : '🏠',
+      name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna i pacchi', icon: flyer ? '📬' : '🏠',
       tip: civici ? `Consegna ai <b>numeri civici ${nums}</b>: la freccia porta solo al primo, gli altri cercali leggendo i <b>numeri sulle case</b> (dispari a sinistra, pari a destra)${specialNote}` : undefined,
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
@@ -1510,13 +1517,11 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
       run.prop(mat, h.door.clone().setY(0.02), 0, 1);
     }
   }
-  // numeri civici su ogni casa della via
-  if (civici) {
+  // numeri civici su ogni casa della via: una targa vera sul muro accanto alla porta
+  if (!flyer) {
     for (const h of street.houses) {
-      const t = label(String(civico(h)), { bg: '#2d6cdb', scale: 0.95 });
-      t.position.set(h.door.x, 2.7, h.door.z);
-      t.userData.noGlow = true;
-      run.prop(t, t.position.clone(), 0, 1);
+      const face = h.side < 0 ? 0 : Math.PI;
+      run.prop(numberPlate(String(civico(h)), 1.15), h.plate, face, 1);
     }
   }
   // il cane gira nel giardino della sua casa, tra il vialetto e la cassetta
@@ -1567,6 +1572,13 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
       }
     }
   };
+  // i civici in grande nel riquadro: fatti in verde, il prossimo (lungo la via) in giallo
+  if (!flyer) {
+    run.chips = () => {
+      const nextH = stops.find((h) => !served.has(h));
+      return stops.map((h) => ({ t: `🏠 ${civico(h)}`, s: served.has(h) ? 'done' as const : h === nextH ? 'next' as const : 'todo' as const }));
+    };
+  }
   run.extraStatus = () => [carrying.has('grande') ? '🛋️ pacco grande' : '', carrying.has('fragile') ? (broken ? '💥 ammaccato' : '🔔 fragile') : ''].filter(Boolean).join(' · ');
   return run;
 }
