@@ -501,6 +501,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **Civici e camere sono targhe vere** (`numberPlate` in world/props.ts), non più etichette che fluttuano: nelle consegne una targa blu col civico è attaccata al muro di ogni casa, accanto alla porta (`Street.wallPoint` cerca il muro vero del modello); nel facchino il numero è una targa sulla porta della camera, rivolta al corridoio
 - **Riquadro del lavoretto più grande e senza informazioni inutili**: niente più "Fase 1/3", scritte più grandi; caselle grandi (`JobRun.chips`) con i **civici da servire** (verde i fatti, giallo il prossimo lungo la via, blu gli altri) e nel facchino con le **camere delle valigie** (giallo quella in mano). Con le caselle non si ripete "in mano"
 
+- **Consegna pacchi senza indicazioni**: a ogni livello i civici vanno cercati leggendo le targhe (niente freccia, niente zerbino giallo, niente cerchio a terra finché non sei davanti alla porta: `Task.search`); i civici si estraggono mescolati davvero (prima usciva quasi sempre il civico 1). Ogni casa ha uguali **zerbino e citofono** (si accendono da vicino solo alla casa giusta): si tocca lo zerbino per lasciare il pacco, si tiene premuto il citofono per firma e contrassegno
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero

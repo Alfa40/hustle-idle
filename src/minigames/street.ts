@@ -31,6 +31,9 @@ export interface StreetHouse {
   door: THREE.Vector3;
   /** dove sta la targa del civico: sul muro della casa, accanto alla porta (rivolta alla strada) */
   plate: THREE.Vector3;
+  /** citofono sul muro accanto alla porta e zerbino davanti alla porta (dove si suona e si lascia il pacco) */
+  bell: THREE.Vector3;
+  mat: THREE.Vector3;
 }
 
 export class Street {
@@ -93,7 +96,9 @@ export class Street {
           this.houses.push({
             side, x, box: new THREE.Vector3(bx, 0, bz), stand: new THREE.Vector3(bx, 0, S.z + side * (ROAD + WALK - 0.55)),
             rot: side < 0 ? 0 : Math.PI, door: new THREE.Vector3(x, 0, S.z + side * (FRONT - 0.7)),
-            plate: this.wallPoint(path, m, x + 1.25, 2.1, side),
+            plate: this.wallPoint(path, m, x + 1.3, 1.85, side),
+            bell: this.wallPoint(path, m, x + 0.75, 1.15, side),
+            mat: this.wallPoint(path, m, x, 0.4, side).setY(0.02).add(new THREE.Vector3(0, 0, -side * 0.45)),
           });
           // vialetto dal marciapiede alla porta
           const walkway = new THREE.Mesh(new THREE.PlaneGeometry(1.4, FRONT - ROAD - WALK), new THREE.MeshLambertMaterial({ color: 0xd7c9a8 }));
@@ -135,7 +140,7 @@ export class Street {
     const dir = new THREE.Vector3(0, 0, side);
     const from = new THREE.Vector3(x, y, S.z + side * (ROAD + WALK));
     const hit = new THREE.Raycaster(from, dir, 0, 20).intersectObject(probe, true)[0];
-    const z = hit ? hit.point.z - side * 0.03 : S.z + side * FRONT;
+    const z = hit ? hit.point.z - side * 0.06 : S.z + side * FRONT;
     return new THREE.Vector3(x, y, z);
   }
 

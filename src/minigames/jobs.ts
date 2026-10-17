@@ -235,6 +235,8 @@ export interface Task {
   enabled?: () => boolean;
   /** niente indicatore né freccette: il punto va cercato (es. il numero civico); si accende solo da vicino */
   quiet?: boolean;
+  /** da cercare davvero (i civici): neanche il cerchio a terra finché non sei lì davanti */
+  search?: boolean;
   /** scritta grande sull'indicatore al posto dell'icona (es. il codice dello scaffale) */
   markerText?: string;
   /** oggetto da far pulsare quando sei vicino, se il punto non ha oggetti che si accendono (es. l'auto) */
@@ -422,8 +424,10 @@ export class PhasedRun extends BaseRun {
     }
     const r = this.standRing;
     // il cerchio a terra serve solo per le azioni veloci ("tocca"): per quelle da tenere premute no
-    r.visible = !!t && t.kind === 'tap';
-    if (!t || t.kind !== 'tap') return;
+    // per i punti da cercare il cerchio compare solo quando ci sei davanti (non deve indicare la strada)
+    const hidden = !!t?.search && Math.hypot(t.pos.x - p.x, t.pos.z - p.z) > 3;
+    r.visible = !!t && t.kind === 'tap' && !hidden;
+    if (!t || t.kind !== 'tap' || hidden) return;
     const sp = this.standPt;
     // il punto si decide una volta sola per ogni oggetto (dal lato da cui arrivi) e poi resta fermo
     const fixed = this.stands.get(t);
@@ -1384,6 +1388,19 @@ function dogModel() {
   return g;
 }
 
+/** Citofono sul muro: piastra grigia con la targhetta del nome e il pulsante giallo, rivolta verso +z. */
+function intercom() {
+  const g = new THREE.Group();
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.4, 0.05), new THREE.MeshLambertMaterial({ color: 0x9aa4ae }));
+  const name = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.07, 0.02), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+  name.position.set(0, 0.08, 0.03);
+  const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.03, 14), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
+  btn.rotation.x = Math.PI / 2;
+  btn.position.set(0, -0.07, 0.035);
+  g.add(plate, name, btn);
+  return g;
+}
+
 export function routeStreetJob(game: Game, level: number, street: Street, title: string, mode: 'package' | 'flyer', lineLevel = 1) {
   const flyer = mode === 'flyer';
   const n = routeStops(level, mode);
@@ -1391,7 +1408,13 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   const pool = [...street.houses];
   const stops: StreetHouse[] = [];
   for (let minGap = 14; stops.length < n && minGap > 4; minGap -= 3) {
-    for (const h of [...pool].sort(() => Math.random() - 0.5)) {
+    // mescolate davvero (Fisher-Yates): nessun civico esce più spesso degli altri
+    const mixed = [...pool];
+    for (let i = mixed.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [mixed[i], mixed[j]] = [mixed[j], mixed[i]];
+    }
+    for (const h of mixed) {
       if (stops.length >= n) break;
       if (stops.includes(h) || stops.some((o) => Math.abs(o.x - h.x) < minGap)) continue;
       stops.push(h);
@@ -1405,8 +1428,8 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     const h = stops[stops.length - 1 - i];
     if (h && h !== stops[0]) kindOf.set(h, k);
   });
-  // dal Liv. 5: si cercano i numeri civici (la guida porta solo al primo)
-  const civici = !flyer && lineLevel >= 5;
+  // i pacchi vanno sempre ai civici da cercare: nessuna freccia né segno a terra, si leggono le targhe
+  const civici = !flyer;
   const civico = (h: StreetHouse) => {
     const k = Math.round((h.x - street.houses[0].x) / 5);
     return h.side < 0 ? 1 + k * 2 : 2 + k * 2;
@@ -1435,6 +1458,8 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   const carrying = new Set<DeliverySpecial>();
   let fragileHits = 0;
   let broken = false;
+  /** zerbino e citofono di ogni casa (si toccano loro per consegnare) */
+  const doorOf = new Map<StreetHouse, THREE.Object3D>();
   /** case già servite (per le caselle dei civici nel riquadro) */
   const served = new Set<StreetHouse>();
   const leaveBox = (at: THREE.Vector3, h: StreetHouse) => {
@@ -1443,8 +1468,8 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   };
   const deliverTask = (h: StreetHouse): Task => {
     const k = kindOf.get(h);
-    const quiet = civici && h !== stops[0];
-    const base = { pos: h.door, onFoot: true, quiet, markerText: undefined as string | undefined };
+    // si tocca (o si tiene premuto) lo zerbino o il citofono della casa: si accendono quando sei vicino
+    const base = { pos: h.door, onFoot: true, quiet: true, search: true, markerText: undefined as string | undefined, obj: doorOf.get(h) };
     const ico = k && k !== 'cane' && k !== 'reso' ? DELIVERY_SPECIALS[k].icon : '📦';
     const done = () => {
       leaveBox(h.door, h);
@@ -1453,27 +1478,27 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     };
     switch (k) {
       case 'firma':
-        return { ...base, kind: 'hold', sec: 2.2, label: 'Suona e aspetta la firma', icon: ico, onDone: done };
+        return { ...base, kind: 'hold', sec: 2.2, label: 'Tieni premuto il citofono: aspetta la firma', icon: ico, onDone: done };
       case 'contrassegno':
-        return { ...base, kind: 'hold', sec: 2, label: 'Incassa e dai il resto', icon: ico, fx: 'spark', onDone: done };
+        return { ...base, kind: 'hold', sec: 2, label: 'Tieni premuto il citofono: incassa e dai il resto', icon: ico, fx: 'spark', onDone: done };
       case 'vicino': {
         // nessuno risponde: il pacco va alla casa accanto (la più vicina che non è una consegna)
         const nb = street.houses.filter((x) => x !== h && !stops.includes(x)).sort((a, b) => Math.abs(a.x - h.x) - Math.abs(b.x - h.x))[0] ?? h;
         return {
-          ...base, kind: 'tap', label: 'Suona il campanello', icon: '🔔',
+          ...base, kind: 'tap', label: 'Suona il citofono', icon: '🔔',
           then: () => {
             toast('🚪 Non c\'è nessuno: lascia il pacco al vicino di casa', 'info');
-            return [{ pos: nb.door, kind: 'tap', label: 'Lascia il pacco al vicino', icon: '🏠', onFoot: true, onDone: () => { leaveBox(nb.door, nb); served.add(h); } }];
+            return [{ pos: nb.door, kind: 'tap', label: 'Lascia il pacco sullo zerbino del vicino', icon: '🏠', onFoot: true, obj: doorOf.get(nb), onDone: () => { leaveBox(nb.door, nb); served.add(h); } }];
           },
         };
       }
       case 'reso':
         return {
-          ...base, kind: 'tap', label: 'Lascia il pacco alla porta', icon: '📦', onDone: done,
+          ...base, kind: 'tap', label: 'Lascia il pacco sullo zerbino', icon: '📦', onDone: done,
           then: () => [{ pos: h.door.clone().add(new THREE.Vector3(-0.6, 0, 0)), kind: 'hold', sec: 1.2, label: 'Ritira il reso', icon: '↩️', onFoot: true }],
         };
       default:
-        return { ...base, kind: 'tap', label: k === 'fragile' ? 'Consegna il pacco fragile' : k === 'grande' ? 'Consegna il pacco grande' : 'Lascia il pacco alla porta', icon: ico, onDone: done };
+        return { ...base, kind: 'tap', label: k === 'fragile' ? 'Lascia il pacco fragile sullo zerbino' : k === 'grande' ? 'Lascia il pacco grande sullo zerbino' : 'Lascia il pacco sullo zerbino', icon: ico, onDone: done };
     }
   };
   const nums = stops.map((h) => civico(h)).join(' · ');
@@ -1492,7 +1517,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna i pacchi', icon: flyer ? '📬' : '🏠',
-      tip: civici ? `Consegna ai <b>numeri civici ${nums}</b>: la freccia porta solo al primo, gli altri cercali leggendo i <b>numeri sulle case</b> (dispari a sinistra, pari a destra)${specialNote}` : undefined,
+      tip: civici ? `Consegna ai <b>numeri civici ${nums}</b>: cercali leggendo le <b>targhe sulle case</b> (dispari a sinistra, pari a destra). Davanti alla porta si accendono lo <b>zerbino</b> e il <b>citofono</b>: tocca per lasciare il pacco, tieni premuto il citofono per firma e contrassegno${specialNote}` : undefined,
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
         ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬', onFoot: true }
@@ -1509,19 +1534,22 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
   const run: PhasedRun = new PhasedRun(game, level, title, phases, { time: ((far * 2) / 4) * 1.5 + n * (flyer ? 3 : 6) + 12 + specials.length * 8 + (civici ? 15 : 0) });
   shopObj = run.prop(flyer ? newsstand() : parcelShop(), street.shop, 0, 1);
   shopObj.userData.noGlow = true;
-  // giornali: cassette blu agli indirizzi da servire; pacchi: zerbino davanti alla porta (coi civici solo il primo)
-  for (const h of stops) {
-    if (flyer) run.prop(postbox(0x2d6cdb), h.box, h.rot, 1);
-    else if (!civici || h === stops[0]) {
-      const mat = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.04, 0.7), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
-      run.prop(mat, h.door.clone().setY(0.02), 0, 1);
-    }
-  }
-  // numeri civici su ogni casa della via: una targa vera sul muro accanto alla porta
+  // giornali: cassette blu agli indirizzi da servire
+  if (flyer) for (const h of stops) run.prop(postbox(0x2d6cdb), h.box, h.rot, 1);
+  // numeri civici su ogni casa della via: una targa vera sul muro accanto alla porta; e a ogni casa uguale
+  // zerbino e citofono (così non si capisce dove consegnare se non leggendo i numeri)
   if (!flyer) {
     for (const h of street.houses) {
       const face = h.side < 0 ? 0 : Math.PI;
-      run.prop(numberPlate(String(civico(h)), 1.15), h.plate, face, 1);
+      run.prop(numberPlate(String(civico(h)), 1.0), h.plate, face, 1);
+      const g = new THREE.Group();
+      const mat = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 0.6), new THREE.MeshLambertMaterial({ color: 0x8a6a45 }));
+      mat.position.copy(h.mat).sub(h.door);
+      const bell = intercom();
+      bell.position.copy(h.bell).sub(h.door);
+      bell.rotation.y = face;
+      g.add(mat, bell);
+      doorOf.set(h, run.prop(g, h.door.clone().setY(0), 0, 1));
     }
   }
   // il cane gira nel giardino della sua casa, tra il vialetto e la cassetta
