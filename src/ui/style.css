@@ -183,6 +183,9 @@ body.job-on .hud-top { display: none; }
 .jobbar .jc { font-size: 22px; font-weight: 800; line-height: 1; padding: 6px 11px; border-radius: 12px; background: #1f4fae; color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.18); }
 .jobbar .jc.next { background: var(--yellow); color: var(--ink); outline: 3px solid var(--ink); outline-offset: -3px; }
 .jobbar .jc.done { background: #dff3e4; color: #2b8a4a; font-size: 17px; box-shadow: none; }
+/* cibo e bevande: blu da iniziare (.jc), giallo in preparazione, verde pronto da consegnare */
+.jobbar .jc.prep { background: var(--yellow); color: var(--ink); }
+.jobbar .jc.ready { background: var(--green); color: #fff; outline: 3px solid var(--green-d); outline-offset: -3px; }
 .jobbar .track { height: 12px; border-radius: 8px; background: #f1ead9; margin-top: 6px; overflow: hidden; }
 .jobbar .fill { height: 100%; background: var(--green); transition: width .1s linear; border-radius: 8px; }
 .jobbar .fill.warn { background: var(--yellow); }

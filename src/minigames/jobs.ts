@@ -16,6 +16,9 @@ import { routeStops, type Street, type StreetHouse } from './street';
 import { TREE_MODELS } from '../world/city';
 import { cutBranch, overgrownHedge, overgrownTree, woodChipper, bigPlanter, flowerBed, hoseReel, newsstand, paintKit, parcelShop, patioSet, postbox, ragBucket, roundShrub, slide, soapSprayer, tarpFor, toolbox, wheelieBin } from '../world/jobprops';
 
+/** una casella del riquadro (vedi `JobRun.chips`) */
+export type Chip = { t: string; s: 'done' | 'next' | 'todo' | 'prep' | 'ready' };
+
 export interface JobRun {
   title: string;
   status: string;
@@ -27,8 +30,11 @@ export interface JobRun {
   frozen?: boolean;
   /** cosa sta succedendo, per il tutorial contestuale */
   guide?(): RunGuide | null;
-  /** caselle grandi nel riquadro del lavoretto (es. i civici delle consegne: fatti, il prossimo, gli altri) */
-  chips?(): { t: string; s: 'done' | 'next' | 'todo' }[];
+  /**
+   * caselle grandi nel riquadro del lavoretto (es. i civici delle consegne: fatti, il prossimo, gli altri).
+   * Cibo e bevande: `todo` blu = da iniziare, `prep` giallo = in preparazione, `ready` verde = pronto da consegnare.
+   */
+  chips?(): Chip[];
   update(dt: number): void;
   /** azione del giocatore; `at`: dove ha toccato lo schermo (in prima persona si fa la cosa toccata) */
   onAction?(at?: { x: number; y: number }): void;
@@ -299,7 +305,7 @@ export class PhasedRun extends BaseRun {
   onTick?: (dt: number) => void;
   /** testo in più nella barra (es. "🛋️ danni 20%") */
   extraStatus?: () => string;
-  chips?: () => { t: string; s: 'done' | 'next' | 'todo' }[];
+  chips?: () => Chip[];
 
   constructor(game: Game, level: number, title: string, phases: Phase[], opts: { zone?: Zone; time: number; keep?: THREE.Vector3 }) {
     super(game, level);

@@ -7,7 +7,7 @@ import { Character } from '../world/character';
 import type { Slot } from '../world/city';
 import { canvasTexture, label, numberPlate } from '../world/props';
 import { Arena } from './arena';
-import { PhasedRun, type Phase, type Task } from './jobs';
+import { PhasedRun, type Chip, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
 import { BurgerStation, DISHWARE, GrillStation, SAUCES, TOPPINGS, WashStation, type Dish, type Rack, type Sauce, type Step, type Topping } from './kitchen';
@@ -350,8 +350,8 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
   }
   tag(run, '🧊 Frigo', fridgeAt, 2.9);
   tag(run, '🔪 Tagliere', benchAt, 1.6);
-  // il foglio delle preparazioni in grande nel riquadro: fatte, quella di adesso, le prossime
-  run.chips = () => orders.map((v, i) => ({ t: VEGGIES[v].icon, s: i < done ? 'done' as const : i === done ? 'next' as const : 'todo' as const }));
+  // il foglio delle preparazioni in grande: blu da iniziare, giallo da tagliare, verde tagliata (alla ciotola)
+  run.chips = () => orders.map((v, i): Chip => ({ t: VEGGIES[v].icon, s: i < done ? 'done' : i === done && holding ? (holding.cut ? 'ready' : 'prep') : 'todo' }));
   run.extraStatus = () => (holding ? (holding.cut ? 'tagliato: mettilo nella sua ciotola' : 'da tagliare sul tagliere') : '');
   return run;
 }
@@ -474,7 +474,9 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
     m.userData.noGlow = true;
     run.prop(m, room.at(1.3, -3.0).add(new THREE.Vector3(-0.5 + i * 0.2, bench.top + 0.03, 0.05)), 0, 1);
   });
-  // nel riquadro solo a che punto è il panino in mano (la comanda si legge sullo scontrino al bancone)
+  // le comande in grande: blu da iniziare, giallo in cottura/da assemblare, verde pronto per il passe
+  run.chips = () => orders.map((_, i): Chip => ({ t: '🍔', s: i < served ? 'done' : i === served && holding ? (holding.stage === 'ready' ? 'ready' : 'prep') : 'todo' }));
+  // e a che punto è il panino in mano (la comanda si legge sullo scontrino al bancone)
   run.extraStatus = () => (holding ? { raw: 'carne cruda: alla piastra', cooked: 'carne cotta: al bancone', ready: 'panino pronto: al passe' }[holding.stage] : '');
   return run;
 }
@@ -599,8 +601,8 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   if (kinds.includes('cornetti')) tag(run, '🧈 Burro', fridgeAt, 2.2);
   tag(run, '👐 Banco', tableAt, 1.5);
   for (const r of racks) tag(run, `${BREADS[r.b].icon} Lievitazione`, r.pos, 1.8, '#8e5bd6');
-  // il foglio degli ordini in grande nel riquadro: fatti, quello di adesso, i prossimi
-  run.chips = () => orders.map((b, i) => ({ t: BREADS[b].icon, s: i < done ? 'done' as const : i === done ? 'next' as const : 'todo' as const }));
+  // il foglio degli ordini in grande: blu da iniziare, giallo in lavorazione, verde con la forma (a lievitare)
+  run.chips = () => orders.map((b, i): Chip => ({ t: BREADS[b].icon, s: i < done ? 'done' : i === done && holding ? (holding.stage === 'shaped' ? 'ready' : 'prep') : 'todo' }));
   return run;
 }
 
@@ -704,7 +706,11 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   run.onTick = (dt) => queue.forEach((c) => c.update(dt));
   // la fila in ordine nella barra: il primo (quello da servire) e i prossimi
   // in grande: l'ordine del primo della fila (col nome) e i prossimi
-  run.chips = () => orders.slice(served, served + 4).map((d, i) => ({ t: i ? DRINKS[d].icon : `${DRINKS[d].icon} ${DRINKS[d].name}`, s: i ? 'todo' as const : 'next' as const }));
+  // il primo: blu da iniziare, giallo in preparazione, verde quando in mano c'è proprio quello che vuole
+  run.chips = () => orders.slice(served, served + 4).map((d, i): Chip => ({
+    t: i ? DRINKS[d].icon : `${DRINKS[d].icon} ${DRINKS[d].name}`,
+    s: i || !holding ? 'todo' : holding === d ? 'ready' : 'prep',
+  }));
   run.extraStatus = () => (holding === 'cup' ? 'tazza vuota in mano' : '');
   return run;
 }

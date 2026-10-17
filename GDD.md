@@ -515,6 +515,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 - **Magazziniere: nastro a punta** (17/10/2026): il nastro colorato attorno alla scatola è piegato a punta da un bordo all'altro, come una **^ (ripiano in alto)** o una **V (ripiano in basso)**; ogni scatola ha il suo ripiano a ogni livello (le pesanti 🏋️ sempre in basso, le fragili 🍷 sempre in alto, con lo sticker sopra dal Liv. 4). Su ogni ripiano un cartellino bianco appeso sul davanti con lo stesso nastro a punta. Nel riquadro: "scaffale 🟩 in alto"
 
+- **Colori dei prodotti nel riquadro** (17/10/2026): nei lavoretti di cibo e bevande (Barista, Aiuto cuoco, Panettiere, Cuoco di linea) la casella di ogni prodotto è **blu** da iniziare, **gialla** in preparazione, **verde** pronta da consegnare (Barista: verde solo se in mano c'è proprio la bevanda chiesta), poi chiara con la spunta quando è consegnata (`Chip` in minigames/jobs.ts: `todo`/`prep`/`ready`/`done`). Il Cuoco di linea ora ha le caselle delle comande
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero
