@@ -1196,3 +1196,28 @@ body.is-short .dg-photo span { font-size: 13px; }
   background: center / contain no-repeat; overflow: hidden; text-indent: 3em; white-space: nowrap;
   line-height: 1; flex: none;
 }
+
+/* ---------- tutorial dei lavoretti: una riga, "?" per la spiegazione, frecce e manine ---------- */
+.tut-mini { padding: 5px 6px 5px 10px; border-radius: 14px; pointer-events: none; width: auto; }
+.tut-mini .tut-row { display: flex; align-items: center; gap: 8px; }
+.tut-mini .tut-line { font-size: 15px; font-weight: 700; line-height: 1.2; flex: 1; min-width: 0; }
+.tut-mini .tut-long { font-size: 13px; font-weight: 600; line-height: 1.3; margin-top: 5px; color: var(--ink-2); }
+.tut-mini.tiny { padding: 3px 4px 3px 8px; }
+.tut-more {
+  pointer-events: auto; flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0;
+  background: #8e5bd6; color: #fff; font: inherit; font-weight: 800; font-size: 16px; line-height: 30px; padding: 0;
+}
+.tut-walk { animation: tut-walk 1.4s ease-in-out infinite; }
+@keyframes tut-walk { 0%, 15% { transform: translate(0, 0); opacity: 1; } 70% { transform: translate(0, -70px); opacity: 1; } 90%, 100% { transform: translate(0, -70px); opacity: 0; } }
+.tut-edge {
+  position: fixed; z-index: 17; width: 52px; height: 52px; border-radius: 50%; pointer-events: none;
+  background: #8e5bd6; border: 3px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,.3);
+  animation: tut-edge .8s ease-in-out infinite alternate;
+}
+.tut-edge::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: translate(-30%, -50%);
+  border-left: 18px solid #fff; border-top: 12px solid transparent; border-bottom: 12px solid transparent;
+}
+@keyframes tut-edge { from { scale: 1; } to { scale: 1.12; } }
+.biz-tut.tut-mini .tut-btns { justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+.biz-tut.tut-mini .tut-btns .btn:only-child { margin-left: auto; }

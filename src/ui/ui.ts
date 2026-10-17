@@ -431,7 +431,7 @@ export class UI {
       const f = run.timeLeft / run.timeTotal;
       // nel riquadro il nome senza l'icona davanti: c'è poco spazio e il nome intero serve di più
       setText(this.jobEl.querySelector('#j-title') as HTMLElement, stripLeadIcon(run.title));
-      setText(this.jobEl.querySelector('#j-time') as HTMLElement, run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`);
+      setText(this.jobEl.querySelector('#j-time') as HTMLElement, run.frozen ? '⏸️ senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`);
       setText(this.jobEl.querySelector('#j-status') as HTMLElement, run.status);
       // caselle grandi (es. i civici delle consegne): si ridisegnano solo se cambiano
       const chips = run.chips?.() ?? [];
