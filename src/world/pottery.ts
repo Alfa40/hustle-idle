@@ -474,11 +474,11 @@ export class PotteryStudio {
   }
 
   private resize = () => {
-    const free = layout.freeRect(STUDIO_UI());
     const { w, h } = layout.info;
     this.camera.aspect = w / h;
     this.camera.fov = firstPersonFov(w / h);
-    this.camera.setViewOffset(w, h, -(free.x + free.w / 2 - w / 2), -(free.y + free.h / 2 - h / 2), w, h);
+    // prima persona: la vista resta dritta (col centro spostato il laboratorio sembra scivolare girandosi)
+    this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   };
 

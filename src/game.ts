@@ -1786,7 +1786,7 @@ export class Game {
     // ombre attorno al giocatore anche in prima persona
     this.sun.target.position.copy(p);
     this.sun.position.copy(p).addScaledVector(this.sunDir, 36);
-    // anche in prima persona il centro della vista sta nella zona libera dai riquadri
+    // in prima persona niente centro spostato (vedi centerInFreeArea)
     this.centerInFreeArea(dt);
   }
 
@@ -1961,10 +1961,14 @@ export class Game {
         { sel: '.hud-right .hud-btns', dock: 'right' }, { sel: '.hud-right .minimap' },
       ]);
       const { w, h } = layout.info;
-      o.tx = free.x + free.w / 2 - w / 2;
-      o.ty = free.y + free.h / 2 - h / 2;
+      // in prima persona la vista resta dritta: con il centro spostato la stanza "scivola" camminando e girandosi
+      // (il centro dello schermo è comunque libero dai riquadri, in verticale e in orizzontale)
+      const fp = this.viewFirstPerson;
+      o.tx = fp ? 0 : free.x + free.w / 2 - w / 2;
+      o.ty = fp ? 0 : free.y + free.h / 2 - h / 2;
     }
-    const k = Math.min(1, dt * 4);
+    if (this.viewFirstPerson) o.tx = o.ty = 0;
+    const k = this.viewFirstPerson ? 1 : Math.min(1, dt * 4);
     o.x += (o.tx - o.x) * k;
     o.y += (o.ty - o.y) * k;
     const { w, h } = layout.info;

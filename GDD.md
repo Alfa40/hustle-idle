@@ -511,6 +511,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Autisti: "Sali sull'autobus / sull'auto / sulla limousine" (prima "sul autobus")
 - Minigiochi a tempo (cuoco dal vivo, barman acrobatico, cena di gala): le note lunghe non coprono più il nome della portata
 
+- **Prima persona sempre dritta** (17/10/2026): niente più centro della vista spostato verso la zona libera dai riquadri (`Game.centerInFreeArea` lo azzera in prima persona, anche nel laboratorio di ceramica). In orizzontale il riquadro a sinistra spostava la vista di ~110 px e la stanza sembrava scivolare camminando e girandosi. Il centro dello schermo resta comunque libero dai riquadri; la terza persona (città, attività) continua a centrare il personaggio nella zona libera
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero
