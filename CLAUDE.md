@@ -6,6 +6,15 @@
   centrale in `src/ui/layout.ts`): verticale e orizzontale, scala in base al lato corto,
   safe area, niente `resize` o pixel fissi sparsi, prova con `debug.html` alle misure
   360×640, 390×844, 430×932, 768×1024 in entrambi gli orientamenti.
+- **Riquadro dei lavoretti essenziale**: nel badge in alto solo quello che serve davvero al player in quel
+  momento (es. i civici dove consegnare, la camera della valigia in mano); niente informazioni inutili o
+  secondarie (numero della fase, cose già visibili in scena, ripetizioni).
+- **Niente vignette fluttuanti** (etichette o fumetti sospesi sopra oggetti, case, porte) se non richiesto
+  espressamente: numeri e nomi stanno fisicamente sugli oggetti (targhe sui muri, sulle porte, etichette sulle
+  scatole).
+- **Niente emoji**: icone e immagini disegnate apposta, in linea con la grafica del gioco (canvas/SVG o modelli),
+  adattate alle esigenze del lavoretto o dell'attività. Vale per tutto ciò che si fa da ora; le emoji già presenti
+  si sostituiscono man mano che si tocca quella parte.
 - **Mai coprire la visuale**: nessun riquadro, messaggio, avviso o fumetto deve stare sopra il personaggio,
   il campo da gioco attorno a lui e soprattutto gli obiettivi di un lavoretto o di un'attività. Tutto ciò che è
   testo va nella colonna in alto a sinistra (in orizzontale: pannello a sinistra), uno sotto l'altro:
