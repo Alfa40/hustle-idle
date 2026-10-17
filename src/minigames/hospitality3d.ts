@@ -10,7 +10,7 @@ import { Arena } from './arena';
 import { PhasedRun, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
-import { BurgerStation, GrillStation, SAUCES, TOPPINGS, type Sauce, type Step, type Topping } from './kitchen';
+import { BurgerStation, DISHWARE, GrillStation, SAUCES, TOPPINGS, WashStation, type Dish, type Rack, type Sauce, type Step, type Topping } from './kitchen';
 import { CutStation, KneadStation, SHAPE_PATHS, ShapeStation, VEGGIES, type Veggie } from './station';
 
 /**
@@ -54,6 +54,175 @@ function npc(run: PhasedRun, at: THREE.Vector3, k: number, face = 0) {
   c.root.rotation.y = face;
   run.prop(c.root, at.clone(), face, 1).userData.noGlow = true;
   return c;
+}
+
+// ======================================================================================
+// Cucina: lavapiatti
+// ======================================================================================
+
+/** Stoviglia in 3D (in mano, sulla pila sporca, ad asciugare): sporca ha le macchie marroni. */
+function dishMesh(kind: Dish, dirty: boolean) {
+  const g = new THREE.Group();
+  const white = new THREE.MeshLambertMaterial({ color: 0xfbfbf8 });
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    g.add(m);
+    return m;
+  };
+  if (kind === 'piano') add(new THREE.CylinderGeometry(0.15, 0.12, 0.025, 18), white);
+  else if (kind === 'fondo') add(new THREE.CylinderGeometry(0.14, 0.08, 0.06, 18), white, 0, 0.02);
+  else if (kind === 'bicchiere') add(new THREE.CylinderGeometry(0.045, 0.036, 0.13, 12), new THREE.MeshLambertMaterial({ color: 0xc8e6fa, transparent: true, opacity: 0.75 }), 0, 0.06);
+  else if (kind === 'posate') for (const x of [-0.03, 0, 0.03]) add(new THREE.BoxGeometry(0.018, 0.008, 0.2), new THREE.MeshLambertMaterial({ color: 0xc9d0d8 }), x, 0.005);
+  else if (kind === 'vaschetta') add(new THREE.BoxGeometry(0.26, 0.07, 0.18), white, 0, 0.03);
+  else add(new THREE.BoxGeometry(0.4, 0.025, 0.28), new THREE.MeshLambertMaterial({ color: 0xd8c3a5 }));
+  if (dirty && kind !== 'bicchiere' && kind !== 'posate') {
+    const dirt = new THREE.MeshLambertMaterial({ color: 0x8a5a2b });
+    const top = kind === 'fondo' ? 0.051 : kind === 'vaschetta' ? 0.066 : 0.014;
+    add(new THREE.CylinderGeometry(0.04, 0.04, 0.005, 10), dirt, 0.03, top, -0.02);
+    add(new THREE.CylinderGeometry(0.025, 0.025, 0.005, 10), dirt, -0.05, top, 0.04);
+  }
+  return g;
+}
+
+/**
+ * Lavapiatti: nella cucina del ristorante chiuso c'è il carrello con la pila delle stoviglie sporche. Una alla
+ * volta: prendila → al lavello (col dito: spugna nel sapone, strofina le macchie, sciacqua sotto l'acqua, vedi
+ * WashStation) → mettila ad asciugare al posto giusto (scolapiatti, portabicchieri, cestello delle posate). Il
+ * posto sbagliato si può scegliere, ma conta alla fine. Salendo arrivano piatti fondi, bicchieri, posate,
+ * vaschette e vassoi, e lo sporco è più ostinato.
+ */
+export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Placed, title: string) {
+  const t = rungProgress('piatti', lineLevel);
+  const n = Math.round(4 + 3 * t);
+  const kinds: Dish[] = ['piano', ...(t >= 0.25 ? ['fondo', 'bicchiere'] as Dish[] : []), ...(t >= 0.55 ? ['posate', 'vaschetta'] as Dish[] : []), ...(t >= 0.8 ? ['vassoio'] as Dish[] : [])];
+  // la pila: almeno una di ogni tipo, il resto a caso, mescolata
+  const pile: Dish[] = Array.from({ length: n }, (_, i) => kinds[i < kinds.length ? i : Math.floor(Math.random() * kinds.length)]);
+  for (let i = pile.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pile[i], pile[j]] = [pile[j], pile[i]];
+  }
+  const spots = Math.round(2 + 2 * t);
+  const tough = 4.5 - 2 * t;
+  const racks = [...new Set(kinds.map((k) => DISHWARE[k].rack))] as Rack[];
+  const room = game.enterArena(new Room({ w: 8, d: 6, tiles: true, sign: 'Cucina', slot, placed }));
+  let holding: { kind: Dish; clean: boolean } | null = null;
+  let next = 0;
+  let done = 0;
+  let wrong = 0;
+  let run: PhasedRun;
+  // carrello della pila sporca, lavello sul fondo, posti per asciugare sul bancone di destra
+  const cart = room.furn('table', -2.6, 0.4, 0);
+  const cartAt = room.near(-2.6, 0.4, 0.9, 0);
+  const sink = room.furn('kitchenSink', 0, -2.4, 0);
+  const sinkAt = room.near(0, -2.4, 0, 0.6);
+  const rackNames: Record<Rack, string> = { piatti: 'scolapiatti', bicchieri: 'portabicchieri', posate: 'cestello delle posate' };
+  const stations = racks.map((r, k) => {
+    const z = -1.2 + k * 1.3;
+    const f = room.furn('kitchenCabinet', 3.0, z, -Math.PI / 2);
+    return { r, obj: f.obj, top: f.top, pos: room.near(3.0, z, -0.7, 0), at: room.at(3.0, z), count: 0 };
+  });
+  const pileObjs: THREE.Object3D[] = [];
+  const phases: Phase[] = [{
+    name: 'Lava le stoviglie', icon: '', count: () => [done, n],
+    tip: 'Prendi una stoviglia sporca dal <b>carrello</b>, al <b>lavello</b> bagna la <b>spugna nel sapone</b>, strofina via ogni macchia e <b>sciacqua</b> sotto l\'acqua finché non resta schiuma. Poi mettila ad asciugare al posto giusto: piatti, vaschette e vassoi nello <b>scolapiatti</b>, bicchieri nel <b>portabicchieri</b>, posate nel <b>cestello</b>',
+    tasks: () => [
+      {
+        pos: cartAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dalla pila: ${DISHWARE[pile[Math.min(next, n - 1)]].name}`; }, icon: '', obj: cart.obj,
+        enabled: () => !holding && next < n,
+        onDone: () => {
+          const kind = pile[next];
+          pileObjs[next].visible = false;
+          next++;
+          holding = { kind, clean: false };
+          hold(game, dishMesh(kind, true));
+        },
+      },
+      {
+        pos: sinkAt, kind: 'tap', repeat: true, quiet: true, get label() { return holding ? `Lava: ${DISHWARE[holding.kind].name}` : 'Lava'; }, icon: '', obj: sink.obj,
+        enabled: () => !!holding && !holding.clean,
+        onDone: () => {
+          const kind = holding!.kind;
+          hold(game);
+          run.openStation(new WashStation(kind, kind === 'posate' || kind === 'bicchiere' ? Math.max(1, spots - 1) : spots, tough, () => {
+            if (!holding) return;
+            holding = { kind, clean: true };
+            hold(game, dishMesh(kind, false));
+          }));
+        },
+      },
+      ...stations.map((st): Task => ({
+        pos: st.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti nel ${rackNames[st.r]}`, icon: '', obj: st.obj,
+        enabled: () => !!holding?.clean,
+        get right() { return !!holding && DISHWARE[holding.kind].rack === st.r; },
+        onDone: () => {
+          const ok = DISHWARE[holding!.kind].rack === st.r;
+          if (!ok) wrong++;
+          // ad asciugare: piatti in piedi nello scolapiatti, bicchieri a testa in giù, posate dritte nel cestello
+          const m = dishMesh(holding!.kind, false);
+          m.userData.noGlow = true;
+          const i = st.count++;
+          const base = st.at.clone().setY(st.top + 0.02);
+          if (st.r === 'piatti') {
+            m.rotation.x = Math.PI / 2;
+            run.prop(m, base.add(new THREE.Vector3(0, 0.15, -0.45 + (i % 7) * 0.13)), Math.PI / 2, 1);
+          } else if (st.r === 'bicchieri') {
+            m.rotation.x = Math.PI;
+            run.prop(m, base.add(new THREE.Vector3(-0.1 + (i % 2) * 0.2, 0.13, -0.3 + Math.floor(i / 2) * 0.15)), 0, 1);
+          } else {
+            m.rotation.x = Math.PI / 2;
+            run.prop(m, base.add(new THREE.Vector3(0, 0.2, -0.04 + (i % 3) * 0.04)), 0, 1);
+          }
+          holding = null;
+          hold(game);
+          done++;
+          run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+          if (done >= n) {
+            if (wrong) toast(`${wrong} ${wrong === 1 ? 'stoviglia messa' : 'stoviglie messe'} ad asciugare al posto sbagliato`, 'bad');
+            run.finishPhase();
+          }
+        },
+      })),
+    ],
+  }];
+  run = new PhasedRun(game, 1, title, phases, { time: Math.min(290, 40 + n * 24) });
+  // la pila sporca sul carrello (la cima è la prossima)
+  const y = cart.top + 0.02;
+  pile.forEach((k, i) => {
+    const m = dishMesh(k, true);
+    m.userData.noGlow = true;
+    pileObjs[i] = run.prop(m, room.at(-2.6, 0.4).add(new THREE.Vector3(0, y + (pile.length - 1 - i) * 0.07, 0)), (i * 0.7) % 3, 1);
+  });
+  // spugna e sapone sul bordo del lavello
+  const sponge = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.08), new THREE.MeshLambertMaterial({ color: 0xf5d33b }));
+  const soap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.2, 12), new THREE.MeshLambertMaterial({ color: 0x5fb8f0 }));
+  sponge.userData.noGlow = soap.userData.noGlow = true;
+  run.prop(sponge, new THREE.Vector3(sink.box.min.x + 0.12, sink.top + 0.025, sink.box.max.z - 0.12), 0.2, 1);
+  run.prop(soap, new THREE.Vector3(sink.box.max.x - 0.1, sink.top + 0.1, sink.box.max.z - 0.14), 0, 1);
+  // cosa c'è su ogni mobile per asciugare: la griglia dello scolapiatti, il tappetino dei bicchieri, il cestello
+  for (const st of stations) {
+    const g = new THREE.Group();
+    const steel = new THREE.MeshLambertMaterial({ color: 0xc9d0d8 });
+    if (st.r === 'piatti') {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 1.0), steel);
+      g.add(base);
+      for (let k = 0; k < 9; k++) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.14, 0.012), steel);
+        bar.position.set(0, 0.08, -0.48 + k * 0.12);
+        g.add(bar);
+      }
+    } else if (st.r === 'bicchieri') {
+      const mat = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.02, 0.75), new THREE.MeshLambertMaterial({ color: 0x5fb8f0 }));
+      g.add(mat);
+    } else {
+      const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.22, 14, 1, true), new THREE.MeshLambertMaterial({ color: 0xc9d0d8, side: THREE.DoubleSide }));
+      basket.position.y = 0.11;
+      g.add(basket);
+    }
+    g.userData.noGlow = true;
+    run.prop(g, st.at.clone().setY(st.top + 0.015), 0, 1);
+  }
+  return run;
 }
 
 // ======================================================================================

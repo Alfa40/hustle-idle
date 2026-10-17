@@ -21,7 +21,7 @@ const TIPS: Record<string, string[] | null> = {
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
-    'Porta un pacco fino alla <b>porta di casa</b> di ogni indirizzo (lo <b>zerbino giallo</b> in fondo al vialetto): l\'ordine lo scegli tu',
+    'Porta un pacco a ogni <b>civico</b> del riquadro in alto: leggi le <b>targhe blu</b> sulle case e tocca lo <b>zerbino</b> davanti alla porta. L\'ordine lo scegli tu',
     'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [
@@ -43,7 +43,6 @@ const TIPS: Record<string, string[] | null> = {
     '<b>Dipingi</b> ogni tratto del muretto di recinzione',
     'Lavoro finito: <b>togli i teloni</b>',
   ],
-  piatti: null,
   'giardino:1': [
     'Ti servono le <b>cesoie da potatura</b>: sono nella <b>cassetta rossa</b>',
     'Le <b>siepi</b> lungo la recinzione hanno delle <b>punte cresciute troppo</b> (verde chiaro): tagliale tutte',
@@ -57,14 +56,6 @@ const TIPS: Record<string, string[] | null> = {
 const AIM_WHAT: Record<string, Record<number, string>> = {
   lavaggio: { 1: 'sulla macchia', 3: 'sulla schiuma', 5: 'sulle gocce' },
   'giardino:1': { 1: 'sulla punta della siepe', 2: 'sul ramo da tagliare' },
-};
-
-/** Per il lavapiatti: cosa vuol dire ogni punto (prendi → lava → appoggia, per ogni tavolo). */
-const PIATTI: Record<string, string> = {
-  'Entra in cucina': 'Vai al <b>ristorante</b> (ha chiuso) ed <b>entra in cucina</b>',
-  'Prendi i piatti sporchi': 'Prendi una pila di <b>piatti sporchi</b> dal carrello',
-  'Lava i piatti': 'Lavali al <b>lavello</b>',
-  'Appoggia sullo scolapiatti': 'Appoggiali sullo <b>scolapiatti</b> ad asciugare',
 };
 
 export class JobTutorial {
@@ -129,8 +120,7 @@ export class JobTutorial {
       document.body.classList.remove('tut-pointing');
       return;
     }
-    // lavapiatti: in cucina le "fasi" sono le pile di piatti
-    const word = g.phaseName.startsWith('Pila') ? 'Pila' : 'Fase';
+    const word = 'Fase';
     const head = `<div class="tut-head">🎓 ${word} ${g.phase + 1} di ${g.phases}${g.left > 1 ? ` · ${g.left} da fare` : ''}</div>`;
     let body: string;
     let foot = '';
@@ -138,7 +128,7 @@ export class JobTutorial {
     let gesture: 'tap' | 'hold' | null = null;
     let aimAt: THREE.Vector3 | null = null;
     const tips = TIPS[this.type];
-    const tip = g.tip ?? tips?.[g.phase] ?? (g.task ? PIATTI[g.task.label] ?? g.task.label : g.phaseName);
+    const tip = g.tip ?? tips?.[g.phase] ?? (g.task ? g.task.label : g.phaseName);
     if (!g.arrived) {
       body = '🚶 Segui le <b>frecce bianche</b> a terra fino alla <b>zona di lavoro</b> (quella con i coni)';
     } else if (!g.inZone) {

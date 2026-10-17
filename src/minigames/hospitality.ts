@@ -4,7 +4,7 @@ import type { JobOffer } from '../sim/state';
 import type { Slot } from '../world/city';
 import type { JobRun } from './jobs';
 import { beats, DragRun, PourRun, RhythmRun, SHAPES, StackRun, TraceRun, type DragItem, type DragSlot, type PourStep, type TraceItem } from './finger';
-import { barJob, conciergeJob, cookLineJob, facchinoJob, gardenPartyJob, housekeepingJob, ovenJob, prepCookJob, restaurantJob, suiteJob } from './hospitality3d';
+import { barJob, conciergeJob, cookLineJob, dishJob, facchinoJob, gardenPartyJob, housekeepingJob, ovenJob, prepCookJob, restaurantJob, suiteJob } from './hospitality3d';
 
 /**
  * Lavoretti di Ristorazione e ospitalità (tabella in CARRIERE.md): Cucina, Sala, Ospitalità, Bar, Forno e
@@ -240,7 +240,7 @@ export function startHospitalityJob(game: Game, offer: JobOffer, slot: Slot, tit
   const placed = game.city.placed;
   switch (offer.type) {
     case 'piatti':
-      return [null, () => prepCookJob(game, lv, slot, placed, title), () => cookLineJob(game, lv, slot, placed, title), () => liveCook(game, t, title), () => chef(game, t, title)][r]?.() ?? null;
+      return [() => dishJob(game, lv, slot, placed, title), () => prepCookJob(game, lv, slot, placed, title), () => cookLineJob(game, lv, slot, placed, title), () => liveCook(game, t, title), () => chef(game, t, title)][r]?.() ?? null;
     case 'festa':
       return [() => gardenPartyJob(game, lv, slot, placed, title), () => catering(game, t, title), () => restaurantJob(game, lv, slot, placed, title), () => maitre(game, t, title), () => gala(game, t, title)][r]();
     case 'hotel':

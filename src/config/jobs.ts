@@ -31,12 +31,12 @@ export const JOBS: Record<JobType, JobDef> = {
   consegna: {
     name: 'Consegna pacchi', icon: '📦', skill: 'logistica', basePay: 26, xp: 12, fame: 1, where: 'shop', vehicleOk: true,
     intro: 'Ritira i pacchi al negozio dei pacchi, consegnali alle cassette gialle segnate (nell\'ordine che vuoi) e torna a firmare la ricevuta. Con un veicolo fai prima!',
-    steps: [['📦', 'Ritira i pacchi al negozio dei pacchi', 'tap'], ['🏠', 'Consegna un pacco a ogni cassetta gialla segnata, in qualsiasi ordine', 'walk'], ['🧾', 'Torna al negozio a firmare la ricevuta', 'tap']],
+    steps: [['📦', 'Ritira i pacchi al negozio dei pacchi', 'tap'], ['🏠', 'Consegna un pacco a ogni civico: leggi le targhe sulle case', 'walk'], ['🧾', 'Torna al negozio a firmare la ricevuta', 'tap']],
   },
   piatti: {
     name: 'Lavapiatti part-time', icon: '🍽️', skill: 'cucina', basePay: 28, xp: 13, fame: 1, where: 'restaurant',
-    intro: 'Il ristorante ha chiuso: entra nella sua cucina e lava tutti i piatti. Per ogni pila: prendila dal carrello, lavala al lavello e appoggiala sullo scolapiatti.',
-    steps: [['🚪', 'Entra nella cucina del ristorante (è chiuso)', 'walk'], ['🍽️', 'Prendi una pila di piatti sporchi dal carrello', 'tap'], ['🫧', 'Lavala al lavello', 'hold'], ['✨', 'Appoggiala sullo scolapiatti', 'tap']],
+    intro: "Il ristorante ha chiuso: nella sua cucina lava le stoviglie una alla volta. Prendile dalla pila sporca sul carrello, al lavello bagna la spugna nel sapone e strofina via le macchie, sciacqua sotto l'acqua finché non resta schiuma e mettile ad asciugare al posto giusto (scolapiatti, portabicchieri, cestello delle posate).",
+    steps: [['', 'Prendi una stoviglia dalla pila sporca', 'tap'], ['', 'Al lavello: spugna nel sapone, strofina le macchie', 'hold'], ['', "Sciacqua sotto l'acqua", 'hold'], ['', 'Mettila ad asciugare al posto giusto', 'tap']],
   },
   volantini: {
     name: 'Consegna giornali', icon: '📰', skill: 'clientela', basePay: 24, xp: 12, fame: 1, where: 'shop', vehicleOk: true,

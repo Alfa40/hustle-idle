@@ -10,7 +10,14 @@ import { Particles } from './particles';
 import { label, ring } from './props';
 import { firstPersonFov, LOOK_SENS } from './viewcam';
 import { layout, type Occluder } from '../ui/layout';
-import type { IndoorHooks } from './dishkitchen';
+
+/** Cosa il laboratorio dice al lavoretto: tempo e stato, fine (stelle), se il tutorial ha fermato il tempo. */
+export interface IndoorHooks {
+  status(timeLeft: number, timeTotal: number, text: string): void;
+  done(stars: number): void;
+  /** il tutorial ferma il tempo */
+  frozen(): boolean;
+}
 
 /** Interfaccia sopra il laboratorio: il centro della vista sta nella zona libera. */
 const STUDIO_UI = () =>

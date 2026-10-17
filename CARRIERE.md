@@ -104,7 +104,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### 🍽️ Cucina
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Lavapiatti ✅ | prendi la pila, lava, appoggia sullo scolapiatti | pile e piatti | 1½–2½ min |
+| 1 | Lavapiatti ✅ | una stoviglia alla volta dalla pila sporca → lavello col dito (spugna nel sapone, strofina le macchie, sciacqua sotto l'acqua) → ad asciugare al posto giusto (scolapiatti, portabicchieri, cestello delle posate) | da 4 a 7 stoviglie; arrivano piatti fondi, bicchieri, posate, vaschette e vassoi; sporco più ostinato | 1½–2½ min |
 | 10 | Aiuto cuoco | in cucina: frigo → tagliere (prendi il coltello col dito e muovilo su e giù sopra ogni linea finché la fetta si stacca) → la ciotola con lo stesso ingrediente | da 3 a 4 ingredienti, da 3 a 5 tagli più fini e precisi | 2 min |
 | 20 | Cuoco di linea | hamburger: frigo → piastra col dito (trascina, gira sul verde, sul panino quando è cotta; prima è cruda, dopo brucia) → bancone: componi il panino come sullo scontrino, salsa a zig-zag con la bottiglia → passe | da 3 a 5 panini, più ingredienti e due salse, cottura più veloce | 2½–3½ min |
 | 30 | Cuoco dal vivo | a ritmo: salta la padella quando il segno arriva sul cerchio, flambé tenendo premuto | 3 piatti, ritmo più veloce | 2 min |
