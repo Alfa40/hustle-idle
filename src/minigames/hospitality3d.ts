@@ -121,12 +121,15 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const stations = racks.map((r, k) => {
     const z = -1.2 + k * 1.3;
     const f = room.furn('kitchenCabinet', 3.0, z, -Math.PI / 2);
-    return { r, obj: f.obj, top: f.top, pos: room.near(3.0, z, -0.7, 0), at: room.at(3.0, z), count: 0 };
+    // posti ad asciugare: una stoviglia ripresa in mano libera il suo posto
+    return { r, obj: f.obj, top: f.top, pos: room.near(3.0, z, -0.7, 0), at: room.at(3.0, z), slots: [] as (THREE.Object3D | null)[] };
   });
+  /** stoviglie ad asciugare nel posto sbagliato (si possono riprendere finché non metti l'ultima) */
+  const misplaced = new Set<THREE.Object3D>();
   const pileObjs: THREE.Object3D[] = [];
   const phases: Phase[] = [{
     name: 'Lava le stoviglie', icon: '', count: () => [done, n],
-    tip: 'Prendi una stoviglia sporca dal <b>carrello</b>, al <b>lavello</b> bagna la <b>spugna nel sapone</b>, strofina via ogni macchia e <b>sciacqua</b> sotto l\'acqua finché non resta schiuma. Poi mettila ad asciugare al posto giusto: piatti, vaschette e vassoi nello <b>scolapiatti</b>, bicchieri nel <b>portabicchieri</b>, posate nel <b>cestello</b>',
+    tip: 'Prendi una stoviglia sporca dal <b>carrello</b>, al <b>lavello</b> bagna la <b>spugna nel sapone</b>, strofina via ogni macchia e <b>sciacqua</b> sotto l\'acqua finché non resta schiuma. Poi mettila ad asciugare al posto giusto: piatti, vaschette e vassoi nello <b>scolapiatti</b>, bicchieri nel <b>portabicchieri</b>, posate nel <b>cestello</b>. Posto sbagliato? Tocca la stoviglia per riprenderla, prima di mettere l\'ultima',
     tasks: () => [
       {
         pos: cartAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dalla pila: ${DISHWARE[pile[Math.min(next, n - 1)]].name}`; }, icon: '', obj: cart.obj,
@@ -157,12 +160,14 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         enabled: () => !!holding?.clean,
         get right() { return !!holding && DISHWARE[holding.kind].rack === st.r; },
         onDone: () => {
-          const ok = DISHWARE[holding!.kind].rack === st.r;
-          if (!ok) wrong++;
+          const kind = holding!.kind;
+          const ok = DISHWARE[kind].rack === st.r;
           // ad asciugare: piatti in piedi nello scolapiatti, bicchieri a testa in giù, posate dritte nel cestello
-          const m = dishMesh(holding!.kind, false);
+          const m = dishMesh(kind, false);
           m.userData.noGlow = true;
-          const i = st.count++;
+          let i = st.slots.indexOf(null);
+          if (i < 0) i = st.slots.length;
+          st.slots[i] = m;
           const base = st.at.clone().setY(st.top + 0.02);
           if (st.r === 'piatti') {
             m.rotation.x = Math.PI / 2;
@@ -177,6 +182,21 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
           holding = null;
           hold(game);
           done++;
+          // nel posto sbagliato: si può riprendere in mano e rimettere giusto (conta solo se resta lì alla fine)
+          if (!ok) {
+            misplaced.add(m);
+            run.retake(m, `Riprendi: ${DISHWARE[kind].name}`, '', () => !holding && done < n, () => {
+              m.visible = false;
+              st.slots[i] = null;
+              misplaced.delete(m);
+              done--;
+              holding = { kind, clean: true };
+              hold(game, dishMesh(kind, false));
+              wrong = misplaced.size;
+              run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+            });
+          }
+          wrong = misplaced.size;
           run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
           if (done >= n) {
             if (wrong) toast(`${wrong} ${wrong === 1 ? 'stoviglia messa' : 'stoviglie messe'} ad asciugare al posto sbagliato`, 'bad');
@@ -264,7 +284,8 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
   const bowls = kinds.map((v, k) => {
     const z = -2.0 + k * (4.2 / Math.max(1, n - 1));
     const f = room.furn('kitchenCabinet', 3.6, z, -Math.PI / 2);
-    return { v, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), count: 0, fill: null as THREE.Mesh | null };
+    // cosa c'è dentro: uno strato di fette per ingrediente messo (quello sbagliato si può riprendere)
+    return { v, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), layers: [] as { v: Veggie; q: number; m: THREE.Mesh }[] };
   });
   const piece = (v: Veggie, cut: boolean) => {
     const c = new THREE.Color(VEGGIES[v].color);
@@ -285,9 +306,19 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
     return g;
   };
   const cur = () => orders[Math.min(next, n - 1)];
+  // stelle da quello che c'è adesso nelle ciotole: lo strato nella ciotola sbagliata vale poco
+  const score = () => {
+    qs.length = 0;
+    wrong = 0;
+    for (const b of bowls) for (const l of b.layers) {
+      if (l.v !== b.v) wrong++;
+      qs.push(l.v === b.v ? l.q : l.q * 0.3);
+    }
+    run.starCap = capFrom(qs);
+  };
   const phases: Phase[] = [{
     name: 'Prepara le verdure', icon: '🔪', count: () => [done, n],
-    tip: 'Segui il <b>foglio delle preparazioni</b>: prendi l\'ingrediente dal <b>frigo</b>, al <b>tagliere</b> prendi il <b>coltello</b> col dito e muovilo <b>su e giù</b> sopra ogni linea finché la fetta si stacca, poi metti le fette nella <b>ciotola</b> con lo stesso ingrediente',
+    tip: 'Segui il <b>foglio delle preparazioni</b>: prendi l\'ingrediente dal <b>frigo</b>, al <b>tagliere</b> prendi il <b>coltello</b> col dito e muovilo <b>su e giù</b> sopra ogni linea finché la fetta si stacca, poi metti le fette nella <b>ciotola</b> con lo stesso ingrediente. Ciotola sbagliata? Tocca le fette per riprenderle, prima di mettere l\'ultimo',
     tasks: () => [
       {
         pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dal frigo: ${VEGGIES[cur()].icon} ${VEGGIES[cur()].name}`; }, icon: '🧊', obj: fridge.obj,
@@ -316,20 +347,29 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
         enabled: () => !!holding?.cut,
         get right() { return holding?.v === b.v; },
         onDone: () => {
-          // la ciotola sbagliata si può scegliere: si paga alla fine
-          if (holding!.v !== b.v) wrong++;
-          qs.push(holding!.v === b.v ? holding!.q : holding!.q * 0.3);
-          // la ciotola si riempie del colore di quello che ci metti
-          if (!b.fill) {
-            b.fill = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.06, 14), new THREE.MeshLambertMaterial({ color: VEGGIES[holding!.v].color }));
-            b.fill.userData.noGlow = true;
-            run.prop(b.fill, b.at.clone().setY(b.top + 0.08), 0, 1);
-          }
-          b.count++;
+          // la ciotola sbagliata si può scegliere: si può riprendere, altrimenti si paga alla fine
+          const v = holding!.v;
+          const q = holding!.q;
+          // la ciotola si riempie del colore di quello che ci metti (uno strato per ingrediente)
+          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.12, 0.05, 14), new THREE.MeshLambertMaterial({ color: VEGGIES[v].color }));
+          m.userData.noGlow = true;
+          run.prop(m, b.at.clone().setY(b.top + 0.07 + b.layers.length * 0.03), 0, 1);
+          const layer = { v, q, m };
+          b.layers.push(layer);
           holding = null;
           hold(game);
           done++;
-          run.starCap = capFrom(qs);
+          if (v !== b.v) {
+            run.retake(m, `Riprendi: ${VEGGIES[v].icon} ${VEGGIES[v].name}`, VEGGIES[v].icon, () => !holding && done < n, () => {
+              m.visible = false;
+              b.layers.splice(b.layers.indexOf(layer), 1);
+              done--;
+              holding = { v, cut: true, q };
+              hold(game, piece(v, true));
+              score();
+            });
+          }
+          score();
           if (done >= n) {
             toast(wrong ? `🥣 ${wrong} ${wrong === 1 ? 'ingrediente nella ciotola sbagliata' : 'ingredienti nelle ciotole sbagliate'}` : '🔪 Tutto tagliato: il cuoco può cucinare!', wrong ? 'bad' : 'good');
             run.finishPhase();
@@ -530,8 +570,20 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const racks = kinds.map((b, k) => {
     const z = -1.6 + k * 1.4;
     const f = room.furn('kitchenCabinet', 3.6, z, -Math.PI / 2);
-    return { b, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), count: 0 };
+    // impasti a lievitare (posti fissi: uno ripreso in mano libera il suo)
+    return { b, obj: f.obj, top: f.top, pos: room.near(3.6, z, -0.7, 0), at: room.at(3.6, z), slots: [] as ({ b: Bread; q: number; m: THREE.Object3D } | null)[] };
   });
+  // stelle da quello che c'è adesso sui ripiani: l'impasto sul ripiano sbagliato vale poco
+  const score = () => {
+    qs.length = 0;
+    wrong = 0;
+    for (const r of racks) for (const x of r.slots) {
+      if (!x) continue;
+      if (x.b !== r.b) wrong++;
+      qs.push(x.b === r.b ? x.q : x.q * 0.3);
+    }
+    run.starCap = capFrom(qs);
+  };
   const doughM = (b: Bread) => {
     const m = new THREE.Mesh(b === 'filone' ? new THREE.CapsuleGeometry(0.09, 0.32, 4, 8) : b === 'cornetti' ? new THREE.TorusGeometry(0.11, 0.05, 6, 10, Math.PI) : new THREE.SphereGeometry(0.15, 10, 8), new THREE.MeshLambertMaterial({ color: BREADS[b].color }));
     if (b === 'filone') m.rotation.z = Math.PI / 2;
@@ -542,7 +594,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
-    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> col dito avanti e indietro senza fermarti, per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo',
+    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> col dito avanti e indietro senza fermarti, per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
     tasks: () => [
       { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1 }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
       {
@@ -575,17 +627,29 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         enabled: () => holding?.stage === 'shaped',
         get right() { return holding?.b === r.b; },
         onDone: () => {
-          // il ripiano sbagliato si può scegliere: si paga alla fine
-          if (holding!.b !== r.b) wrong++;
-          qs.push(holding!.b === r.b ? holding!.q : holding!.q * 0.3);
-          const d = doughM(holding!.b);
+          // il ripiano sbagliato si può scegliere: si può riprendere, altrimenti si paga alla fine
+          const b = holding!.b;
+          const q = holding!.q;
+          const d = doughM(b);
           d.userData.noGlow = true;
-          run.prop(d, r.at.clone().add(new THREE.Vector3(0, r.top + 0.12, -0.5 + (r.count % 4) * 0.33)), 0, 1);
-          r.count++;
+          let k = r.slots.indexOf(null);
+          if (k < 0) k = r.slots.length;
+          run.prop(d, r.at.clone().add(new THREE.Vector3(0, r.top + 0.12, -0.5 + (k % 4) * 0.33)), 0, 1);
+          r.slots[k] = { b, q, m: d };
           holding = null;
           hold(game);
           done++;
-          run.starCap = capFrom(qs);
+          if (b !== r.b) {
+            run.retake(d, `Riprendi: ${BREADS[b].icon} ${BREADS[b].name}`, BREADS[b].icon, () => !holding && done < n, () => {
+              d.visible = false;
+              r.slots[k] = null;
+              done--;
+              holding = { stage: 'shaped', b, q };
+              hold(game, doughM(b));
+              score();
+            });
+          }
+          score();
           if (done >= n) {
             toast(wrong ? `🧺 ${wrong} ${wrong === 1 ? 'impasto sul ripiano sbagliato' : 'impasti sui ripiani sbagliati'}` : '🌙 Tutti gli impasti a lievitare: domattina si inforna!', wrong ? 'bad' : 'good');
             run.finishPhase();
@@ -966,20 +1030,32 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     pos: d.pos.clone().add(new THREE.Vector3(-d.side * 0.5, 0, 0)), kind: 'tap', quiet: true, label: `Lascia alla porta ${d.num}`, icon: '🚪',
     group: 'bag' + bags.indexOf(b), right: d === b.door,
     onDone: () => {
-      if (d !== b.door) wrong++;
-      run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
       done.add(b);
       holding = null;
       hold(game);
       delivered++;
       const v = crate(0.4, 0x2d6cdb);
       run.prop(v, d.pos.clone().add(new THREE.Vector3(-d.side * 0.45, 0, 0.5)), 0, 1).userData.noGlow = true;
+      // alla porta sbagliata: si può riprendere e portare alla camera giusta (conta solo se resta lì alla fine)
+      if (d !== b.door) {
+        wrong++;
+        run.retake(v, `Riprendi la valigia (camera ${b.door.num})`, '🧳', () => !holding, () => {
+          v.visible = false;
+          done.delete(b);
+          delivered--;
+          wrong--;
+          run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
+          holding = b;
+          hold(game, crate(0.45, 0x2d6cdb));
+        }, () => doorTasks(b));
+      }
+      run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
     },
   }));
   const phases: Phase[] = [
     {
       name: 'Porta le valigie in camera', icon: '🧳', count: () => [delivered, n],
-      tip: 'Prendi una <b>valigia</b> alla reception e leggi il <b>numero sull\'etichetta</b>: portala alla porta con quel numero (i numeri sono sulle porte)',
+      tip: 'Prendi una <b>valigia</b> alla reception e leggi il <b>numero sull\'etichetta</b>: portala alla porta con quel numero (i numeri sono sulle porte). Porta sbagliata? Tocca la valigia per riprenderla',
       tasks: () => bags.map((b): Task => ({
         pos: b.at, kind: 'tap', quiet: true, label: `Prendi la valigia (camera ${b.door.num})`, icon: '🧳', enabled: () => !holding,
         onDone: () => {
@@ -995,6 +1071,8 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
       tasks: () => [{
         // la receptionist aspetta accanto al banco con la bolla in mano: si tocca lei
         pos: room.near(-1.9, D / 2 - 1.6, 1.9, 0), kind: 'tap', quiet: true, label: 'Avvisa la reception: fatto!', icon: '🛎️', get obj() { return desk; },
+        // con una valigia ripresa in mano prima la si porta in camera
+        enabled: () => !holding,
         onDone: () => toast(wrong ? `🛎️ ${wrong} ${wrong === 1 ? 'valigia sbagliata' : 'valigie sbagliate'}: massimo ${run.starCap} stelle` : '🛎️ Tutte le valigie nella camera giusta!', wrong ? 'bad' : 'good'),
       }],
     },

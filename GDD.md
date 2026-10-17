@@ -517,6 +517,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 - **Colori dei prodotti nel riquadro** (17/10/2026): nei lavoretti di cibo e bevande (Barista, Aiuto cuoco, Panettiere, Cuoco di linea) la casella di ogni prodotto è **blu** da iniziare, **gialla** in preparazione, **verde** pronta da consegnare (Barista: verde solo se in mano c'è proprio la bevanda chiesta), poi chiara con la spunta quando è consegnata (`Chip` in minigames/jobs.ts: `todo`/`prep`/`ready`/`done`). Il Cuoco di linea ora ha le caselle delle comande
 
+- **Si può rimediare a un posto sbagliato** (17/10/2026): in Magazziniere, Facchino, Lavapiatti, Aiuto cuoco e Panettiere ciò che metti nel posto sbagliato (scatola, valigia, stoviglia, fette, impasto) si accende quando ci sei vicino e si tocca per **riprenderlo in mano** e rimetterlo giusto; ciò che è al posto giusto resta fisso. Conta come errore solo se è ancora sbagliato quando **firmi** (Magazziniere), **avvisi la reception** (Facchino) o **metti l'ultimo** (gli altri). Con l'oggetto ripreso in mano non si firma né si avvisa: prima lo si rimette a posto (`PhasedRun.retake`, punti `loose` che restano anche nella fase dopo e non servono per chiuderla)
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero

@@ -35,7 +35,7 @@ i minigiochi si svolgono nel vero quartiere dove si accetta il lavoro · le atti
 #### 🏭 Magazzino ✅
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli del gradino | Durata |
 |---|---|---|---|---|
-| 1 | Magazziniere | scarica il camion, ogni scatola sullo scaffale del colore del suo nastro e sul ripiano indicato dalla punta del nastro (^ in alto, V in basso), nel primo posto libero; si può sbagliare, ma alla fine le scatole fuori posto tolgono stelle | da 6 a 10 scatole, più colori; dal Liv. 4 sticker in cima alla scatola: 🏋️ pesante in basso, 🍷 fragile in alto | 1½–2 min |
+| 1 | Magazziniere | scarica il camion, ogni scatola sullo scaffale del colore del suo nastro e sul ripiano indicato dalla punta del nastro (^ in alto, V in basso), nel primo posto libero; si può sbagliare e riprendere la scatola per rimetterla giusta; le scatole ancora fuori posto alla firma tolgono stelle | da 6 a 10 scatole, più colori; dal Liv. 4 sticker in cima alla scatola: 🏋️ pesante in basso, 🍷 fragile in alto | 1½–2 min |
 | 10 | Carrellista | muletto col joystick, tieni premuto per alzare le forche, bancali sul camion senza urtare | da 3 a 4 bancali, ripiani più alti, corsie più strette | 2–3 min |
 | 20 | Preparatore ordini | lista, carrello e scanner; conta il giro più corto | da 5 a 6 articoli, articoli simili tra loro | 2–3 min |
 | 30 | Addetto spedizioni | scatola giusta, riempitivo, nastro, etichetta; carica in ordine (ultimo dentro = prima consegna) | da 2 a 3 pacchi, oggetti dalle forme strane | 2–3 min |

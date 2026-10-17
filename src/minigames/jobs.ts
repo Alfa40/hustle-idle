@@ -229,6 +229,11 @@ export interface Task {
    * (si accende quando `enabled`). La fase finisce quando sono fatti i punti normali, o con `finishPhase`.
    */
   repeat?: boolean;
+  /**
+   * punto "di riserva" che resta attivo anche nelle fasi dopo e non serve per chiuderle: es. riprendere in mano una
+   * scatola messa nel posto sbagliato per rimetterla a posto (vedi `PhasedRun.retake`)
+   */
+  loose?: boolean;
   /** zona invisibile da toccare, se il punto non ha un oggetto che si accende (la mette il lavoretto) */
   hitObj?: THREE.Object3D;
   /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
@@ -379,6 +384,11 @@ export class PhasedRun extends BaseRun {
   /** Fa brillare gli oggetti vicini a un punto da fare (cassetta, cespuglio, muretto…). */
   private addGlow(t: Task) {
     if (!this.glows.has(t)) this.glows.set(t, { meshes: [] });
+    // da riprendere: si accende (e si tocca) solo l'oggetto stesso, non lo scaffale o il mobile su cui sta
+    if (t.loose && t.obj) {
+      this.glowObj(t, t.obj);
+      return;
+    }
     for (const o of this.objs) this.glowObj(t, o);
   }
 
@@ -505,8 +515,10 @@ export class PhasedRun extends BaseRun {
       this.done();
       return;
     }
+    // i punti di riserva ancora da fare passano alla fase nuova (es. riprendere una scatola prima di firmare)
+    const keep = this.tasks.filter((t) => t.loose && !t.done);
     this.tasks = this.phases[this.idx].tasks();
-    for (const t of this.tasks) this.addTask(t);
+    for (const t of [...this.tasks, ...keep]) this.addTask(t);
   }
 
   /** Un punto nuovo nella fase: si illumina e ha il suo indicatore. */
@@ -559,12 +571,37 @@ export class PhasedRun extends BaseRun {
 
   private pending() {
     const p = this.tasks.filter((t) => !t.done && (!t.enabled || t.enabled()));
-    return this.phases[this.idx]?.ordered ? p.slice(0, 1) : p;
+    return this.phases[this.idx]?.ordered ? [...p.filter((t) => !t.loose).slice(0, 1), ...p.filter((t) => t.loose)] : p;
+  }
+
+  /** la fase è finita: fatti tutti i punti normali (postazioni, scelte sbagliate e punti di riserva non contano) */
+  private phaseDone() {
+    return this.tasks.every((x) => x.done || x.decoy || x.repeat || x.loose) && this.tasks.some((x) => !x.repeat && !x.decoy && !x.loose);
+  }
+
+  /**
+   * Oggetto messo nel posto sbagliato: si può toccare per riprenderlo in mano (anche nelle fasi dopo, es. prima di
+   * firmare la bolla) e rimetterlo nel posto giusto. `can`: si può prendere adesso (di solito: mani libere).
+   * Restituisce il punto (per toglierlo se l'oggetto sparisce in altro modo).
+   */
+  retake(obj: THREE.Object3D, label: string, icon: string, can: () => boolean, onTake: () => void, then?: () => Task[]) {
+    // l'oggetto (di solito appoggiato senza luce) si accende: è lui che si tocca
+    obj.userData.noGlow = false;
+    obj.traverse((c) => {
+      const m = c as THREE.Mesh;
+      if (m.isMesh && !(m.material as THREE.Material & { isMeshBasicMaterial?: boolean }).isMeshBasicMaterial) c.userData.noGlow = false;
+    });
+    const t: Task = {
+      pos: obj.position.clone().setY(0), kind: 'tap', quiet: true, loose: true, label, icon, obj,
+      enabled: () => can(), onDone: onTake, then,
+    };
+    this.addTask(t);
+    return t;
   }
 
   /** Punti giusti ancora da fare nella fase (le scelte sbagliate non contano). */
   private left() {
-    return this.tasks.filter((t) => !t.done && !t.decoy).length;
+    return this.tasks.filter((t) => !t.done && !t.decoy && !t.loose).length;
   }
 
   private reach() {
@@ -684,7 +721,7 @@ export class PhasedRun extends BaseRun {
     this.nearTask = near;
     this.nearOk = !!near && nd <= this.reach();
     this.placeStand(near, p);
-    const real = this.tasks.filter((t) => !t.decoy);
+    const real = this.tasks.filter((t) => !t.decoy && !t.loose);
     const [done, all] = ph.count?.() ?? [real.filter((t) => t.done).length, real.length];
     // con le caselle grandi (civici, camere, la lista) il conteggio sarebbe ripetuto: non si scrive
     let status = `${ph.icon ? `${ph.icon} ` : ''}${ph.name}${all > 1 && !this.chips ? ` ${done}/${all}` : ''}`;
@@ -874,7 +911,7 @@ export class PhasedRun extends BaseRun {
       if (!external) this.game.player.play('idle');
       t.onDone?.();
       for (const n of t.then?.() ?? []) this.addTask(n);
-      if (this.tasks.every((x) => x.done || x.decoy || x.repeat) && this.tasks.some((x) => !x.repeat)) this.nextPhase();
+      if (this.phaseDone()) this.nextPhase();
       return;
     }
     t.done = true;
@@ -895,7 +932,7 @@ export class PhasedRun extends BaseRun {
       }
     }
     for (const n of t.then?.() ?? []) this.addTask(n);
-    if (this.tasks.every((x) => x.done || x.decoy || x.repeat) && this.tasks.some((x) => !x.repeat && !x.decoy)) this.nextPhase();
+    if (this.phaseDone()) this.nextPhase();
   }
 
   dispose() {
