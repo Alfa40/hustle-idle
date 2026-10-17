@@ -85,9 +85,70 @@ function sticker(kind: 'heavy' | 'fragile', size: number) {
   return m;
 }
 
-/** Scatola col nastro del colore dello scaffale e, se è pesante o fragile, lo sticker sopra. */
-function shelfBox(size: number, color: number, kind: BoxKind) {
-  const g = crate(size, kind === 'heavy' ? 0x9c6b3e : 0xc8935a, color);
+const chevronTex = new Map<string, THREE.Texture>();
+/**
+ * Nastro piegato a punta (come una ^ o una V) da un bordo all'altro, del colore dello scaffale: punta in alto
+ * (ripiano in alto) o in basso (ripiano in basso). Ai bordi sta alla stessa altezza, così gira attorno alla scatola
+ * senza interrompersi. `bg`: sfondo (per le lastrine dei ripiani), altrimenti trasparente.
+ */
+function chevronTexture(color: number, up: boolean, bg?: string) {
+  const k = `${color}${up}${bg ?? ''}`;
+  let tex = chevronTex.get(k);
+  if (!tex) {
+    tex = canvasTexture(128, 102, (g) => {
+      if (bg) {
+        g.fillStyle = bg;
+        g.beginPath();
+        g.roundRect(3, 3, 122, 96, 14);
+        g.fill();
+        g.lineWidth = 5;
+        g.strokeStyle = '#3a2f55';
+        g.stroke();
+      }
+      const x0 = bg ? 14 : -4;
+      const x1 = bg ? 114 : 132;
+      const edge = up ? 80 : 22;
+      const apex = up ? 22 : 80;
+      g.lineJoin = 'miter';
+      g.lineCap = 'butt';
+      g.beginPath();
+      g.moveTo(x0, edge);
+      g.lineTo(64, apex);
+      g.lineTo(x1, edge);
+      // bordino scuro sotto e nastro del colore sopra
+      g.strokeStyle = '#3a2f55';
+      g.lineWidth = 26;
+      g.stroke();
+      g.strokeStyle = `#${color.toString(16).padStart(6, '0')}`;
+      g.lineWidth = 19;
+      g.stroke();
+    });
+    chevronTex.set(k, tex);
+  }
+  return tex;
+}
+
+/** Piano verticale (guarda verso +Z) col nastro a punta; fuori dal disegno niente (né contorno né profondità). */
+function chevronPlane(color: number, up: boolean, w: number, h: number, bg?: string) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: chevronTexture(color, up, bg), alphaTest: 0.5 }));
+  m.userData.noGlow = true;
+  return m;
+}
+
+/**
+ * Scatola col nastro del colore dello scaffale tutto attorno, piegato a punta: ^ = ripiano in alto,
+ * V = ripiano in basso. Se è pesante o fragile, sopra c'è anche lo sticker.
+ */
+function shelfBox(size: number, color: number, kind: BoxKind, top: boolean) {
+  const g = crate(size, kind === 'heavy' ? 0x9c6b3e : 0xc8935a);
+  const h = size * 0.8;
+  for (let i = 0; i < 4; i++) {
+    const a = chevronPlane(color, top, size, h);
+    const ang = (i * Math.PI) / 2;
+    a.position.set(Math.sin(ang) * (size / 2 + 0.004), h / 2, Math.cos(ang) * (size / 2 + 0.004));
+    a.rotation.y = ang;
+    g.add(a);
+  }
   if (kind !== 'normal') {
     const st = sticker(kind, size * 0.7);
     st.position.y = size * 0.8 + 0.006;
@@ -143,7 +204,9 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     let top = false;
     for (let guard = 0; guard < 100; guard++) {
       shelf = wh.shelves[Math.floor(Math.random() * wh.shelves.length)];
-      top = kind === 'fragile' ? true : kind === 'heavy' ? false : room(shelf, true) >= room(shelf, false);
+      // le normali: il ripiano con più posto (a pari posto a caso), indicato dalla punta del nastro
+      const rt = room(shelf, true), rb = room(shelf, false);
+      top = kind === 'fragile' ? true : kind === 'heavy' ? false : rt === rb ? Math.random() < 0.5 : rt > rb;
       if (room(shelf, top) > 0) break;
     }
     want.set(key(shelf, top), (want.get(key(shelf, top)) ?? 0) + 1);
@@ -163,8 +226,8 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     const out: Task[] = [];
     for (const s of wh.shelves) {
       for (const top of [false, true]) {
-        // le normali vanno su un ripiano qualsiasi del loro scaffale; pesanti e fragili sul loro
-        const ok = s === it.shelf && (it.kind === 'normal' || top === it.top);
+        // scaffale del colore e ripiano della punta del nastro
+        const ok = s === it.shelf && top === it.top;
         // ogni ripiano con posto si può scegliere: quello sbagliato si paga alla fine
         out.push({
           pos: spotAt(s, top), kind: 'tap', label: `Appoggia sul ripiano ${top ? 'in alto' : 'in basso'}`, icon: '📦', quiet: true,
@@ -181,7 +244,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
               wrong++;
               run.starCap = wrong >= 2 ? 1 : 2;
             }
-            const c = run.prop(shelfBox(0.42, s.color.hex, it.kind), slotAt(s, top, Math.min(PER_SPOT - 1, k)), 0, 1);
+            const c = run.prop(shelfBox(0.42, s.color.hex, it.kind, top), slotAt(s, top, Math.min(PER_SPOT - 1, k)), 0, 1);
             c.userData.noGlow = true;
           },
         });
@@ -193,15 +256,15 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     {
       name: 'Sistema le scatole sugli scaffali', icon: '📦', count: () => [items.filter((x) => x.obj && !x.obj.visible && x !== carrying).length, n],
       tip: levels
-        ? 'Il <b>nastro</b> è del colore dello <b>scaffale</b>. Lo <b>sticker</b> sopra la scatola dice il ripiano: <b>🏋️ pesante = in basso</b> (si solleva tenendo premuto), <b>🍷 fragile = in alto</b>, come sulle lastrine. Senza sticker: un ripiano qualsiasi del suo scaffale. Le scatole fuori posto alla fine tolgono stelle'
-        : 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> dove va: appoggiala su un ripiano libero di quello scaffale. Le scatole fuori posto alla fine tolgono stelle',
+        ? 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> e fa una <b>punta</b>: <b>^ in alto</b>, <b>V in basso</b>, come i cartellini sui ripiani. Le pesanti 🏋️ vanno sempre in basso (si sollevano tenendo premuto), le fragili 🍷 sempre in alto. Le scatole fuori posto alla fine tolgono stelle'
+        : 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> dove va e fa una <b>punta</b>: <b>^ ripiano in alto</b>, <b>V ripiano in basso</b>, come i cartellini sui ripiani. Le scatole fuori posto alla fine tolgono stelle',
       tasks: () => items.map((it) => ({
         pos: it.pos, kind: it.kind === 'heavy' ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.kind === 'heavy' ? 'Solleva la scatola pesante' : it.kind === 'fragile' ? 'Prendi la scatola fragile' : 'Prendi la scatola', icon: it.kind === 'heavy' ? '🏋️' : it.kind === 'fragile' ? '🍷' : '📦',
         quiet: true, enabled: () => !carrying, obj: it.obj,
         onDone: () => {
           carrying = it;
           if (it.obj) it.obj.visible = false;
-          hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind));
+          hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind, it.top));
           run.speedMul = it.kind === 'heavy' ? 0.6 : 1;
         },
         then: () => placeTasks(it),
@@ -220,7 +283,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   run = new PhasedRun(game, 1, title, phases, { time: 30 + n * 15 + nHeavy * 5 });
   boss = run.finisher(bossAt, Math.PI, '🧾 Firma qui la bolla');
   for (const it of items) {
-    it.obj = run.prop(shelfBox(it.kind === 'heavy' ? 0.75 : 0.55, it.shelf.color.hex, it.kind), it.pos, Math.random() * 0.5, 1);
+    it.obj = run.prop(shelfBox(it.kind === 'heavy' ? 0.75 : 0.55, it.shelf.color.hex, it.kind, it.top), it.pos, Math.random() * 0.5, 1);
     it.obj.userData.solid = false;
   }
   // le lastrine dei ripiani (bordo del colore dello scaffale, centro bianco o nero) e le scatole già lì
@@ -229,6 +292,10 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
       const at = spotAt(s, top).setY(s.boards[top ? 2 : 0] + 0.01);
       const rim = run.prop(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.03, 0.6), new THREE.MeshLambertMaterial({ color: s.color.hex })), at, 0, 1);
       rim.userData.solid = false;
+      // cartellino col nastro a punta appeso sul davanti, sotto il ripiano in alto / sotto quello di mezzo per il ripiano in basso
+      // (non copre le scatole): uguale al nastro delle scatole di quel ripiano
+      const ay = top ? s.boards[2] - 0.2 : s.boards[1] - 0.19;
+      run.prop(chevronPlane(s.color.hex, top, top ? 0.36 : 0.3, (top ? 0.36 : 0.3) * 0.8, '#ffffff'), at.clone().addScaledVector(s.front, 0.33).setY(ay), Math.atan2(s.front.x, s.front.z), 1);
       // dal Liv. 4: lo sticker del ripiano (🏋️ in basso, 🍷 in alto), come quello sulle scatole
       if (levels) {
         const st = sticker(top ? 'fragile' : 'heavy', 0.36);
@@ -236,9 +303,9 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
       }
     }
   }
-  for (const p of pre) run.prop(shelfBox(0.42, p.s.color.hex, 'normal'), slotAt(p.s, p.top, 0), 0, 1).userData.noGlow = true;
-  // in mano: il colore dello scaffale e il bollino (⚪ in alto, ⚫ in basso)
-  run.extraStatus = () => (carrying ? `scaffale ${carrying.shelf.color.icon}${carrying.kind === 'heavy' ? '🏋️' : carrying.kind === 'fragile' ? '🍷' : ''}` : '');
+  for (const p of pre) run.prop(shelfBox(0.42, p.s.color.hex, 'normal', p.top), slotAt(p.s, p.top, 0), 0, 1).userData.noGlow = true;
+  // in mano: il colore dello scaffale e il ripiano
+  run.extraStatus = () => (carrying ? `scaffale ${carrying.shelf.color.icon} ${carrying.top ? 'in alto' : 'in basso'}` : '');
   return run;
 }
 

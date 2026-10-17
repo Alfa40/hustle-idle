@@ -50,8 +50,8 @@ export const JOBS: Record<JobType, JobDef> = {
   },
   magazzino: {
     name: 'Magazziniere', icon: '🏭', skill: 'logistica', basePay: 28, xp: 13, fame: 1, where: 'shop',
-    intro: 'Al magazzino è arrivato un camion: scarica le scatole e metti ognuna sullo scaffale del suo colore. Le scatole pesanti si sollevano tenendo premuto e vanno sul ripiano in basso.',
-    steps: [['📦', 'Prendi una scatola dal camion', 'tap'], ['🎨', 'Portala allo scaffale del suo colore', 'walk'], ['⬇️', 'Le pesanti vanno sul ripiano in basso', 'hold']],
+    intro: 'Al magazzino è arrivato un camion: scarica le scatole e metti ognuna sullo scaffale del colore del suo nastro. La punta del nastro dice il ripiano: verso l\'alto in alto, verso il basso in basso.',
+    steps: [['📦', 'Prendi una scatola dal camion', 'tap'], ['🎨', 'Portala allo scaffale del colore del nastro', 'walk'], ['↕️', 'Punta in su: ripiano in alto · punta in giù: in basso', 'tap']],
   },
   autista: {
     name: 'Autista di navetta', icon: '🚐', skill: 'logistica', basePay: 30, xp: 14, fame: 1.1, where: 'shop',

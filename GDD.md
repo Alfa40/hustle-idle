@@ -513,6 +513,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 - **Prima persona sempre dritta** (17/10/2026): niente più centro della vista spostato verso la zona libera dai riquadri (`Game.centerInFreeArea` lo azzera in prima persona, anche nel laboratorio di ceramica). In orizzontale il riquadro a sinistra spostava la vista di ~110 px e la stanza sembrava scivolare camminando e girandosi. Il centro dello schermo resta comunque libero dai riquadri; la terza persona (città, attività) continua a centrare il personaggio nella zona libera
 
+- **Magazziniere: nastro a punta** (17/10/2026): il nastro colorato attorno alla scatola è piegato a punta da un bordo all'altro, come una **^ (ripiano in alto)** o una **V (ripiano in basso)**; ogni scatola ha il suo ripiano a ogni livello (le pesanti 🏋️ sempre in basso, le fragili 🍷 sempre in alto, con lo sticker sopra dal Liv. 4). Su ogni ripiano un cartellino bianco appeso sul davanti con lo stesso nastro a punta. Nel riquadro: "scaffale 🟩 in alto"
+
 ### Prossimi passi proposti
 - Agganci tra attività dei trasporti e degli altri settori (consegne a domicilio dei ristoranti, deposito che rifornisce i negozi) quando gli altri settori si riaccendono
 - Settore successivo: 🍳 Ristorazione, ad albero
