@@ -187,7 +187,7 @@ body.job-on .hud-top { display: none; }
 .jobbar .fill { height: 100%; background: var(--green); transition: width .1s linear; border-radius: 8px; }
 .jobbar .fill.warn { background: var(--yellow); }
 .jobbar .fill.danger { background: var(--red); }
-.jobbar .quit { background: #f1ead9; border: none; border-radius: 10px; padding: 3px 9px; font-size: 12px; color: var(--ink-2); font-weight: 600; flex: none; }
+.jobbar .quit { background: #f1ead9; border: none; border-radius: 10px; padding: 4px 7px; font-size: 18px; line-height: 1; color: var(--ink-2); font-weight: 600; flex: none; }
 
 /* ---------- azione: si tocca l'oggetto; cerchio sopra la testa; scritta in alto ---------- */
 @property --p { syntax: '<percentage>'; inherits: true; initial-value: 0%; }
@@ -558,7 +558,10 @@ hr { border: none; border-top: 2px dashed var(--line); margin: 10px 0; }
 .switch i { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 2px 4px rgba(0,0,0,.2); }
 .switch.on { background: var(--green); }
 .switch.on i { left: 25px; }
-.jobbar #j-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jobbar #j-title { flex: 1 1 0; min-width: min-content; line-height: 1.15; hyphens: manual; }
+/* parole lunghe (es. "Preparatore"): il tempo e la pausa vanno a capo, il nome non si spezza */
+.jobbar .row:first-child { flex-wrap: wrap; row-gap: 4px; }
+.jobbar .j-tp { display: flex; gap: 8px; align-items: center; flex: none; margin-left: auto; }
 
 
 /* ---------- comandi della camera ---------- */
@@ -1183,3 +1186,10 @@ body.is-short .dg-photo span { font-size: 13px; }
 .jobbar .jg-fill.over { background: var(--orange); }
 .jobbar .jg-mark { position: absolute; top: -3px; width: 3px; height: 18px; margin-left: -1px; background: var(--ink); border-radius: 2px; }
 .jobbar .jg-mark[hidden] { display: none; }
+
+/* ---------- icone disegnate al posto delle emoji (src/ui/icons.ts) ---------- */
+.ic {
+  display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; font-style: normal;
+  background: center / contain no-repeat; overflow: hidden; text-indent: 3em; white-space: nowrap;
+  line-height: 1; flex: none;
+}

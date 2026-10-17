@@ -1,4 +1,5 @@
 import { Station } from './station';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Minigiochi col dito della cucina (si aprono toccando una postazione, vedi Station): la piastra degli
@@ -547,7 +548,7 @@ export class BurgerStation extends Station {
       g.font = `600 ${Math.round(Math.min(13, rowH * S * 0.6))}px Fredoka, system-ui, sans-serif`;
       g.textAlign = 'left';
       g.textBaseline = 'middle';
-      g.fillText(`${stepIcon(s)} ${s.t === 'sauce' ? SAUCES[s.k].name : stepName(s)} ${mark}`, rx + 6, yy, 0.34 * S - 10);
+      fillTextIco(g, `${stepIcon(s)} ${s.t === 'sauce' ? SAUCES[s.k].name : stepName(s)} ${mark}`, rx + 6, yy, 0.34 * S - 10);
     });
     // bottiglie delle salse
     this.bottles().forEach((b, i) => {

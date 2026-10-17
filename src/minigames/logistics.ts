@@ -14,6 +14,7 @@ import { PhasedRun, type JobRun, type Phase, type Task } from './jobs';
 import { driveJob } from './drive';
 import { PaintingsRun, PianoLiftRun, SortingRun, VanPuzzleRun } from './overlay';
 import { crate, forklift, pallet, SHELF_COLORS, trolley, Warehouse, workBench, type Shelf } from './warehouse';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Lavoretti di Trasporti e logistica (linea Magazzino e parte della linea Consegne): tutti "con le mani"
@@ -74,7 +75,7 @@ function sticker(kind: 'heavy' | 'fragile', size: number) {
       g.font = '78px sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(kind === 'heavy' ? '🏋️' : '🍷', 64, 70);
+      fillTextIco(g, kind === 'heavy' ? '🏋️' : '🍷', 64, 70);
     });
     stickerTex.set(kind, tex);
   }
@@ -237,7 +238,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   }
   for (const p of pre) run.prop(shelfBox(0.42, p.s.color.hex, 'normal'), slotAt(p.s, p.top, 0), 0, 1).userData.noGlow = true;
   // in mano: il colore dello scaffale e il bollino (⚪ in alto, ⚫ in basso)
-  run.extraStatus = () => (carrying ? `📦 ${carrying.shelf.color.icon}${carrying.kind === 'heavy' ? '🏋️' : carrying.kind === 'fragile' ? '🍷' : ''}` : '');
+  run.extraStatus = () => (carrying ? `scaffale ${carrying.shelf.color.icon}${carrying.kind === 'heavy' ? '🏋️' : carrying.kind === 'fragile' ? '🍷' : ''}` : '');
   return run;
 }
 
@@ -403,7 +404,8 @@ export function pickingJob(game: Game, lineLevel: number, wh: Warehouse, title: 
     tg.position.set(0, 0.75, 0.15);
     c.add(tg);
   }
-  run.extraStatus = () => `📋 ${order.map((x) => (got.has(x) ? '✅' : x)).join(' ')}`;
+  // la lista in grande: presi e da prendere
+  run.chips = () => order.map((x) => ({ t: x, s: got.has(x) ? 'done' as const : 'todo' as const }));
   return run;
 }
 

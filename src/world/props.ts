@@ -1,6 +1,7 @@
 import { gltf, model } from '../assets';
 import * as THREE from 'three';
 import { ceramicProduct } from './ceramics';
+import { fillTextIco, measureIco } from '../ui/icons';
 
 export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas');
@@ -41,7 +42,7 @@ export function label(text: string, opts: { bg?: string; fg?: string; scale?: nu
   const pad = 18;
   const tmp = document.createElement('canvas').getContext('2d')!;
   tmp.font = `600 ${fontPx}px Fredoka, system-ui, sans-serif`;
-  const w = Math.ceil(tmp.measureText(text).width) + pad * 2;
+  const w = Math.ceil(measureIco(tmp, text)) + pad * 2;
   const h = fontPx + pad * 1.4;
   const tex = canvasTexture(w, h, (g) => {
     g.fillStyle = opts.bg ?? '#ffffff';
@@ -53,7 +54,7 @@ export function label(text: string, opts: { bg?: string; fg?: string; scale?: nu
     g.font = `600 ${fontPx}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, w / 2, h / 2 + 2);
+    fillTextIco(g, text, w / 2, h / 2 + 2);
   });
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
   const sc = (opts.scale ?? 0.5) * 0.72;
@@ -161,7 +162,7 @@ export function saleSign(text: string) {
     c.textAlign = 'center';
     c.fillText('IN VENDITA', 128, 52);
     c.font = '600 34px Fredoka, system-ui, sans-serif';
-    c.fillText(text, 128, 100);
+    fillTextIco(c, text, 128, 100);
   });
   const panel = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.65, 0.06), new THREE.MeshLambertMaterial({ map: tex }));
   panel.position.y = 1.5;
@@ -333,7 +334,7 @@ export function numberPlate(text: string, w = 0.6, bg = '#1f4fae', fg = '#ffffff
     g.font = `700 ${text.length > 3 ? 92 : 112}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, 128, 86, 230);
+    fillTextIco(g, text, 128, 86, 230);
   });
   const g = new THREE.Group();
   const back = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), lamb(0xffffff));

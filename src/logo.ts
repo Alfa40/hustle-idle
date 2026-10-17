@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fillTextIco } from './ui/icons';
 
 /**
  * Logo delle attività del giocatore (uno per partita): forma, colore di sfondo,
@@ -153,7 +154,7 @@ export function drawLogo(g: CanvasRenderingContext2D, logo: Logo, s: number, pho
   g.textBaseline = 'middle';
   g.fillStyle = logo.fg;
   g.font = `${Math.round(s * (hasText ? 0.34 : 0.44))}px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
-  g.fillText(logo.symbol, s / 2, hasText ? cy - s * 0.09 : cy + s * 0.02);
+  fillTextIco(g, logo.symbol, s / 2, hasText ? cy - s * 0.09 : cy + s * 0.02);
   if (hasText) {
     g.font = `800 ${Math.round(s * 0.17)}px Fredoka, system-ui, sans-serif`;
     g.fillText(logo.text.toUpperCase(), s / 2, cy + s * 0.2);

@@ -39,6 +39,7 @@ import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, playStats, wipeSave, yearOf,
   type Business, type Employee, type JobOffer, type Mission, type ServiceOrder, type SpecialOrder,
 } from '../sim/state';
+import { stripLeadIcon } from './icons';
 
 
 type Actions = Record<string, (arg: string) => void>;
@@ -128,6 +129,10 @@ function keepScroll(root: HTMLElement) {
 /** Soldi al secondo con i centesimi (es. "€1,70/s"). */
 const perSec = (v: number) => `€${v.toFixed(2).replace('.', ',')}/s`;
 
+/** scrive il testo solo se è cambiato (ogni riscrittura rifà anche le icone disegnate) */
+function setText(el: HTMLElement, v: string) {
+  if (el.textContent !== v) el.textContent = v;
+}
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 function demandBars(v: number, max = 4) {
@@ -248,7 +253,7 @@ export class UI {
 
     const job = document.createElement('div');
     job.className = 'jobbar';
-    job.innerHTML = `<div class="row"><span id="j-title"></span><span id="j-time"></span><button class="quit" id="j-pause">⏸ Pausa</button></div>
+    job.innerHTML = `<div class="row"><span id="j-title"></span><span class="j-tp"><span id="j-time"></span><button class="quit" id="j-pause" aria-label="Pausa">⏸️</button></span></div>
       <div class="j-chips" id="j-chips" hidden></div><div class="row muted small" id="j-status"></div><div class="track"><div class="fill" id="j-fill"></div></div>
       <div class="j-gauge" id="j-gauge" hidden><span class="jg-l"></span><div class="jg-bar"><i class="jg-fill"></i><b class="jg-mark"></b></div></div>`;
     this.root.appendChild(job);
@@ -424,9 +429,10 @@ export class UI {
     const run = this.game.run;
     if (run) {
       const f = run.timeLeft / run.timeTotal;
-      (this.jobEl.querySelector('#j-title') as HTMLElement).textContent = run.title;
-      (this.jobEl.querySelector('#j-time') as HTMLElement).textContent = run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`;
-      (this.jobEl.querySelector('#j-status') as HTMLElement).textContent = run.status;
+      // nel riquadro il nome senza l'icona davanti: c'è poco spazio e il nome intero serve di più
+      setText(this.jobEl.querySelector('#j-title') as HTMLElement, stripLeadIcon(run.title));
+      setText(this.jobEl.querySelector('#j-time') as HTMLElement, run.frozen ? '🎓 senza tempo' : `⏱ ${Math.ceil(run.timeLeft)}s`);
+      setText(this.jobEl.querySelector('#j-status') as HTMLElement, run.status);
       // caselle grandi (es. i civici delle consegne): si ridisegnano solo se cambiano
       const chips = run.chips?.() ?? [];
       const cEl = this.jobEl.querySelector('#j-chips') as HTMLElement;
@@ -442,7 +448,7 @@ export class UI {
       gEl.hidden = !gv;
       if (gv) {
         const k = Math.max(0, Math.min(1, gv.value / gv.max));
-        (gEl.querySelector('.jg-l') as HTMLElement).textContent = `${gv.icon} ${gv.text}`;
+        setText(gEl.querySelector('.jg-l') as HTMLElement, `${gv.icon} ${gv.text}`);
         const f = gEl.querySelector('.jg-fill') as HTMLElement;
         f.style.width = `${k * 100}%`;
         f.classList.toggle('over', gv.mark !== undefined && k > gv.mark);
@@ -826,7 +832,10 @@ export class UI {
     // né nelle righe che scorrono di lato (schede, gruppi, carte): si salvano e si rimettono uguali
     const keepTabs = keepScroll(tabsEl);
     const keepBody = keepScroll(body);
-    if (tabsEl.innerHTML !== tabs) tabsEl.innerHTML = tabs;
+    if (tabsEl.dataset.k !== tabs) {
+      tabsEl.dataset.k = tabs;
+      tabsEl.innerHTML = tabs;
+    }
     body.innerHTML = content;
     // prima si ridisegna (il canvas cambia l'altezza), poi si ripristina lo scorrimento
     this.panel.after?.(body);
@@ -2700,7 +2709,7 @@ export class UI {
           void navigator.clipboard?.writeText(friendCode()).then(() => this.toast('📋 Codice copiato', 'good'), () => this.toast(`Il tuo codice: ${friendCode()}`));
         },
         share: () => {
-          const text = `Giochiamo a Hustle Idle! Aggiungimi con il mio codice amico: ${friendCode()} 👉 https://alfa40.github.io/hustle-idle/`;
+          const text = `Giochiamo a Hustle Idle! Aggiungimi con il mio codice amico: ${friendCode()} → https://alfa40.github.io/hustle-idle/`;
           if (navigator.share) void navigator.share({ text }).catch(() => {});
           else void navigator.clipboard?.writeText(text).then(() => this.toast('📋 Messaggio copiato', 'good'));
         },

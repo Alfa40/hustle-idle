@@ -12,6 +12,7 @@ import { crate } from './warehouse';
 import { Room } from './room';
 import { BurgerStation, DISHWARE, GrillStation, SAUCES, TOPPINGS, WashStation, type Dish, type Rack, type Sauce, type Step, type Topping } from './kitchen';
 import { CutStation, KneadStation, SHAPE_PATHS, ShapeStation, VEGGIES, type Veggie } from './station';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Lavoretti in 3D di Ristorazione e ospitalità (prima persona, in un locale: vedi Room). Le postazioni da usare
@@ -349,12 +350,9 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
   }
   tag(run, '🧊 Frigo', fridgeAt, 2.9);
   tag(run, '🔪 Tagliere', benchAt, 1.6);
-  // il foglio delle preparazioni nella barra: fatti ✅, quello in mano, i prossimi
-  run.extraStatus = () => {
-    const sheet = orders.map((v, i) => (i < done ? '✅' : VEGGIES[v].icon)).join(' ');
-    const inHand = holding ? ` · in mano ${VEGGIES[holding.v].icon}${holding.cut ? ' tagliato' : ' da tagliare'}` : '';
-    return `📋 ${sheet}${inHand}`;
-  };
+  // il foglio delle preparazioni in grande nel riquadro: fatte, quella di adesso, le prossime
+  run.chips = () => orders.map((v, i) => ({ t: VEGGIES[v].icon, s: i < done ? 'done' as const : i === done ? 'next' as const : 'todo' as const }));
+  run.extraStatus = () => (holding ? (holding.cut ? 'tagliato: mettilo nella sua ciotola' : 'da tagliare sul tagliere') : '');
   return run;
 }
 
@@ -476,14 +474,8 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
     m.userData.noGlow = true;
     run.prop(m, room.at(1.3, -3.0).add(new THREE.Vector3(-0.5 + i * 0.2, bench.top + 0.03, 0.05)), 0, 1);
   });
-  // la comanda nella barra: panini fatti, quello in mano
-  run.extraStatus = () => {
-    const sheet = orders.map((_, i) => (i < served ? '✅' : '🍔')).join(' ');
-    const o = cur();
-    const what = next < n ? ` · 🧾 ${o.filter((s) => s.t !== 'bun').map((s) => (s.t === 'top' ? TOPPINGS[s.k].icon : `🧴${SAUCES[s.k].name}`)).join(' ')}` : '';
-    const inHand = holding ? ` · in mano ${{ raw: '🥩 cruda', cooked: '🥩 cotta', ready: '🍔 pronto' }[holding.stage]}` : '';
-    return `${sheet}${what}${inHand}`;
-  };
+  // nel riquadro solo a che punto è il panino in mano (la comanda si legge sullo scontrino al bancone)
+  run.extraStatus = () => (holding ? { raw: 'carne cruda: alla piastra', cooked: 'carne cotta: al bancone', ready: 'panino pronto: al passe' }[holding.stage] : '');
   return run;
 }
 
@@ -607,12 +599,8 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   if (kinds.includes('cornetti')) tag(run, '🧈 Burro', fridgeAt, 2.2);
   tag(run, '👐 Banco', tableAt, 1.5);
   for (const r of racks) tag(run, `${BREADS[r.b].icon} Lievitazione`, r.pos, 1.8, '#8e5bd6');
-  // il foglio degli ordini nella barra: fatti ✅, quello in mano, i prossimi
-  run.extraStatus = () => {
-    const sheet = orders.map((b, i) => (i < done ? '✅' : BREADS[b].icon)).join(' ');
-    const inHand = holding ? ` · in mano ${{ flour: '🌾', dough: '🫓', butter: '🫓🧈', shaped: BREADS[holding.b].icon }[holding.stage]} per ${BREADS[holding.b].icon}` : '';
-    return `📋 ${sheet}${inHand}`;
-  };
+  // il foglio degli ordini in grande nel riquadro: fatti, quello di adesso, i prossimi
+  run.chips = () => orders.map((b, i) => ({ t: BREADS[b].icon, s: i < done ? 'done' as const : i === done ? 'next' as const : 'todo' as const }));
   return run;
 }
 
@@ -715,10 +703,9 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   if (kinds.includes('te')) tag(run, '🍵 Bollitore', kettleAt, 1.6);
   run.onTick = (dt) => queue.forEach((c) => c.update(dt));
   // la fila in ordine nella barra: il primo (quello da servire) e i prossimi
-  run.extraStatus = () => {
-    const line = orders.slice(served, served + 4).map((d, i) => (i ? DRINKS[d].icon : `👉 ${DRINKS[d].icon} ${DRINKS[d].name}`)).join(' › ') + (n - served > 4 ? ' …' : '');
-    return `🧾 ${line}${holding ? ` · in mano ${holding === 'cup' ? '🫖 tazza vuota' : DRINKS[holding as Drink]?.icon ?? ''}` : ''}`;
-  };
+  // in grande: l'ordine del primo della fila (col nome) e i prossimi
+  run.chips = () => orders.slice(served, served + 4).map((d, i) => ({ t: i ? DRINKS[d].icon : `${DRINKS[d].icon} ${DRINKS[d].name}`, s: i ? 'todo' as const : 'next' as const }));
+  run.extraStatus = () => (holding === 'cup' ? 'tazza vuota in mano' : '');
   return run;
 }
 
@@ -929,7 +916,7 @@ export function restaurantJob(game: Game, lineLevel: number, slot: Slot, placed:
           g.font = '600 38px Fredoka, sans-serif';
           g.textAlign = 'center';
           g.textBaseline = 'middle';
-          g.fillText('🧾 il conto!', 128, 34);
+          fillTextIco(g, '🧾 il conto!', 128, 34);
         });
       }
     }
@@ -1098,7 +1085,7 @@ export function housekeepingJob(game: Game, lineLevel: number, slot: Slot, place
   run.onTick = () => {
     if (jobs.every((x) => x.done) && !holding) run.finishPhase();
   };
-  run.extraStatus = () => (holding ? `in mano ${{ lenzuola: '🛏️', asciugamani: '🧺', spazzatura: '🗑️' }[holding]}` : '');
+  run.extraStatus = () => (holding && game.viewFirstPerson ? `in mano ${{ lenzuola: '🛏️', asciugamani: '🧺', spazzatura: '🗑️' }[holding]}` : '');
   return run;
 }
 
@@ -1183,7 +1170,7 @@ export function conciergeJob(game: Game, lineLevel: number, slot: Slot, placed: 
     tag(run, it.icon, itemAt(k), 1.4);
   });
   run.onTick = (dt) => guests.forEach((g) => g.c.update(dt));
-  run.extraStatus = () => [busy !== null ? `🙋 vuole ${guests[busy].r.icon}` : '', holding ? `in mano ${holding}` : ''].filter(Boolean).join(' · ');
+  run.extraStatus = () => [busy !== null ? `🙋 vuole ${guests[busy].r.icon}` : '', holding && game.viewFirstPerson ? `in mano ${holding}` : ''].filter(Boolean).join(' · ');
   return run;
 }
 
@@ -1296,6 +1283,7 @@ export function suiteJob(game: Game, lineLevel: number, slot: Slot, placed: Plac
       if (q < 0.99) toast(`📋 Sul carrello ${n - ok} ${n - ok === 1 ? 'cosa sbagliata' : 'cose sbagliate'}`, 'bad');
     }
   };
-  run.extraStatus = () => (holding ? `in mano ${holding}` : `📋 ${want.map((w) => (onCart.includes(w.icon) ? '✅' : w.icon)).join(' ')}`);
+  // la lista in grande: già sul carrello, le altre
+  run.chips = () => want.map((w) => ({ t: w.icon, s: onCart.includes(w.icon) ? 'done' as const : 'todo' as const }));
   return run;
 }

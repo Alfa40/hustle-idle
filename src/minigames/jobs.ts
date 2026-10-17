@@ -680,7 +680,8 @@ export class PhasedRun extends BaseRun {
     this.placeStand(near, p);
     const real = this.tasks.filter((t) => !t.decoy);
     const [done, all] = ph.count?.() ?? [real.filter((t) => t.done).length, real.length];
-    let status = `${ph.icon} ${ph.name}${all > 1 ? ` ${done}/${all}` : ''}`;
+    // con le caselle grandi (civici, camere, la lista) il conteggio sarebbe ripetuto: non si scrive
+    let status = `${ph.icon ? `${ph.icon} ` : ''}${ph.name}${all > 1 && !this.chips ? ` ${done}/${all}` : ''}`;
     const extra = this.extraStatus?.();
     if (extra) status += ` · ${extra}`;
     // prima di arrivare: si dice dove andare; poi l'avviso resta accanto alla fase, senza nasconderla
@@ -691,8 +692,9 @@ export class PhasedRun extends BaseRun {
       this.outTimer = 0;
       this.wasInZone = true;
     }
-    // (se il lavoretto dice già cosa hai in mano, non lo si ripete)
-    this.status = status + (this.heldIcon && this.game.player.held && !extra?.includes('in mano') && !this.chips ? ` · in mano ${this.heldIcon}` : '');
+    // niente "in mano" generico: l'attrezzo appena preso non serve ripeterlo (i lavoretti dove conta cosa porti
+    // lo dicono loro, es. lo scaffale della scatola o cosa vuole l'ospite)
+    this.status = status;
     const aimed = pend.filter((t) => t.aim);
     if (aimed.length) {
       this.updateAim(dt, aimed, near);
@@ -803,8 +805,6 @@ export class PhasedRun extends BaseRun {
   }
 
   private fxT = 0;
-  /** icona di ciò che si tiene in mano (in prima persona l'oggetto non si vede) */
-  private heldIcon = '';
 
   private ray = new THREE.Raycaster();
 
@@ -866,9 +866,7 @@ export class PhasedRun extends BaseRun {
       t.progress = 0;
       this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.9), 5, t.fxColor);
       if (!external) this.game.player.play('idle');
-      const before = this.game.player.held;
       t.onDone?.();
-      if (!external && this.game.player.held !== before) this.heldIcon = this.game.player.held ? t.icon : '';
       for (const n of t.then?.() ?? []) this.addTask(n);
       if (this.tasks.every((x) => x.done || x.decoy || x.repeat) && this.tasks.some((x) => !x.repeat)) this.nextPhase();
       return;
@@ -877,10 +875,7 @@ export class PhasedRun extends BaseRun {
     this.removeGlow(t);
     this.game.fx.emit(t.fx ?? 'spark', t.pos.clone().setY(0.8), t.fx ? 8 : 5, t.fxColor);
     if (!external) this.game.player.play('idle');
-    const before = this.game.player.held;
     t.onDone?.();
-    // l'icona di ciò che hai in mano cambia solo se il punto ti ha dato (o tolto) qualcosa
-    if (!external && this.game.player.held !== before) this.heldIcon = this.game.player.held ? t.icon : '';
     const m = this.markers.get(t);
     if (m) m.visible = false;
     // le altre scelte dello stesso gruppo non servono più

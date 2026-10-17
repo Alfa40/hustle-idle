@@ -3,6 +3,7 @@ import { rungProgress } from '../config/careers';
 import { toast } from '../sim/bus';
 import { layout } from '../ui/layout';
 import { BaseRun, starsFor, type RunGuide } from './jobs';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Minigiochi che si giocano col dito su un "tavolo" disegnato (furgone a incastri, pianoforte sul
@@ -504,7 +505,7 @@ export class PianoLiftRun extends OverlayRun {
     g.fillStyle = '#ffd21a';
     g.font = `${Math.round(h * 0.035)}px Fredoka, sans-serif`;
     g.textAlign = 'center';
-    g.fillText('🏠 qui', w / 2, wy + h * 0.08, bw * 0.38);
+    fillTextIco(g, '🏠 qui', w / 2, wy + h * 0.08, bw * 0.38);
     // le funi e la piattaforma che sale
     const py = h * 0.88 - (h * 0.88 - (wy + h * 0.17)) * this.rise;
     g.strokeStyle = '#555';
@@ -522,7 +523,7 @@ export class PianoLiftRun extends OverlayRun {
     g.fillRect(-60, 0, 120, 10);
     g.font = `${Math.round(Math.min(w, h) * 0.2)}px sans-serif`;
     g.textBaseline = 'bottom';
-    g.fillText('🎹', 0, 4);
+    fillTextIco(g, '🎹', 0, 4);
     g.restore();
     // la livella: quanto pende (verde dritto, rosso quasi a sbattere)
     const lv = Math.min(1, Math.abs(this.angle) / 0.45);
@@ -534,7 +535,7 @@ export class PianoLiftRun extends OverlayRun {
       g.fillStyle = 'rgba(58,47,85,.85)';
       g.font = `600 ${Math.round(h * 0.032)}px Fredoka, sans-serif`;
       g.font = `600 ${Math.round(Math.min(h * 0.032, w / 18))}px Fredoka, sans-serif`;
-      g.fillText('👆 Tieni il dito e spostalo', w / 2, h - 58, w - 12);
+      fillTextIco(g, '👆 Tieni il dito e spostalo', w / 2, h - 58, w - 12);
       g.fillText('dalla parte opposta', w / 2, h - 40, w - 12);
     }
     if (this.phaseIdx === 1) {
@@ -542,7 +543,7 @@ export class PianoLiftRun extends OverlayRun {
       g.fillRect(w * 0.15, h * 0.45, w * 0.7, h * 0.1);
       g.fillStyle = '#fff';
       g.font = `700 ${Math.round(h * 0.04)}px Fredoka, sans-serif`;
-      g.fillText('👆 Tocca: spingilo dentro', w / 2, h * 0.52, w * 0.66);
+      fillTextIco(g, '👆 Tocca: spingilo dentro', w / 2, h * 0.52, w * 0.66);
     }
   }
 
@@ -893,7 +894,7 @@ export class SortingRun extends OverlayRun {
     for (const f of this.flash) {
       g.font = '28px sans-serif';
       g.textAlign = 'center';
-      g.fillText(f.ok ? '✅' : '❌', f.x, f.y - 20 - (0.6 - f.t) * 30);
+      fillTextIco(g, f.ok ? '✅' : '❌', f.x, f.y - 20 - (0.6 - f.t) * 30);
     }
   }
 

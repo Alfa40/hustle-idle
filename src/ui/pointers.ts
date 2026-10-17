@@ -105,8 +105,12 @@ export class EdgePointers {
       el.classList.toggle('target', m.kind === 'target' || m.kind === 'waypoint');
       el.style.setProperty('--c', m.color);
       (el.querySelector('.edge-arrow') as HTMLElement).style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
-      (el.querySelector('.edge-ico') as HTMLElement).textContent = m.icon;
-      (el.querySelector('.edge-dist') as HTMLElement).textContent = `${Math.round(m.dist)} m`;
+      // solo se cambia: ogni riscrittura rifà l'icona disegnata
+      const ico = el.querySelector('.edge-ico') as HTMLElement;
+      if (ico.textContent !== m.icon) ico.textContent = m.icon;
+      const dist = el.querySelector('.edge-dist') as HTMLElement;
+      const dt = `${Math.round(m.dist)} m`;
+      if (dist.textContent !== dt) dist.textContent = dt;
     });
   }
 }

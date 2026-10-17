@@ -2,6 +2,7 @@ import type { Game } from '../game';
 import { toast } from '../sim/bus';
 import { OverlayRun } from './overlay';
 import { starsFor } from './jobs';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Motori dei minigiochi col dito di Ristorazione e ospitalità (riquadro nella zona libera, vedi OverlayRun):
@@ -87,7 +88,7 @@ abstract class CanvasRun extends OverlayRun {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     // mai più largo del riquadro (si stringe un po' invece di uscire)
-    g.fillText(t, x, y, this.w - 16);
+    fillTextIco(g, t, x, y, this.w - 16);
   }
 
   /** Riquadro quadrato più grande che sta sotto la riga del titolo (per i disegni). */
@@ -289,7 +290,7 @@ export class TraceRun extends CanvasRun {
       g.font = `${Math.round(sq.s * 0.5)}px sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(it.icon, sq.x + sq.s / 2, sq.y + sq.s / 2);
+      fillTextIco(g, it.icon, sq.x + sq.s / 2, sq.y + sq.s / 2);
     }
     g.restore();
     // il disegno da seguire: tratteggiato, i pezzi già fatti diventano pieni
@@ -488,7 +489,6 @@ export class RhythmRun extends CanvasRun {
     g.fillRect(0, 0, w, h);
     const s = this.sections[this.sec];
     if (!s) return;
-    this.text(`${s.icon} ${s.name}`, w / 2, 26, 20, '#fff');
     const L = this.lane();
     g.strokeStyle = 'rgba(255,255,255,.25)';
     g.lineWidth = 46;
@@ -511,7 +511,7 @@ export class RhythmRun extends CanvasRun {
         g.strokeStyle = C.warn;
         g.lineWidth = 22;
         g.beginPath();
-        g.moveTo(L.x, Math.min(L.y1, y));
+        g.moveTo(L.x, Math.max(L.y0, Math.min(L.y1, y)));
         g.lineTo(L.x, Math.max(L.y0, y2));
         g.stroke();
       }
@@ -525,6 +525,10 @@ export class RhythmRun extends CanvasRun {
     const f = this.fx[this.fx.length - 1];
     if (f) this.text(f.text, w / 2, L.y1 - 70, 24, f.text === 'Mancato' || f.text === '…' ? C.bad : C.good, 700);
     this.text(this.holding ? '✊ Tieni premuto!' : '👆 Tocca quando il segno è sul cerchio', w / 2, h - 30, 15, '#fff');
+    // il nome della portata per ultimo, sopra la corsia (le note lunghe non lo coprono)
+    g.fillStyle = '#2b2440';
+    g.fillRect(0, 0, w, 44);
+    this.text(`${s.icon} ${s.name}`, w / 2, 26, 20, '#fff');
   }
 
   protected statusExtra() {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Oggetti di scena dei lavoretti, costruiti con forme semplici ma riconoscibili:
@@ -33,7 +34,7 @@ function signTex(text: string, bg: string, fg = '#ffffff', w = 512, h = 128, fon
     g.font = `800 ${font}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, w / 2, h / 2 + 4);
+    fillTextIco(g, text, w / 2, h / 2 + 4);
     t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     texCache.set(key, t);

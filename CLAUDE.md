@@ -13,8 +13,9 @@
   espressamente: numeri e nomi stanno fisicamente sugli oggetti (targhe sui muri, sulle porte, etichette sulle
   scatole).
 - **Niente emoji**: icone e immagini disegnate apposta, in linea con la grafica del gioco (canvas/SVG o modelli),
-  adattate alle esigenze del lavoretto o dell'attività. Vale per tutto ciò che si fa da ora; le emoji già presenti
-  si sostituiscono man mano che si tocca quella parte.
+  adattate alle esigenze del lavoretto o dell'attività. Sistema già pronto: ogni carattere emoji nel codice viene
+  mostrato col disegno di `src/ui/iconart.ts` (HTML in automatico, canvas con `fillTextIco`); un'icona nuova va
+  disegnata lì, e nei canvas non si usa `fillText` diretto per testi con icone.
 - **Mai coprire la visuale**: nessun riquadro, messaggio, avviso o fumetto deve stare sopra il personaggio,
   il campo da gioco attorno a lui e soprattutto gli obiettivi di un lavoretto o di un'attività. Tutto ciò che è
   testo va nella colonna in alto a sinistra (in orizzontale: pannello a sinistra), uno sotto l'altro:

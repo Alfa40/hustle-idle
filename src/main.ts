@@ -8,8 +8,11 @@ import { TitleScreen } from './ui/title';
 import { showInstallTip } from './ui/install';
 import { preloadLogo } from './logo';
 import { checkDevLink, DEV_SLOT } from './dev';
+import { watchIcons } from './ui/icons';
 
 async function boot() {
+  // niente emoji: ogni emoji nella pagina diventa un'icona disegnata del gioco
+  watchIcons();
   // link segreto della modalità developer (solo sul telefono dello sviluppatore, vedi src/dev.ts)
   await checkDevLink();
   const canvas = document.getElementById('game') as HTMLCanvasElement;

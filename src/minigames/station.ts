@@ -1,5 +1,6 @@
 import type { Game } from '../game';
 import { layout } from '../ui/layout';
+import { fillTextIco } from '../ui/icons';
 
 /**
  * Minigioco col dito dentro un lavoretto in 3D (impastare, dare la forma…): toccando la postazione si apre un
@@ -108,7 +109,7 @@ export abstract class Station {
     g.font = `${weight} ${Math.round(size)}px Fredoka, system-ui, sans-serif`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(t, x, y, this.w - 16);
+    fillTextIco(g, t, x, y, this.w - 16);
   }
 
   /** Riquadro quadrato più grande che sta tra il titolo e la barra in fondo. */

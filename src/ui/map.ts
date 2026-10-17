@@ -1,6 +1,7 @@
 import { CITY_MAP, LOTS, TILE } from '../config/map';
 import type { Game, MapMarker } from '../game';
 import { bizType } from '../config/business';
+import { fillTextIco, measureIco } from './icons';
 
 /** Colori della mappa per ogni tipo di tessera. */
 const TILE_COLORS: Record<string, string> = {
@@ -147,7 +148,7 @@ export function drawMap(g: CanvasRenderingContext2D, w: number, h: number, game:
       g.textAlign = 'center';
       g.textBaseline = 'top';
       const text = m.label.length > 26 ? m.label.slice(0, 25) + '…' : m.label;
-      const tw = g.measureText(text).width;
+      const tw = measureIco(g, text);
       const ty = y + size * 0.8;
       g.globalAlpha = opts.dim?.(m) ? 0.4 : 1;
       g.fillStyle = 'rgba(255,255,255,0.92)';
@@ -155,7 +156,7 @@ export function drawMap(g: CanvasRenderingContext2D, w: number, h: number, game:
       g.roundRect(x - tw / 2 - 5, ty - 1, tw + 10, emoji * 0.5 + 6, 6);
       g.fill();
       g.fillStyle = '#3a2f55';
-      g.fillText(text, x, ty + 2);
+      fillTextIco(g, text, x, ty + 2);
       g.globalAlpha = 1;
     }
   }
@@ -203,7 +204,7 @@ function pin(g: CanvasRenderingContext2D, x: number, y: number, m: MapMarker, si
   g.font = `${size * 0.95}px system-ui, "Apple Color Emoji", sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(m.icon, x, y + size * 0.05);
+  fillTextIco(g, m.icon, x, y + size * 0.05);
   g.globalAlpha = 1;
 }
 
@@ -245,7 +246,7 @@ export class Minimap {
       this.g.font = `${size * 0.36}px system-ui`;
       this.g.textAlign = 'center';
       this.g.textBaseline = 'middle';
-      this.g.fillText(this.game.interior ? bizType(this.game.interior.biz.type).icon : '🏠', size / 2, size / 2);
+      fillTextIco(this.g, this.game.interior ? bizType(this.game.interior.biz.type).icon : '🏠', size / 2, size / 2);
       return;
     }
     const p = this.game.player.root.position;

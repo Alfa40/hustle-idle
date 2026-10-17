@@ -99,12 +99,12 @@ interface Stop {
 
 type DriveKind = 'navetta' | 'autobus' | 'turistico' | 'privato' | 'limousine';
 
-const RIDES: Record<DriveKind, { model: () => THREE.Object3D; speed: number; radius: number; accel: number; name: string }> = {
-  navetta: { model: () => carModel('cars/van.glb', 4.8), speed: 11, radius: 1.3, accel: 7, name: 'pulmino' },
-  autobus: { model: () => busModel(0x2d6cdb), speed: 10, radius: 1.6, accel: 5.5, name: 'autobus' },
-  turistico: { model: () => busModel(0xe5484d, true), speed: 9.5, radius: 1.6, accel: 5.5, name: 'bus scoperto' },
-  privato: { model: () => carModel('cars/suv-luxury.glb', 4.6), speed: 13, radius: 1.2, accel: 7, name: 'auto' },
-  limousine: { model: () => carModel('cars/sedan.glb', 4.4, 1.7, 0x1c1c22), speed: 12, radius: 1.4, accel: 6, name: 'limousine' },
+const RIDES: Record<DriveKind, { model: () => THREE.Object3D; speed: number; radius: number; accel: number; name: string; on: string }> = {
+  navetta: { model: () => carModel('cars/van.glb', 4.8), speed: 11, radius: 1.3, accel: 7, name: 'pulmino', on: 'sul pulmino' },
+  autobus: { model: () => busModel(0x2d6cdb), speed: 10, radius: 1.6, accel: 5.5, name: 'autobus', on: "sull'autobus" },
+  turistico: { model: () => busModel(0xe5484d, true), speed: 9.5, radius: 1.6, accel: 5.5, name: 'bus scoperto', on: 'sul bus scoperto' },
+  privato: { model: () => carModel('cars/suv-luxury.glb', 4.6), speed: 13, radius: 1.2, accel: 7, name: 'auto', on: "sull'auto" },
+  limousine: { model: () => carModel('cars/sedan.glb', 4.4, 1.7, 0x1c1c22), speed: 12, radius: 1.4, accel: 6, name: 'limousine', on: 'sulla limousine' },
 };
 
 export class DriveRun extends BaseRun {
@@ -255,8 +255,8 @@ export class DriveRun extends BaseRun {
     const p = this.game.player.root.position;
     if (!this.boarded) {
       const d = Math.hypot(this.carAt.x - p.x, this.carAt.z - p.z);
-      this.status = `🔑 Sali sul ${RIDES[this.kind].name} · ${Math.round(d)} m`;
-      this.game.prompt = d < 3.2 ? { label: `Sali sul ${RIDES[this.kind].name}`, icon: '🔑', at: this.carAt.clone().setY(1.6) } : null;
+      this.status = `🔑 Sali ${RIDES[this.kind].on} · ${Math.round(d)} m`;
+      this.game.prompt = d < 3.2 ? { label: `Sali ${RIDES[this.kind].on}`, icon: '🔑', at: this.carAt.clone().setY(1.6) } : null;
       return;
     }
     this.game.prompt = null;
@@ -489,7 +489,7 @@ export class DriveRun extends BaseRun {
     const p = this.game.player.root.position;
     if (!this.boarded) {
       const near = Math.hypot(this.carAt.x - p.x, this.carAt.z - p.z) < 3.2;
-      return { phase: 0, phases: this.stops.length + 1, phaseName: `Sali sul ${RIDES[this.kind].name}`, phaseIcon: '🔑', left: 1, task: { pos: this.carAt, kind: 'tap', label: 'Sali', icon: '🔑' }, near, inZone: true, arrived: true, tip: `Il <b>${RIDES[this.kind].name}</b> è parcheggiato sulla strada: avvicinati e sali` };
+      return { phase: 0, phases: this.stops.length + 1, phaseName: `Sali ${RIDES[this.kind].on}`, phaseIcon: '🔑', left: 1, task: { pos: this.carAt, kind: 'tap', label: 'Sali', icon: '🔑' }, near, inZone: true, arrived: true, tip: `Il <b>${RIDES[this.kind].name}</b> è parcheggiato sulla strada: avvicinati e sali` };
     }
     const s = this.stop;
     if (!s) return null;
