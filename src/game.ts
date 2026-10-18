@@ -201,6 +201,8 @@ export class Game {
   jobRide: JobRide | null = null;
   /** velocità attuale col mezzo da lavoro (con l'inerzia) */
   rideVel = new THREE.Vector3();
+  /** Rimbalzo del veicolo contro ostacoli ed edifici della città (come se fossero di gomma). */
+  private bounceVel = new THREE.Vector3();
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
   private nextJobSpawn = 3;
@@ -1838,7 +1840,15 @@ export class Game {
       p.z += mz * speed * dt;
       // nel minigioco valgono solo i suoi ostacoli: quelli della città (confini compresi) lo
       // spingerebbero via, contro il muretto in fondo
+      const hit = new THREE.Vector3(p.x, 0, p.z);
       if (!this.arena) this.city.collide(p, ride ? ride.radius : 0.38);
+      if (ride && !jr && !this.arena) {
+        // urto contro un ostacolo: il veicolo rimbalza via, in proporzione alla velocità
+        hit.set(p.x - hit.x, 0, p.z - hit.z);
+        if (hit.length() > 0.004 && hit.normalize().dot(new THREE.Vector3(mx, 0, mz).normalize()) < -0.3) {
+          this.bounceVel.copy(hit).multiplyScalar(Math.min(ride.speed, 14) * 0.7 * Math.min(1, len));
+        }
+      }
       // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
       this.run?.collide?.(p, ride ? ride.radius : 0.35);
       // nel minigioco: dentro il lotto, fuori dalla casa
@@ -1851,6 +1861,18 @@ export class Game {
     } else if (this.player.currentName === 'walk' || this.player.currentName === 'sprint') {
       this.player.play('idle');
     }
+    // rimbalzo: la spinta dell'urto si spegne in fretta, senza attraversare i muri
+    if (this.bounceVel.lengthSq() > 0.01) {
+      if (this.arena || !this.state.riding || jr) this.bounceVel.set(0, 0, 0);
+      else {
+        const rad = VEHICLES[this.state.riding].radius;
+        p.x += this.bounceVel.x * dt;
+        p.z += this.bounceVel.z * dt;
+        this.city.collide(p, rad);
+        this.traffic.pushOut(p, rad);
+        this.bounceVel.multiplyScalar(Math.max(0, 1 - 7 * dt));
+      }
+    } else this.bounceVel.set(0, 0, 0);
     // nel minigioco si salva il posto in città dove si era (non quello nella scena separata)
     if (!this.arena) {
       this.state.player.x = p.x;
