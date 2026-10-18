@@ -55,6 +55,8 @@ export interface WarehouseOpts {
   shelfW?: number;
   /** scaffali tutti del loro colore (montanti compresi) e senza cartello col codice: si riconoscono dal colore */
   colorOnly?: boolean;
+  /** altezze dei ripiani (m), al posto di quelli normali ogni 62 cm (es. due ripiani con spazio per le pile) */
+  boards?: number[];
   slot?: Slot;
   placed?: { path: string; m: THREE.Matrix4 }[];
 }
@@ -150,7 +152,7 @@ export class Warehouse {
         const x = O.x - ((opts.perRow - 1) * (SH_W + 0.6)) / 2 + i * (SH_W + 0.6);
         const color = SHELF_COLORS[k % SHELF_COLORS.length];
         const code = String.fromCharCode(65 + k);
-        const rack = shelfRack(SH_W, SH_D, opts.tall ? 4 : 3, color.hex, opts.colorOnly);
+        const rack = shelfRack(SH_W, SH_D, opts.tall ? 4 : 3, color.hex, opts.colorOnly, opts.boards);
         rack.obj.position.set(x, 0, z);
         rack.obj.userData.noGlow = true;
         g.add(rack.obj);
@@ -197,10 +199,11 @@ export class Warehouse {
   }
 }
 
-/** Scaffale metallico: montanti blu, ripiani arancioni, fascia del colore in basso. */
-export function shelfRack(w: number, d: number, levels: number, color: number, colored = false) {
+/** Scaffale metallico: montanti blu, ripiani arancioni, fascia del colore in basso. `ys`: altezze dei ripiani. */
+export function shelfRack(w: number, d: number, levels: number, color: number, colored = false, ys?: number[]) {
   const g = new THREE.Group();
-  const H = levels * 0.62 + 0.2;
+  const at = ys ?? Array.from({ length: levels }, (_, i) => 0.15 + i * 0.62);
+  const H = ys ? at[at.length - 1] + 0.95 : levels * 0.62 + 0.2;
   // `colored`: montanti del colore dello scaffale, così si riconosce da lontano
   const up = mat(colored ? color : 0x2d4f8a);
   for (const x of [-w / 2 + 0.05, w / 2 - 0.05]) for (const z of [-d / 2 + 0.05, d / 2 - 0.05]) {
@@ -210,8 +213,7 @@ export function shelfRack(w: number, d: number, levels: number, color: number, c
     g.add(p);
   }
   const boards: number[] = [];
-  for (let i = 0; i < levels; i++) {
-    const y = 0.15 + i * 0.62;
+  for (const y of at) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), mat(0xff9f43));
     b.position.y = y;
     b.castShadow = b.receiveShadow = true;

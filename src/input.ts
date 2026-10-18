@@ -210,8 +210,23 @@ export class Input {
       this.onActionDown?.();
       return;
     }
-    // il dito è sull'oggetto da usare (ovunque, anche sul joystick: l'oggetto da toccare vince sempre): tocco = azione "tocca", dito tenuto = "tieni premuto"
-    if (!claim && this.onTargetHit?.(e.clientX, e.clientY)) {
+    // il dito è sull'oggetto da usare: tocco = azione "tocca", dito tenuto = "tieni premuto".
+    // Nel quadrato del joystick però si decide dopo: se il dito scivola è il joystick (si cammina, anche se
+    // davanti c'è un mobile che brilla), se si alza subito o resta fermo è l'azione sull'oggetto.
+    const hit = !claim && this.onTargetHit?.(e.clientX, e.clientY);
+    if (hit && this.inside(z.move, e.clientX, e.clientY)) {
+      if (this.pointerId !== null) this.releaseStick();
+      this.pointerId = e.pointerId;
+      this.start = { x: e.clientX, y: e.clientY, t: performance.now() };
+      this.dragging = false;
+      this.maybeAct = e.pointerId;
+      const id = e.pointerId;
+      setTimeout(() => {
+        if (this.maybeAct === id && this.pointerId === id && !this.dragging) this.stickToAction(this.start.x, this.start.y, true);
+      }, 260);
+      return;
+    }
+    if (hit) {
       if (this.actionId !== null) this.releaseAction();
       this.actionId = e.pointerId;
       this.actionPos = { x: e.clientX, y: e.clientY };
@@ -236,6 +251,14 @@ export class Input {
   }
 
   private moveEv(e: PointerEvent) {
+    if (e.pointerId === this.actionId && this.fromStick && Math.hypot(e.clientX - this.fromStick.x, e.clientY - this.fromStick.y) > 16) {
+      const st = this.fromStick;
+      this.releaseAction();
+      this.fromStick = null;
+      this.pointerId = e.pointerId;
+      this.start = { x: st.x, y: st.y, t: performance.now() };
+      this.dragging = false;
+    }
     if (e.pointerId === this.actionId) this.actionPos = { x: e.clientX, y: e.clientY };
     // tenere premuto sull'oggetto: se il dito scivola fuori l'azione si ferma, se torna sopra riprende
     if (e.pointerId === this.actionId && this.onTarget) this.actionHeld = !!this.onTargetHit?.(e.clientX, e.clientY);
@@ -252,6 +275,7 @@ export class Input {
     const len = Math.hypot(dx, dy);
     if (!this.dragging && len > 12) {
       this.dragging = true;
+      this.maybeAct = null;
       this.stick.style.left = this.start.x + 'px';
       this.stick.style.top = this.start.y + 'px';
       this.stick.classList.add('on');
@@ -265,6 +289,7 @@ export class Input {
 
   private up(e: PointerEvent) {
     if (e.pointerId === this.actionId) {
+      this.fromStick = null;
       this.onTarget = false;
       this.actionId = null;
       this.actionPos = null;
@@ -277,10 +302,37 @@ export class Input {
       return;
     }
     if (e.pointerId !== this.pointerId) return;
+    // tocco breve e fermo sull'oggetto nel quadrato del joystick: è l'azione "tocca"
+    if (this.maybeAct === e.pointerId && !this.dragging) {
+      this.stickToAction(this.start.x, this.start.y, false);
+      this.up(e);
+      return;
+    }
     this.releaseStick();
   }
 
+  /** dito nel quadrato del joystick sopra l'oggetto, rimasto fermo: diventa l'azione su quell'oggetto */
+  private maybeAct: number | null = null;
+  private stickToAction(x: number, y: number, held: boolean) {
+    const id = this.pointerId!;
+    this.releaseStick();
+    if (this.actionId !== null) this.releaseAction();
+    this.actionId = id;
+    this.actionPos = { x, y };
+    this.pressPos = { x, y };
+    this.actClaimed = true;
+    // tocco breve: "tocca"; dito fermo: solo "tieni premuto" (un oggetto da toccare non scatta da solo)
+    if (!held) this.actionPressed = true;
+    this.actionHeld = true;
+    this.onTarget = held;
+    this.fromStick = held ? { x, y } : null;
+    this.onActionDown?.();
+  }
+  /** azione nata dal dito fermo nel joystick: se poi il dito scivola si torna a camminare */
+  private fromStick: { x: number; y: number } | null = null;
+
   private releaseStick() {
+    this.maybeAct = null;
     this.pointerId = null;
     // un tocco breve non fa più muovere il personaggio: si usa solo il joystick
     this.dragging = false;
@@ -290,6 +342,7 @@ export class Input {
   }
 
   private releaseAction() {
+    this.fromStick = null;
     this.onTarget = false;
     this.actionId = null;
     this.actionPos = null;

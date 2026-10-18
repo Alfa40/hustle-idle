@@ -234,6 +234,8 @@ export interface Task {
    * scatola messa nel posto sbagliato per rimetterla a posto (vedi `PhasedRun.retake`)
    */
   loose?: boolean;
+  /** si accende (e si tocca) solo il suo `obj`, non gli oggetti lì attorno (es. un posto preciso di uno scaffale) */
+  own?: boolean;
   /** zona invisibile da toccare, se il punto non ha un oggetto che si accende (la mette il lavoretto) */
   hitObj?: THREE.Object3D;
   /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
@@ -385,7 +387,7 @@ export class PhasedRun extends BaseRun {
   private addGlow(t: Task) {
     if (!this.glows.has(t)) this.glows.set(t, { meshes: [] });
     // da riprendere: si accende (e si tocca) solo l'oggetto stesso, non lo scaffale o il mobile su cui sta
-    if (t.loose && t.obj) {
+    if ((t.loose || t.own) && t.obj) {
       this.glowObj(t, t.obj);
       return;
     }

@@ -53,10 +53,17 @@ function bumpTracker(game: Game, onBump: () => void) {
 
 // ---------------- Magazziniere (Magazzino, gradino 1) ----------------
 
-/** Scatola pesante o fragile: lo sticker sulla parte alta dice il ripiano (pesante in basso, fragile in alto). */
+/** Scatola pesante o fragile: lo sticker sopra dice dove va nella pila (pesante sotto a tutte, fragile in cima). */
 type BoxKind = 'normal' | 'heavy' | 'fragile';
-/** posti per ripiano (metà scaffale ciascuno): le scatole vanno in un posto libero, mai una sopra l'altra */
-const PER_SPOT = 3;
+/** pile per ripiano (una accanto all'altra) e quante scatole al massimo in ogni pila (in basso c'è più spazio) */
+const COLS = 3;
+const MAX_STACK = { low: 3, high: 2 };
+/** i due ripiani degli scaffali del magazziniere: in basso e in alto, con lo spazio per le pile */
+export const SHELVING_BOARDS = [0.15, 1.3];
+/** larghezza degli scaffali del magazziniere (m) */
+export const SHELVING_W = 3.4;
+const BOX = 0.42;
+const BOX_H = BOX * 0.8;
 
 const stickerTex = new Map<string, THREE.Texture>();
 /** Sticker quadrato ben visibile: 🏋️ su grigio scuro (pesante) o 🍷 su bianco col bordo rosso (fragile). */
@@ -159,18 +166,20 @@ function shelfBox(size: number, color: number, kind: BoxKind, top: boolean) {
 
 /**
  * Magazziniere: le scatole scaricate dal camion stanno davanti alla banchina. Niente cartelli né frecce: si
- * va a colori. Il **nastro** della scatola è del colore dello scaffale dove va. Dal Liv. 4 arrivano le
- * scatole con lo **sticker** ben visibile sopra: 🏋️ pesante = ripiano in basso (si solleva tenendo premuto e
- * si cammina più piano), 🍷 fragile = ripiano in alto; le lastrine dei ripiani hanno lo stesso sticker. Le
- * scatole senza sticker vanno su qualsiasi ripiano del loro scaffale. Ogni scatola va nel primo posto libero
- * del ripiano, accanto a quelle che ci sono già. Si può appoggiare anche nel posto sbagliato: il gioco lo
- * lascia fare, ma alla fine (firmando la bolla) ogni scatola fuori posto toglie stelle e quindi paga
- * (una sbagliata: massimo 2 stelle, due o più: 1). Salendo: più scatole e più colori.
+ * va a colori. Ogni scaffale ha **due ripiani**, uno in basso e uno in alto. Il **nastro** della scatola è del
+ * colore dello scaffale e fa una punta: ^ = ripiano in alto, V = ripiano in basso (come il cartellino sul
+ * montante). Su ogni ripiano le scatole si **impilano** (tre pile per ripiano: 3 scatole in basso, 2 in alto);
+ * si tocca la pila dove appoggiarla. Dal Liv. 4 gli **sticker** sopra la scatola dicono dove va nella pila:
+ * 🏋️ pesante = direttamente sul ripiano, mai sopra altre scatole (le schiaccia; si solleva tenendo premuto e si
+ * cammina più piano), 🍷 fragile = in cima, niente sopra. Ogni errore (scaffale o ripiano sbagliato, pesante
+ * sopra altre, qualcosa sopra una fragile) si vede subito e si può sistemare riprendendo la scatola in cima alla
+ * pila; conta solo quello che è ancora sbagliato quando si firma la bolla (uno: massimo 2 stelle, due o più: 1).
+ * Salendo: più scatole e più colori.
  */
 export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title: string) {
   const t = rungProgress('magazzino', lineLevel);
   const n = Math.round(6 + 4 * t);
-  /** pesanti e fragili (e quindi il ripiano giusto), dal Liv. 4 */
+  /** pesanti e fragili (e quindi le regole della pila), dal Liv. 4 */
   const levels = lineLevel >= 4;
   const nHeavy = !levels ? 0 : t < 0.6 ? 1 : 2;
   const nFragile = !levels ? 0 : t < 0.7 ? 1 : 2;
@@ -185,106 +194,158 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     const col = Math.floor(i / 2);
     spots.push(new THREE.Vector3(O.x - 2.6 + col * 1.3 - (row ? 0.65 : 0), 0, O.z - 1.6 - row * 1.3));
   }
-  // posti sui ripiani: ogni metà scaffale ne ha PER_SPOT; alcune scatole ci sono già
-  const key = (s: Shelf, top: boolean) => `${wh.shelves.indexOf(s)}${top ? 't' : 'b'}`;
-  // posti occupati di ogni ripiano (una scatola ripresa in mano libera il suo)
-  const occ = new Map<string, boolean[]>();
-  const slotsOf = (s: Shelf, top: boolean) => {
-    const k = key(s, top);
-    if (!occ.has(k)) occ.set(k, Array(PER_SPOT).fill(false));
-    return occ.get(k)!;
-  };
-  const filled = (s: Shelf, top: boolean) => slotsOf(s, top).filter(Boolean).length;
-  const pre: { s: Shelf; top: boolean }[] = [];
-  for (const s of wh.shelves) for (const top of [false, true]) if (Math.random() < 0.5) {
-    slotsOf(s, top)[0] = true;
-    pre.push({ s, top });
-  }
   type Item = { pos: THREE.Vector3; shelf: Shelf; kind: BoxKind; top: boolean; obj?: THREE.Object3D };
+  /** una scatola in una pila (`it` null: c'era già) */
+  type Entry = { it: Item | null; kind: BoxKind; obj: THREE.Object3D };
+  // le pile di ogni ripiano: chiave scaffale + ripiano + pila
+  const stacks = new Map<string, Entry[]>();
+  const stackOf = (s: Shelf, top: boolean, c: number) => {
+    const k = `${wh.shelves.indexOf(s)}${top ? 't' : 'b'}${c}`;
+    if (!stacks.has(k)) stacks.set(k, []);
+    return stacks.get(k)!;
+  };
+  const maxOf = (top: boolean) => (top ? MAX_STACK.high : MAX_STACK.low);
+  // alcune scatole ci sono già (normali, sul ripiano): una per ripiano, a volte
+  const pre: { s: Shelf; top: boolean; c: number }[] = [];
+  for (const s of wh.shelves) for (const top of [false, true]) if (Math.random() < 0.5) pre.push({ s, top, c: Math.floor(Math.random() * COLS) });
+  const preOn = (s: Shelf, top: boolean) => pre.filter((p) => p.s === s && p.top === top).length;
   const want = new Map<string, number>();
-  const room = (s: Shelf, top: boolean) => PER_SPOT - filled(s, top) - (want.get(key(s, top)) ?? 0);
+  const wantH = new Map<string, number>();
+  const bk = (s: Shelf, top: boolean) => `${wh.shelves.indexOf(s)}${top}`;
+  const room = (s: Shelf, top: boolean) => COLS * maxOf(top) - preOn(s, top) - (want.get(bk(s, top)) ?? 0);
   const items: Item[] = [];
   for (let i = 0; i < n; i++) {
     const kind: BoxKind = i < nHeavy ? 'heavy' : i < nHeavy + nFragile ? 'fragile' : 'normal';
-    // uno scaffale con ancora posto sul ripiano che serve (le normali: su uno dei due)
     let shelf = wh.shelves[0];
     let top = false;
     for (let guard = 0; guard < 100; guard++) {
       shelf = wh.shelves[Math.floor(Math.random() * wh.shelves.length)];
-      // le normali: il ripiano con più posto (a pari posto a caso), indicato dalla punta del nastro
-      const rt = room(shelf, true), rb = room(shelf, false);
-      top = kind === 'fragile' ? true : kind === 'heavy' ? false : rt === rb ? Math.random() < 0.5 : rt > rb;
+      // in basso vanno più scatole (si impilano), in alto meno
+      top = Math.random() < 0.4;
+      // una pesante vuole una pila vuota tutta per sé
+      if (kind === 'heavy' && (wantH.get(bk(shelf, top)) ?? 0) + preOn(shelf, top) >= COLS) continue;
       if (room(shelf, top) > 0) break;
     }
-    want.set(key(shelf, top), (want.get(key(shelf, top)) ?? 0) + 1);
+    want.set(bk(shelf, top), (want.get(bk(shelf, top)) ?? 0) + 1);
+    if (kind === 'heavy') wantH.set(bk(shelf, top), (wantH.get(bk(shelf, top)) ?? 0) + 1);
     items.push({ pos: spots[i], shelf, kind, top });
   }
   items.sort(() => Math.random() - 0.5);
   let carrying: Item | null = null;
-  /** scatole appoggiate nel posto sbagliato: si possono riprendere fino alla firma, poi contano */
-  const misplaced = new Set<Item>();
-  const cap = () => (misplaced.size >= 2 ? 1 : misplaced.size ? 2 : 3);
   let run: PhasedRun;
-  // le lastrine: ripiano in basso a sinistra, ripiano in alto a destra (metà scaffale ciascuna)
-  const spotAt = (s: Shelf, top: boolean) => s.pos.clone().addScaledVector(s.front, 0.25).addScaledVector(s.side, top ? 0.85 : -0.85);
-  // il prossimo posto libero sul ripiano: da sinistra a destra, accanto alle scatole che ci sono già
-  const slotAt = (s: Shelf, top: boolean, k: number) => spotAt(s, top).addScaledVector(s.side, (k - (PER_SPOT - 1) / 2) * 0.52).setY(s.boards[top ? 2 : 0]);
+  // le pile: lungo lo scaffale, un po' verso il corridoio
+  const colAt = (s: Shelf, top: boolean, c: number) => s.pos.clone().addScaledVector(s.front, 0.12).addScaledVector(s.side, (c - (COLS - 1) / 2) * 0.95).setY(s.boards[top ? 1 : 0]);
+  /** cosa c'è di sbagliato in una pila: scatole fuori posto, pesanti sopra altre, fragili con qualcosa sopra */
+  const faults = (s: Shelf, top: boolean, arr: Entry[]) => {
+    let place = 0, heavy = 0, fragile = 0;
+    arr.forEach((e, i) => {
+      if (e.it && (e.it.shelf !== s || e.it.top !== top)) place++;
+      if (e.kind === 'heavy' && i > 0) heavy++;
+      if (e.kind === 'fragile' && i < arr.length - 1) fragile++;
+    });
+    return { place, heavy, fragile, all: place + heavy + fragile };
+  };
+  const allFaults = () => {
+    const f = { place: 0, heavy: 0, fragile: 0, all: 0 };
+    for (const s of wh.shelves) for (const top of [false, true]) for (let c = 0; c < COLS; c++) {
+      const x = faults(s, top, stackOf(s, top, c));
+      f.place += x.place; f.heavy += x.heavy; f.fragile += x.fragile; f.all += x.all;
+    }
+    return f;
+  };
+  const cap = () => { const a = allFaults().all; return a >= 2 ? 1 : a ? 2 : 3; };
+  /** sul ripiano deve ancora andare una pesante ma ogni pila ha già qualcosa: le scatole in cima si possono spostare */
+  const heavyBlocked = (s: Shelf, top: boolean) => {
+    const cols = Array.from({ length: COLS }, (_, c) => stackOf(s, top, c));
+    if (cols.some((a) => !a.length)) return false;
+    return items.some((x) => x.kind === 'heavy' && x.shelf === s && x.top === top && !cols.some((a) => a[0]?.it === x));
+  };
+  // la pila si rimette in ordine: le scatole schiacciate (sotto una pesante, o una fragile con qualcosa sopra) si abbassano
+  const relayout = (s: Shelf, top: boolean, c: number) => {
+    const arr = stackOf(s, top, c);
+    let y = colAt(s, top, c).y;
+    arr.forEach((e, i) => {
+      const above = arr.slice(i + 1);
+      const squashed = above.some((x) => x.kind === 'heavy') || (e.kind === 'fragile' && above.length > 0);
+      e.obj.scale.y = squashed ? 0.78 : 1;
+      e.obj.position.y = y;
+      y += BOX_H * e.obj.scale.y;
+    });
+  };
+  const pick = (it: Item) => {
+    carrying = it;
+    hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind, it.top));
+    run.speedMul = it.kind === 'heavy' ? 0.6 : 1;
+  };
+  // per ogni pila: una piastrella del colore sul ripiano (si accende) e la zona da toccare, alta quanto la pila
+  const pads = new Map<string, THREE.Object3D>();
+  const padOf = (s: Shelf, top: boolean, c: number) => {
+    const k = `${wh.shelves.indexOf(s)}${top}${c}`;
+    let g = pads.get(k);
+    if (!g) {
+      g = new THREE.Group();
+      const tile = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.03, 0.62), new THREE.MeshLambertMaterial({ color: s.color.hex }));
+      tile.position.y = 0.015;
+      const zone = new THREE.Mesh(new THREE.BoxGeometry(0.7, BOX_H * maxOf(top) + 0.1, 0.7), new THREE.MeshBasicMaterial({ visible: false }));
+      zone.position.y = (BOX_H * maxOf(top) + 0.1) / 2;
+      g.add(tile, zone);
+      run.prop(g, colAt(s, top, c), 0, 1).userData.solid = false;
+      pads.set(k, g);
+    }
+    return g;
+  };
   const placeTasks = (it: Item): Task[] => {
     const g = `place${items.indexOf(it)}`;
     const out: Task[] = [];
-    for (const s of wh.shelves) {
-      for (const top of [false, true]) {
-        // scaffale del colore e ripiano della punta del nastro
-        const ok = s === it.shelf && top === it.top;
-        // ogni ripiano con posto si può scegliere: quello sbagliato si paga alla fine
-        out.push({
-          pos: spotAt(s, top), kind: 'tap', label: `Appoggia sul ripiano ${top ? 'in alto' : 'in basso'}`, icon: '📦', quiet: true,
-          group: g, right: ok,
-          // un ripiano pieno non si sceglie (si usa l'altro dello stesso scaffale)
-          enabled: () => filled(s, top) < PER_SPOT,
-          onDone: () => {
-            carrying = null;
-            run.speedMul = 1;
-            hold(game);
-            const arr = slotsOf(s, top);
-            const k = Math.max(0, arr.indexOf(false));
-            arr[k] = true;
-            const c = run.prop(shelfBox(0.42, s.color.hex, it.kind, top), slotAt(s, top, k), 0, 1);
-            c.userData.noGlow = true;
-            // nel posto sbagliato: si può riprendere in mano e rimettere giusto prima di firmare la bolla
-            if (!ok) {
-              misplaced.add(it);
-              run.retake(c, 'Riprendi la scatola', '📦', () => !carrying, () => {
-                c.visible = false;
-                arr[k] = false;
-                misplaced.delete(it);
-                run.starCap = cap();
-                carrying = it;
-                hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind, it.top));
-                run.speedMul = it.kind === 'heavy' ? 0.6 : 1;
-              }, () => placeTasks(it));
-            }
+    for (const s of wh.shelves) for (const top of [false, true]) for (let c = 0; c < COLS; c++) {
+      const arr = stackOf(s, top, c);
+      const pad = padOf(s, top, c);
+      out.push({
+        pos: pad.position.clone().setY(0), kind: 'tap', quiet: true, own: true, obj: pad, icon: '📦',
+        get label() { return arr.length ? 'Appoggia sopra la pila' : `Appoggia sul ripiano ${top ? 'in alto' : 'in basso'}`; },
+        group: g, right: s === it.shelf && top === it.top,
+        // una pila piena non si sceglie
+        enabled: () => arr.length < maxOf(top),
+        onDone: () => {
+          carrying = null;
+          run.speedMul = 1;
+          hold(game);
+          const box = run.prop(shelfBox(BOX, s.color.hex, it.kind, top), colAt(s, top, c), 0, 1);
+          box.userData.noGlow = true;
+          box.userData.solid = false;
+          const e: Entry = { it, kind: it.kind, obj: box };
+          const under = arr[arr.length - 1];
+          arr.push(e);
+          relayout(s, top, c);
+          // gli errori della pila si vedono e si dicono subito (si possono ancora sistemare)
+          if (it.kind === 'heavy' && under) toast('🏋️ Pesante sopra altre scatole: le schiaccia!', 'bad');
+          else if (under?.kind === 'fragile') toast('🍷 Qualcosa sopra la fragile: si rompe!', 'bad');
+          // la scatola in cima a una pila con qualcosa che non va si riprende in mano (anche una giusta che copre una fragile)
+          run.retake(box, 'Riprendi la scatola', '📦', () => !carrying && arr[arr.length - 1] === e && (faults(s, top, arr).all > 0 || heavyBlocked(s, top)), () => {
+            box.visible = false;
+            arr.pop();
+            relayout(s, top, c);
+            pick(it);
             run.starCap = cap();
-          },
-        });
-      }
+          }, () => placeTasks(it));
+          run.starCap = cap();
+        },
+      });
     }
     return out;
   };
   const phases: Phase[] = [
     {
       name: 'Sistema le scatole sugli scaffali', icon: '📦', count: () => [items.filter((x) => x.obj && !x.obj.visible && x !== carrying).length, n],
-      tip: levels
-        ? 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> e fa una <b>punta</b>: <b>^ in alto</b>, <b>V in basso</b>, come i cartellini sui ripiani. Le pesanti 🏋️ vanno sempre in basso (si sollevano tenendo premuto), le fragili 🍷 sempre in alto. Se sbagli, tocca la scatola per riprenderla: contano solo quelle ancora fuori posto quando firmi la bolla'
-        : 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> dove va e fa una <b>punta</b>: <b>^ ripiano in alto</b>, <b>V ripiano in basso</b>, come i cartellini sui ripiani. Se sbagli, tocca la scatola per riprenderla: contano solo quelle ancora fuori posto quando firmi la bolla',
+      tip: 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> e fa una <b>punta</b>: <b>^ ripiano in alto</b>, <b>V ripiano in basso</b>, come il cartellino sul montante. Le scatole si possono <b>impilare</b>: tocca la pila dove appoggiarla.'
+        + (levels ? ' La <b>pesante</b> 🏋️ va sempre direttamente sul ripiano, mai sopra altre scatole (le schiaccia); sulla <b>fragile</b> 🍷 non va messo niente sopra.' : '')
+        + ' Se sbagli, tocca la scatola in cima alla pila per riprenderla: conta solo quello che è ancora sbagliato quando firmi la bolla',
       tasks: () => items.map((it) => ({
         pos: it.pos, kind: it.kind === 'heavy' ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.kind === 'heavy' ? 'Solleva la scatola pesante' : it.kind === 'fragile' ? 'Prendi la scatola fragile' : 'Prendi la scatola', icon: it.kind === 'heavy' ? '🏋️' : it.kind === 'fragile' ? '🍷' : '📦',
         quiet: true, enabled: () => !carrying, obj: it.obj,
         onDone: () => {
-          carrying = it;
           if (it.obj) it.obj.visible = false;
-          hold(game, shelfBox(it.kind === 'heavy' ? 0.6 : 0.45, it.shelf.color.hex, it.kind, it.top));
-          run.speedMul = it.kind === 'heavy' ? 0.6 : 1;
+          pick(it);
         },
         then: () => placeTasks(it),
       })),
@@ -296,11 +357,16 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
         pos: bossAt.clone().add(new THREE.Vector3(0, 0, -0.9)), kind: 'tap', quiet: true, label: 'Firma la bolla di consegna', icon: '🧾', get obj() { return boss; },
         // con una scatola ripresa in mano prima la si mette a posto
         enabled: () => !carrying,
-        // il controllo del capo magazzino: le scatole fuori posto si contano adesso
+        // il controllo del capo magazzino: gli errori ancora lì si contano adesso
         onDone: () => {
-          const wrong = misplaced.size;
+          const f = allFaults();
           run.starCap = cap();
-          toast(wrong ? `📋 Controllo: ${wrong} ${wrong === 1 ? 'scatola fuori posto' : 'scatole fuori posto'} · massimo ${run.starCap} ${run.starCap === 1 ? 'stella' : 'stelle'}` : '📋 Controllo: tutte le scatole al posto giusto!', wrong ? 'bad' : 'good');
+          const parts = [
+            f.place && `${f.place} fuori posto`,
+            f.heavy && `${f.heavy} ${f.heavy === 1 ? 'pesante' : 'pesanti'} sopra altre scatole`,
+            f.fragile && `${f.fragile} ${f.fragile === 1 ? 'fragile' : 'fragili'} con qualcosa sopra`,
+          ].filter(Boolean);
+          toast(f.all ? `📋 Controllo: ${parts.join(', ')} · massimo ${run.starCap} ${run.starCap === 1 ? 'stella' : 'stelle'}` : '📋 Controllo: tutte le scatole al posto giusto!', f.all ? 'bad' : 'good');
         },
       }],
     },
@@ -311,26 +377,26 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     it.obj = run.prop(shelfBox(it.kind === 'heavy' ? 0.75 : 0.55, it.shelf.color.hex, it.kind, it.top), it.pos, Math.random() * 0.5, 1);
     it.obj.userData.solid = false;
   }
-  // le lastrine dei ripiani (bordo del colore dello scaffale, centro bianco o nero) e le scatole già lì
   for (const s of wh.shelves) {
+    const rot = Math.atan2(s.front.x, s.front.z);
     for (const top of [false, true]) {
-      const at = spotAt(s, top).setY(s.boards[top ? 2 : 0] + 0.01);
-      const rim = run.prop(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.03, 0.6), new THREE.MeshLambertMaterial({ color: s.color.hex })), at, 0, 1);
-      rim.userData.solid = false;
-      // cartellino col nastro a punta appeso sul davanti, sotto il ripiano in alto / sotto quello di mezzo per il ripiano in basso
-      // (non copre le scatole): uguale al nastro delle scatole di quel ripiano
-      const ay = top ? s.boards[2] - 0.2 : s.boards[1] - 0.19;
-      run.prop(chevronPlane(s.color.hex, top, top ? 0.36 : 0.3, (top ? 0.36 : 0.3) * 0.8, '#ffffff'), at.clone().addScaledVector(s.front, 0.33).setY(ay), Math.atan2(s.front.x, s.front.z), 1);
-      // dal Liv. 4: lo sticker del ripiano (🏋️ in basso, 🍷 in alto), come quello sulle scatole
-      if (levels) {
-        const st = sticker(top ? 'fragile' : 'heavy', 0.36);
-        run.prop(st, at.clone().add(new THREE.Vector3(0, 0.03, 0.12)), 0, 1).rotation.set(-Math.PI / 2, 0, 0);
-      }
+      for (let c = 0; c < COLS; c++) padOf(s, top, c);
+      // cartellino col nastro a punta sul montante di sinistra, all'altezza del suo ripiano (non copre le pile)
+      const y = s.boards[top ? 1 : 0] + (top ? 0.45 : 0.55);
+      const at = s.pos.clone().addScaledVector(s.front, 0.47).addScaledVector(s.side, -SHELVING_W / 2 + 0.05).setY(y);
+      run.prop(chevronPlane(s.color.hex, top, 0.3, 0.24, '#ffffff'), at, rot, 1);
     }
   }
-  for (const p of pre) run.prop(shelfBox(0.42, p.s.color.hex, 'normal', p.top), slotAt(p.s, p.top, 0), 0, 1).userData.noGlow = true;
-  // in mano: il colore dello scaffale e il ripiano
-  run.extraStatus = () => (carrying ? `scaffale ${carrying.shelf.color.icon} ${carrying.top ? 'in alto' : 'in basso'}` : '');
+  for (const p of pre) {
+    const box = run.prop(shelfBox(BOX, p.s.color.hex, 'normal', p.top), colAt(p.s, p.top, p.c), 0, 1);
+    box.userData.noGlow = true;
+    box.userData.solid = false;
+    stackOf(p.s, p.top, p.c).push({ it: null, kind: 'normal', obj: box });
+  }
+  // per le prove automatiche: le pile
+  Object.assign(run, { shelfStacks: stacks });
+  // in mano: il colore dello scaffale e il ripiano (e per pesanti e fragili dove va nella pila)
+  run.extraStatus = () => (carrying ? `scaffale ${carrying.shelf.color.icon} ${carrying.top ? 'in alto' : 'in basso'}${carrying.kind === 'heavy' ? ' · 🏋️ niente sotto' : carrying.kind === 'fragile' ? ' · 🍷 niente sopra' : ''}` : '');
   return run;
 }
 
@@ -660,7 +726,7 @@ export function startLogisticsJob(game: Game, offer: JobOffer, slot: Slot, title
   if (offer.type === 'autista') return driveJob(game, lv, slot, title);
   if (offer.type === 'magazzino') {
     switch (r) {
-      case 0: return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: t < 0.4 ? 3 : t < 0.7 ? 4 : 5, shelfW: 3.4, colorOnly: true, slot, placed })), title);
+      case 0: return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: t < 0.4 ? 3 : t < 0.7 ? 4 : 5, shelfW: SHELVING_W, colorOnly: true, boards: SHELVING_BOARDS, slot, placed })), title);
       case 1: return forkliftJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: 3, tall: t >= 0.3, aisle: 4.4 - 1.1 * t, slot, placed })), title);
       case 2: return pickingJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: t < 0.5 ? 3 : 4, slot, placed })), title);
       case 3: return shippingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: 3, flatbed: false, slot, placed })), title);
