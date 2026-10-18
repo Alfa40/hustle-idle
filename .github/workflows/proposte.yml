@@ -2,7 +2,8 @@ name: Proposte approvate dal gioco
 
 # I tester scrivono le proposte nel gioco (Opzioni → Proponi): restano private sul server delle classifiche
 # finché lo sviluppatore non le approva (Opzioni → Proposte, sul suo telefono). Ogni 10 minuti questo
-# workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml).
+# workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml), e chiude
+# le proposte la cui anteprima lo sviluppatore ha rifiutato (app developer → Anteprime → Rifiuta).
 # Serve il segreto PROPOSTE_ROBOT_KEY (chiave del "robot": il server conosce solo la sua impronta).
 
 on:
@@ -60,4 +61,20 @@ jobs:
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/imported" -H 'Content-Type: application/json' \
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" --argjson n "$issue" '{key: $k, id: $id, issue: $n}')" > /dev/null
             echo "Proposta del gioco #$id → issue #$issue"
+          done
+      - name: Anteprime rifiutate → proposta chiusa
+        if: always()
+        run: |
+          if [ -z "$KEY" ]; then exit 0; fi
+          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/toclose" \
+            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > chiudere.json
+          jq -c '.proposals[]' chiudere.json | while read -r p; do
+            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p")
+            if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
+              gh issue close "$issue" -R "$REPO" --reason "not planned" \
+                --comment "Lo sviluppatore ha provato l'anteprima e ha deciso di non metterla nel gioco."
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/closed" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" '{key: $k, id: $id}')" > /dev/null
+            echo "Proposta del gioco #$id rifiutata → issue #$issue chiusa"
           done

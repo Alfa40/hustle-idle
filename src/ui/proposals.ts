@@ -28,7 +28,7 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 interface Proposal {
   id: number;
-  status: 'nuova' | 'approvata' | 'scartata' | 'importata';
+  status: 'nuova' | 'approvata' | 'scartata' | 'importata' | 'rifiutata';
   text: string;
   why: string;
   where: string;
@@ -235,13 +235,13 @@ export class Proposals {
   }
 
   private card(p: Proposal) {
-    const tag = { nuova: '', approvata: '<span class="tag">⏳ approvata, sta per andare su GitHub</span>', scartata: '<span class="tag">❌ scartata</span>', importata: `<span class="tag">✅ su GitHub #${p.issue}</span>` }[p.status];
+    const tag = { nuova: '', approvata: '<span class="tag">⏳ approvata, sta per andare su GitHub</span>', scartata: '<span class="tag">❌ scartata</span>', importata: `<span class="tag">✅ su GitHub #${p.issue}</span>`, rifiutata: '<span class="tag">❌ rifiutata dopo l\'anteprima</span>' }[p.status];
     const busy = this.busy.has(p.id);
     const photo = p.photo && this.open.has(p.id) ? `<img class="prop-photo" src="${API}/hustle/proposal-photo/${p.id}.jpg?k=${encodeURIComponent(devKey())}" alt="">` : '';
     const btns =
       p.status === 'nuova'
         ? `<button class="btn sm good" data-a="revDo:${p.id}|approve" ${busy ? 'disabled' : ''}>✅ Approva</button><button class="btn sm danger" data-a="revDo:${p.id}|reject" ${busy ? 'disabled' : ''}>❌ Scarta</button>`
-        : p.status === 'importata'
+        : p.status === 'importata' || p.status === 'rifiutata'
           ? `<a class="btn sm blue" href="${REPO}/issues/${p.issue}" target="_blank" rel="noopener">Apri su GitHub</a>`
           : `<button class="btn sm sec" data-a="revDo:${p.id}|reopen" ${busy ? 'disabled' : ''}>↩️ Rimetti in attesa</button>`;
     return `<div class="card prop-card"><h3>#${p.id} · ${esc(p.nickname)} <span class="muted small">${when(p.created)}</span></h3>${tag}

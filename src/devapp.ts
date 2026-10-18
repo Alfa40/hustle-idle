@@ -3,7 +3,8 @@
  * - Partita developer (apre il gioco con `./?app=dev`: un miliardo, comandi rapidi, mai in classifica);
  * - Anteprime: le proposte aperte su GitHub con il ramo di Claude, con chi le ha scritte, da aprire sul telefono;
  * - Tester: per ogni persona quante proposte ha inviato, quante sono state rifiutate e accettate, e tra le
- *   accettate quali sono finite davvero nel gioco (pull request del ramo di Claude unita).
+ *   accettate quali sono finite davvero nel gioco (pull request del ramo di Claude unita). Le anteprime provate e
+ *   non piaciute si rifiutano da qui ("Rifiuta"): il robot di GitHub chiude la proposta e conta come rifiutata.
  * Serve la chiave developer (una volta per telefono): le proposte sul server sono private.
  */
 import '@fontsource/fredoka/500.css';
@@ -24,7 +25,7 @@ const issueUrl = (n: number) => `https://github.com/${REPO}/issues/${n}`;
 /** proposta come la vede il server */
 interface Prop {
   id: number;
-  status: 'nuova' | 'approvata' | 'scartata' | 'importata';
+  status: 'nuova' | 'approvata' | 'scartata' | 'importata' | 'rifiutata';
   text: string;
   nickname: string;
   player: string;
@@ -40,15 +41,16 @@ interface Issue {
   pull_request?: unknown;
 }
 /** a che punto è una proposta, mettendo insieme server e GitHub */
-type Stage = 'attesa' | 'rifiutata' | 'lavoro' | 'prova' | 'gioco' | 'chiusa';
+type Stage = 'attesa' | 'scartata' | 'bocciata' | 'lavoro' | 'prova' | 'gioco';
 const STAGE: Record<Stage, { label: string; ico: string }> = {
   attesa: { label: 'In attesa di lettura', ico: '⏳' },
-  rifiutata: { label: 'Rifiutata', ico: '❌' },
+  scartata: { label: 'Rifiutata subito', ico: '❌' },
+  bocciata: { label: "Rifiutata dopo l'anteprima", ico: '❌' },
   lavoro: { label: 'Accettata · Claude ci sta lavorando', ico: '🛠️' },
   prova: { label: 'Accettata · anteprima da provare', ico: '📱' },
   gioco: { label: 'Accettata · nel gioco', ico: '✅' },
-  chiusa: { label: 'Accettata · chiusa senza entrare nel gioco', ico: '🚫' },
 };
+const REJECTED: Stage[] = ['scartata', 'bocciata'];
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -103,10 +105,12 @@ async function load(): Promise<Data> {
 
 function stageOf(p: Prop, d: Data): Stage {
   if (p.status === 'nuova') return 'attesa';
-  if (p.status === 'scartata') return 'rifiutata';
+  if (p.status === 'scartata') return 'scartata';
+  if (p.status === 'rifiutata') return 'bocciata';
   if (p.status === 'approvata' || !p.issue) return 'lavoro';
   if (d.merged.has(p.issue)) return 'gioco';
-  if (d.issues.get(p.issue)?.state === 'closed') return 'chiusa';
+  // chiusa su GitHub senza unire la modifica: rifiutata anche questa
+  if (d.issues.get(p.issue)?.state === 'closed') return 'bocciata';
   return d.branches.has(p.issue) ? 'prova' : 'lavoro';
 }
 
@@ -119,6 +123,9 @@ let keyMsg = '';
 let loading = false;
 let lastLoad = 0;
 let tab: 'anteprime' | 'tester' = 'anteprime';
+/** "Rifiuta" toccato una volta: si chiede conferma con un secondo tocco */
+let confirmReject = 0;
+let rejecting = 0;
 const openTesters = new Set<string>();
 
 function keyHtml() {
@@ -129,15 +136,20 @@ function keyHtml() {
 
 function previewsHtml(d: Data) {
   // nome di chi ha scritto ogni proposta su GitHub (dal server; per le proposte aperte a mano, dal testo)
-  const who = new Map(d.props.filter((p) => p.issue).map((p) => [p.issue, p.nickname]));
-  const open = [...d.issues.values()].filter((i) => i.state === 'open' && !d.merged.has(i.number));
+  const propOf = new Map(d.props.filter((p) => p.issue).map((p) => [p.issue, p]));
+  // aperte su GitHub, non ancora unite e non rifiutate (la chiusura su GitHub arriva qualche minuto dopo)
+  const open = [...d.issues.values()].filter((i) => i.state === 'open' && !d.merged.has(i.number) && propOf.get(i.number)?.status !== 'rifiutata');
   const ready = open.filter((i) => d.branches.has(i.number)).sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
   const busy = open.filter((i) => !d.branches.has(i.number));
   const row = (i: Issue, ok: boolean) => {
-    const name = who.get(i.number) ?? /da \*\*(.+?)\*\*/.exec(i.body ?? '')?.[1] ?? '';
-    return `<a class="t-btn ${ok ? '' : 'wait'}" href="${ok ? preview(i.number) : issueUrl(i.number)}" target="_blank" rel="noopener">
+    const prop = propOf.get(i.number);
+    const name = prop?.nickname ?? /da \*\*(.+?)\*\*/.exec(i.body ?? '')?.[1] ?? '';
+    const rej = prop
+      ? `<button class="btn sm danger dv-rej" data-a="reject:${prop.id}" ${rejecting === prop.id ? 'disabled' : ''}>${rejecting === prop.id ? 'Rifiuto…' : confirmReject === prop.id ? 'Sicuro? Tocca ancora per rifiutarla' : '❌ Rifiuta'}</button>`
+      : '';
+    return `<div class="dv-prev"><a class="t-btn ${ok ? '' : 'wait'}" href="${ok ? preview(i.number) : issueUrl(i.number)}" target="_blank" rel="noopener">
       <span class="t-ico">${ok ? '📱' : '🛠️'}</span><span class="l-txt"><b>#${i.number} · ${esc(i.title.replace(/^Proposta:\s*/i, ''))}</b>
-      <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}${ok ? `aggiornata ${ago(Date.parse(i.updated_at))}` : 'Claude ci sta lavorando'}</small></span></a>`;
+      <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}${ok ? `aggiornata ${ago(Date.parse(i.updated_at))}` : 'Claude ci sta lavorando'}</small></span></a>${rej}</div>`;
   };
   if (!open.length) return '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
   return ready.map((i) => row(i, true)).join('') + busy.map((i) => row(i, false)).join('');
@@ -156,7 +168,7 @@ function testersHtml(d: Data) {
       const st = ps.map((p) => stageOf(p, d));
       const n = (f: (s: Stage) => boolean) => st.filter(f).length;
       return { k, ps, st, name: ps[0].nickname || 'Senza nome', last: ps[0].created,
-        rej: n((s) => s === 'rifiutata'), acc: n((s) => s !== 'attesa' && s !== 'rifiutata'), game: n((s) => s === 'gioco'), wait: n((s) => s === 'attesa') };
+        rej: n((s) => REJECTED.includes(s)), acc: n((s) => s !== 'attesa' && !REJECTED.includes(s)), game: n((s) => s === 'gioco'), wait: n((s) => s === 'attesa') };
     })
     .sort((a, b) => b.last - a.last);
   return list.map((t) => {
@@ -195,6 +207,23 @@ function render() {
   scrollTo(0, y);
 }
 
+/** Anteprima non piaciuta: rifiutata sul server; il robot di GitHub chiude la proposta entro una decina di minuti. */
+async function reject(id: number) {
+  rejecting = id;
+  render();
+  try {
+    const r = await fetch(API + '/hustle/proposals/decide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: devKey(), id, action: 'reject_preview' }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `errore ${r.status}`);
+    const p = data?.props.find((x) => x.id === id);
+    if (p) p.status = 'rifiutata';
+  } catch (e) {
+    error = `Non riuscito: ${(e as Error).message}`;
+  }
+  rejecting = 0;
+  render();
+}
+
 async function refresh(force = false) {
   if (!devKey() || loading || (!force && Date.now() - lastLoad < 60000)) return;
   loading = true;
@@ -223,6 +252,16 @@ ui.addEventListener('click', (e) => {
     if (openTesters.has(arg)) openTesters.delete(arg);
     else openTesters.add(arg);
     render();
+  }
+  if (a === 'reject') {
+    const id = Number(arg);
+    if (confirmReject !== id) {
+      confirmReject = id;
+      render();
+      return;
+    }
+    confirmReject = 0;
+    void reject(id);
   }
   if (a === 'key') {
     const v = ui.querySelector<HTMLInputElement>('.dv-key')?.value ?? '';

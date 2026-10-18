@@ -1258,6 +1258,8 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .dv-st { font-size: 13px; font-weight: 700; }
 .dv-st a { color: var(--blue); }
 .dv-prop.st-gioco .dv-st { color: var(--green-d); }
-.dv-prop.st-rifiutata .dv-st, .dv-prop.st-chiusa .dv-st { color: #d8455a; }
+.dv-prop.st-scartata .dv-st, .dv-prop.st-bocciata .dv-st { color: #d8455a; }
+.dv-prev { display: flex; flex-direction: column; gap: 6px; }
+.dv-rej { align-self: flex-end; min-height: 40px; }
 .dv-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 2px 0; }
 .dv-who { display: inline; font-weight: 700; color: var(--ink); }
