@@ -74,15 +74,18 @@
   completare i punti da codice: va provato il **tocco vero sullo schermo** (touchscreen) su ogni punto, la
   **raggiungibilità** camminando (griglia con le collisioni del gioco) e una foto dall'alto per le sovrapposizioni.
 
-- **Partita developer** (src/dev.ts): solo sul telefono dello sviluppatore, acceso col link segreto
-  `?dev=<chiave>` oppure scrivendo la chiave in Crediti dopo 7 tocchi su "Versione" (serve nell'app sulla Home,
-  che su iPhone ha la memoria separata da Safari); nel codice c'è solo l'impronta SHA-256, `?dev=off` la spegne. Slot a parte (9), un
-  miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; non va mai in classifica né in "sto giocando".
-  Ogni comando nuovo utile ai test va aggiunto lì.
+- **Telefono dello sviluppatore** (src/dev.ts): acceso col link segreto `?dev=<chiave>` o scrivendo la chiave in
+  Crediti dopo 7 tocchi su "Versione" (l'app sulla Home su iPhone ha la memoria separata da Safari); nel codice c'è solo
+  l'impronta SHA-256, `?dev=off` la spegne. Nell'app per giocare aggiunge solo le schede "📝 Proponi" e "📮 Proposte".
+- **App developer** (`developer.html`, src/devapp.ts), separata dal gioco: Partita developer (`./?app=dev`, slot 9, un
+  miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; mai in classifica né in "sto giocando"), anteprime
+  e tester. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
+- **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
+  già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte.
 
 ## Pubblicazione e servizi
 

@@ -7,6 +7,8 @@
  * iniziale compare "🛠️ Partita developer", salvata in uno slot a parte (non tocca le 3 partite normali).
  * `?dev=off` la spegne su quel telefono.
  */
+import { previewPr } from './preview';
+
 const DEV_HASH = 'c9973361080da099481708145340d318dc2f5bb1b66009b5207ed4b7a6ee41a5';
 const DEV_KEY = 'hustle.dev';
 /** la chiave stessa: serve per leggere e approvare le proposte dei tester sul server (src/ui/proposals.ts) */
@@ -15,6 +17,8 @@ const DEV_SECRET = 'hustle.devKey';
 export const DEV_SLOT = 9;
 
 export function isDevDevice() {
+  // nelle anteprime delle proposte (sito a parte) la partita developer c'è sempre: serve a provare in fretta
+  if (previewPr !== null) return true;
   try {
     return localStorage.getItem(DEV_KEY) === '1';
   } catch {
@@ -71,6 +75,12 @@ export function devKey() {
     return '';
   }
 }
+
+/**
+ * Il gioco aperto dall'app developer (developer.html → `./?app=dev`): parte subito la partita developer, senza
+ * menu iniziale, e "torna al menu" riporta all'app developer. Nell'app per giocare la partita developer non c'è.
+ */
+export const devApp = new URLSearchParams(location.search).get('app') === 'dev';
 
 /** La partita in corso è quella developer: niente classifica, "sto giocando" né offerte. */
 export let devGame = false;

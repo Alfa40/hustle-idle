@@ -116,7 +116,7 @@ jobs:
             extra="
 
           📱 **Anteprima da provare sul telefono:** https://proposta-$N.hustle-anteprime.pages.dev (pronta tra 2–3 minuti)
-          ✅ **Va bene?** [Apri la richiesta di unione](https://github.com/$REPO/compare/main...$BRANCH?expand=1) e premi «Create pull request», poi «Merge».
+          ✅ **Va bene?** [Apri la richiesta di unione](https://github.com/$REPO/compare/main...$BRANCH?expand=1&body=Closes%20%23$N) e premi «Create pull request», poi «Merge».
           ✏️ **Da cambiare?** Scrivi qui un commento che inizia con @claude."
           else
             extra="

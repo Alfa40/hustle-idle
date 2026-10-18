@@ -1,0 +1,16 @@
+{
+  "name": "Hustle Idle · Developer",
+  "short_name": "Hustle Dev",
+  "description": "Partita developer, anteprime delle proposte e tester.",
+  "id": "./developer.html",
+  "start_url": "./developer.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1d2433",
+  "theme_color": "#1d2433",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

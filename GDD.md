@@ -260,6 +260,11 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Le proposte vanno al server delle classifiche (`/hustle/proposal`, chiavi `hustle:prop…`) e restano **private**. Sul telefono dello sviluppatore c'è la scheda **📮 Proposte**: Approva, Scarta, Rimetti in attesa. Claude non consuma niente finché non si approva.
 - Ogni 10 minuti `.github/workflows/proposte.yml` prende le approvate, le pubblica come issue (con la foto) e fa partire `claude.yml` per quel numero; Claude lavora sul ramo `claude/issue-N-proposta`, poi il workflow carica il ramo, fa partire l'anteprima e scrive nella issue cosa cambia, il link dell'anteprima e quello per unire la modifica. Serve il segreto `PROPOSTE_ROBOT_KEY`.
 
+**Due app separate:**
+- **App per giocare** (`index.html`, quella di sempre): il gioco normale; sul telefono dello sviluppatore anche le schede 📝 Proponi e 📮 Proposte nelle Opzioni. La Partita developer qui non c'è più (i dati restano salvati, solo non si apre da qui).
+- **App developer** (`developer.html`, "Hustle Dev" sulla Home, `src/devapp.ts`): chiede la chiave developer una volta; ha la **Partita developer** (apre il gioco con `./?app=dev`, senza menu iniziale; "torna al menu" riporta all'app developer), le **Anteprime** (proposte aperte su GitHub con il ramo di Claude, con il nome di chi le ha scritte) e i **Tester**: per ogni persona inviate, rifiutate, accettate e, tra le accettate, quelle finite davvero nel gioco (pull request del ramo di Claude unita), con lo stato di ogni proposta. Dati: proposte dal server (con la chiave), rami, issue e pull request da GitHub (pubblici).
+- Nelle anteprime nome ("Prova N") e logo sono già pronti, nel menu c'è "Gioca subito" e la Partita developer; il link per unire la modifica chiude da solo la proposta ("Closes #N").
+
 ## 13. Punti aperti
 
 - **Guadagno offline al 100× più lento (valore di prova):** 30 ore offline con un food truck autonomo in periferia ≈ 9 giorni di gioco ≈ €430 netti. Un'ora di gioco attivo con lo stesso furgone ≈ €2.600. Da ritarare dopo i primi test.

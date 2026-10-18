@@ -32,7 +32,7 @@ import {
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
-import { devGame } from '../dev';
+import { devApp, devGame } from '../dev';
 import { canPropose, canReview, Proposals } from './proposals';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
@@ -3170,7 +3170,9 @@ export class UI {
         menu: () => {
           this.game.save();
           this.game.resetting = true;
-          location.reload();
+          // app developer: si torna alla sua schermata (anteprime, tester)
+          if (devApp) location.href = './developer.html';
+          else location.reload();
         },
         reset: () => {
           if (!confirm) {
