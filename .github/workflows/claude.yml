@@ -108,6 +108,9 @@ jobs:
           [ -n "$msg" ] || msg="Claude non ha risposto (controlla il lavoro nella scheda Actions)."
           # Claude ha fatto almeno un commit che cambia qualcosa rispetto a main
           if ! git diff --quiet origin/main HEAD; then
+            # claude-code-action lascia nel repository la sua chiave (già scaduta): si carica con quella del workflow
+            git config --local --unset-all http.https://github.com/.extraheader || true
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
             git push -f origin "HEAD:$BRANCH"
             gh workflow run anteprime.yml --ref "$BRANCH"
             extra="
