@@ -1229,3 +1229,13 @@ textarea.lb-input { display: block; resize: vertical; min-height: 3.2em; font-si
 .prop-card .tag { display: inline-block; margin-bottom: 4px; }
 body.is-short textarea.prop-in { height: 3.4em; min-height: 2.6em; }
 body.is-short .prop-photo { max-height: 55vh; }
+
+/* lanciatore delle anteprime (anteprime.html, src/launcher.ts) */
+body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b2350); min-height: 100%; }
+.launcher-screen { position: absolute; min-height: 100%; justify-content: flex-start; padding-top: calc(var(--sat) + 24px); padding-bottom: calc(var(--sab) + 24px); }
+.launcher-screen .t-btn { text-decoration: none; }
+.launcher-screen .t-btn.wait { opacity: .75; }
+.launcher-screen .l-txt { min-width: 0; }
+.launcher-screen .l-txt b { display: block; overflow-wrap: anywhere; }
+.l-note { color: #fff; text-align: center; margin: 4px 8px 0; text-shadow: 0 1px 3px rgba(0,0,0,.35); }
+@media (orientation: landscape) { .launcher-screen { flex-direction: row; align-items: flex-start; } }

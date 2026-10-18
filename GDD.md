@@ -260,6 +260,8 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Le proposte vanno al server delle classifiche (`/hustle/proposal`, chiavi `hustle:prop…`) e restano **private**. Sul telefono dello sviluppatore c'è la scheda **📮 Proposte**: Approva, Scarta, Rimetti in attesa. Claude non consuma niente finché non si approva.
 - Ogni 10 minuti `.github/workflows/proposte.yml` prende le approvate, le pubblica come issue (con la foto) e fa partire `claude.yml` per quel numero; Claude lavora sul ramo `claude/issue-N-proposta`, poi il workflow carica il ramo, fa partire l'anteprima e scrive nella issue cosa cambia, il link dell'anteprima e quello per unire la modifica. Serve il segreto `PROPOSTE_ROBOT_KEY`.
 
+**Lanciatore delle anteprime:** pagina `anteprime.html` (seconda app da aggiungere alla schermata Home, `src/launcher.ts`), aperta anche dal menu principale sul telefono developer (pulsante "Anteprime delle proposte"). Elenca le proposte aperte su GitHub con il ramo di Claude (dati pubblici, senza chiavi) e apre l'anteprima di ognuna; quelle senza ramo compaiono come "Claude ci sta lavorando". Nelle anteprime nome ("Prova N") e logo sono già pronti, nel menu c'è "Gioca subito" (partita nuova nello slot 1) e la Partita developer è sempre disponibile; le schede Proponi e Proposte non ci sono.
+
 ## 13. Punti aperti
 
 - **Guadagno offline al 100× più lento (valore di prova):** 30 ore offline con un food truck autonomo in periferia ≈ 9 giorni di gioco ≈ €430 netti. Un'ora di gioco attivo con lo stesso furgone ≈ €2.600. Da ritarare dopo i primi test.

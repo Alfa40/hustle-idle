@@ -83,6 +83,8 @@
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
+- **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
+  già pronti, "Gioca subito" e Partita developer. Il lanciatore `anteprime.html` (`src/launcher.ts`) le elenca tutte.
 
 ## Pubblicazione e servizi
 

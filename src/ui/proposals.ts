@@ -13,6 +13,7 @@ import type { Game } from '../game';
 import { bizType } from '../config/business';
 import { devKey, isDevDevice } from '../dev';
 import { testerKey } from '../tester';
+import { previewPr } from '../preview';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, day } from '../sim/state';
 import { photoPicker, shrinkImage } from '../logo';
@@ -39,9 +40,9 @@ interface Proposal {
 }
 
 /** si vede la scheda "Proponi" su questo telefono */
-export const canPropose = () => testerKey() !== '' || isDevDevice();
-/** si vede la scheda "Proposte" (lettura e approvazione) */
-export const canReview = () => isDevDevice();
+export const canPropose = () => previewPr === null && (testerKey() !== '' || isDevDevice());
+/** si vede la scheda "Proposte" (lettura e approvazione); nelle anteprime no */
+export const canReview = () => previewPr === null && isDevDevice();
 
 /** Immagine (canvas o foto) in JPEG, rimpicciolita finché non sta nel limite del server. */
 function toJpeg(src: HTMLCanvasElement | HTMLImageElement, w: number, h: number) {

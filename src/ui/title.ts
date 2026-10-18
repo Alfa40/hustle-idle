@@ -4,6 +4,7 @@ import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
 import { DEV_SLOT, isDevDevice, tryDevKey } from '../dev';
 import { tryTesterKey } from '../tester';
+import { previewPr } from '../preview';
 import { loadState } from '../sim/state';
 
 type View = 'main' | 'slots' | 'new' | 'settings' | 'credits';
@@ -65,9 +66,11 @@ export class TitleScreen {
         <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">Da squattrinato a magnate 💼</div></div>
         <div class="t-menu">
           ${ls ? `<button class="t-btn t-main" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
-          <button class="t-btn ${ls ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
+          ${previewPr !== null && !ls ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}
+          <button class="t-btn ${ls || previewPr !== null ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
           ${isDevDevice() ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
+          ${isDevDevice() && previewPr === null ? '<a class="t-btn" href="./anteprime.html" style="text-decoration:none"><span class="t-ico">📱</span><span><b>Anteprime delle proposte</b><small>Le modifiche dei tester da provare</small></span></a>' : ''}
           <div class="t-row">
             <button class="t-btn t-small" data-t="view:settings"><span class="t-ico">⚙️</span><b>Impostazioni</b></button>
             <button class="t-btn t-small" data-t="view:credits"><span class="t-ico">ℹ️</span><b>Crediti</b></button>
@@ -139,6 +142,10 @@ export class TitleScreen {
         break;
       case 'play':
         this.onStart(+arg);
+        return;
+      case 'quick':
+        // anteprima: partita nuova nello slot 1, senza scegliere nome della partita e slot
+        this.onStart(1, `Anteprima #${previewPr}`);
         return;
       case 'ver':
         // 7 tocchi su "Versione": compare il campo per il codice developer

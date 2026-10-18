@@ -11,6 +11,8 @@ import { showInstallTip } from './ui/install';
 import { preloadLogo } from './logo';
 import { checkDevLink, DEV_SLOT } from './dev';
 import { checkTesterLink } from './tester';
+import { previewPr } from './preview';
+import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
 
 async function boot() {
@@ -47,6 +49,11 @@ async function boot() {
       game.state.dev = true;
       game.state.tutorialDone = true;
       game.save();
+    }
+    // anteprima di una proposta: nome e logo già pronti, si gioca subito (il logo è quello casuale della partita)
+    if (previewPr !== null) {
+      if (!nickname()) setNickname(`Prova ${previewPr}`);
+      game.state.logoChosen = true;
     }
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
