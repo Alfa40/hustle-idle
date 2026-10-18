@@ -2,7 +2,7 @@ import { rank } from '../sim/progress';
 import { euro, lastSlot, listSlots, SLOT_COUNT, wipeSave, type GameState } from '../sim/state';
 import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
-import { DEV_SLOT, isDevDevice, tryDevKey } from '../dev';
+import { DEV_SLOT, tryDevKey } from '../dev';
 import { tryTesterKey } from '../tester';
 import { previewPr } from '../preview';
 import { loadState } from '../sim/state';
@@ -69,8 +69,7 @@ export class TitleScreen {
           ${previewPr !== null && !ls ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}
           <button class="t-btn ${ls || previewPr !== null ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
-          ${isDevDevice() ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
-          ${isDevDevice() && previewPr === null ? '<a class="t-btn" href="./anteprime.html" style="text-decoration:none"><span class="t-ico">📱</span><span><b>Anteprime delle proposte</b><small>Le modifiche dei tester da provare</small></span></a>' : ''}
+          ${previewPr !== null ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
           <div class="t-row">
             <button class="t-btn t-small" data-t="view:settings"><span class="t-ico">⚙️</span><b>Impostazioni</b></button>
             <button class="t-btn t-small" data-t="view:credits"><span class="t-ico">ℹ️</span><b>Crediti</b></button>
@@ -157,7 +156,7 @@ export class TitleScreen {
         // stesso campo per il codice developer e per quello dei tester
         void tryDevKey(v).then(async (ok) => {
           const tester = !ok && (await tryTesterKey(v));
-          this.devMsg = ok ? '✅ Attivata: torna indietro, trovi 🛠️ Partita developer' : tester ? '✅ Modalità tester attiva: in partita trovi 📝 Proponi nelle ⚙️ Opzioni' : '❌ Codice sbagliato';
+          this.devMsg = ok ? '✅ Telefono dello sviluppatore: in partita trovi 📮 Proposte nelle ⚙️ Opzioni' : tester ? '✅ Modalità tester attiva: in partita trovi 📝 Proponi nelle ⚙️ Opzioni' : '❌ Codice sbagliato';
           this.render();
         });
         return;

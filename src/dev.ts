@@ -76,6 +76,12 @@ export function devKey() {
   }
 }
 
+/**
+ * Il gioco aperto dall'app developer (developer.html → `./?app=dev`): parte subito la partita developer, senza
+ * menu iniziale, e "torna al menu" riporta all'app developer. Nell'app per giocare la partita developer non c'è.
+ */
+export const devApp = new URLSearchParams(location.search).get('app') === 'dev';
+
 /** La partita in corso è quella developer: niente classifica, "sto giocando" né offerte. */
 export let devGame = false;
 export const setDevGame = (v: boolean) => (devGame = v);
