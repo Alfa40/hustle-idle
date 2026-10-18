@@ -3,6 +3,7 @@ import { euro, lastSlot, listSlots, SLOT_COUNT, wipeSave, type GameState } from 
 import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
 import { DEV_SLOT, isDevDevice, tryDevKey } from '../dev';
+import { tryTesterKey } from '../tester';
 import { loadState } from '../sim/state';
 
 type View = 'main' | 'slots' | 'new' | 'settings' | 'credits';
@@ -106,7 +107,7 @@ export class TitleScreen {
         <div class="card"><h3>Hustle Idle</h3><p class="muted small" style="margin:0">Un gioco gestionale in cui parti dai lavoretti e costruisci il tuo impero di attività.</p></div>
         <div class="card"><h3>Grafica</h3><p class="muted small" style="margin:0">Modelli 3D di <b>Kenney.nl</b> (licenza CC0): Mini Characters, City Kit, Car Kit, Food Kit, Furniture Kit.<br>Font: Fredoka.</p></div>
         <div class="card" data-t="ver"><h3>Versione</h3><p class="muted small" style="margin:0">Prototipo 0.5</p></div>
-        ${this.verTaps >= 7 ? `<div class="card"><h3>🛠️ Codice developer</h3><input class="t-input" name="devkey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Codice" />
+        ${this.verTaps >= 7 ? `<div class="card"><h3>🔑 Codice</h3><input class="t-input" name="devkey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Codice" />
           <button class="btn good full" data-t="devkey" style="margin-top:8px">Attiva</button>${this.devMsg ? `<p class="small center" style="margin:6px 0 0">${this.devMsg}</p>` : ''}</div>` : ''}`);
     }
     this.el.innerHTML = html;
@@ -146,8 +147,10 @@ export class TitleScreen {
         break;
       case 'devkey': {
         const v = (this.el.querySelector('input[name="devkey"]') as HTMLInputElement | null)?.value ?? '';
-        void tryDevKey(v).then((ok) => {
-          this.devMsg = ok ? '✅ Attivata: torna indietro, trovi 🛠️ Partita developer' : '❌ Codice sbagliato';
+        // stesso campo per il codice developer e per quello dei tester
+        void tryDevKey(v).then(async (ok) => {
+          const tester = !ok && (await tryTesterKey(v));
+          this.devMsg = ok ? '✅ Attivata: torna indietro, trovi 🛠️ Partita developer' : tester ? '✅ Modalità tester attiva: in partita trovi 📝 Proponi nelle ⚙️ Opzioni' : '❌ Codice sbagliato';
           this.render();
         });
         return;

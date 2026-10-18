@@ -1221,3 +1221,11 @@ body.is-short .dg-photo span { font-size: 13px; }
 @keyframes tut-edge { from { scale: 1; } to { scale: 1.12; } }
 .biz-tut.tut-mini .tut-btns { justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
 .biz-tut.tut-mini .tut-btns .btn:only-child { margin-left: auto; }
+
+/* proposte dei tester (src/ui/proposals.ts) */
+textarea.lb-input { display: block; resize: vertical; min-height: 3.2em; font-size: 16px; line-height: 1.35; }
+.prop-photo { display: block; max-width: 100%; max-height: 42vh; margin: 0 auto 8px; border-radius: 12px; border: 2px solid #d6d6e4; object-fit: contain; }
+.prop-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.prop-card .tag { display: inline-block; margin-bottom: 4px; }
+body.is-short textarea.prop-in { height: 3.4em; min-height: 2.6em; }
+body.is-short .prop-photo { max-height: 55vh; }

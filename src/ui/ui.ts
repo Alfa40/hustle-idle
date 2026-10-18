@@ -33,6 +33,7 @@ import {
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
 import { devGame } from '../dev';
+import { canPropose, canReview, Proposals } from './proposals';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
@@ -3113,16 +3114,33 @@ export class UI {
 
   // ---------------- impostazioni ----------------
 
+  /** proposte dei tester (src/ui/proposals.ts): la bozza resta anche chiudendo le Opzioni */
+  private proposalsView?: Proposals;
+  private get proposals() {
+    return (this.proposalsView ??= new Proposals(this.game, () => this.renderPanel()));
+  }
+
   openSettings() {
     let confirm = false;
     // nella partita developer si apre subito sui comandi rapidi
     let tab = devGame ? 'dev' : 'impostazioni';
+    // telefoni tester: foto dello schermo e posto nel gioco presi adesso, prima che la finestra copra tutto
+    this.proposals.capture();
     this.open({
       title: '⚙️ Opzioni',
       color: 'var(--gray)',
+      after: (body) => {
+        if (tab === 'proponi') this.proposals.after(body);
+      },
       render: () => {
-        const tabs = `<div class="tabs">${[...(devGame ? [['dev', '🛠️ Developer']] : []), ['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
+        const tabs = `<div class="tabs">${[
+          ...(canPropose() ? [['proponi', '📝 Proponi']] : []),
+          ...(canReview() ? [['proposte', '📮 Proposte']] : []),
+          ...(devGame ? [['dev', '🛠️ Developer']] : []),
+          ['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
           .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        if (tab === 'proponi') return tabs + this.proposals.formHtml();
+        if (tab === 'proposte') return tabs + this.proposals.reviewHtml();
         if (tab === 'dev') return tabs + this.devHtml();
         if (tab === 'impostazioni') return tabs + settingsHtml();
         if (tab === 'partita') {
@@ -3144,6 +3162,7 @@ export class UI {
       },
       actions: {
         ...this.devActions(),
+        ...this.proposals.actions(),
         tab: (k) => (tab = k),
         set: (v) => settingsAction('set:' + v),
         tog: (v) => settingsAction('tog:' + v),

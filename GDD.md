@@ -254,6 +254,12 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Lo sviluppatore prova l'anteprima e decide: unisce la modifica (pull request dal link di Claude → «Merge»: si pubblica come sempre), chiede cambi con «@claude» o chiude la proposta.
 - Serve (una volta): app GitHub «Claude» installata sul repository, segreto `CLAUDE_CODE_OAUTH_TOKEN` (abbonamento Claude, da `claude setup-token`) o `ANTHROPIC_API_KEY`, segreti `CLOUDFLARE_API_TOKEN` (permesso Cloudflare Pages: modifica) e `CLOUDFLARE_ACCOUNT_ID`.
 
+**Proposte dal gioco (modalità tester, senza account):**
+- I tester ricevono un link segreto `?tester=<chiave>` (o scrivono la chiave in Crediti dopo 7 tocchi su "Versione", per l'app sulla Home). Vale per le partite già iniziate e non cambia niente del gioco (salvataggi, classifiche, progressi): aggiunge solo la scheda **📝 Proponi** nelle ⚙️ Opzioni (`src/tester.ts`, `src/ui/proposals.ts`).
+- Proponi: cosa cambiare, perché (facoltativo), foto dello schermo presa all'apertura delle Opzioni (togliibile o sostituibile con una della galleria) e il posto nel gioco compilato da solo. La bozza resta se si chiudono le Opzioni. Limite 15 proposte al giorno per telefono.
+- Le proposte vanno al server delle classifiche (`/hustle/proposal`, chiavi `hustle:prop…`) e restano **private**. Sul telefono dello sviluppatore c'è la scheda **📮 Proposte**: Approva, Scarta, Rimetti in attesa. Claude non consuma niente finché non si approva.
+- Ogni 10 minuti `.github/workflows/proposte.yml` prende le approvate, le pubblica come issue (con la foto) e fa partire `claude.yml` per quel numero; Claude lavora sul ramo `claude/issue-N-proposta`, poi il workflow carica il ramo, fa partire l'anteprima e scrive nella issue cosa cambia, il link dell'anteprima e quello per unire la modifica. Serve il segreto `PROPOSTE_ROBOT_KEY`.
+
 ## 13. Punti aperti
 
 - **Guadagno offline al 100× più lento (valore di prova):** 30 ore offline con un food truck autonomo in periferia ≈ 9 giorni di gioco ≈ €430 netti. Un'ora di gioco attivo con lo stesso furgone ≈ €2.600. Da ritarare dopo i primi test.

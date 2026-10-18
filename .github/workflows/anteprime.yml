@@ -10,6 +10,8 @@ name: Anteprime delle proposte
 on:
   push:
     branches: ['claude/**']
+  # le proposte arrivate dal gioco: il ramo lo carica claude.yml, che poi fa partire l'anteprima da qui
+  workflow_dispatch:
 
 concurrency:
   group: anteprima-${{ github.ref_name }}

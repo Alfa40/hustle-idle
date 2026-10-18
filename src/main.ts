@@ -10,6 +10,7 @@ import { TitleScreen } from './ui/title';
 import { showInstallTip } from './ui/install';
 import { preloadLogo } from './logo';
 import { checkDevLink, DEV_SLOT } from './dev';
+import { checkTesterLink } from './tester';
 import { watchIcons } from './ui/icons';
 
 async function boot() {
@@ -17,6 +18,8 @@ async function boot() {
   watchIcons();
   // link segreto della modalità developer (solo sul telefono dello sviluppatore, vedi src/dev.ts)
   await checkDevLink();
+  // link segreto dei tester: aggiunge solo la scheda "Proponi" nelle Opzioni (vedi src/tester.ts)
+  await checkTesterLink();
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   const bar = document.getElementById('loadbar')!;
   // il font serve già per le scritte 3D disegnate su canvas

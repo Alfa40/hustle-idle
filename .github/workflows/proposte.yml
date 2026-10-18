@@ -1,0 +1,63 @@
+name: Proposte approvate dal gioco
+
+# I tester scrivono le proposte nel gioco (Opzioni → Proponi): restano private sul server delle classifiche
+# finché lo sviluppatore non le approva (Opzioni → Proposte, sul suo telefono). Ogni 10 minuti questo
+# workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml).
+# Serve il segreto PROPOSTE_ROBOT_KEY (chiave del "robot": il server conosce solo la sua impronta).
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: proposte
+  cancel-in-progress: false
+
+jobs:
+  importa:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      KEY: ${{ secrets.PROPOSTE_ROBOT_KEY }}
+      API: https://crazy-town.onrender.com
+    steps:
+      - name: Proposte approvate → GitHub → Claude
+        run: |
+          if [ -z "$KEY" ]; then echo "Manca il segreto PROPOSTE_ROBOT_KEY"; exit 0; fi
+          # il server gratuito si addormenta: la prima risposta può metterci un minuto
+          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/approved" \
+            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > approvate.json
+          n=$(jq '.proposals | length' approvate.json)
+          echo "Proposte approvate da pubblicare: $n"
+          [ "$n" -gt 0 ] || exit 0
+          gh label create proposta -R "$REPO" --color 1D76DB --description "Proposta di modifica di un tester" 2>/dev/null || true
+          gh label create claude -R "$REPO" --color D97757 --description "Claude prepara la modifica proposta" 2>/dev/null || true
+          jq -c '.proposals[]' approvate.json | while read -r p; do
+            id=$(jq -r '.id' <<<"$p")
+            # già pubblicata (es. la conferma al server non era arrivata): si riprende quella
+            issue=$(gh issue list -R "$REPO" --state all --search "\"proposta-gioco-$id\" in:body" --json number -q '.[0].number // empty')
+            if [ -z "$issue" ]; then
+              title=$(jq -r '"Proposta: " + (.text | gsub("\\s+"; " ") | .[0:70])' <<<"$p")
+              jq -r --arg api "$API" '
+                "<!-- proposta-gioco-\(.id) -->\n" +
+                "Proposta scritta nel gioco da **\(.nickname)** e approvata dallo sviluppatore.\n\n" +
+                "### Cosa vorrebbe cambiare\n\n\(.text)\n\n" +
+                (if .why != "" then "### Perché\n\n\(.why)\n\n" else "" end) +
+                "### Dove nel gioco\n\n\(.where)\n\n" +
+                ((.ctx | to_entries | map("\(.key): \(.value)") | join(" · ")) as $c | if $c != "" then "<sub>\($c)</sub>\n\n" else "" end) +
+                (if .photo then "### Foto dello schermo\n\n![Foto dello schermo](\($api)/hustle/proposal-photo/\(.id).jpg)\n" else "" end)
+              ' <<<"$p" > body.md
+              url=$(gh issue create -R "$REPO" --title "$title" --body-file body.md --label proposta --label claude)
+              issue=${url##*/}
+              gh workflow run claude.yml -R "$REPO" -f issue="$issue"
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/imported" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --argjson n "$issue" '{key: $k, id: $id, issue: $n}')" > /dev/null
+            echo "Proposta del gioco #$id → issue #$issue"
+          done

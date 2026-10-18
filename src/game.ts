@@ -2049,6 +2049,26 @@ export class Game {
     else this.renderer.render(scene, camera);
   }
 
+  /**
+   * Foto dello schermo di adesso (solo la scena 3D, senza l'interfaccia): ridisegna e legge subito il canvas,
+   * perché WebGL svuota l'immagine dopo averla mostrata. Serve alle proposte dei tester (src/ui/proposals.ts).
+   */
+  snapshot(): HTMLCanvasElement | null {
+    try {
+      if (this.interior) this.draw(this.interior.scene, this.interior.camera);
+      else if (this.house) this.draw(this.house.scene, this.house.camera);
+      else this.draw(this.scene, this.camera);
+      const src = this.renderer.domElement;
+      const c = document.createElement('canvas');
+      c.width = src.width;
+      c.height = src.height;
+      c.getContext('2d')!.drawImage(src, 0, 0);
+      return c;
+    } catch {
+      return null;
+    }
+  }
+
   resetting = false;
   save() {
     this.saveTimer = 0;

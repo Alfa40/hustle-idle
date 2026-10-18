@@ -79,6 +79,10 @@
   che su iPhone ha la memoria separata da Safari); nel codice c'è solo l'impronta SHA-256, `?dev=off` la spegne. Slot a parte (9), un
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; non va mai in classifica né in "sto giocando".
   Ogni comando nuovo utile ai test va aggiunto lì.
+- **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
+  codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
+  (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
+  solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
 
 ## Pubblicazione e servizi
 

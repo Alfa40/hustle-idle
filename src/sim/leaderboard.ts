@@ -10,7 +10,7 @@ import { preloadLogo, safeLogo, type Logo } from '../logo';
  * ma con chiavi separate (`game: 'hustle'`). Identità anonima per dispositivo,
  * nickname scelto dal giocatore; la rete non deve mai bloccare il gioco.
  */
-const API = 'https://crazy-town.onrender.com';
+export const API = 'https://crazy-town.onrender.com';
 const ID_KEY = 'hustle.playerId';
 const NICK_KEY = 'hustle.nickname';
 const BEST_KEY = 'hustle.lbBest';
