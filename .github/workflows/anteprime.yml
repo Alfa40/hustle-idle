@@ -1,0 +1,81 @@
+name: Anteprime delle proposte
+
+# Quando Claude aggiorna il ramo di una proposta (claude/issue-N-…) si pubblica un'anteprima su un sito a parte,
+# Cloudflare Pages: https://proposta-N.hustle-anteprime.pages.dev (ogni proposta il suo indirizzo, niente in comune
+# col gioco vero su GitHub Pages né coi suoi salvataggi).
+# Sicurezza: il codice della proposta non è ancora stato controllato, quindi si costruisce in un lavoro senza
+# chiavi né permessi di scrittura; il lavoro che pubblica (con la chiave di Cloudflare) non esegue quel codice,
+# carica solo i file già pronti.
+
+on:
+  push:
+    branches: ['claude/**']
+
+concurrency:
+  group: anteprima-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  costruisci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      n: ${{ steps.n.outputs.n }}
+    steps:
+      - id: n
+        run: echo "n=$(echo '${{ github.ref_name }}' | sed -n 's#^claude/issue-\([0-9]*\).*#\1#p')" >> "$GITHUB_OUTPUT"
+      - if: steps.n.outputs.n != ''
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - if: steps.n.outputs.n != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - if: steps.n.outputs.n != ''
+        run: npm ci && npm run build
+      - if: steps.n.outputs.n != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: anteprima
+          path: dist
+          retention-days: 3
+
+  pubblica:
+    needs: costruisci
+    if: needs.costruisci.outputs.n != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    env:
+      N: ${{ needs.costruisci.outputs.n }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: anteprima
+          path: dist
+      # la prima volta crea il sito delle anteprime (dopo dà errore perché c'è già: va bene)
+      - uses: cloudflare/wrangler-action@v3
+        continue-on-error: true
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create hustle-anteprime --production-branch=main
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=hustle-anteprime --branch=proposta-${{ env.N }} --commit-dirty=true
+      - name: Link dell'anteprima nella proposta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          url="https://proposta-$N.hustle-anteprime.pages.dev"
+          if gh api "repos/$REPO/issues/$N/comments" --paginate -q '.[].body' | grep -q "anteprima-proposta-$N"; then exit 0; fi
+          gh issue comment "$N" -R "$REPO" --body "<!-- anteprima-proposta-$N -->
+          📱 **Anteprima da provare sul telefono:** $url
+
+          Si aggiorna da sola 2–3 minuti dopo ogni modifica di Claude. È un sito a parte: parte da una partita nuova, non tocca il gioco vero e non va in classifica."

@@ -246,6 +246,14 @@ Obiettivo: provare il loop base su telefono.
 
 Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni settimanali, altre zone.
 
+## 12b. Proposte dei tester (Claude su GitHub)
+
+- I tester scrivono una **Proposta di modifica** con il modulo delle issue del repository (`.github/ISSUE_TEMPLATE/proposta.yml`: cosa cambiare, dove, perché, screenshot); niente issue libere.
+- Lo sviluppatore la legge e, se va bene, aggiunge l'etichetta **claude**: parte `.github/workflows/claude.yml` (azione ufficiale `anthropics/claude-code-action`), Claude prepara la modifica su un ramo `claude/issue-N-…` (mai su `main`), segue CLAUDE.md, controlla tipi e build, aggiorna il GDD e spiega nella proposta in italiano semplice cosa cambia. Solo chi ha i permessi di scrittura (lo sviluppatore) può farlo partire o chiedere cambi con «@claude …» nei commenti.
+- **Anteprima sul telefono** (`.github/workflows/anteprime.yml`): a ogni modifica del ramo si pubblica su un sito a parte, Cloudflare Pages, `https://proposta-N.hustle-anteprime.pages.dev`, e il link compare nella proposta. Sito diverso dal gioco vero (salvataggi e gioco pubblicato al sicuro anche se la proposta contenesse codice dannoso); il codice della proposta si costruisce in un lavoro senza chiavi, il lavoro che pubblica carica solo i file pronti. L'anteprima parte da una partita nuova e non va in classifica (`src/preview.ts`).
+- Lo sviluppatore prova l'anteprima e decide: unisce la modifica (pull request dal link di Claude → «Merge»: si pubblica come sempre), chiede cambi con «@claude» o chiude la proposta.
+- Serve (una volta): app GitHub «Claude» installata sul repository, segreto `CLAUDE_CODE_OAUTH_TOKEN` (abbonamento Claude, da `claude setup-token`) o `ANTHROPIC_API_KEY`, segreti `CLOUDFLARE_API_TOKEN` (permesso Cloudflare Pages: modifica) e `CLOUDFLARE_ACCOUNT_ID`.
+
 ## 13. Punti aperti
 
 - **Guadagno offline al 100× più lento (valore di prova):** 30 ore offline con un food truck autonomo in periferia ≈ 9 giorni di gioco ≈ €430 netti. Un'ora di gioco attivo con lo stesso furgone ≈ €2.600. Da ritarare dopo i primi test.

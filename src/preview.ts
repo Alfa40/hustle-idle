@@ -1,0 +1,10 @@
+// Anteprime delle modifiche proposte dai tester: stanno su un sito a parte (Cloudflare Pages), ognuna col suo
+// indirizzo, es. https://proposta-12.hustle-anteprime.pages.dev (12 = numero della proposta su GitHub). Essendo un
+// altro sito, il salvataggio è già separato da quello del gioco vero; qui si riconosce l'anteprima per tenerla
+// fuori dalla classifica e scriverlo nel titolo della pagina.
+
+const m = /^proposta-(\d+)\.hustle-anteprime\.pages\.dev$/.exec(location.hostname);
+/** numero della proposta in anteprima, o null nel gioco vero */
+export const previewPr = m ? Number(m[1]) : null;
+
+if (previewPr !== null) document.title = `Anteprima #${previewPr} · ${document.title}`;

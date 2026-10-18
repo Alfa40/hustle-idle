@@ -1,0 +1,32 @@
+name: Proposta di modifica
+description: Hai provato il gioco e vuoi cambiare qualcosa? Scrivilo qui, Claude preparerà la modifica.
+title: "Proposta: "
+labels: ["proposta"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie per provare **Hustle Idle**! Descrivi la modifica in modo semplice, come la diresti a voce.
+        Lo sviluppatore la legge e, se va bene, Claude prepara una **versione di prova** da provare sul telefono.
+  - type: textarea
+    id: cosa
+    attributes:
+      label: Cosa vorresti cambiare?
+      description: "Es. «Nel lavoretto del barista i clienti arrivano troppo in fretta» oppure «Aggiungi un cappello da cuoco nel negozio»."
+    validations:
+      required: true
+  - type: input
+    id: dove
+    attributes:
+      label: Dove nel gioco?
+      description: "Es. lavoretto Barista, livello 3 · schermata Negozio · mappa della città"
+  - type: textarea
+    id: perche
+    attributes:
+      label: Perché? (facoltativo)
+      description: Cosa non ti è piaciuto o cosa renderebbe il gioco più bello.
+  - type: textarea
+    id: foto
+    attributes:
+      label: Screenshot (facoltativo)
+      description: Trascina qui una foto dello schermo, se aiuta a capire.

@@ -1,4 +1,5 @@
 import { devGame } from '../dev';
+import { previewPr } from '../preview';
 import { day, playStats, type GameState } from './state';
 import { rank, totalFame, totalLevel } from './progress';
 import { estimateMonthlyProfit, isAutonomous } from './economy';
@@ -118,6 +119,8 @@ let lastSent = 0;
 const automated = typeof navigator !== 'undefined' && navigator.webdriver === true;
 
 export async function submit(s: GameState, force = false) {
+  // le anteprime delle proposte non vanno in classifica
+  if (previewPr !== null) return;
   const nick = nickname();
   // la partita developer non va mai in classifica
   if (!nick || automated || devGame || s.dev) return;
@@ -158,6 +161,7 @@ export async function fetchBoard(limit = 50, kind: BoardKind = 'fame'): Promise<
 
 /** "Sto giocando": i tuoi amici vedono aperto il tuo furgone (e accese le luci del tuo piano). */
 export async function ping() {
+  if (previewPr !== null) return;
   if (!nickname() || document.hidden || automated || devGame) return;
   try {
     await fetch(API + '/leaderboard/ping', {

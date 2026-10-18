@@ -1,0 +1,50 @@
+name: Claude prepara le proposte
+
+# Un tester apre una "Proposta di modifica" (modulo). Lo sviluppatore la legge e, se va bene, aggiunge
+# l'etichetta "claude": Claude prepara la modifica su un ramo claude/issue-N-… (mai su main) e risponde
+# nella proposta. Lo sviluppatore può chiedere cambi scrivendo "@claude …" nei commenti.
+# Solo chi ha i permessi di scrittura sul repository (lo sviluppatore) può far partire Claude.
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issues' && github.event.label.name == 'claude') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          label_trigger: claude
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Bash(npm run build),Bash(npx tsc --noEmit -p .),Bash(git diff:*),Bash(git status),Bash(git log:*)"
+            --append-system-prompt "Stai lavorando su GitHub a una proposta di modifica scritta da un tester di Hustle Idle. Segui CLAUDE.md, tranne le regole su push e screenshot: qui lavori su un ramo claude/… e lo sviluppatore decide se unirlo. Fai solo quello che chiede la proposta (se è poco chiara o va contro le regole del gioco, chiedi o spiega nel commento invece di indovinare). Non aggiungere dipendenze npm e non toccare .github/. Prima di finire esegui npx tsc --noEmit -p . e npm run build, e aggiorna GDD.md. Nel commento finale scrivi in italiano semplice (per lo sviluppatore, che non è un programmatore): cosa cambia nel gioco e come provarlo. L'anteprima da provare sul telefono è https://proposta-NUMERO.hustle-anteprime.pages.dev (NUMERO = numero di questa proposta) ed è pronta 2–3 minuti dopo il tuo ultimo commit; parte da una partita nuova."
