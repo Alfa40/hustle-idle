@@ -16,7 +16,7 @@ export interface VehicleDef {
   radius: number;
 }
 
-export const WALK_SPEED = 5.2;
+export const WALK_SPEED = 6.8;
 
 export const VEHICLES: Record<VehicleId, VehicleDef> = {
   monopattino: {
