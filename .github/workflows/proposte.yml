@@ -2,8 +2,9 @@ name: Proposte approvate dal gioco
 
 # I tester scrivono le proposte nel gioco (Opzioni → Proponi): restano private sul server delle classifiche
 # finché lo sviluppatore non le approva (Opzioni → Proposte, sul suo telefono). Ogni 10 minuti questo
-# workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml), e chiude
-# le proposte la cui anteprima lo sviluppatore ha rifiutato (app developer → Anteprime → Rifiuta).
+# workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml), chiude
+# le proposte la cui anteprima lo sviluppatore ha rifiutato (app developer → Anteprime → Rifiuta) e unisce al
+# gioco quelle accettate (app developer → Anteprime → Accetta e pubblica), poi fa partire la pubblicazione.
 # Serve il segreto PROPOSTE_ROBOT_KEY (chiave del "robot": il server conosce solo la sua impronta).
 
 on:
@@ -19,7 +20,7 @@ jobs:
   importa:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
       actions: write
     env:
@@ -28,6 +29,11 @@ jobs:
       KEY: ${{ secrets.PROPOSTE_ROBOT_KEY }}
       API: https://crazy-town.onrender.com
     steps:
+      # serve il codice per unire le anteprime accettate (il push con il token del workflow non fa partire la
+      # pubblicazione da solo: la si fa partire alla fine)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Proposte approvate → GitHub → Claude
         run: |
           if [ -z "$KEY" ]; then echo "Manca il segreto PROPOSTE_ROBOT_KEY"; exit 0; fi
@@ -78,3 +84,41 @@ jobs:
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" '{key: $k, id: $id}')" > /dev/null
             echo "Proposta del gioco #$id rifiutata → issue #$issue chiusa"
           done
+      - name: Anteprime accettate → unite nel gioco e pubblicate
+        if: always()
+        run: |
+          if [ -z "$KEY" ]; then exit 0; fi
+          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/tomerge" \
+            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > unire.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f pubblica
+          jq -c '.proposals[]' unire.json | while read -r p; do
+            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p")
+            branch=$(git ls-remote --heads origin "claude/issue-$issue-*" | head -1 | sed 's#.*refs/heads/##')
+            ok=false; err=""
+            if [ "$issue" -le 0 ] || [ -z "$branch" ]; then
+              err="non trovo il ramo con la modifica"
+            else
+              git fetch -q origin main "$branch"
+              git checkout -q -B main origin/main
+              title=$(gh issue view "$issue" -R "$REPO" --json title -q '.title | sub("^Proposta: *"; "")')
+              if git merge -q --no-ff "origin/$branch" -m "Proposta #$issue: $title" -m "Accettata dallo sviluppatore dall'app developer. Closes #$issue"; then
+                if git push -q origin main; then
+                  ok=true; touch pubblica
+                  gh issue close "$issue" -R "$REPO" --reason completed \
+                    --comment "Lo sviluppatore ha provato l'anteprima e l'ha accettata: la modifica è nel gioco (si pubblica in 2–3 minuti)."
+                else
+                  err="non riesco a salvare la modifica nel gioco (riprova)"
+                fi
+              else
+                git merge --abort || true
+                err="si scontra con altre modifiche del gioco fatte nel frattempo: va aggiornata prima di pubblicarla"
+                gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha accettato l'anteprima, ma la modifica non si unisce al gioco perché si scontra con altre modifiche fatte nel frattempo. Per sistemarla scrivi qui sotto un commento che inizia con @claude (per esempio: \"@claude aggiorna il ramo con main e risolvi i conflitti\"), poi riprova l'anteprima e accettala di nuovo dall'app developer."
+              fi
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/merged" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --argjson ok "$ok" --arg e "$err" '{key: $k, id: $id, ok: $ok, error: $e}')" > /dev/null
+            echo "Proposta del gioco #$id (issue #$issue, ramo $branch): unita=$ok $err"
+          done
+          if [ -f pubblica ]; then gh workflow run deploy.yml -R "$REPO" --ref main; fi

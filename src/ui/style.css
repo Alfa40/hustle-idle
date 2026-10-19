@@ -1266,7 +1266,11 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .dv-prop.st-gioco .dv-st { color: var(--green-d); }
 .dv-prop.st-scartata .dv-st, .dv-prop.st-bocciata .dv-st { color: #d8455a; }
 .dv-prev { display: flex; flex-direction: column; gap: 6px; }
-.dv-rej { align-self: flex-end; min-height: 40px; }
+.dv-rej, .dv-acc { min-height: 40px; }
+.dv-acts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+.dv-note { font-size: 12.5px; font-weight: 700; border-radius: 10px; padding: 6px 10px; }
+.dv-note.ok { background: #e6f7ec; color: #1e7a43; }
+.dv-note.bad { background: #ffe6e9; color: #9b1c2c; }
 .dv-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 2px 0; }
 .dv-who { display: inline; font-weight: 700; color: var(--ink); }
 

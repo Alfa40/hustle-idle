@@ -79,7 +79,8 @@
   l'impronta SHA-256, `?dev=off` la spegne. Nell'app per giocare aggiunge solo le schede "📝 Proponi" e "📮 Proposte".
 - **App developer** (`developer.html`, src/devapp.ts), separata dal gioco: Partita developer (`./?app=dev`, slot 9, un
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; mai in classifica né in "sto giocando"), anteprime
-  e tester. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
+  e tester; ogni anteprima si accetta ("Accetta e pubblica": il robot `proposte.yml` la unisce in main e pubblica) o si
+  rifiuta da lì. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
