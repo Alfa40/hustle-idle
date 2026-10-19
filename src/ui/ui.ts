@@ -20,14 +20,14 @@ import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../wo
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
 import { bizReport, ensurePartials } from '../sim/report';
-import { shiftText } from '../sim/shifts';
+import { inShift, shiftText } from '../sim/shifts';
 import { chainGroups, groupUpgradeTargets, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
   bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
-  hire, isAutonomous, isOpenHour, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
+  hire, isAutonomous, isOpenHour, shiftsFor, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
@@ -1443,7 +1443,9 @@ export class UI {
         ensurePartials(s);
         const full = biz.report;
         const snap = full ?? biz.partial;
-        if (!snap) return this.reportWaiting(biz);
+        // turni e conti si vedono sempre, anche prima del resoconto del manager
+        const liveCards = this.reportLive(biz);
+        if (!snap) return liveCards + this.reportWaiting(biz);
         // statistiche dal resoconto della settimana; la domanda dei prodotti invece è quella di oggi
         // (cambia ogni giorno: i consigli su cosa vendere restano aggiornati)
         const isMarket = (a: { icon: string }) => ['📈', '🎉', '🏗️', '🍔'].includes(a.icon);
@@ -1494,7 +1496,7 @@ export class UI {
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
         return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
           ${full ? `<div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>`
-            : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Il manager sta ancora raccogliendo informazioni: con pochi giorni i numeri possono cambiare. Si aggiorna ogni sera alla chiusura; il resoconto completo arriva a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + advice + day + peakCard + staffCard + prod + costs;
+            : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Il manager sta ancora raccogliendo informazioni: con pochi giorni i numeri possono cambiare. Si aggiorna ogni sera alla chiusura; il resoconto completo arriva a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + liveCards + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
         go: (tab) => {
@@ -1768,6 +1770,92 @@ export class UI {
   }
 
   /** Il manager sta ancora raccogliendo i dati: meno di 7 giornate dalla fine dell'ultimo resoconto o dall'ultimo cambio. */
+  /**
+   * Parte del resoconto sempre aggiornata (non aspetta il manager): i conti di oggi e del mese e il grafico dei
+   * turni di oggi, una colonna per ora con un colore per dipendente, i clienti previsti e le fasce orarie.
+   */
+  private reportLive(biz: Business) {
+    const s = this.s;
+    const def = bizType(biz.type);
+    const unit = def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti';
+    const D = TIME.DAYS_PER_MONTH;
+    const c = monthlyCosts(s, biz);
+    const salaries = biz.staff.reduce((a, e) => a + e.salary, 0);
+    const fixedMonth = c.rent + c.utilities + salaries;
+    const dom = dayOfMonth(day(s));
+    const t = biz.today;
+    const m = biz.month;
+    const profitToday = t.revenue - t.costs - fixedMonth / D;
+    const profitMonth = m.revenue - m.costs - (fixedMonth * dom) / D;
+    const pct = (l: { served: number; lost: number }) => (l.served + l.lost ? Math.round((l.lost / (l.served + l.lost)) * 100) : 0);
+    const row = (name: string, a: string, b: string, cls = '') => `<div class="lv-row ${cls}"><span>${name}</span><b>${a}</b><b>${b}</b></div>`;
+    const neg = (x: number) => (x ? `−${euro(x)}` : euro(0));
+    const why = t.lost ? `<div class="small muted" style="margin-top:6px">Persi oggi: ${t.lostStaff ?? 0} per personale che non basta · ${t.lostStock ?? 0} per prodotti finiti · ${t.lostQueue ?? 0} in fila mentre lavoravi tu</div>` : '';
+    const money = `<div class="card"><h3>💶 I conti</h3>
+      <div class="lv-row lv-head"><span></span><b>Oggi</b><b>Mese (${dom}/${D})</b></div>
+      ${row(`👥 ${unit[0].toUpperCase() + unit.slice(1)} serviti`, String(t.served), String(m.served))}
+      ${row('❌ Persi', `${t.lost}${t.lost ? ` <small>(${pct(t)}%)</small>` : ''}`, `${m.lost}${m.lost ? ` <small>(${pct(m)}%)</small>` : ''}`, t.lost || m.lost ? 'lv-bad' : '')}
+      ${row('💰 Incassi', `<span class="money-t">${euro(t.revenue)}</span>`, `<span class="money-t">${euro(m.revenue)}</span>`)}
+      ${row('📦 Merce comprata', neg(t.costs), neg(m.costs))}
+      ${row(`👔 Stipendi (${biz.staff.length})`, neg(salaries / D), neg((salaries * dom) / D))}
+      ${row('🏠 Affitto e bollette', neg((c.rent + c.utilities) / D), neg(((c.rent + c.utilities) * dom) / D))}
+      ${row('📊 Utile', `<span class="${profitToday >= 0 ? 'good' : 'bad'}">${euro(profitToday)}</span>`, `<span class="${profitMonth >= 0 ? 'good' : 'bad'}">${euro(profitMonth)}</span>`, 'lv-tot')}
+      ${why}
+      <div class="row between small" style="margin-top:8px"><span>Spese fisse al mese: stipendi ${euro(salaries)} + affitto ${euro(c.rent)} + bollette ${euro(c.utilities)}</span><b>${euro(fixedMonth)}</b></div>
+      <p class="muted small explain" style="margin:6px 0 0">Stipendi, affitto e bollette si pagano a fine mese: qui sono divisi per giorno, così vedi se l'attività guadagna davvero. La merce è quella comprata per il magazzino.</p></div>`;
+    if (def.kind === 'craft') return money;
+    // turni di oggi
+    const { plan, curve } = shiftsFor(s, biz);
+    const O = BUSINESS.OPEN_HOUR;
+    const C = BUSINESS.CLOSE_HOUR;
+    const hours = Array.from({ length: C - O }, (_, i) => O + i);
+    const PAL = ['#e8590c', '#2d9cdb', '#27ae60', '#9b51e0', '#f2b705', '#eb5757', '#00a8a8', '#d35fb7', '#6d8f1f', '#2f5fd0', '#b5793d', '#7a7a7a'];
+    const team = biz.staff.filter((e) => !e.trainingEnd);
+    const color = new Map(team.map((e, i) => [e.id, PAL[i % PAL.length]]));
+    const shiftFor = (e: Employee) => plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
+    const now = Math.floor(hourOf(s));
+    const tol = 0.97;
+    const cols = hours.map((h) => {
+      const on = team.filter((e) => {
+        const sh = shiftFor(e);
+        return sh && inShift(sh, h);
+      });
+      const short = team.length > 0 && curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol;
+      return `<div class="sh-col ${h === now ? 'now' : ''} ${short ? 'short' : ''}"><em>${fmtRate(curve[h])}</em>
+        <div class="sh-stack">${on.map((e) => `<i style="background:${color.get(e.id)}"></i>`).join('')}</div><span>${h}</span></div>`;
+    }).join('');
+    const legend = team.length
+      ? team.map((e) => {
+          const sh = shiftFor(e);
+          return `<div class="sh-leg"><i style="background:${color.get(e.id)}"></i><b>${esc(e.name)}</b><span class="muted">${roleName(biz.type, e.role)}</span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span></div>`;
+        }).join('')
+      : `<div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>`;
+    const inTraining = biz.staff.length - team.length;
+    const bands: [string, number, number][] = [['🌅 Mattina', O, 12], ['🍝 Pranzo', 12, 15], ['☀️ Pomeriggio', 15, 18], ['🌙 Sera', 18, C]];
+    const bandRows = bands.map(([name, a, b]) => {
+      let want = 0;
+      let lost = 0;
+      let maxOn = 0;
+      for (let h = a; h < b; h++) {
+        want += curve[h];
+        lost += Math.max(0, curve[h] - plan.capAt(h));
+        maxOn = Math.max(maxOn, team.filter((e) => { const sh = shiftFor(e); return sh && inShift(sh, h); }).length);
+      }
+      // senza dipendenti i clienti li servi tu: niente "persi" per i turni
+      const bad = team.length > 0 && want > 0.05 && lost > want * (1 - tol);
+      return `<div class="lv-row ${bad ? 'lv-bad' : ''}"><span>${name} <small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
+    }).join('');
+    const shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
+      <div class="sh-chart">${cols}</div>
+      <div class="small muted sh-note"><b>Numero in alto</b>: ${unit} previsti in quell'ora · <b>colori</b>: chi è di turno${team.length && hours.some((h) => curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>
+      <div class="sh-legend">${legend}</div>${inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : ''}
+      <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>
+      <div class="lv-row lv-head lv-4"><span></span><b>${unit} previsti</b><b>di turno</b><b>persi</b></div>
+      ${bandRows.replace(/class="lv-row/g, 'class="lv-row lv-4')}
+      <p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Persi" sono i ${unit} che con questi turni non si riescono a servire: in quelle fasce assumi qualcuno nel reparto che manca o migliora l'attrezzatura. I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p></div>`;
+    return shifts + money;
+  }
+
   private reportWaiting(biz: Business) {
     const why = biz.statsWhy && (biz.week?.from ?? 0) === biz.statsFrom ? `<p class="muted small">🔄 La raccolta è ripartita dopo l'ultimo cambio (<b>${esc(biz.statsWhy)}</b>): i dati di prima non valgono più.</p>` : '';
     return `<div class="card center"><div class="hero"><div class="emoji">🧑‍💼</div></div>
