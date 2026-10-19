@@ -115,6 +115,54 @@ export async function claimPoker(game: Game, quiet = false) {
   }
 }
 
+// ---------------- fiches da portare ----------------
+
+/** cifra scritta a mano ("10.000", "10000 €"…) → numero intero */
+export const parseAmount = (v: string) => Number(v.replace(/[^0-9]/g, '')) || 0;
+const plain = (n: number) => Math.round(n).toLocaleString('it-IT');
+
+/**
+ * Scelta delle fiches da portare: cifra da scrivere, cursore e scorciatoie (minimo, metà, massimo). `go` è il
+ * pulsante che riporta la cifra nel testo (si aggiorna mentre scrivi, senza ridisegnare la finestra).
+ */
+export function buyBox(key: string, min: number, max: number, value: number, bb: number) {
+  const v = Math.max(min, Math.min(max, value || min));
+  const mid = Math.max(min, Math.min(max, Math.round(((min + max) / 2) / bb) * bb));
+  return `<div class="pk-amt" data-k="${key}" data-min="${min}" data-max="${max}">
+      <label class="pk-amt-row"><span>€</span><input class="lb-input pk-amt-in" inputmode="numeric" autocomplete="off" value="${plain(v)}"></label>
+      <input type="range" class="pk-amt-range" min="${min}" max="${max}" step="${Math.max(1, bb)}" value="${v}">
+      <div class="pk-amt-pre"><button class="chip" data-amt="${min}">Minimo</button>${mid > min && mid < max ? `<button class="chip" data-amt="${mid}">${euro(mid)}</button>` : ''}<button class="chip" data-amt="${max}">Massimo</button></div>
+      <div class="small muted pk-amt-lim">da ${euro(min)} a ${euro(max)}<span class="bad pk-amt-err"></span></div></div>`;
+}
+
+/** Collega cifra, cursore e scorciatoie di ogni `buyBox` dentro `root`; `onChange(key, valore, valida)` a ogni modifica. */
+export function wireBuyBox(root: HTMLElement, onChange: (key: string, v: number, ok: boolean) => void) {
+  root.querySelectorAll<HTMLElement>('.pk-amt').forEach((box) => {
+    const key = box.dataset.k!;
+    const min = Number(box.dataset.min);
+    const max = Number(box.dataset.max);
+    const inp = box.querySelector<HTMLInputElement>('.pk-amt-in')!;
+    const rng = box.querySelector<HTMLInputElement>('.pk-amt-range')!;
+    const err = box.querySelector<HTMLElement>('.pk-amt-err')!;
+    const set = (v: number, from: 'text' | 'range' | 'chip') => {
+      const ok = v >= min && v <= max;
+      err.textContent = ok ? '' : v < min ? ` · almeno ${euro(min)}` : ` · al massimo ${euro(max)}`;
+      if (from !== 'range') rng.value = String(Math.max(min, Math.min(max, v)));
+      if (from !== 'text') inp.value = plain(v);
+      onChange(key, v, ok);
+    };
+    inp.addEventListener('input', () => set(parseAmount(inp.value), 'text'));
+    inp.addEventListener('blur', () => {
+      if (parseAmount(inp.value)) inp.value = plain(parseAmount(inp.value));
+    });
+    rng.addEventListener('input', () => set(Number(rng.value), 'range'));
+    box.querySelectorAll<HTMLButtonElement>('[data-amt]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      set(Number(b.dataset.amt), 'chip');
+    }));
+  });
+}
+
 // ---------------- carte ----------------
 
 const SUIT_PATH: Record<string, string> = {
@@ -156,6 +204,8 @@ export class PokerTable {
   private busy = false;
   private msg = '';
   private exiting = false;
+  /** fiches da ricomprare (cifra scelta) */
+  private rebuyAmt = 0;
   /** fiches comprate in tutto (per dire quanto si è vinto o perso uscendo) */
   private bought: number;
 
@@ -268,8 +318,9 @@ export class PokerTable {
     if (me.chips <= 0 && !me.inHand) {
       const max = Math.min(s.maxBuy, Math.floor(money));
       if (money < s.minBuy) return `<div class="pk-note">Hai finito le fiches e sul conto non hai i ${euro(s.minBuy)} per ricomprarle.</div>`;
-      return `<div class="pk-note">Hai finito le fiches. Ricompri?</div><div class="pk-acts">
-        <button class="pk-btn" data-p="rebuy:${s.minBuy}">${euro(s.minBuy)}</button>${max > s.minBuy ? `<button class="pk-btn good" data-p="rebuy:${max}">${euro(max)}</button>` : ''}</div>`;
+      if (!this.rebuyAmt) this.rebuyAmt = max;
+      return `<div class="pk-note">Hai finito le fiches. Quante ne ricompri?</div><div class="pk-rebuy">${buyBox('rb', s.minBuy, max, this.rebuyAmt, s.bb)}</div>
+        <div class="pk-acts"><button class="pk-btn good pk-rebuy-go" data-p="rebuy">Ricompra <b>${euro(Math.max(s.minBuy, Math.min(max, this.rebuyAmt)))}</b></button></div>`;
     }
     const my = s.my;
     if (!my) {
@@ -329,6 +380,11 @@ export class PokerTable {
         ${this.fails >= 3 ? '<div class="pk-note bad">Connessione persa: riprovo…</div>' : ''}${this.msg ? `<div class="pk-note bad">${esc(this.msg)}</div>` : ''}
         ${this.actionsHtml()}
       </div>`;
+    wireBuyBox(this.el, (_k, v) => {
+      this.rebuyAmt = v;
+      const b = this.el.querySelector('.pk-rebuy-go b');
+      if (b) b.textContent = euro(v);
+    });
   }
 
   private async send(body: object) {
@@ -429,7 +485,16 @@ export class PokerTable {
       this.raiseTo = Number(arg);
       this.render();
     } else if (a === 'raiseGo') void this.send({ action: 'raise', amount: this.raiseTo });
-    else if (a === 'rebuy') void this.rebuy(Number(arg));
+    else if (a === 'rebuy') {
+      const box = this.el.querySelector<HTMLElement>('.pk-amt');
+      const v = this.rebuyAmt;
+      if (box && (v < Number(box.dataset.min) || v > Number(box.dataset.max))) {
+        this.msg = `Scegli una cifra da ${euro(Number(box.dataset.min))} a ${euro(Number(box.dataset.max))}`;
+        this.render();
+        return;
+      }
+      void this.rebuy(v);
+    }
     else if (a === 'back') void this.rebuy(0, true);
     else this.render();
   }

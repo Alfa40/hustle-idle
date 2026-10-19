@@ -41,7 +41,7 @@ import {
   type Business, type Employee, type JobOffer, type Mission, type ServiceOrder, type SpecialOrder,
 } from '../sim/state';
 import { stripLeadIcon } from './icons';
-import { MAX_BUY_BB, MIN_BUY_BB, pk, pokerBlocked, pokerName, PokerTable, STAKES, type PkInfo, type PkState } from './poker';
+import { buyBox, MAX_BUY_BB, MIN_BUY_BB, pk, pokerBlocked, pokerName, PokerTable, STAKES, wireBuyBox, type PkInfo, type PkState } from './poker';
 
 
 type Actions = Record<string, (arg: string) => void>;
@@ -2306,15 +2306,17 @@ export class UI {
     const s = this.s;
     const blocked = pokerBlocked();
     let stake = Math.max(0, STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money) === -1 ? 0 : STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money));
-    let buyPick = 0;
-    let joinPick = 0;
+    // fiches da portare (scritte a mano, col cursore o con le scorciatoie)
+    let buyAmt = 0;
+    let joinAmt = 0;
     let code = '';
     let info: PkInfo | null = null;
     let where: string | null = null;
     let busy = '';
     let err = '';
     // scelte di fiches da portare: minimo (20 grandi bui), medio (50), massimo (100), mai più di quello che hai
-    const buyOptions = (bb: number) => [...new Set([MIN_BUY_BB, 50, MAX_BUY_BB].map((k) => Math.min(k * bb, Math.floor(s.money))))].filter((x) => x >= bb * MIN_BUY_BB);
+    const maxFor = (bb: number) => Math.min(bb * MAX_BUY_BB, Math.floor(s.money));
+    const okAmt = (v: number, bb: number) => v >= bb * MIN_BUY_BB && v <= maxFor(bb);
     let panel: Panel;
     const rerender = () => {
       if (this.panel === panel) this.renderPanel();
@@ -2356,29 +2358,35 @@ export class UI {
     panel = {
       money: true,
       title: '🃏 Poker',
+      // cifra delle fiches: si aggiorna mentre scrivi, senza ridisegnare la finestra
+      after: (body) => wireBuyBox(body, (k, v) => {
+        if (k === 'c') buyAmt = v;
+        else joinAmt = v;
+        const el = body.querySelector(`.pk-go-${k}`);
+        if (el) el.textContent = euro(v);
+      }),
       color: '#1f7a4c',
       render: () => {
         if (blocked) return `<div class="card"><p class="small" style="margin:0">${esc(blocked)}</p></div>`;
         const [sb, bb] = STAKES[stake];
-        const opts = buyOptions(bb);
+        const canCreate = maxFor(bb) >= bb * MIN_BUY_BB;
+        if (canCreate && !okAmt(buyAmt, bb)) buyAmt = Math.min(maxFor(bb), bb * 50);
         const stakes = STAKES.map(([a, b], i) => `<button class="seg ${i === stake ? 'on' : ''}" data-a="stake:${i}" ${s.money < b * MIN_BUY_BB ? 'disabled' : ''}>${euro(a)}/${euro(b)}</button>`).join('');
-        const buyRow = (list: number[], pick: number, act: string) => list.length
-          ? `<div class="segs pk-buys">${list.map((x, i) => `<button class="seg ${i === Math.min(pick, list.length - 1) ? 'on' : ''}" data-a="${act}:${i}">${euro(x)}</button>`).join('')}</div>`
-          : '';
         const create = `<div class="card"><h3>➕ Crea una stanza</h3>
             <div class="small muted">Puntate del tavolo (piccolo e grande buio)</div><div class="segs pk-stakes">${stakes}</div>
-            ${opts.length ? `<div class="small muted" style="margin-top:8px">Fiches da portare al tavolo</div>${buyRow(opts, buyPick, 'buy')}
-              <button class="btn good full" data-a="create" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy === 'create' ? 'Creo la stanza…' : `Crea la stanza (${euro(opts[Math.min(buyPick, opts.length - 1)])})`}</button>`
+            ${canCreate ? `<div class="small muted" style="margin-top:8px">Fiches da portare al tavolo</div>${buyBox('c', bb * MIN_BUY_BB, maxFor(bb), buyAmt, bb)}
+              <button class="btn good full" data-a="create" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy === 'create' ? 'Creo la stanza…' : `Crea la stanza (<span class="pk-go-c">${euro(buyAmt)}</span>)`}</button>`
             : `<p class="small bad" style="margin:8px 0 0">Per questo tavolo servono almeno ${euro(bb * MIN_BUY_BB)}.</p>`}
-            <p class="muted small explain" style="margin:6px 0 0">Il piccolo buio (${euro(sb)}) e il grande buio (${euro(bb)}) sono le puntate obbligatorie di ogni mano. Al tavolo si portano da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui: quei soldi diventano fiches e il resto del conto resta al sicuro.</p></div>`;
+            <p class="muted small explain" style="margin:6px 0 0">Il piccolo buio (${euro(sb)}) e il grande buio (${euro(bb)}) sono le puntate obbligatorie di ogni mano. Al tavolo si portano da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui (mai più di quello che hai): quei soldi diventano fiches e il resto del conto resta al sicuro.</p></div>`;
         let joinBox = '';
         if (info) {
-          const jo = buyOptions(info.bb);
+          const jmax = maxFor(info.bb);
+          if (jmax >= info.minBuy && !okAmt(joinAmt, info.bb)) joinAmt = Math.min(jmax, info.bb * 50);
           joinBox = `<div class="pk-info"><b>Stanza ${info.code}</b> · bui ${euro(info.sb)}/${euro(info.bb)} · ${info.players.length} ${info.players.length === 1 ? 'giocatore' : 'giocatori'}${info.started ? ' · partita in corso' : ''}
               <div class="small muted">${info.players.map(esc).join(', ')}</div></div>
             ${info.seated ? `<button class="btn good full" data-a="join" ${busy ? 'disabled' : ''}>Torna al tuo posto</button>`
               : !info.free ? '<p class="small bad">Il tavolo è pieno (8 giocatori).</p>'
-              : jo.length ? `<div class="small muted">Fiches da portare</div>${buyRow(jo, joinPick, 'jbuy')}<button class="btn good full" data-a="join" style="margin-top:8px" ${busy ? 'disabled' : ''}>${busy === 'join' ? 'Entro…' : `Entra (${euro(jo[Math.min(joinPick, jo.length - 1)])})`}</button>`
+              : jmax >= info.minBuy ? `<div class="small muted">Fiches da portare</div>${buyBox('j', info.minBuy, jmax, joinAmt, info.bb)}<button class="btn good full" data-a="join" style="margin-top:8px" ${busy ? 'disabled' : ''}>${busy === 'join' ? 'Entro…' : `Entra (<span class="pk-go-j">${euro(joinAmt)}</span>)`}</button>`
               : `<p class="small bad">Per questo tavolo servono almeno ${euro(info.minBuy)}.</p>`}`;
         }
         const join = `<div class="card"><h3>🔑 Entra con un codice</h3>
@@ -2391,15 +2399,15 @@ export class UI {
       actions: {
         stake: (i) => {
           stake = +i;
-          buyPick = 0;
+          buyAmt = 0;
         },
-        buy: (i) => (buyPick = +i),
-        jbuy: (i) => (joinPick = +i),
         create: () => {
           const bb = STAKES[stake][1];
-          const opts = buyOptions(bb);
-          const buy = opts[Math.min(buyPick, opts.length - 1)];
-          if (!buy || buy > s.money) return;
+          const buy = buyAmt;
+          if (!okAmt(buy, bb)) {
+            err = `Scegli quante fiches portare: da ${euro(bb * MIN_BUY_BB)} a ${euro(maxFor(bb))}`;
+            return;
+          }
           busy = 'create';
           err = '';
           void pk<{ code: string; bought: number; state: PkState }>('create', { nickname: pokerName(this.game), slot: currentSlot, stake, buy })
@@ -2417,16 +2425,18 @@ export class UI {
           info = null;
           void pk<PkInfo>('info', { code }).then((j) => {
             info = j;
-            joinPick = 0;
+            joinAmt = 0;
             busy = '';
             rerender();
           }).catch(fail);
         },
         join: () => {
           if (!info) return;
-          const opts = buyOptions(info.bb);
-          const buy = info.seated ? 0 : opts[Math.min(joinPick, opts.length - 1)];
-          if (!info.seated && (!buy || buy > s.money)) return;
+          const buy = info.seated ? 0 : joinAmt;
+          if (!info.seated && !okAmt(buy, info.bb)) {
+            err = `Scegli quante fiches portare: da ${euro(info.minBuy)} a ${euro(maxFor(info.bb))}`;
+            return;
+          }
           busy = 'join';
           err = '';
           void pk<{ bought: number; state: PkState }>('join', { code: info.code, nickname: pokerName(this.game), slot: currentSlot, buy })
