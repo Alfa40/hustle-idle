@@ -55,13 +55,20 @@ function bumpTracker(game: Game, onBump: () => void) {
 
 /** Scatola pesante o fragile: lo sticker sopra dice dove va nella pila (pesante sotto a tutte, fragile in cima). */
 type BoxKind = 'normal' | 'heavy' | 'fragile';
-/** pile per ripiano (una accanto all'altra) e quante scatole al massimo in ogni pila (in basso c'è più spazio) */
-const COLS = 3;
+/** quante scatole al massimo in ogni pila (in basso c'è più spazio); le pile per ripiano dipendono dalla larghezza */
 const MAX_STACK = { low: 3, high: 2 };
 /** i due ripiani degli scaffali del magazziniere: in basso e in alto, con lo spazio per le pile */
 export const SHELVING_BOARDS = [0.15, 1.3];
 /** larghezza degli scaffali del magazziniere (m) */
 export const SHELVING_W = 3.4;
+/**
+ * Scaffali del magazziniere: con più casse servono più scaffali, ma la stanza non si allarga quasi: diventano più
+ * stretti (2 pile invece di 3). 3 scaffali larghi 3,4 m, 4 da 2,6 m, 5 da 2,2 m (stanza 18 → 19 → 20 m).
+ */
+export const shelvingLayout = (t: number) => {
+  const perRow = t < 0.4 ? 3 : t < 0.7 ? 4 : 5;
+  return { perRow, shelfW: perRow === 3 ? SHELVING_W : perRow === 4 ? 2.6 : 2.2 };
+};
 const BOX = 0.42;
 const BOX_H = BOX * 0.8;
 
@@ -176,9 +183,11 @@ function shelfBox(size: number, color: number, kind: BoxKind, top: boolean) {
  * pila; conta solo quello che è ancora sbagliato quando si firma la bolla (uno: massimo 2 stelle, due o più: 1).
  * Salendo: più scatole e più colori.
  */
-export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title: string) {
+export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title: string, shelfW = SHELVING_W) {
   const t = rungProgress('magazzino', lineLevel);
-  const n = Math.round(6 + 4 * t);
+  // pile per ripiano: 3 sugli scaffali larghi, 2 su quelli stretti
+  const COLS = shelfW >= 3 ? 3 : 2;
+  const n = Math.round(8 + 6 * t);
   /** pesanti e fragili (e quindi le regole della pila), dal Liv. 4 */
   const levels = lineLevel >= 4;
   const nHeavy = !levels ? 0 : t < 0.6 ? 1 : 2;
@@ -187,12 +196,13 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   // il capo magazzino: di fianco al retro del camion, girato verso il magazzino
   const bossAt = O.clone().add(new THREE.Vector3(wh.truck.bedW / 2 + 0.6, 0, 0.2));
   let boss: THREE.Object3D | undefined;
-  // scatole a terra davanti al camion, in due file
+  // scatole a terra davanti al camion, in due file (tre quando sono più di 10, così restano vicine)
   const spots: THREE.Vector3[] = [];
+  const rows = n > 10 ? 3 : 2;
   for (let i = 0; i < n; i++) {
-    const row = i % 2;
-    const col = Math.floor(i / 2);
-    spots.push(new THREE.Vector3(O.x - 2.6 + col * 1.3 - (row ? 0.65 : 0), 0, O.z - 1.6 - row * 1.3));
+    const row = i % rows;
+    const col = Math.floor(i / rows);
+    spots.push(new THREE.Vector3(O.x - 2.6 + col * 1.3 - (row % 2 ? 0.65 : 0), 0, O.z - 1.6 - row * 1.3));
   }
   type Item = { pos: THREE.Vector3; shelf: Shelf; kind: BoxKind; top: boolean; obj?: THREE.Object3D };
   /** una scatola in una pila (`it` null: c'era già) */
@@ -383,7 +393,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
       for (let c = 0; c < COLS; c++) padOf(s, top, c);
       // cartellino col nastro a punta sul montante di sinistra, all'altezza del suo ripiano (non copre le pile)
       const y = s.boards[top ? 1 : 0] + (top ? 0.45 : 0.55);
-      const at = s.pos.clone().addScaledVector(s.front, 0.47).addScaledVector(s.side, -SHELVING_W / 2 + 0.05).setY(y);
+      const at = s.pos.clone().addScaledVector(s.front, 0.47).addScaledVector(s.side, -shelfW / 2 + 0.05).setY(y);
       run.prop(chevronPlane(s.color.hex, top, 0.3, 0.24, '#ffffff'), at, rot, 1);
     }
   }
@@ -726,7 +736,10 @@ export function startLogisticsJob(game: Game, offer: JobOffer, slot: Slot, title
   if (offer.type === 'autista') return driveJob(game, lv, slot, title);
   if (offer.type === 'magazzino') {
     switch (r) {
-      case 0: return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: t < 0.4 ? 3 : t < 0.7 ? 4 : 5, shelfW: SHELVING_W, colorOnly: true, boards: SHELVING_BOARDS, slot, placed })), title);
+      case 0: {
+        const { perRow, shelfW } = shelvingLayout(t);
+        return shelvingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow, shelfW, colorOnly: true, boards: SHELVING_BOARDS, slot, placed })), title, shelfW);
+      }
       case 1: return forkliftJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: 3, tall: t >= 0.3, aisle: 4.4 - 1.1 * t, slot, placed })), title);
       case 2: return pickingJob(game, lv, game.enterArena(new Warehouse({ rows: 2, perRow: t < 0.5 ? 3 : 4, slot, placed })), title);
       case 3: return shippingJob(game, lv, game.enterArena(new Warehouse({ rows: 1, perRow: 3, flatbed: false, slot, placed })), title);
