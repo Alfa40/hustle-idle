@@ -1300,3 +1300,14 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .sh-leg > span:nth-of-type(1) { grid-area: n; line-height: 1.2; }
 .sh-leg .sh-rate { grid-area: r; text-align: right; font-size: 11.5px; font-weight: 700; color: var(--green-d); white-space: nowrap; }
 .sh-leg .sh-time { grid-area: t; text-align: right; font-weight: 800; white-space: nowrap; }
+
+/* turni: trama per reparto sopra il colore del dipendente (stessa trama = stesso lavoro) */
+.pat-0 { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.5) 0 3px, transparent 3px 8px); }
+.pat-1 { background-image: radial-gradient(rgba(255,255,255,.6) 1.7px, transparent 2px); background-size: 7px 7px; }
+.pat-2 { background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.5) 0 2px, transparent 2px 6px); }
+.pat-3 { background-image: linear-gradient(rgba(255,255,255,.45) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(255,255,255,.45) 1.5px, transparent 1.5px); background-size: 7px 7px; }
+.pat-m { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.4) 0 2px, transparent 2px 7px), repeating-linear-gradient(-45deg, rgba(255,255,255,.4) 0 2px, transparent 2px 7px); }
+.shg-who, .sh-leg i { text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+.sh-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 6px; font-size: 12.5px; font-weight: 700; }
+.sh-key span { display: inline-flex; align-items: center; gap: 5px; }
+.sh-key i { width: 18px; height: 18px; border-radius: 5px; background-color: #8a8478; }
