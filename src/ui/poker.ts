@@ -20,8 +20,8 @@ import { currentSlot, euro } from '../sim/state';
 export const STAKES: [number, number][] = [
   [10, 20], [100, 200], [1000, 2000], [10000, 20000], [100000, 200000], [1000000, 2000000], [10000000, 20000000], [100000000, 200000000],
 ];
-/** fama totale per sedersi a ogni tavolo (come sul server): i primi due liberi, poi una soglia per rango */
-export const STAKE_FAME = [0, 0, 15, 50, 120, 300, 700, 1500];
+/** fama totale per sedersi a ogni tavolo (come sul server): i primi due liberi; dai bui da 1M in su molta più fama */
+export const STAKE_FAME = [0, 0, 15, 50, 120, 2000, 5000, 10000];
 export const MIN_BUY_BB = 20;
 export const MAX_BUY_BB = 100;
 
