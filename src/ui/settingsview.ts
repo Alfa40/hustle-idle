@@ -1,4 +1,4 @@
-import { HUD_NAMES, setSetting, settings, SETTING_OPTIONS, type HudKey, type Settings } from '../settings';
+import { HUD_KEYS, HUD_NAMES, setSetting, settings, SETTING_OPTIONS, type HudKey, type Settings } from '../settings';
 
 type Choice = 'quality' | 'camera';
 type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap' | 'battery' | 'swapControls';
@@ -61,7 +61,7 @@ export function settingsAction(a: string) {
     if (op === 'menu') setSetting('hudMenu', settings.hudMenu.includes(k) ? settings.hudMenu.filter((x) => x !== k) : [...settings.hudMenu, k]);
     if (op === 'reset') {
       setSetting('hudMenu', []);
-      setSetting('hudOrder', ['biz', 'missions', 'profile', 'home', 'shop', 'settings', 'camera']);
+      setSetting('hudOrder', [...HUD_KEYS]);
     }
   } else if (cmd === 'tog') {
     const k = arg as Toggle;

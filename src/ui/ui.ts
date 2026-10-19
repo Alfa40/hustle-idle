@@ -41,6 +41,7 @@ import {
   type Business, type Employee, type JobOffer, type Mission, type ServiceOrder, type SpecialOrder,
 } from '../sim/state';
 import { stripLeadIcon } from './icons';
+import { MAX_BUY_BB, MIN_BUY_BB, pk, pokerBlocked, pokerName, PokerTable, STAKES, type PkInfo, type PkState } from './poker';
 
 
 type Actions = Record<string, (arg: string) => void>;
@@ -227,6 +228,7 @@ export class UI {
         <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span><span class="dot" id="h-dot-p" style="display:none">!</span></button>
         <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
         <button class="hbtn c-pink" data-h="shop"><span class="i">🛍️</span><span class="l">Negozio</span></button>
+        <button class="hbtn c-teal" data-h="multi"><span class="i">🎮</span><span class="l">Sfide</span></button>
         <button class="hbtn c-gray" data-h="settings"><span class="i">⚙️</span><span class="l">Opzioni</span></button>
         <div class="hud-menu"><button class="hbtn c-dark hud-menu-btn" aria-label="Menu"><span class="i">☰</span><span class="l">Menu</span><span class="dot" id="h-dot2" style="display:none">!</span></button><div class="hud-drop"></div></div>
       </div>`;
@@ -250,6 +252,7 @@ export class UI {
         if (k === 'profile') this.openProfile();
         if (k === 'home') this.game.goHome();
         if (k === 'shop') this.openShop();
+        if (k === 'multi') this.openMulti();
         if (k === 'settings') this.openSettings();
         this.hudMenuEl.classList.remove('open');
       }),
@@ -2276,6 +2279,174 @@ export class UI {
   }
 
   // ---------------- negozio ----------------
+
+  /** Multigiocatore: minigiochi da fare contro gli amici (per ora il poker). */
+  openMulti() {
+    const card = (a: string, icon: string, title: string, sub: string, color: string) =>
+      `<button class="shop-card" data-a="${a}" style="--sc:${color}"><span class="shop-ico">${icon}</span><span><b>${title}</b><small>${sub}</small></span><span class="shop-go">›</span></button>`;
+    this.open({
+      money: true,
+      title: '🎮 Multigiocatore',
+      small: true,
+      color: '#14a3a3',
+      render: () => `${explain('Sfida i tuoi amici con i soldi della tua partita. Mentre giochi la tua partita è offline, come ad app chiusa: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo.')}
+        ${card('poker', '🃏', 'Poker', "Texas Hold'em da 2 a 8 giocatori: crea una stanza o entra con il codice di un amico", '#1f7a4c')}
+        <p class="muted small center" style="margin:10px 0 0">Altri giochi in arrivo</p>`,
+      actions: {
+        poker: () => {
+          this.close();
+          this.openPoker();
+        },
+      },
+    });
+  }
+
+  /** Poker: crea una stanza (puntate e fiches) o entra con il codice; poi si apre il tavolo (src/ui/poker.ts). */
+  openPoker() {
+    const s = this.s;
+    const blocked = pokerBlocked();
+    let stake = Math.max(0, STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money) === -1 ? 0 : STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money));
+    let buyPick = 0;
+    let joinPick = 0;
+    let code = '';
+    let info: PkInfo | null = null;
+    let where: string | null = null;
+    let busy = '';
+    let err = '';
+    // scelte di fiches da portare: minimo (20 grandi bui), medio (50), massimo (100), mai più di quello che hai
+    const buyOptions = (bb: number) => [...new Set([MIN_BUY_BB, 50, MAX_BUY_BB].map((k) => Math.min(k * bb, Math.floor(s.money))))].filter((x) => x >= bb * MIN_BUY_BB);
+    let panel: Panel;
+    const rerender = () => {
+      if (this.panel === panel) this.renderPanel();
+    };
+    const sit = (st: PkState, bought: number) => {
+      if (bought > 0) {
+        s.money -= bought;
+        this.game.save();
+      }
+      const key = 'hustle.poker.bought';
+      let spent = 0;
+      try {
+        const m = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, number>;
+        spent = (m[st.code] || 0) + bought;
+        localStorage.setItem(key, JSON.stringify({ [st.code]: spent }));
+      } catch {
+        spent = bought;
+      }
+      this.close();
+      new PokerTable(this.game, st.code, st, spent, () => {
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          /* niente */
+        }
+      }).open();
+    };
+    const fail = (e: unknown) => {
+      const d = (e as { data?: { code?: string } }).data;
+      if (d?.code) where = d.code;
+      err = (e as Error).message;
+      busy = '';
+      rerender();
+    };
+    void pk<{ code: string | null }>('where', {}, 60000).then((j) => {
+      where = j.code;
+      rerender();
+    }).catch(() => {});
+    panel = {
+      money: true,
+      title: '🃏 Poker',
+      color: '#1f7a4c',
+      render: () => {
+        if (blocked) return `<div class="card"><p class="small" style="margin:0">${esc(blocked)}</p></div>`;
+        const [sb, bb] = STAKES[stake];
+        const opts = buyOptions(bb);
+        const stakes = STAKES.map(([a, b], i) => `<button class="seg ${i === stake ? 'on' : ''}" data-a="stake:${i}" ${s.money < b * MIN_BUY_BB ? 'disabled' : ''}>${euro(a)}/${euro(b)}</button>`).join('');
+        const buyRow = (list: number[], pick: number, act: string) => list.length
+          ? `<div class="segs pk-buys">${list.map((x, i) => `<button class="seg ${i === Math.min(pick, list.length - 1) ? 'on' : ''}" data-a="${act}:${i}">${euro(x)}</button>`).join('')}</div>`
+          : '';
+        const create = `<div class="card"><h3>➕ Crea una stanza</h3>
+            <div class="small muted">Puntate del tavolo (piccolo e grande buio)</div><div class="segs pk-stakes">${stakes}</div>
+            ${opts.length ? `<div class="small muted" style="margin-top:8px">Fiches da portare al tavolo</div>${buyRow(opts, buyPick, 'buy')}
+              <button class="btn good full" data-a="create" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy === 'create' ? 'Creo la stanza…' : `Crea la stanza (${euro(opts[Math.min(buyPick, opts.length - 1)])})`}</button>`
+            : `<p class="small bad" style="margin:8px 0 0">Per questo tavolo servono almeno ${euro(bb * MIN_BUY_BB)}.</p>`}
+            <p class="muted small explain" style="margin:6px 0 0">Il piccolo buio (${euro(sb)}) e il grande buio (${euro(bb)}) sono le puntate obbligatorie di ogni mano. Al tavolo si portano da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui: quei soldi diventano fiches e il resto del conto resta al sicuro.</p></div>`;
+        let joinBox = '';
+        if (info) {
+          const jo = buyOptions(info.bb);
+          joinBox = `<div class="pk-info"><b>Stanza ${info.code}</b> · bui ${euro(info.sb)}/${euro(info.bb)} · ${info.players.length} ${info.players.length === 1 ? 'giocatore' : 'giocatori'}${info.started ? ' · partita in corso' : ''}
+              <div class="small muted">${info.players.map(esc).join(', ')}</div></div>
+            ${info.seated ? `<button class="btn good full" data-a="join" ${busy ? 'disabled' : ''}>Torna al tuo posto</button>`
+              : !info.free ? '<p class="small bad">Il tavolo è pieno (8 giocatori).</p>'
+              : jo.length ? `<div class="small muted">Fiches da portare</div>${buyRow(jo, joinPick, 'jbuy')}<button class="btn good full" data-a="join" style="margin-top:8px" ${busy ? 'disabled' : ''}>${busy === 'join' ? 'Entro…' : `Entra (${euro(jo[Math.min(joinPick, jo.length - 1)])})`}</button>`
+              : `<p class="small bad">Per questo tavolo servono almeno ${euro(info.minBuy)}.</p>`}`;
+        }
+        const join = `<div class="card"><h3>🔑 Entra con un codice</h3>
+            <div class="row" style="gap:6px"><input class="lb-input pk-code-in" maxlength="5" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Codice della stanza" value="${esc(code)}" style="flex:1;font-size:16px;padding:9px 12px;text-transform:uppercase">
+            <button class="btn sm blue" data-a="find" ${busy ? 'disabled' : ''}>${busy === 'find' ? 'Cerco…' : '🔍 Cerca'}</button></div>${joinBox}</div>`;
+        const back = where ? `<div class="card hl"><h3>🃏 Sei ancora seduto al tavolo ${esc(where)}</h3><button class="btn good full" data-a="rejoin" ${busy ? 'disabled' : ''}>Torna al tavolo</button></div>` : '';
+        return `${explain("Texas Hold'em senza limite, da 2 a 8 giocatori, con i soldi della tua partita. Chi crea la stanza sceglie le puntate e manda il codice agli amici; si può entrare anche a partita iniziata e uscire quando si vuole. Uscendo, le fiches che hai tornano sul conto. Se al tavolo restano meno di 2 giocatori la stanza si chiude. Mentre giochi la tua partita è offline: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo. Il primo collegamento può metterci fino a un minuto.")}
+          ${back}${err ? `<p class="small center bad">${esc(err)}</p>` : ''}${create}${join}`;
+      },
+      actions: {
+        stake: (i) => {
+          stake = +i;
+          buyPick = 0;
+        },
+        buy: (i) => (buyPick = +i),
+        jbuy: (i) => (joinPick = +i),
+        create: () => {
+          const bb = STAKES[stake][1];
+          const opts = buyOptions(bb);
+          const buy = opts[Math.min(buyPick, opts.length - 1)];
+          if (!buy || buy > s.money) return;
+          busy = 'create';
+          err = '';
+          void pk<{ code: string; bought: number; state: PkState }>('create', { nickname: pokerName(this.game), slot: currentSlot, stake, buy })
+            .then((j) => sit(j.state, j.bought))
+            .catch(fail);
+        },
+        find: () => {
+          code = ((this.modal?.querySelector('.pk-code-in') as HTMLInputElement | null)?.value ?? '').trim().toUpperCase();
+          if (code.length !== 5) {
+            err = 'Il codice della stanza ha 5 caratteri';
+            return;
+          }
+          busy = 'find';
+          err = '';
+          info = null;
+          void pk<PkInfo>('info', { code }).then((j) => {
+            info = j;
+            joinPick = 0;
+            busy = '';
+            rerender();
+          }).catch(fail);
+        },
+        join: () => {
+          if (!info) return;
+          const opts = buyOptions(info.bb);
+          const buy = info.seated ? 0 : opts[Math.min(joinPick, opts.length - 1)];
+          if (!info.seated && (!buy || buy > s.money)) return;
+          busy = 'join';
+          err = '';
+          void pk<{ bought: number; state: PkState }>('join', { code: info.code, nickname: pokerName(this.game), slot: currentSlot, buy })
+            .then((j) => sit(j.state, j.bought))
+            .catch(fail);
+        },
+        rejoin: () => {
+          if (!where) return;
+          busy = 'join';
+          void pk<{ bought: number; state: PkState }>('join', { code: where, nickname: pokerName(this.game), slot: currentSlot, buy: 0 })
+            .then((j) => sit(j.state, j.bought))
+            .catch((e) => {
+              where = null;
+              fail(e);
+            });
+        },
+      },
+    };
+    this.open(panel);
+  }
 
   /** Negozio: accesso veloce a concessionaria, agenzia immobiliare e stile del personaggio. */
   openShop() {

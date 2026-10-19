@@ -1579,6 +1579,8 @@ export class Game {
       this.titleFrame(dt);
       return;
     }
+    // al poker (multigiocatore) la partita è offline: niente tempo che scorre e niente disegno della città
+    if (this.awayAt) return;
     const s = this.state;
 
     // il tempo del gioco scorre sempre (è un idle), anche con i pannelli aperti
@@ -2123,13 +2125,39 @@ export class Game {
   save() {
     this.saveTimer = 0;
     if (this.resetting || this.mode !== 'play') return;
-    saveState(this.state);
+    // al poker la partita è "offline": riaprendo il gioco il tempo si conta da quando ci sei entrato
+    saveState(this.state, undefined, this.awayAt || Date.now());
     void submitScore(this.state);
+  }
+
+  /**
+   * Multigiocatore (poker): mentre sei al tavolo la tua partita è offline, come ad app chiusa. Il tempo del gioco
+   * si ferma (niente soldi al secondo) e uscendo arrivano i guadagni offline di quel tempo, con le solite riduzioni.
+   */
+  awayAt = 0;
+  enterAway() {
+    if (this.awayAt) return;
+    this.save();
+    this.awayAt = Date.now();
+    this.input.cancel();
+  }
+  leaveAway() {
+    if (!this.awayAt) return;
+    const rep = applyOffline(this.state, Date.now() - this.awayAt);
+    this.awayAt = 0;
+    this.clock.getDelta();
+    this.save();
+    if (rep) this.ui.openOffline(rep);
   }
 
   private hiddenAt = 0;
   private onVisibility() {
     if (this.mode !== 'play') return;
+    // al poker il tempo offline lo conta già awayAt
+    if (this.awayAt) {
+      if (document.hidden) this.save();
+      return;
+    }
     if (document.hidden) {
       this.save();
       this.hiddenAt = Date.now();

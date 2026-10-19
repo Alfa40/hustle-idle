@@ -20,10 +20,10 @@ export interface Settings {
 export const actSide = () => (settings.swapControls ? 'sinistra' : 'destra');
 export const moveSide = () => (settings.swapControls ? 'destra' : 'sinistra');
 
-export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'settings', 'camera'] as const;
+export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'multi', 'settings', 'camera'] as const;
 export type HudKey = (typeof HUD_KEYS)[number];
 export const HUD_NAMES: Record<HudKey, string> = {
-  biz: '🏢 Attività', missions: '📋 Missioni', profile: '👤 Profilo', home: '🏠 Casa', shop: '🛍️ Negozio', settings: '⚙️ Opzioni', camera: '🎥 Camera',
+  biz: '🏢 Attività', missions: '📋 Missioni', profile: '👤 Profilo', home: '🏠 Casa', shop: '🛍️ Negozio', multi: '🎮 Multigiocatore', settings: '⚙️ Opzioni', camera: '🎥 Camera',
 };
 
 const KEY = 'hustleidle.settings';
@@ -38,7 +38,14 @@ try {
   // pulsanti nuovi (o nomi sconosciuti) sistemati: ogni pulsante compare una volta sola
   const known = (k: unknown): k is HudKey => (HUD_KEYS as readonly unknown[]).includes(k);
   const order = (Array.isArray(settings.hudOrder) ? settings.hudOrder : []).filter(known);
-  settings.hudOrder = [...new Set([...order, ...HUD_KEYS])];
+  // un pulsante nuovo va al suo posto (subito dopo quello che lo precede nell'ordine predefinito), non in fondo
+  const merged = [...new Set(order)];
+  HUD_KEYS.forEach((k, i) => {
+    if (merged.includes(k)) return;
+    const prev = HUD_KEYS.slice(0, i).reverse().find((x) => merged.includes(x));
+    merged.splice(prev ? merged.indexOf(prev) + 1 : 0, 0, k);
+  });
+  settings.hudOrder = merged;
   settings.hudMenu = [...new Set((Array.isArray(settings.hudMenu) ? settings.hudMenu : []).filter(known))];
 } catch {
   /* si usano i valori predefiniti */

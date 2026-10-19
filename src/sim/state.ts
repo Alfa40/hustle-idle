@@ -415,8 +415,9 @@ export function loadState(slot = currentSlot): GameState | null {
   }
 }
 
-export function saveState(s: GameState, slot = currentSlot) {
-  s.lastSeen = Date.now();
+/** `seen`: da quando contare il tempo offline al prossimo avvio (di solito adesso; al poker: da quando ci sei entrato) */
+export function saveState(s: GameState, slot = currentSlot, seen = Date.now()) {
+  s.lastSeen = seen;
   try {
     localStorage.setItem(slotKey(slot), JSON.stringify(s));
     // la partita developer non diventa il "Continua" delle partite normali

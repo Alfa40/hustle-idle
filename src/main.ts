@@ -12,6 +12,7 @@ import { preloadLogo } from './logo';
 import { checkDevLink, DEV_SLOT, devApp } from './dev';
 import { loadState } from './sim/state';
 import { checkTesterLink } from './tester';
+import { claimPoker } from './ui/poker';
 import { previewPr } from './preview';
 import { applyPreviewStart, previewStart } from './previewStart';
 import { nickname, setNickname } from './sim/leaderboard';
@@ -65,6 +66,8 @@ async function boot() {
     else if (game.offlineReport) game.ui.openOffline(game.offlineReport);
     game.ui.refresh();
     if (jump) applyPreviewStart(game, jump);
+    // fiches del poker rimaste sul server (app chiusa al tavolo, stanza chiusa mentre eri via): tornano sul conto
+    void claimPoker(game);
     // la foto del logo (se c'è) si decodifica subito: profilo e classifica la mostrano
     void preloadLogo(game.state.logo).then(() => game.ui.refresh());
   };

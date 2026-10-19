@@ -684,6 +684,7 @@ body.guide-on .hud-top { display: none; }
 
 /* ---------- negozio ---------- */
 .hbtn.c-pink { --b: #e84393; --bd: #b8306f; }
+.hbtn.c-teal { --b: #14a3a3; --bd: #0b7676; }
 .shop-card { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; border: none; background: #fff; border-radius: 18px; padding: 12px; margin-bottom: 10px; box-shadow: 0 3px 0 rgba(0,0,0,.08); border-left: 8px solid var(--sc); font: inherit; }
 .shop-card b { display: block; font-size: 17px; color: var(--ink); }
 .shop-card small { color: var(--ink-2); font-size: 12px; }
@@ -1340,3 +1341,100 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .sh-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 6px; font-size: 12.5px; font-weight: 700; }
 .sh-key span { display: inline-flex; align-items: center; gap: 5px; }
 .sh-key i { width: 18px; height: 18px; border-radius: 5px; background-color: #8a8478; }
+
+/* ---------- poker (multigiocatore, src/ui/poker.ts) ---------- */
+.pk {
+  position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; color: #fff; font-weight: 700;
+  background: radial-gradient(120% 90% at 50% 40%, #2d1f4a, #160f26); padding: var(--sat) var(--sar) var(--sab) var(--sal); box-sizing: border-box;
+  -webkit-user-select: none; user-select: none; overflow: hidden;
+}
+body.in-poker .toasts { z-index: 31; }
+.pk-top { display: flex; align-items: center; gap: 8px; padding: 6px 0; flex: none; }
+.pk-exit, .pk-code { font: inherit; font-weight: 700; border: 0; border-radius: 14px; min-height: 40px; padding: 0 12px; color: #fff; background: rgba(255,255,255,.14); }
+.pk-exit.warn { background: #d8455a; }
+.pk-code { margin-left: auto; }
+.pk-code b { letter-spacing: 2px; color: #ffe08a; }
+.pk-blinds { font-size: 12px; opacity: .8; white-space: nowrap; }
+.pk-felt { position: relative; flex: 1; min-height: 0; margin: 4px 6px; }
+.pk-oval {
+  position: absolute; inset: 9% 8%; border-radius: 50% / 46%; background: radial-gradient(ellipse at 50% 40%, #2fa866, #1b7a46 70%, #136037);
+  border: 10px solid #7a4a26; box-shadow: inset 0 0 0 3px rgba(255,255,255,.12), inset 0 10px 30px rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.5);
+}
+.pk-center { position: absolute; left: 50%; top: 47%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: 74%; text-align: center; }
+.pk-pot { background: rgba(0,0,0,.35); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.pk-pot b { color: #ffe08a; }
+.pk-board { display: flex; gap: 4px; justify-content: center; }
+.pk-line { font-size: 13px; line-height: 1.3; background: rgba(0,0,0,.35); border-radius: 12px; padding: 4px 10px; }
+.pk-line b { color: #ffe08a; }
+.pk-card {
+  position: relative; width: 36px; height: 52px; border-radius: 6px; background: #fff; color: #222; box-shadow: 0 2px 4px rgba(0,0,0,.35);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; flex: none;
+}
+.pk-card b { font-size: 17px; line-height: 1; font-weight: 800; }
+.pk-card .pk-suit { width: 16px; height: 16px; fill: currentColor; }
+.pk-card.red { color: #d8263c; }
+.pk-card.hl { box-shadow: 0 0 0 3px #ffd23f, 0 2px 6px rgba(0,0,0,.4); transform: translateY(-3px); }
+.pk-card.back { background: repeating-linear-gradient(45deg, #5b3fa3 0 4px, #4a3290 4px 8px); border: 2px solid #fff; box-sizing: border-box; }
+.pk-card.slot { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 2px rgba(255,255,255,.18); }
+.pk-card.sm { width: 22px; height: 31px; border-radius: 4px; }
+.pk-card.sm b { font-size: 11px; }
+.pk-card.sm .pk-suit { width: 10px; height: 10px; }
+.pk-card.lg { width: 54px; height: 76px; border-radius: 8px; }
+.pk-card.lg b { font-size: 26px; }
+.pk-card.lg .pk-suit { width: 24px; height: 24px; }
+.pk-seat { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; width: 84px; z-index: 2; }
+.pk-seat.out { opacity: .5; }
+.pk-av { position: relative; width: 40px; height: 40px; border-radius: 50%; background: var(--c); border: 3px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.pk-seat.turn .pk-av { border-color: #ffd23f; box-shadow: 0 0 0 4px rgba(255,210,63,.45); }
+.pk-seat.win .pk-av { border-color: #6ee39a; box-shadow: 0 0 0 5px rgba(110,227,154,.5); }
+.pk-dealer { position: absolute; right: -8px; bottom: -4px; width: 18px; height: 18px; border-radius: 50%; background: #fff; color: #3a2f55; font-size: 11px; display: flex; align-items: center; justify-content: center; border: 2px solid #3a2f55; }
+.pk-plate { position: relative; margin-top: -4px; background: rgba(20,12,36,.85); border-radius: 10px; padding: 3px 7px 4px; text-align: center; min-width: 64px; max-width: 84px; overflow: hidden; }
+.pk-plate b { display: block; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-plate span { display: block; font-size: 11px; color: #ffe08a; }
+.pk-timer { position: absolute; left: 0; bottom: 0; height: 3px; width: var(--w); background: #ffd23f; animation: pk-timer linear forwards; }
+@keyframes pk-timer { to { width: 0; } }
+.pk-tag { margin-top: 2px; font-size: 10.5px; background: rgba(0,0,0,.45); border-radius: 8px; padding: 1px 6px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.pk-tag.won { background: #1f9a4c; color: #fff; }
+.pk-scards { display: flex; gap: 2px; margin-bottom: -6px; z-index: 1; }
+.pk-seat.me .pk-av { width: 34px; height: 34px; font-size: 12px; }
+.pk-bet { position: absolute; transform: translate(-50%, -50%); z-index: 1; display: flex; align-items: center; gap: 4px; font-size: 11.5px; background: rgba(0,0,0,.45); border-radius: 999px; padding: 2px 8px 2px 3px; white-space: nowrap; }
+.pk-bet i { width: 14px; height: 14px; border-radius: 50%; background: #ff5d73; border: 2px dashed #fff; box-sizing: border-box; }
+.pk-me { flex: none; padding: 6px 4px 2px; display: flex; flex-direction: column; gap: 6px; }
+.pk-hand { display: flex; align-items: center; gap: 6px; }
+.pk-hinfo { display: flex; flex-direction: column; margin-left: 6px; font-size: 13px; gap: 1px; }
+.pk-hinfo b { color: #ffe08a; }
+.pk-hinfo > b { font-size: 15px; }
+.pk-hinfo .muted { color: rgba(255,255,255,.6); font-size: 12px; }
+.pk-note { font-size: 13.5px; text-align: center; padding: 6px 4px; color: rgba(255,255,255,.9); }
+.pk-note b { color: #ffe08a; }
+.pk-note.bad { color: #ffb3bd; }
+.pk-acts { display: flex; gap: 8px; }
+.pk-btn {
+  flex: 1; min-height: 50px; font: inherit; font-weight: 800; font-size: 15px; border: 0; border-radius: 16px; color: #fff;
+  background: #5c5277; box-shadow: 0 4px 0 #3b3452; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1;
+}
+.pk-btn b { font-size: 12.5px; color: #ffe08a; }
+.pk-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #3b3452; }
+.pk-btn:disabled { opacity: .5; }
+.pk-btn.bad { background: #d8455a; box-shadow: 0 4px 0 #9b2c3c; }
+.pk-btn.blue { background: #2d9cdb; box-shadow: 0 4px 0 #1b74a8; }
+.pk-btn.good { background: #35c46a; box-shadow: 0 4px 0 #1f9a4c; }
+.pk-raise { display: flex; flex-direction: column; gap: 8px; }
+.pk-presets { display: flex; gap: 6px; }
+.pk-chip { flex: 1; font: inherit; font-weight: 700; font-size: 12.5px; min-height: 36px; border: 0; border-radius: 12px; background: rgba(255,255,255,.16); color: #fff; }
+.pk-range { width: 100%; accent-color: #35c46a; height: 28px; }
+.pk-closed { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; color: var(--ink); }
+.pk-closed .card { max-width: 360px; width: 100%; }
+.pk-stakes { flex-wrap: wrap; }
+.pk-stakes .seg { flex: 1 1 30%; font-size: 12.5px; }
+.pk-stakes .seg:disabled, .pk-buys .seg:disabled { opacity: .4; }
+.pk-info { margin: 10px 0 8px; font-size: 14px; }
+@media (orientation: landscape) {
+  .pk { display: grid; grid-template-columns: 1fr min(300px, 36%); grid-template-rows: auto 1fr; column-gap: 10px; }
+  .pk-top { grid-column: 1 / 3; padding: 2px 0; }
+  .pk-felt { grid-row: 2; margin: 0; }
+  .pk-me { grid-row: 2; justify-content: center; overflow-y: auto; }
+  .pk-oval { inset: 10% 6%; border-radius: 46% / 50%; }
+  .pk-acts { flex-wrap: wrap; }
+  .pk-btn { flex: 1 1 40%; min-height: 46px; }
+}
