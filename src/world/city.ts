@@ -338,6 +338,9 @@ export class City {
     const off = TILE * 0.43;
     const base = k % 2 === 0 ? new THREE.Vector3(p.x, 0, p.z + off) : new THREE.Vector3(p.x + off, 0, p.z);
     inst.add('roads/light-square.glb', placeMatrix(base.x, base.z, k % 2 === 0 ? 0 : Math.PI / 2, TILE));
+    // il palo non si attraversa (a piedi né coi veicoli): un quadratino sottile alla base
+    const pole = 0.14;
+    this.colliders.push({ minX: base.x - pole, maxX: base.x + pole, minZ: base.z - pole, maxZ: base.z + pole });
     // la lampada sta in cima, sporgente verso il centro della strada
     const toRoad = p.clone().sub(base).normalize();
     this.lampHeads.push(base.clone().addScaledVector(toRoad, 1.15).setY(3.35));
