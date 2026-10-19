@@ -1830,7 +1830,7 @@ export class UI {
     // poi una colonna per dipendente piena nelle ore in cui lavora (un buco se il turno è in due pezzi)
     const R0 = 2;
     const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
-    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who ${pat(e.role)}" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
+    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
     hours.forEach((h, i) => {
       const r = R0 + i;
       const cls = `${shortAt(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
@@ -1848,7 +1848,7 @@ export class UI {
       ? team.map((e) => {
           const sh = shiftFor(e);
           const serves = (bizType(biz.type).roles as Role[]).includes(e.role);
-          return `<div class="sh-leg"><i class="${pat(e.role)}" style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
+          return `<div class="sh-leg"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
         }).join('')
       : `<div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>`;
     const inTraining = biz.staff.length - team.length;
