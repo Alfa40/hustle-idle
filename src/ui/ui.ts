@@ -27,7 +27,7 @@ import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
   bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
-  hire, isAutonomous, isOpenHour, shiftsFor, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
+  hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
@@ -1810,49 +1810,70 @@ export class UI {
     const C = BUSINESS.CLOSE_HOUR;
     const hours = Array.from({ length: C - O }, (_, i) => O + i);
     const PAL = ['#e8590c', '#2d9cdb', '#27ae60', '#9b51e0', '#f2b705', '#eb5757', '#00a8a8', '#d35fb7', '#6d8f1f', '#2f5fd0', '#b5793d', '#7a7a7a'];
-    const team = biz.staff.filter((e) => !e.trainingEnd);
+    // in ordine di reparto (es. cuochi, cassieri, poi il manager), così le colonne dello stesso reparto stanno vicine
+    const roleOrder = [...(bizType(biz.type).roles as Role[]), 'manager'];
+    const team = biz.staff.filter((e) => !e.trainingEnd).sort((a, b) => (roleOrder.indexOf(a.role) + 99) % 99 - (roleOrder.indexOf(b.role) + 99) % 99);
     const color = new Map(team.map((e, i) => [e.id, PAL[i % PAL.length]]));
     const shiftFor = (e: Employee) => plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
     const now = Math.floor(hourOf(s));
     const tol = 0.97;
-    const cols = hours.map((h) => {
-      const on = team.filter((e) => {
-        const sh = shiftFor(e);
-        return sh && inShift(sh, h);
-      });
-      const short = team.length > 0 && curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol;
-      return `<div class="sh-col ${h === now ? 'now' : ''} ${short ? 'short' : ''}"><em>${fmtRate(curve[h])}</em>
-        <div class="sh-stack">${on.map((e) => `<i style="background:${color.get(e.id)}"></i>`).join('')}</div><span>${h}</span></div>`;
-    }).join('');
-    const legend = team.length
+    const onAt = (h: number) => team.filter((e) => {
+      const sh = shiftFor(e);
+      return sh && inShift(sh, h);
+    });
+    const shortAt = (h: number) => team.length > 0 && curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol;
+    const initials = (n: string) => n.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase();
+    // griglia: ore in verticale (8 in alto), poi clienti previsti e quanti ne reggono quelli di turno,
+    // poi una colonna per dipendente piena nelle ore in cui lavora (un buco se il turno è in due pezzi)
+    const R0 = 2;
+    const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
+    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
+    hours.forEach((h, i) => {
+      const r = R0 + i;
+      const cls = `${shortAt(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
+      cells.push(`<i class="shg-row ${cls}" style="grid-row:${r}"></i>`,
+        `<span class="shg-hour ${cls}" style="grid-row:${r};grid-column:1">${h}</span>`,
+        `<span class="shg-n" style="grid-row:${r};grid-column:2">${fmtRate(curve[h])}</span>`,
+        `<span class="shg-n shg-cap ${cls}" style="grid-row:${r};grid-column:3">${team.length ? fmtRate(plan.capAt(h)) : '—'}</span>`);
+    });
+    team.forEach((e, k) => {
+      const sh = shiftFor(e);
+      for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background:${color.get(e.id)}"></i>`);
+    });
+    const grid = `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, team.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
+    const who = team.length
       ? team.map((e) => {
           const sh = shiftFor(e);
-          return `<div class="sh-leg"><i style="background:${color.get(e.id)}"></i><b>${esc(e.name)}</b><span class="muted">${roleName(biz.type, e.role)}</span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span></div>`;
+          const serves = (bizType(biz.type).roles as Role[]).includes(e.role);
+          return `<div class="sh-leg"><i style="background:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
         }).join('')
       : `<div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>`;
     const inTraining = biz.staff.length - team.length;
     const bands: [string, number, number][] = [['🌅 Mattina', O, 12], ['🍝 Pranzo', 12, 15], ['☀️ Pomeriggio', 15, 18], ['🌙 Sera', 18, C]];
     const bandRows = bands.map(([name, a, b]) => {
       let want = 0;
+      let cap = 0;
       let lost = 0;
       let maxOn = 0;
       for (let h = a; h < b; h++) {
         want += curve[h];
+        cap += plan.capAt(h);
         lost += Math.max(0, curve[h] - plan.capAt(h));
-        maxOn = Math.max(maxOn, team.filter((e) => { const sh = shiftFor(e); return sh && inShift(sh, h); }).length);
+        maxOn = Math.max(maxOn, onAt(h).length);
       }
       // senza dipendenti i clienti li servi tu: niente "persi" per i turni
       const bad = team.length > 0 && want > 0.05 && lost > want * (1 - tol);
-      return `<div class="lv-row ${bad ? 'lv-bad' : ''}"><span>${name} <small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
+      return `<div class="lv-row lv-5 ${bad ? 'lv-bad' : ''}"><span>${name}<small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${team.length ? fmtRate(cap) : '—'}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
     }).join('');
+    const anyShort = hours.some(shortAt);
     const shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
-      <div class="sh-chart">${cols}</div>
-      <div class="small muted sh-note"><b>Numero in alto</b>: ${unit} previsti in quell'ora · <b>colori</b>: chi è di turno${team.length && hours.some((h) => curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>
-      <div class="sh-legend">${legend}</div>${inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : ''}
+      ${team.length ? grid : ''}
+      ${team.length ? `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente${anyShort ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>` : ''}
+      <div class="sh-legend">${who}</div>${inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : ''}
       <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>
-      <div class="lv-row lv-head lv-4"><span></span><b>${unit} previsti</b><b>di turno</b><b>persi</b></div>
-      ${bandRows.replace(/class="lv-row/g, 'class="lv-row lv-4')}
-      <p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Persi" sono i ${unit} che con questi turni non si riescono a servire: in quelle fasce assumi qualcuno nel reparto che manca o migliora l'attrezzatura. I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p></div>`;
+      <div class="lv-row lv-head lv-5"><span></span><b>previsti</b><b>reggono</b><b>di turno</b><b>persi</b></div>
+      ${bandRows}
+      <p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire: conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere). Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p></div>`;
     return shifts + money;
   }
 
