@@ -310,7 +310,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
           carrying = null;
           run.speedMul = 1;
           hold(game);
-          const box = run.prop(shelfBox(BOX, s.color.hex, it.kind, top), colAt(s, top, c), 0, 1);
+          const box = run.prop(shelfBox(BOX, it.shelf.color.hex, it.kind, it.top), colAt(s, top, c), 0, 1);
           box.userData.noGlow = true;
           box.userData.solid = false;
           const e: Entry = { it, kind: it.kind, obj: box };
