@@ -1070,6 +1070,8 @@ export class UI {
 
   /** gruppi aperti nella lista "Le mie" (restano aperti finché non si chiude il gioco) */
   private bizGroupsOpen = new Set<string>();
+  /** resoconto: reparto scelto nei turni di oggi, per attività (niente = tutta l'attività) */
+  private shiftView = new Map<string, string>();
 
   /** Agenzia affari: quelle in vendita, le tue attività, i resoconti e il mercato. Senza tab: chi non ha
    *  ancora attività vede quelle in vendita, gli altri le proprie. */
@@ -1508,6 +1510,7 @@ export class UI {
           this.close();
           this.openBusiness(bizId, tab);
         },
+        shv: (v) => this.shiftView.set(bizId, v),
       },
     });
   }
@@ -1878,32 +1881,33 @@ export class UI {
     }).join('');
     const inTraining = biz.staff.length - team.length;
     const training = inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : '';
-    const note = (key: string) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona${key}${hours.some(shortWith(capOf(null))) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
+    const note = (key: string, cap = capOf(null)) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona${key}${hours.some(shortWith(cap)) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
     const explainTxt = `<p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire${need.length > 1 ? `: ogni reparto ha i suoi numeri e per tutta l'attività conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere)` : ''}. Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p>`;
     let shifts: string;
     if (!team.length) {
       shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
         <div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
         <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
-    } else if (need.length <= 1) {
-      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${gridOf(team, capOf(null))}
-        <div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>${note(' e la trama il lavoro')}
-        <div class="sh-legend">${legendOf(team)}</div>${training}
-        <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf(team, capOf(null))}${explainTxt}</div>`;
     } else {
-      // più reparti (es. cuochi e cassieri): ogni reparto ha la sua griglia, le sue fasce e i clienti che regge
-      const dept = need.map((r) => {
-        const members = team.filter((e) => e.role === r);
-        const cap = capOf(r);
-        const slow = hours.some(shortWith(cap));
-        const head = `<h3 class="sh-dept ${slow ? 'bad' : ''}"><i class="${pat(r)}"></i>${esc(rolePlural(roleName(biz.type, r)))} <span class="muted small">${members.length}</span>${slow ? ' <span class="small">⚠️ non bastano</span>' : ''}</h3>`;
-        if (!members.length) return `<div class="sh-sec">${head}<div class="small bad">Nessuno in questo reparto: l'attività non serve nessuno. Assumi dalla scheda 👥 Personale.</div></div>`;
-        return `<div class="sh-sec">${head}${gridOf(members, cap)}<div class="sh-legend">${legendOf(members)}</div>${bandsOf(members, cap)}</div>`;
-      }).join('');
-      const managers = team.filter((e) => !need.includes(e.role));
-      const boss = managers.length ? `<div class="sh-sec"><h3 class="sh-dept"><i class="pat-m"></i>Manager</h3><div class="sh-legend">${legendOf(managers)}</div></div>` : '';
-      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${note('')}${dept}${boss}${training}
-        <div class="sh-sec"><h3 class="sh-dept">⏰ Tutta l'attività <span class="muted small">conta il reparto più lento</span></h3>${bandsOf(team.filter((e) => need.includes(e.role)), capOf(null))}</div>${explainTxt}</div>`;
+      // più reparti (es. cuochi e cassieri): stessa griglia e stesse fasce, con i dati del reparto scelto sopra
+      // ("Tutti": tutta l'attività, dove conta il reparto più lento)
+      const multi = need.length > 1;
+      const saved = this.shiftView.get(biz.id);
+      const view: Role | null = multi && saved && need.includes(saved as Role) ? (saved as Role) : null;
+      const members = view ? team.filter((e) => e.role === view) : team;
+      const cap = capOf(view);
+      const segs = multi
+        ? `<div class="segs sh-segs">${[null, ...need].map((r) => {
+            const slow = r !== null && hours.some(shortWith(capOf(r)));
+            return `<button class="seg ${r === view ? 'on' : ''} ${slow ? 'slow' : ''}" data-a="shv:${r ?? 'all'}">${r ? esc(rolePlural(roleName(biz.type, r))) : 'Tutti'}${r ? ` <small>${team.filter((e) => e.role === r).length}</small>` : ''}${slow ? ' ⚠️' : ''}</button>`;
+          }).join('')}</div>`
+        : '';
+      const label = view ? rolePlural(roleName(biz.type, view)) : multi ? "tutta l'attività" : '';
+      const empty = view && !members.length ? `<div class="small bad">Nessun ${esc(roleName(biz.type, view).toLowerCase())}: l'attività non serve nessuno. Assumi dalla scheda 👥 Personale.</div>` : '';
+      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${segs}${gridOf(members, cap)}${empty}
+        ${view ? '' : `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>`}${note(view ? '' : ' e la trama il lavoro', cap)}
+        <div class="sh-legend">${legendOf(members)}</div>${training}
+        <h3 style="margin:12px 0 4px">⏰ Fasce orarie${label ? ` <span class="muted small">${esc(label)}</span>` : ''}</h3>${bandsOf(members.filter((e) => need.includes(e.role)), cap)}${explainTxt}</div>`;
     }
     return shifts + money;
   }

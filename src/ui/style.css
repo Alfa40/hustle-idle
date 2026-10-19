@@ -1333,11 +1333,10 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .pat-3 { background-image: linear-gradient(rgba(255,255,255,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.3) 1px, transparent 1px); background-size: 6px 6px; }
 .pat-m { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.26) 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, rgba(255,255,255,.26) 0 1px, transparent 1px 6px); }
 .shg-who, .sh-leg i { text-shadow: 0 1px 1px rgba(0,0,0,.25); }
-.sh-sec { border-top: 2px solid #eee6f4; margin-top: 10px; padding-top: 8px; }
-.sh-dept { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 2px; }
-.sh-dept.bad { color: #d8455a; }
-.sh-dept > i { width: 18px; height: 18px; border-radius: 5px; background-color: #8a8478; flex: none; }
-.sh-sec .lv-head { margin-top: 8px; }
+.sh-segs { margin: 4px 0 2px; }
+.sh-segs .seg { min-height: 40px; }
+.sh-segs .seg small { opacity: .75; }
+.sh-segs .seg.slow:not(.on) { background: #ffe3e6; color: #9b1c2c; }
 .sh-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 6px; font-size: 12.5px; font-weight: 700; }
 .sh-key span { display: inline-flex; align-items: center; gap: 5px; }
 .sh-key i { width: 18px; height: 18px; border-radius: 5px; background-color: #8a8478; }
