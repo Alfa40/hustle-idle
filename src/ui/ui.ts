@@ -41,7 +41,7 @@ import {
   type Business, type Employee, type JobOffer, type Mission, type ServiceOrder, type SpecialOrder,
 } from '../sim/state';
 import { stripLeadIcon } from './icons';
-import { buyBox, MAX_BUY_BB, MIN_BUY_BB, pk, pokerBlocked, pokerName, PokerTable, STAKES, wireBuyBox, type PkInfo, type PkState } from './poker';
+import { buyBox, MAX_BUY_BB, MIN_BUY_BB, pk, pokerBlocked, pokerName, PokerTable, STAKE_FAME, STAKES, wireBuyBox, type PkInfo, type PkState } from './poker';
 
 
 type Actions = Record<string, (arg: string) => void>;
@@ -2305,7 +2305,10 @@ export class UI {
   openPoker() {
     const s = this.s;
     const blocked = pokerBlocked();
-    let stake = Math.max(0, STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money) === -1 ? 0 : STAKES.findIndex(([, bb]) => bb * MIN_BUY_BB <= s.money));
+    // i tavoli dal terzo in su chiedono fama (STAKE_FAME), oltre ai soldi per le fiches
+    const fame = () => totalFame(s);
+    const fameOk = (need: number) => fame() >= need;
+    let stake = 0;
     // fiches da portare (scritte a mano, col cursore o con le scorciatoie)
     let buyAmt = 0;
     let joinAmt = 0;
@@ -2371,12 +2374,16 @@ export class UI {
         const [sb, bb] = STAKES[stake];
         const canCreate = maxFor(bb) >= bb * MIN_BUY_BB;
         if (canCreate && !okAmt(buyAmt, bb)) buyAmt = Math.min(maxFor(bb), bb * 50);
-        const stakes = STAKES.map(([a, b], i) => `<button class="seg ${i === stake ? 'on' : ''}" data-a="stake:${i}" ${s.money < b * MIN_BUY_BB ? 'disabled' : ''}>${euro(a)}/${euro(b)}</button>`).join('');
+        const stakes = STAKES.map(([a, b], i) => {
+          const locked = !fameOk(STAKE_FAME[i]);
+          return `<button class="seg ${i === stake ? 'on' : ''}" data-a="stake:${i}" ${locked || s.money < b * MIN_BUY_BB ? 'disabled' : ''}>${euro(a)}/${euro(b)}${locked ? `<small>🔒 ⭐ ${STAKE_FAME[i]}</small>` : ''}</button>`;
+        }).join('');
         const create = `<div class="card"><h3>➕ Crea una stanza</h3>
             <div class="small muted">Puntate del tavolo (piccolo e grande buio)</div><div class="segs pk-stakes">${stakes}</div>
             ${canCreate ? `<div class="small muted" style="margin-top:8px">Fiches da portare al tavolo</div>${buyBox('c', bb * MIN_BUY_BB, maxFor(bb), buyAmt, bb)}
               <button class="btn good full" data-a="create" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy === 'create' ? 'Creo la stanza…' : `Crea la stanza (<span class="pk-go-c">${euro(buyAmt)}</span>)`}</button>`
             : `<p class="small bad" style="margin:8px 0 0">Per questo tavolo servono almeno ${euro(bb * MIN_BUY_BB)}.</p>`}
+            <p class="muted small explain" style="margin:6px 0 0">I primi due tavoli sono per tutti; dal terzo in su serve fama totale (⭐ ${STAKE_FAME.slice(2).join(', ')}): la tua è ⭐ ${fame().toFixed(1)}. Vale anche per entrare con il codice.</p>
             <p class="muted small explain" style="margin:6px 0 0">Il piccolo buio (${euro(sb)}) e il grande buio (${euro(bb)}) sono le puntate obbligatorie di ogni mano. Al tavolo si portano da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui (mai più di quello che hai): quei soldi diventano fiches e il resto del conto resta al sicuro.</p></div>`;
         let joinBox = '';
         if (info) {
@@ -2386,6 +2393,7 @@ export class UI {
               <div class="small muted">${info.players.map(esc).join(', ')}</div></div>
             ${info.seated ? `<button class="btn good full" data-a="join" ${busy ? 'disabled' : ''}>Torna al tuo posto</button>`
               : !info.free ? '<p class="small bad">Il tavolo è pieno (8 giocatori).</p>'
+              : !fameOk(info.fame) ? `<p class="small bad">🔒 Per questo tavolo serve fama ⭐ ${info.fame} (la tua: ⭐ ${fame().toFixed(1)}).</p>`
               : jmax >= info.minBuy ? `<div class="small muted">Fiches da portare</div>${buyBox('j', info.minBuy, jmax, joinAmt, info.bb)}<button class="btn good full" data-a="join" style="margin-top:8px" ${busy ? 'disabled' : ''}>${busy === 'join' ? 'Entro…' : `Entra (<span class="pk-go-j">${euro(joinAmt)}</span>)`}</button>`
               : `<p class="small bad">Per questo tavolo servono almeno ${euro(info.minBuy)}.</p>`}`;
         }
@@ -2404,13 +2412,17 @@ export class UI {
         create: () => {
           const bb = STAKES[stake][1];
           const buy = buyAmt;
+          if (!fameOk(STAKE_FAME[stake])) {
+            err = `Per questo tavolo serve fama ⭐ ${STAKE_FAME[stake]}`;
+            return;
+          }
           if (!okAmt(buy, bb)) {
             err = `Scegli quante fiches portare: da ${euro(bb * MIN_BUY_BB)} a ${euro(maxFor(bb))}`;
             return;
           }
           busy = 'create';
           err = '';
-          void pk<{ code: string; bought: number; state: PkState }>('create', { nickname: pokerName(this.game), slot: currentSlot, stake, buy })
+          void pk<{ code: string; bought: number; state: PkState }>('create', { nickname: pokerName(this.game), slot: currentSlot, stake, buy, fame: fame() })
             .then((j) => sit(j.state, j.bought))
             .catch(fail);
         },
@@ -2432,6 +2444,10 @@ export class UI {
         },
         join: () => {
           if (!info) return;
+          if (!info.seated && !fameOk(info.fame)) {
+            err = `Per questo tavolo serve fama ⭐ ${info.fame}`;
+            return;
+          }
           const buy = info.seated ? 0 : joinAmt;
           if (!info.seated && !okAmt(buy, info.bb)) {
             err = `Scegli quante fiches portare: da ${euro(info.minBuy)} a ${euro(maxFor(info.bb))}`;
@@ -2439,7 +2455,7 @@ export class UI {
           }
           busy = 'join';
           err = '';
-          void pk<{ bought: number; state: PkState }>('join', { code: info.code, nickname: pokerName(this.game), slot: currentSlot, buy })
+          void pk<{ bought: number; state: PkState }>('join', { code: info.code, nickname: pokerName(this.game), slot: currentSlot, buy, fame: fame() })
             .then((j) => sit(j.state, j.bought))
             .catch(fail);
         },
