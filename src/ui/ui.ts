@@ -1230,13 +1230,14 @@ export class UI {
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
-    return `<p class="muted small explain">Clienti (o ordini) all'ora previsti oggi per ogni prodotto nelle tre zone. Cambia ogni giorno con stagioni, meteo ed eventi.</p>` +
+    return `<div class="muted small explain" style="margin-bottom:8px"><p style="margin:0 0 6px">Ogni numero è quanti <b>clienti all'ora</b> (per le imprese di servizi: <b>ordini all'ora</b>) chiedono oggi quel prodotto in ogni zona. Cambia ogni giorno con stagioni, meteo, eventi e la tua fama.</p>
+        <p style="margin:0">Come usarlo: apri dove i numeri sono più alti; metti nel menù i prodotti più richiesti e togli quelli quasi a zero; se i clienti all'ora sono più di quanti il tuo personale ne serve, assumi o migliora l'attrezzatura (nei Resoconti vedi quanti ne perdi).</p></div>` +
       BUSINESS_TYPE_IDS.filter((t) => bizType(t).products.length).map((t) => {
         const def = bizType(t);
         const fm = fameMultiplier(s, t);
         const rows = def.products.map((p) => `<div class="row between small" style="margin-top:4px"><span style="flex:1">${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>
-          ${zones.map((z) => `<span style="width:58px;text-align:right">${(marketDemand(s, p, z) * fm).toFixed(1)}</span>`).join('')}</div>`).join('');
-        return `<div class="card"><h3>${def.icon} ${def.name}</h3>
+          ${zones.map((z) => `<span style="width:58px;text-align:right">${fmtRate(marketDemand(s, p, z) * fm)}</span>`).join('')}</div>`).join('');
+        return `<div class="card"><div class="row between" style="gap:8px;flex-wrap:wrap"><h3 style="margin:0">${def.icon} ${def.name}</h3><span class="tag">${def.kind === 'service' ? "📋 ordini all'ora" : "👥 clienti all'ora"}</span></div>
           <div class="row between small muted"><span style="flex:1"></span>${zones.map((z) => `<span style="width:58px;text-align:right">${ZONES[z].name.slice(0, 6)}</span>`).join('')}</div>${rows}</div>`;
       }).join('');
   }
