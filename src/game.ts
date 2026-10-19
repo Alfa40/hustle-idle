@@ -203,6 +203,8 @@ export class Game {
   rideVel = new THREE.Vector3();
   /** Rimbalzo del veicolo contro ostacoli ed edifici della città (come se fossero di gomma). */
   private bounceVel = new THREE.Vector3();
+  /** secondi di rimbalzo che restano: intanto il joystick non spinge il veicolo (il rimbalzo si vede) */
+  private bounceT = 0;
   /** il minigioco in corso può sostituire il pulsante azione */
   prompt: ActionPrompt | null = null;
   private nextJobSpawn = 3;
@@ -1835,7 +1837,8 @@ export class Game {
       }
     } else if (len > 0.05) {
       const ride = jr ?? (this.state.riding ? VEHICLES[this.state.riding] : null);
-      const speed = (ride ? ride.speed : WALK_SPEED * (this.run?.speedMul ?? 1)) * Math.min(1, len);
+      // durante il rimbalzo il veicolo non risponde al joystick: lo porta indietro solo la spinta dell'urto
+      const speed = (ride ? ride.speed : WALK_SPEED * (this.run?.speedMul ?? 1)) * Math.min(1, len) * (ride && this.bounceT > 0 ? 0 : 1);
       p.x += mx * speed * dt;
       p.z += mz * speed * dt;
       // nel minigioco valgono solo i suoi ostacoli: quelli della città (confini compresi) lo
@@ -1845,8 +1848,10 @@ export class Game {
       if (ride && !jr && !this.arena) {
         // urto contro un ostacolo: il veicolo rimbalza via, in proporzione alla velocità
         hit.set(p.x - hit.x, 0, p.z - hit.z);
-        if (hit.length() > 0.004 && hit.normalize().dot(new THREE.Vector3(mx, 0, mz).normalize()) < -0.3) {
-          this.bounceVel.copy(hit).multiplyScalar(Math.min(ride.speed, 14) * 0.7 * Math.min(1, len));
+        if (this.bounceT <= 0 && speed > 2.5 && hit.length() > 0.004 && hit.normalize().dot(new THREE.Vector3(mx, 0, mz).normalize()) < -0.3) {
+          // all'indietro con quasi tutta la velocità che avevi (più vai forte, più rimbalzi)
+          this.bounceVel.copy(hit).multiplyScalar(Math.min(speed, 16) * 1.1);
+          this.bounceT = 0.55;
         }
       }
       // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
@@ -1862,15 +1867,19 @@ export class Game {
       this.player.play('idle');
     }
     // rimbalzo: la spinta dell'urto si spegne in fretta, senza attraversare i muri
+    this.bounceT = Math.max(0, this.bounceT - dt);
     if (this.bounceVel.lengthSq() > 0.01) {
-      if (this.arena || !this.state.riding || jr) this.bounceVel.set(0, 0, 0);
+      if (this.arena || !this.state.riding || jr) {
+        this.bounceVel.set(0, 0, 0);
+        this.bounceT = 0;
+      }
       else {
         const rad = VEHICLES[this.state.riding].radius;
         p.x += this.bounceVel.x * dt;
         p.z += this.bounceVel.z * dt;
         this.city.collide(p, rad);
         this.traffic.pushOut(p, rad);
-        this.bounceVel.multiplyScalar(Math.max(0, 1 - 7 * dt));
+        this.bounceVel.multiplyScalar(Math.max(0, 1 - 3.5 * dt));
       }
     } else this.bounceVel.set(0, 0, 0);
     // nel minigioco si salva il posto in città dove si era (non quello nella scena separata)
