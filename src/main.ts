@@ -13,6 +13,7 @@ import { checkDevLink, DEV_SLOT, devApp } from './dev';
 import { loadState } from './sim/state';
 import { checkTesterLink } from './tester';
 import { previewPr } from './preview';
+import { applyPreviewStart, previewStart } from './previewStart';
 import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
 
@@ -40,7 +41,7 @@ async function boot() {
   // accesso da console per i test
   (window as unknown as { game: Game }).game = game;
 
-  const start = (slot: number, newName?: string) => {
+  const start = (slot: number, newName?: string, quick = false) => {
     game.begin(slot, newName);
     // partita developer nuova: un miliardo, niente tutorial di benvenuto
     if (slot === DEV_SLOT && newName !== undefined) {
@@ -54,12 +55,16 @@ async function boot() {
       if (!nickname()) setNickname(`Prova ${previewPr}`);
       game.state.logoChosen = true;
     }
+    // "Gioca subito" in un'anteprima con punto di partenza: niente benvenuto, si va dritti alla parte cambiata
+    const jump = previewStart && quick ? previewStart : null;
+    if (jump) game.state.tutorialDone = true;
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
     if (!devApp && game.ui.needsIdentity()) game.ui.openLogoEditor(true);
     if (!game.state.tutorialDone) game.ui.openWelcome();
     else if (game.offlineReport) game.ui.openOffline(game.offlineReport);
     game.ui.refresh();
+    if (jump) applyPreviewStart(game, jump);
     // la foto del logo (se c'è) si decodifica subito: profilo e classifica la mostrano
     void preloadLogo(game.state.logo).then(() => game.ui.refresh());
   };
@@ -70,9 +75,9 @@ async function boot() {
     return;
   }
   // schermata iniziale: si entra in partita solo dopo aver scelto lo slot
-  const title = new TitleScreen((slot, newName) => {
+  const title = new TitleScreen((slot, newName, quick) => {
     title.hide();
-    start(slot, newName);
+    start(slot, newName, quick);
   });
   (window as unknown as { title: TitleScreen }).title = title;
 }

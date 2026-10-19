@@ -34,7 +34,7 @@ export class TitleScreen {
   private verTaps = 0;
   private devMsg = '';
 
-  constructor(private onStart: (slot: number, newName?: string) => void) {
+  constructor(private onStart: (slot: number, newName?: string, quick?: boolean) => void) {
     this.el = document.createElement('div');
     this.el.className = 'title';
     document.body.appendChild(this.el);
@@ -65,8 +65,8 @@ export class TitleScreen {
       html = `
         <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">Da squattrinato a magnate 💼</div></div>
         <div class="t-menu">
-          ${ls ? `<button class="t-btn t-main" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
-          ${previewPr !== null && !ls ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}
+          ${ls ? `<button class="t-btn ${previewPr !== null ? '' : 't-main'}" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
+          ${previewPr !== null ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}
           <button class="t-btn ${ls || previewPr !== null ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
           ${previewPr !== null ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
@@ -143,8 +143,8 @@ export class TitleScreen {
         this.onStart(+arg);
         return;
       case 'quick':
-        // anteprima: partita nuova nello slot 1, senza scegliere nome della partita e slot
-        this.onStart(1, `Anteprima #${previewPr}`);
+        // anteprima: ogni volta una partita nuova nello slot 1, che parte dalla parte cambiata (src/previewStart.ts)
+        this.onStart(1, `Anteprima #${previewPr}`, true);
         return;
       case 'ver':
         // 7 tocchi su "Versione": compare il campo per il codice developer
