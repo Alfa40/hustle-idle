@@ -1845,8 +1845,13 @@ export class Game {
       // spingerebbero via, contro il muretto in fondo
       const hit = new THREE.Vector3(p.x, 0, p.z);
       if (!this.arena) this.city.collide(p, ride ? ride.radius : 0.38);
+      // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
+      this.run?.collide?.(p, ride ? ride.radius : 0.35);
+      // nel minigioco: dentro il lotto, fuori dalla casa
+      this.arena?.collide(p, 0.35);
+      if (!this.arena) this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       if (ride && !jr && !this.arena) {
-        // urto contro un ostacolo: il veicolo rimbalza via, in proporzione alla velocità
+        // urto contro un edificio, un oggetto o un'altra auto: il veicolo rimbalza via, in proporzione alla velocità
         hit.set(p.x - hit.x, 0, p.z - hit.z);
         if (this.bounceT <= 0 && speed > 2.5 && hit.length() > 0.004 && hit.normalize().dot(new THREE.Vector3(mx, 0, mz).normalize()) < -0.3) {
           // all'indietro con quasi tutta la velocità che avevi (più vai forte, più rimbalzi)
@@ -1854,11 +1859,6 @@ export class Game {
           this.bounceT = 0.55;
         }
       }
-      // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
-      this.run?.collide?.(p, ride ? ride.radius : 0.35);
-      // nel minigioco: dentro il lotto, fuori dalla casa
-      this.arena?.collide(p, 0.35);
-      if (!this.arena) this.traffic.pushOut(p, ride ? ride.radius : 0.38);
       this.player.faceTowards(p.x + mx, p.z + mz, dt, jr ? 6 : ride && 'kind' in ride && ride.kind === 'car' ? 7 : 12);
       if (jr) this.player.play('idle');
       else if (ride) this.player.play(riderPose(this.state.riding!).anim);
