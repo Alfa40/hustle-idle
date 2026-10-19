@@ -1809,6 +1809,25 @@ export class Game {
     cam.quaternion.slerpQuaternions(b.quat, cam.quaternion.clone(), e);
   }
 
+  /**
+   * Ostacoli della città per il giocatore. Le auto sono lunghe il doppio della larghezza: oltre al cerchio al
+   * centro si controllano anche il muso e la coda (così pali e muri non entrano nel cofano).
+   */
+  private collideCity(p: THREE.Vector3, ride: { radius: number; kind?: string } | null) {
+    const r = ride ? ride.radius : 0.38;
+    this.city.collide(p, r);
+    if (ride?.kind !== 'car') return;
+    const a = this.player.root.rotation.y;
+    for (const side of [1, -1]) {
+      const q = new THREE.Vector3(p.x + Math.sin(a) * r * side, 0, p.z + Math.cos(a) * r * side);
+      const ox = q.x;
+      const oz = q.z;
+      this.city.collide(q, r * 0.8);
+      p.x += q.x - ox;
+      p.z += q.z - oz;
+    }
+  }
+
   private updatePlayer(dt: number) {
     // ci si muove solo col joystick (o la tastiera): toccare un punto dello schermo non fa niente
     const v = this.moveVector();
@@ -1844,7 +1863,7 @@ export class Game {
       // nel minigioco valgono solo i suoi ostacoli: quelli della città (confini compresi) lo
       // spingerebbero via, contro il muretto in fondo
       const hit = new THREE.Vector3(p.x, 0, p.z);
-      if (!this.arena) this.city.collide(p, ride ? ride.radius : 0.38);
+      if (!this.arena) this.collideCity(p, ride);
       // auto, cespugli, tavolini, muretti… del lavoretto in corso non si attraversano
       this.run?.collide?.(p, ride ? ride.radius : 0.35);
       // nel minigioco: dentro il lotto, fuori dalla casa
@@ -1877,7 +1896,7 @@ export class Game {
         const rad = VEHICLES[this.state.riding].radius;
         p.x += this.bounceVel.x * dt;
         p.z += this.bounceVel.z * dt;
-        this.city.collide(p, rad);
+        this.collideCity(p, VEHICLES[this.state.riding]);
         this.traffic.pushOut(p, rad);
         this.bounceVel.multiplyScalar(Math.max(0, 1 - 3.5 * dt));
       }
