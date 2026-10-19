@@ -77,12 +77,18 @@ export interface PkInfo {
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
+/** giochi del casinò sul server: poker (`hustle-poker.js`) e blackjack (`hustle-blackjack.js`) */
+export type CasinoGame = 'poker' | 'bj';
+
 /** chiamata al server del poker (il primo collegamento può metterci fino a un minuto: il server si sveglia) */
-export async function pk<T>(path: string, body: object, timeoutMs = 60000): Promise<T> {
+export const pk = <T>(path: string, body: object, timeoutMs = 60000) => casino<T>('poker', path, body, timeoutMs);
+
+/** chiamata al server di un gioco del casinò */
+export async function casino<T>(game: CasinoGame, path: string, body: object, timeoutMs = 60000): Promise<T> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(`${API}/hustle/poker/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...body }), signal: ctl.signal });
+    const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...body }), signal: ctl.signal });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(j.error || `errore ${r.status}`), { data: j });
     return j as T;
@@ -103,7 +109,10 @@ export function pokerBlocked(): string | null {
 
 export const pokerName = (game: Game) => lbNickname() || game.state.saveName || 'Giocatore';
 
-/** Vincite del poker ancora da ritirare per questa partita (app chiusa al tavolo, stanza chiusa…): sul conto. */
+/**
+ * Vincite del casinò (poker e blackjack, stessa lista sul server) ancora da ritirare per questa partita (app chiusa al
+ * tavolo, stanza chiusa…): sul conto.
+ */
 export async function claimPoker(game: Game, quiet = false) {
   if (pokerBlocked()) return 0;
   try {
@@ -111,7 +120,7 @@ export async function claimPoker(game: Game, quiet = false) {
     if (j.amount > 0) {
       game.state.money += j.amount;
       game.save();
-      if (!quiet) toast(`Fiches del poker tornate sul conto: +${euro(j.amount)}`, 'money');
+      if (!quiet) toast(`Fiches del casinò tornate sul conto: +${euro(j.amount)}`, 'money');
     }
     return j.amount;
   } catch {
@@ -190,6 +199,9 @@ const colorOf = (name: string) => PAL[[...name].reduce((a, ch) => a + ch.charCod
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || '?';
 
 // posti attorno al tavolo (in %), a partire dal tuo in basso e poi in senso orario
+export const colorOfName = colorOf;
+export const initialsOf = initials;
+
 const SPOTS_P: [number, number][] = [[50, 90], [12, 74], [8, 46], [16, 20], [50, 13], [84, 20], [92, 46], [88, 74]];
 const SPOTS_L: [number, number][] = [[50, 86], [20, 82], [7, 52], [20, 22], [50, 17], [80, 22], [93, 52], [80, 82]];
 

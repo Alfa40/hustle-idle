@@ -93,8 +93,9 @@
   precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): "Gioca subito" parte già lì
   (`veicolo`, `lavoretto`+`gradino`, `attivita`, più `cosa` e `soldi`).
 
-- **Multigiocatore** (pulsante 🎮 Sfide): minigiochi contro gli amici, per ora il poker (`src/ui/poker.ts`, server
-  `hustle-poker.js` nel repo della classifica, chiavi `hustle:poker:…`). Il server decide tutto (mazzo, turni, regole);
+- **Multigiocatore** (pulsante 🎮 Sfide): minigiochi contro gli amici per categoria; categoria Casinò con poker (`src/ui/poker.ts`, server
+  `hustle-poker.js` nel repo della classifica, chiavi `hustle:poker:…`) e blackjack contro il banco (`src/ui/blackjack.ts`,
+  `hustle-blackjack.js`, chiavi `hustle:bj:…`, vincite nella stessa lista `hustle:poker:cash:…`). Lobby comune `openCasino(kind)`. Il server decide tutto (mazzo, turni, regole);
   le fiches si tolgono dal conto entrando e tornano uscendo (vincite da ritirare per slot). Al tavolo la partita è
   offline (`Game.enterAway`/`leaveAway`). Prove: bot contro il server con Upstash finto e più telefoni simulati.
 

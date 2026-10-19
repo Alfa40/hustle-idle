@@ -1439,6 +1439,39 @@ body.in-poker .toasts { z-index: 31; }
   .pk-acts { flex-wrap: wrap; }
   .pk-btn { flex: 1 1 40%; min-height: 46px; }
 }
+/* blackjack (src/ui/blackjack.ts): stesso tavolo del poker, banco in alto e le tue mani sotto il tavolo */
+.bj { background: radial-gradient(120% 90% at 50% 40%, #4a1f2d, #210d15); }
+.bj-oval { background: radial-gradient(ellipse at 50% 30%, #2fa866, #1b7a46 70%, #136037); }
+.bj-dealer { position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; z-index: 1; }
+.bj-dlabel { font-size: 13px; background: rgba(0,0,0,.35); border-radius: 999px; padding: 2px 12px; }
+.bj-cards { display: flex; }
+.bj-cards .pk-card + .pk-card { margin-left: -8px; }
+.bj-cards .pk-card.sm + .pk-card.sm { margin-left: -5px; }
+.bj-cards .pk-card.lg + .pk-card.lg { margin-left: -20px; }
+.bj-total { color: #ffe08a; margin-left: 2px; }
+.bj-rules { font-size: 10px; line-height: 1.25; color: rgba(255,255,255,.5); text-align: center; white-space: nowrap; }
+.bj-line { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); max-width: 62%; text-align: center; z-index: 1; }
+.bj-seat { width: 96px; }
+.bj-shands { display: flex; gap: 3px; margin-bottom: -4px; z-index: 1; }
+.bj-hand { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px; padding: 2px 3px; }
+.bj-hand.on { box-shadow: 0 0 0 2px #ffd23f; background: rgba(255,210,63,.14); }
+.bj-hand.perde, .bj-hand.sballato { opacity: .65; }
+.bj-hinfo { display: flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 10.5px; }
+.bj-chip { background: rgba(0,0,0,.4); border-radius: 999px; padding: 0 6px; }
+.bj-res { border-radius: 8px; padding: 0 6px; background: rgba(0,0,0,.45); white-space: nowrap; }
+.bj-res.vince, .bj-res.blackjack { background: #1f9a4c; }
+.bj-res.perde, .bj-res.sballato { background: #9b2c3c; }
+.bj-mine { display: flex; gap: 10px; justify-content: center; overflow-x: auto; min-height: 96px; align-items: flex-end; }
+.bj-mine .bj-hinfo { font-size: 13px; gap: 6px; }
+.bj-mine .bj-total { font-size: 18px; }
+.bj-mine.many .bj-total { font-size: 15px; }
+.bj-mybar { display: flex; justify-content: space-between; font-size: 13px; padding: 0 4px; }
+.bj-mybar b { color: #ffe08a; }
+.bj-mybar .muted { color: rgba(255,255,255,.6); }
+@media (orientation: landscape) {
+  .bj-dealer { top: 26%; }
+  .bj-mine { min-height: 0; }
+}
 /* fiches da portare: cifra da scrivere, cursore e scorciatoie (finestra Poker e ricompra al tavolo) */
 .pk-amt { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .pk-amt-row { display: flex; align-items: center; gap: 6px; font-size: 22px; font-weight: 800; color: var(--ink); }
