@@ -85,7 +85,9 @@
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
 - **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
-  già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte.
+  già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte. **Ogni proposta che cambia una parte
+  precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): "Gioca subito" parte già lì
+  (`veicolo`, `lavoretto`+`gradino`, `attivita`, più `cosa` e `soldi`).
 
 ## Pubblicazione e servizi
 

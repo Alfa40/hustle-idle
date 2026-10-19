@@ -3203,6 +3203,19 @@ export class UI {
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
+  /** Fa partire subito un lavoretto (linea e gradino, da 0): partita developer e anteprime delle proposte. */
+  playJobNow(line: string, rung: number) {
+    const s = this.s;
+    const level = rung === 0 ? 1 : rung * EVOLVE_EVERY;
+    s.jobXp ??= {};
+    if (lineLevel(s, line) < level || lineLevel(s, line) >= level + EVOLVE_EVERY) s.jobXp[line] = LEVEL.xpForLevel(Math.max(1, level)) + 1;
+    const type = line as JobOffer['type'];
+    const offer: JobOffer = { id: s.jobSeq++, type, slot: 0, level, pay: this.game.offerPay(type, level) };
+    s.jobs.push(offer);
+    while (this.isOpen) this.close();
+    this.game.startJob(offer, !this.game.tutorial.isDone(jobInfo(type, level).key));
+  }
+
   private devActions(): Actions {
     const s = this.s;
     const xpFor = (l: number) => LEVEL.xpForLevel(Math.max(1, l)) + 1;
@@ -3221,14 +3234,7 @@ export class UI {
       },
       devJob: (arg) => {
         const [line, r] = arg.split('|');
-        const level = +r === 0 ? 1 : +r * EVOLVE_EVERY;
-        s.jobXp ??= {};
-        if (lineLevel(s, line) < level || lineLevel(s, line) >= level + EVOLVE_EVERY) s.jobXp[line] = xpFor(level);
-        const type = line as JobOffer['type'];
-        const offer: JobOffer = { id: s.jobSeq++, type, slot: 0, level, pay: this.game.offerPay(type, level) };
-        s.jobs.push(offer);
-        while (this.isOpen) this.close();
-        this.game.startJob(offer, !this.game.tutorial.isDone(jobInfo(type, level).key));
+        this.playJobNow(line, +r);
       },
       devUpg: () => {
         for (const b of s.businesses) {
