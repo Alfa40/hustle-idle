@@ -21,7 +21,7 @@ export const STAKES: [number, number][] = [
   [10, 20], [100, 200], [1000, 2000], [10000, 20000], [100000, 200000], [1000000, 2000000], [10000000, 20000000], [100000000, 200000000],
 ];
 /** fama totale per sedersi a ogni tavolo (come sul server): i primi due liberi, poi circa ×2,5 a ogni tavolo */
-export const STAKE_FAME = [0, 0, 200, 500, 1200, 3000, 8000, 20000];
+export const STAKE_FAME = [0, 0, 2000, 5000, 12000, 30000, 80000, 200000];
 export const MIN_BUY_BB = 20;
 export const MAX_BUY_BB = 100;
 
