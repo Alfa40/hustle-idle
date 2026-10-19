@@ -107,7 +107,7 @@ export class TitleScreen {
     } else {
       html = this.panel('ℹ️ Crediti', `
         <div class="card"><h3>Hustle Idle</h3><p class="muted small" style="margin:0">Un gioco gestionale in cui parti dai lavoretti e costruisci il tuo impero di attività.</p></div>
-        <div class="card"><h3>Grafica</h3><p class="muted small" style="margin:0">Modelli 3D di <b>Kenney.nl</b> (licenza CC0): Mini Characters, City Kit, Car Kit, Food Kit, Furniture Kit.<br>Font: Fredoka.</p></div>
+        <div class="card"><h3>Grafica</h3><p class="muted small" style="margin:0">Modelli 3D di <b>Kenney.nl</b> (licenza CC0): Mini Characters, City Kit, Car Kit, Food Kit, Furniture Kit.<br>Font: Fredoka (SIL Open Font License 1.1).<br>Grafica 3D: three.js (licenza MIT, © three.js authors).<br><a href="./LICENSES.txt" target="_blank" rel="noopener">Testo completo delle licenze</a></p></div>
         <div class="card" data-t="ver"><h3>Versione</h3><p class="muted small" style="margin:0">Prototipo 0.5</p></div>
         ${this.verTaps >= 7 ? `<div class="card"><h3>🔑 Codice</h3><input class="t-input" name="devkey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Codice" />
           <button class="btn good full" data-t="devkey" style="margin-top:8px">Attiva</button>${this.devMsg ? `<p class="small center" style="margin:6px 0 0">${this.devMsg}</p>` : ''}</div>` : ''}`);

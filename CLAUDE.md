@@ -110,4 +110,6 @@
   `hustle:` e non bisogna mai toccare quelle di Magic Trip. Account senza progressi da più di 30 giorni
   nascosti dalle classifiche, da più di 90 cancellati (dal server, ogni giorno). Le prove automatiche
   (browser pilotato, `navigator.webdriver`) non inviano niente alla classifica.
-- Asset: modelli Kenney CC0 in `public/models` (zip completi in `assets-src/`, non pubblicati).
+- Asset: modelli Kenney CC0 in `public/models` (zip completi in `assets-src/`, non pubblicati). Licenze di terze parti
+  (three.js MIT, Fredoka OFL, Kenney CC0) in `public/LICENSES.txt`, linkato dai Crediti: ogni libreria, font o asset
+  nuovo va aggiunto lì e nei Crediti. Niente marchi, nomi o grafiche di aziende o giochi reali.
