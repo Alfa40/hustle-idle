@@ -83,3 +83,28 @@ export function rungProgress(line: string, level: number) {
   const start = r === 0 ? 1 : r * EVOLVE_EVERY;
   return Math.max(0, Math.min(1, (level - start) / (EVOLVE_EVERY - 1 - (r === 0 ? 1 : 0))));
 }
+
+/**
+ * Curva di difficoltà dentro un gradino: p = quanto sei avanti (0..1) → quanto è difficile (0..1). I primi 3 livelli
+ * salgono come prima (si impara il lavoretto), dal 4° al 7° la difficoltà sale molto più in fretta, poi quasi in piano
+ * fino al massimo del gradino, che resta quello di prima (regola dei 5 minuti).
+ */
+export function difficultyCurve(p: number) {
+  if (p <= 0.25) return p;
+  if (p <= 0.75) return 0.25 + 1.4 * (p - 0.25);
+  return Math.min(1, 0.95 + 0.2 * (p - 0.75));
+}
+
+/**
+ * Livello "di difficoltà" con cui si gioca un lavoretto: stesso gradino del livello vero, ma dentro il gradino segue
+ * `difficultyCurve` (es. Liv. 5 si gioca come un 5,8, Liv. 7 come un 8,6). Lo usa solo il minigioco: paga, esperienza
+ * e gradino dipendono sempre dal livello vero, quindi la curva di progressione non cambia.
+ */
+export function effectiveJobLevel(line: string, level: number) {
+  const r = rungOf(line, level);
+  const start = r === 0 ? 1 : r * EVOLVE_EVERY;
+  const span = EVOLVE_EVERY - 1 - (r === 0 ? 1 : 0);
+  const p = (level - start) / span;
+  if (p <= 0 || p >= 1) return level;
+  return start + span * difficultyCurve(p);
+}

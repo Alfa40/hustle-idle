@@ -13,7 +13,7 @@ import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
-import { EVOLVE_EVERY, readyJobTypes } from './config/careers';
+import { effectiveJobLevel, EVOLVE_EVERY, readyJobTypes } from './config/careers';
 import {
   day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot,
   type GameState, type JobOffer,
@@ -1065,9 +1065,12 @@ export class Game {
     const def = jobInfo(offer.type, offer.level);
     if (!def.vehicleOk) this.dismount();
     const title = `${def.icon} ${def.name}`;
-    const lv = jobDifficulty(offer.level);
+    // il minigioco si gioca al livello della curva di difficoltà (paga ed esperienza restano sul livello vero)
+    const eff = effectiveJobLevel(offer.type, offer.level);
+    const lv = jobDifficulty(eff);
+    const play = { ...offer, level: eff } as JobOffer;
     // Trasporti e logistica: magazzino, autista e i gradini alti delle consegne (minigames/logistics.ts)
-    const logi = startLogisticsJob(this, offer as JobOffer, slot, title) ?? startHospitalityJob(this, offer as JobOffer, slot, title);
+    const logi = startLogisticsJob(this, play, slot, title) ?? startHospitalityJob(this, play, slot, title);
     if (logi) return logi;
     switch (offer.type) {
       case 'giardino': {
@@ -1075,7 +1078,7 @@ export class Game {
         // dal Liv. 10 di manualità: potatura di siepi e alberi
         return def.variant >= 1 ? pruneArenaJob(this, lv, arena, title) : gardenArenaJob(this, lv, arena, title);
       }
-      case 'consegna': return routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package', offer.level);
+      case 'consegna': return routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'package'), slot, this.city.placed)), title, 'package', eff);
       case 'volantini': return routeStreetJob(this, lv, this.enterArena(new Street(routeStops(lv, 'flyer'), slot, this.city.placed)), title, 'flyer');
       case 'lavaggio': return carWashArenaJob(this, lv, this.enterArena(new Arena({ size: carWashLot(lv), slot, placed: this.city.placed })), title);
       case 'imbianchino': return paintArenaJob(this, lv, this.enterArena(new Arena({ level: lv, slot, placed: this.city.placed })), title);
