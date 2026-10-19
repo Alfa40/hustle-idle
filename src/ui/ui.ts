@@ -1814,6 +1814,9 @@ export class UI {
     const roleOrder = [...(bizType(biz.type).roles as Role[]), 'manager'];
     const team = biz.staff.filter((e) => !e.trainingEnd).sort((a, b) => (roleOrder.indexOf(a.role) + 99) % 99 - (roleOrder.indexOf(b.role) + 99) % 99);
     const color = new Map(team.map((e, i) => [e.id, PAL[i % PAL.length]]));
+    // trama per reparto sopra il colore del dipendente: stessa trama = stesso lavoro (il manager ha sempre la sua)
+    const roles = [...new Set(team.map((e) => e.role))];
+    const pat = (r: Role) => (r === 'manager' ? 'pat-m' : `pat-${roles.filter((x) => x !== 'manager').indexOf(r) % 4}`);
     const shiftFor = (e: Employee) => plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
     const now = Math.floor(hourOf(s));
     const tol = 0.97;
@@ -1827,7 +1830,7 @@ export class UI {
     // poi una colonna per dipendente piena nelle ore in cui lavora (un buco se il turno è in due pezzi)
     const R0 = 2;
     const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
-    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
+    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who ${pat(e.role)}" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
     hours.forEach((h, i) => {
       const r = R0 + i;
       const cls = `${shortAt(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
@@ -1838,14 +1841,14 @@ export class UI {
     });
     team.forEach((e, k) => {
       const sh = shiftFor(e);
-      for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background:${color.get(e.id)}"></i>`);
+      for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar ${pat(e.role)}" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background-color:${color.get(e.id)}"></i>`);
     });
     const grid = `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, team.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
     const who = team.length
       ? team.map((e) => {
           const sh = shiftFor(e);
           const serves = (bizType(biz.type).roles as Role[]).includes(e.role);
-          return `<div class="sh-leg"><i style="background:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
+          return `<div class="sh-leg"><i class="${pat(e.role)}" style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
         }).join('')
       : `<div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>`;
     const inTraining = biz.staff.length - team.length;
@@ -1868,7 +1871,8 @@ export class UI {
     const anyShort = hours.some(shortAt);
     const shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
       ${team.length ? grid : ''}
-      ${team.length ? `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente${anyShort ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>` : ''}
+      ${team.length ? `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>
+      <div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona e la trama il lavoro${anyShort ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>` : ''}
       <div class="sh-legend">${who}</div>${inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : ''}
       <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>
       <div class="lv-row lv-head lv-5"><span></span><b>previsti</b><b>reggono</b><b>di turno</b><b>persi</b></div>
