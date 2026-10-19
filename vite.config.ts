@@ -5,7 +5,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 900,
-    // due app: il gioco (index.html) e l'app developer (developer.html: partita developer, anteprime, tester)
-    rollupOptions: { input: { main: 'index.html', developer: 'developer.html' } },
+    // tre app: il gioco (index.html), l'app developer (developer.html: partita developer, anteprime, tester) e
+    // l'app dei tester (tester.html: anteprime da provare e votare, proposte dei tester)
+    rollupOptions: { input: { main: 'index.html', developer: 'developer.html', tester: 'tester.html' } },
   },
 });

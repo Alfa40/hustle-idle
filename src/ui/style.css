@@ -1273,6 +1273,27 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .dv-note.bad { background: #ffe6e9; color: #9b1c2c; }
 .dv-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 2px 0; }
 .dv-who { display: inline; font-weight: 700; color: var(--ink); }
+.dv-nums.n2 { grid-template-columns: repeat(2, 1fr); }
+/* avvisi delle proposte in preparazione (app developer e tester) */
+.dv-preps { display: flex; flex-direction: column; gap: 6px; }
+.dv-preps h3 { margin: 0 0 2px; }
+.dv-prep { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 14px; background: #fff4d9; color: var(--ink); text-decoration: none; }
+.dv-prep .t-ico { font-size: 22px; width: 28px; text-align: center; }
+.dv-prep b { display: block; }
+.dv-prep small { display: block; font-size: 12px; color: var(--ink-2); font-weight: 600; overflow-wrap: anywhere; }
+/* voti dei tester sulle anteprime */
+.dv-votes { background: #fff; border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.dv-vsum { display: flex; gap: 6px; }
+.dv-vsum span { flex: 1; text-align: center; font-size: 12.5px; font-weight: 700; padding: 4px 6px; border-radius: 10px; }
+.dv-vsum .s-green { background: #dcf6e5; color: #1e7a43; } .dv-vsum .s-red { background: #ffe3e6; color: #9b1c2c; }
+.dv-vote { font-size: 13px; border-left: 4px solid #35c46a; padding: 2px 0 2px 8px; }
+.dv-vote.no { border-left-color: #ff5d73; }
+.dv-vote.mine { background: #fff; border-radius: 12px; padding: 8px 10px; border-left-width: 6px; }
+.dv-vote .dv-acts { margin-top: 6px; }
+.tp-vote { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.tp-com { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 15px; }
+.tp-hint { color: #fff; margin: 2px 4px; font-weight: 600; }
+.tp-name, .tp-key { width: 100%; box-sizing: border-box; }
 
 /* resoconto in diretta: conti (tabella) e turni di oggi (una colonna per ora, un colore per dipendente) */
 .lv-row { display: grid; grid-template-columns: 1fr 76px 92px; gap: 6px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid #f1ead9; font-size: 13.5px; }
