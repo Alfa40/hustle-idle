@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizType, evolvesOf, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
+import { BIZ_GROUPS, BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizGroup, bizType, evolvesOf, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -240,7 +240,7 @@ export class UI {
     right.querySelectorAll<HTMLButtonElement>('[data-h]').forEach((b) =>
       b.addEventListener('click', () => {
         const k = b.dataset.h;
-        if (k === 'biz') this.openAgency('mie', false);
+        if (k === 'biz') this.openAgency();
         if (k === 'missions') this.openMissions();
         if (k === 'profile') this.openProfile();
         if (k === 'home') this.game.goHome();
@@ -1063,11 +1063,15 @@ export class UI {
     });
   }
 
-  /** Agenzia affari: le tue attività, quelle in vendita, i resoconti e il mercato. */
-  openAgency(tab = 'mie', atAgency = false) {
-    let cur = tab;
+  /** gruppi aperti nella lista "Le mie" (restano aperti finché non si chiude il gioco) */
+  private bizGroupsOpen = new Set<string>();
+
+  /** Agenzia affari: quelle in vendita, le tue attività, i resoconti e il mercato. Senza tab: chi non ha
+   *  ancora attività vede quelle in vendita, gli altri le proprie. */
+  openAgency(tab?: string, atAgency = false) {
+    let cur = tab ?? (this.s.businesses.length ? 'mie' : 'compra');
     let sel: string | null = null;
-    const tabs = [['mie', '🏢 Le mie'], ['compra', '🛒 In vendita'], ['resoconti', '📊 Resoconti'], ['mercato', '📈 Mercato']];
+    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconti'], ['mercato', '📈 Mercato']];
     this.open({
       money: true,
       title: atAgency ? '🏢 Agenzia affari' : '🏢 Attività',
@@ -1083,6 +1087,9 @@ export class UI {
           sel = null;
         },
         lot: (id) => (sel = id),
+        grp: (id) => {
+          if (!this.bizGroupsOpen.delete(id)) this.bizGroupsOpen.add(id);
+        },
         back: () => (sel = null),
         open: (id) => {
           this.close();
@@ -1126,17 +1133,34 @@ export class UI {
         return `<button class="card chain-card" data-a="chain:${t}" style="--sc:${d.color}"><div class="icon-bubble" style="background:${d.color};color:#fff">🔗</div>
           <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${n} attività · resoconto e gestione insieme o a gruppi</div></div><span class="shop-go">›</span></button>`;
       }).join('');
-      return (chains ? `<h3 class="sec-title">🔗 Le tue catene</h3>${chains}<h3 class="sec-title">🏪 Tutte le attività</h3>` : '') + s.businesses
-        .map((b) => {
-          const def = bizType(b.type);
-          const lot = lotDef(b.lotId);
-          const extra = def.kind === 'service' && b.orders.length ? ` · <b>${b.orders.length} ordini in attesa</b>` : '';
-          return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble" style="background:${def.color}">${def.icon}</div>
-              <div><h3 style="margin:0">${def.name}</h3><div class="muted small">${lot.name}</div></div></div>${this.autoTag(b)}</div>
-            <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti'}${extra}</span>
-            <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div></div>`;
-        })
-        .join('');
+      const card = (b: Business) => {
+        const def = bizType(b.type);
+        const lot = lotDef(b.lotId);
+        const extra = def.kind === 'service' && b.orders.length ? ` · <b>${b.orders.length} ordini in attesa</b>` : '';
+        return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble" style="background:${def.color}">${def.icon}</div>
+            <div><h3 style="margin:0">${def.name}</h3><div class="muted small">${lot.name}</div></div></div>${this.autoTag(b)}</div>
+          <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti'}${extra}</span>
+          <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div></div>`;
+      };
+      // un menu a tendina per gruppo (ristorazione, consegne, traslochi…), nell'ordine di BIZ_GROUPS
+      const groups = new Map<string, { g: ReturnType<typeof bizGroup>; list: Business[] }>();
+      for (const b of s.businesses) {
+        const g = bizGroup(b.type);
+        if (!groups.has(g.id)) groups.set(g.id, { g, list: [] });
+        groups.get(g.id)!.list.push(b);
+      }
+      const order = (id: string) => (BIZ_GROUPS.findIndex((x) => x.id === id) + 1 || 99);
+      const sorted = [...groups.values()].sort((a, b) => order(a.g.id) - order(b.g.id));
+      const lists = sorted.map(({ g, list }) => {
+        const open = this.bizGroupsOpen.has(g.id) || sorted.length === 1;
+        const today = list.reduce((a, b) => a + b.today.revenue, 0);
+        const waiting = list.reduce((a, b) => a + (bizType(b.type).kind === 'service' ? b.orders.length : 0), 0);
+        const color = bizType(list[0].type).color;
+        return `<button class="card biz-group ${open ? 'open' : ''}" data-a="grp:${g.id}" style="--sc:${color}"><div class="icon-bubble" style="background:${color}">${g.icon}</div>
+          <div style="flex:1;text-align:left"><b>${g.name}</b><div class="muted small">${list.length} attività · oggi <b class="money-t">${euro(today)}</b>${waiting ? ` · <b>${waiting} ordini in attesa</b>` : ''}</div></div><span class="grp-arrow">›</span></button>
+          ${open ? `<div class="biz-group-list">${list.map(card).join('')}</div>` : ''}`;
+      }).join('');
+      return (chains ? `<h3 class="sec-title">🔗 Le tue catene</h3>${chains}<h3 class="sec-title">🏪 Tutte le attività</h3>` : '') + lists;
     }
     if (tab === 'compra') {
       if (sel) {
@@ -1220,7 +1244,7 @@ export class UI {
   // ---------------- attività ----------------
 
   openBusinessList() {
-    this.openAgency('mie', false);
+    this.openAgency();
   }
 
   private autoTag(b: Business) {

@@ -452,6 +452,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Strada e obiettivi
 - La linea tratteggiata verso l'obiettivo segue le strade (percorso più breve sulle tessere di strada, `City.route`), gira agli incroci e finisce sull'obiettivo. Se esci dalla strada sparisce e restano le frecce
+- **Schermata Attività** (`UI.openAgency`): schede nell'ordine 🛒 In vendita, 🏢 Le mie, 📊 Resoconti, 📈 Mercato. Si apre su **In vendita** se non hai ancora attività, altrimenti su **Le mie**. In Le mie, sotto le catene, le attività sono divise in **gruppi a tendina** (Ristorazione, Consegne, Traslochi e trasporti, Trasporto persone, Pulizie, Artigianato: `BIZ_GROUPS` in config/business.ts, ogni attività va nel gruppo della sua attività base): chiusi all'inizio (aperto se c'è un solo gruppo), con numero di attività, incasso di oggi e ordini in attesa; un tocco apre o chiude e resta così finché non chiudi il gioco. Il **Mercato** mostra per ogni prodotto i clienti (o ordini) all'ora previsti oggi in Periferia, Residenziale e Centro (con stagioni, meteo, eventi e la tua fama)
 - Dalla lista delle attività (🛒 In vendita) un lotto si può impostare come obiettivo sulla mappa ("📍 Imposta come obiettivo"), per andare a comprarlo
 - Prodotti delle attività: si vedono solo quelli già disponibili; quelli che servono un ampliamento compaiono quando lo compri
 - Missioni settimanali più difficili e meno ricche per unità: 30–40 lavoretti, 3 stelle in 15–20, 3 lavoretti di ogni tipo, 120–180 clienti, guadagna ~€3.000 (premio 20%)

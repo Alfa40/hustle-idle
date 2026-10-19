@@ -332,6 +332,32 @@ export function upgOf(t: BusinessType, id: UpgradeId): UpgradeDef {
 }
 export const BUSINESS_TYPE_IDS = Object.keys(BUSINESS_TYPES) as BusinessType[];
 export const bizType = (t: BusinessType): BusinessTypeDef => BUSINESS_TYPES[t];
+
+/**
+ * Gruppi per la lista "Le mie" (un menu a tendina per gruppo). Un'attività sta nel gruppo della sua attività
+ * base (radice dell'albero delle evoluzioni); un'attività base nuova senza gruppo qui ne ha uno tutto suo.
+ */
+export const BIZ_GROUPS: { id: string; name: string; icon?: string; roots: BusinessType[] }[] = [
+  { id: 'ristorazione', name: 'Ristorazione', icon: '🍽️', roots: ['foodtruck', 'panificio'] },
+  { id: 'consegne', name: 'Consegne', roots: ['bici'] },
+  { id: 'traslochi', name: 'Traslochi e trasporti', roots: ['traslochi'] },
+  { id: 'persone', name: 'Trasporto persone', roots: ['navetta'] },
+  { id: 'pulizie', name: 'Pulizie', roots: ['pulizie'] },
+  { id: 'artigianato', name: 'Artigianato', roots: ['artigianato'] },
+];
+
+/** attività base da cui si arriva a questa (se stessa per le attività base) */
+export function bizRoot(t: BusinessType): BusinessType {
+  const parent = BUSINESS_TYPE_IDS.find((p) => bizType(p).evolvesTo?.includes(t));
+  return parent ? bizRoot(parent) : t;
+}
+
+/** gruppo dell'attività per la lista "Le mie": id, nome e icona */
+export function bizGroup(t: BusinessType): { id: string; name: string; icon: string } {
+  const root = bizRoot(t);
+  const g = BIZ_GROUPS.find((x) => x.roots.includes(root));
+  return g ? { id: g.id, name: g.name, icon: g.icon ?? bizType(g.roots[0]).icon } : { id: root, name: bizType(root).name, icon: bizType(root).icon };
+}
 export const roleName = (t: BusinessType, r: Role) => bizType(t).roleNames[r] ?? ROLES[r].name;
 
 export const FIRST_NAMES = [

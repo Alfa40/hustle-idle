@@ -998,6 +998,12 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .chain-card { display: flex; align-items: center; gap: 10px; width: 100%; border: none; text-align: left; border-left: 6px solid var(--sc); }
 .chain-shop { padding: 10px 12px; }
 
+/* attività: un menu a tendina per gruppo (ristorazione, consegne, traslochi…) */
+.biz-group { display: flex; align-items: center; gap: 10px; width: 100%; border: none; text-align: left; border-left: 6px solid var(--sc); cursor: pointer; }
+.biz-group .grp-arrow { margin-left: auto; font-size: 28px; color: var(--sc); font-weight: 900; transition: transform .15s; }
+.biz-group.open .grp-arrow { transform: rotate(90deg); }
+.biz-group-list { margin: -4px 0 12px 14px; padding-left: 10px; border-left: 3px solid #e6dcf5; }
+
 /* resoconti: avvisi sul personale */
 .report-alert { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border-radius: 12px; font-size: 13px; line-height: 1.3; font-weight: 600; }
 .report-alert .btn { flex: none; margin-left: auto; }
