@@ -135,6 +135,11 @@ function setText(el: HTMLElement, v: string) {
   if (el.textContent !== v) el.textContent = v;
 }
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+/** plurale del nome di un ruolo, per i titoli dei reparti ("Cuoco" → "Cuochi", "Addetto pulizie" → "Addetti pulizie") */
+function rolePlural(name: string) {
+  const ODD: Record<string, string> = { Cuoco: 'Cuochi', Tecnico: 'Tecnici', Caposquadra: 'Capisquadra', Rider: 'Rider', specializzato: 'specializzati' };
+  return name.split(' ').map((w, i) => ODD[w] ?? (i === 0 ? w.replace(/[oea]$/, 'i') : w)).join(' ');
+}
 
 function demandBars(v: number, max = 4) {
   const n = Math.max(0, Math.min(5, Math.round((v / max) * 5)));
@@ -1820,64 +1825,86 @@ export class UI {
     const shiftFor = (e: Employee) => plan.byRole.get(e.role)?.shifts.find((x) => x.emp.id === e.id);
     const now = Math.floor(hourOf(s));
     const tol = 0.97;
-    const onAt = (h: number) => team.filter((e) => {
-      const sh = shiftFor(e);
-      return sh && inShift(sh, h);
-    });
-    const shortAt = (h: number) => team.length > 0 && curve[h] > 0.05 && plan.capAt(h) < curve[h] * tol;
     const initials = (n: string) => n.split(' ').map((x) => x[0]).join('').slice(0, 2).toUpperCase();
+    const need = def.roles as Role[];
+    // quanti ne regge un reparto in un'ora (senza reparto: tutta l'attività, cioè il reparto più lento)
+    const capOf = (r: Role | null) => (h: number) => (r ? plan.byRole.get(r)?.cap[h] ?? 0 : plan.capAt(h));
+    const shortWith = (cap: (h: number) => number) => (h: number) => team.length > 0 && curve[h] > 0.05 && cap(h) < curve[h] * tol;
     // griglia: ore in verticale (8 in alto), poi clienti previsti e quanti ne reggono quelli di turno,
     // poi una colonna per dipendente piena nelle ore in cui lavora (un buco se il turno è in due pezzi)
-    const R0 = 2;
-    const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
-    team.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
-    hours.forEach((h, i) => {
-      const r = R0 + i;
-      const cls = `${shortAt(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
-      cells.push(`<i class="shg-row ${cls}" style="grid-row:${r}"></i>`,
-        `<span class="shg-hour ${cls}" style="grid-row:${r};grid-column:1">${h}</span>`,
-        `<span class="shg-n" style="grid-row:${r};grid-column:2">${fmtRate(curve[h])}</span>`,
-        `<span class="shg-n shg-cap ${cls}" style="grid-row:${r};grid-column:3">${team.length ? fmtRate(plan.capAt(h)) : '—'}</span>`);
-    });
-    team.forEach((e, k) => {
+    const gridOf = (members: Employee[], cap: (h: number) => number) => {
+      const short = shortWith(cap);
+      const R0 = 2;
+      const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
+      members.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
+      hours.forEach((h, i) => {
+        const r = R0 + i;
+        const cls = `${short(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
+        cells.push(`<i class="shg-row ${cls}" style="grid-row:${r}"></i>`,
+          `<span class="shg-hour ${cls}" style="grid-row:${r};grid-column:1">${h}</span>`,
+          `<span class="shg-n" style="grid-row:${r};grid-column:2">${fmtRate(curve[h])}</span>`,
+          `<span class="shg-n shg-cap ${cls}" style="grid-row:${r};grid-column:3">${fmtRate(cap(h))}</span>`);
+      });
+      members.forEach((e, k) => {
+        const sh = shiftFor(e);
+        for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar ${pat(e.role)}" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background-color:${color.get(e.id)}"></i>`);
+      });
+      return `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, members.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
+    };
+    const legendOf = (members: Employee[]) => members.map((e) => {
       const sh = shiftFor(e);
-      for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar ${pat(e.role)}" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background-color:${color.get(e.id)}"></i>`);
-    });
-    const grid = `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, team.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
-    const who = team.length
-      ? team.map((e) => {
-          const sh = shiftFor(e);
-          const serves = (bizType(biz.type).roles as Role[]).includes(e.role);
-          return `<div class="sh-leg"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
-        }).join('')
-      : `<div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>`;
-    const inTraining = biz.staff.length - team.length;
+      const serves = need.includes(e.role);
+      return `<div class="sh-leg"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
+    }).join('');
     const bands: [string, number, number][] = [['🌅 Mattina', O, 12], ['🍝 Pranzo', 12, 15], ['☀️ Pomeriggio', 15, 18], ['🌙 Sera', 18, C]];
-    const bandRows = bands.map(([name, a, b]) => {
+    // fasce orarie: previsti, quanti ne reggono (il reparto o tutta l'attività), quanti di turno, quanti persi
+    const bandsOf = (members: Employee[], cap: (h: number) => number) => `<div class="lv-row lv-head lv-5"><span></span><b>previsti</b><b>reggono</b><b>di turno</b><b>persi</b></div>` + bands.map(([name, a, b]) => {
       let want = 0;
-      let cap = 0;
+      let got = 0;
       let lost = 0;
       let maxOn = 0;
       for (let h = a; h < b; h++) {
         want += curve[h];
-        cap += plan.capAt(h);
-        lost += Math.max(0, curve[h] - plan.capAt(h));
-        maxOn = Math.max(maxOn, onAt(h).length);
+        got += cap(h);
+        lost += Math.max(0, curve[h] - cap(h));
+        maxOn = Math.max(maxOn, members.filter((e) => {
+          const sh = shiftFor(e);
+          return sh && inShift(sh, h);
+        }).length);
       }
       // senza dipendenti i clienti li servi tu: niente "persi" per i turni
       const bad = team.length > 0 && want > 0.05 && lost > want * (1 - tol);
-      return `<div class="lv-row lv-5 ${bad ? 'lv-bad' : ''}"><span>${name}<small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${team.length ? fmtRate(cap) : '—'}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
+      return `<div class="lv-row lv-5 ${bad ? 'lv-bad' : ''}"><span>${name}<small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${team.length ? fmtRate(got) : '—'}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
     }).join('');
-    const anyShort = hours.some(shortAt);
-    const shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
-      ${team.length ? grid : ''}
-      ${team.length ? `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>
-      <div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona e la trama il lavoro${anyShort ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>` : ''}
-      <div class="sh-legend">${who}</div>${inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : ''}
-      <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>
-      <div class="lv-row lv-head lv-5"><span></span><b>previsti</b><b>reggono</b><b>di turno</b><b>persi</b></div>
-      ${bandRows}
-      <p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire: conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere). Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p></div>`;
+    const inTraining = biz.staff.length - team.length;
+    const training = inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : '';
+    const note = (key: string) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona${key}${hours.some(shortWith(capOf(null))) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
+    const explainTxt = `<p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire${need.length > 1 ? `: ogni reparto ha i suoi numeri e per tutta l'attività conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere)` : ''}. Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p>`;
+    let shifts: string;
+    if (!team.length) {
+      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
+        <div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
+        <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
+    } else if (need.length <= 1) {
+      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${gridOf(team, capOf(null))}
+        <div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>${note(' e la trama il lavoro')}
+        <div class="sh-legend">${legendOf(team)}</div>${training}
+        <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf(team, capOf(null))}${explainTxt}</div>`;
+    } else {
+      // più reparti (es. cuochi e cassieri): ogni reparto ha la sua griglia, le sue fasce e i clienti che regge
+      const dept = need.map((r) => {
+        const members = team.filter((e) => e.role === r);
+        const cap = capOf(r);
+        const slow = hours.some(shortWith(cap));
+        const head = `<h3 class="sh-dept ${slow ? 'bad' : ''}"><i class="${pat(r)}"></i>${esc(rolePlural(roleName(biz.type, r)))} <span class="muted small">${members.length}</span>${slow ? ' <span class="small">⚠️ non bastano</span>' : ''}</h3>`;
+        if (!members.length) return `<div class="sh-sec">${head}<div class="small bad">Nessuno in questo reparto: l'attività non serve nessuno. Assumi dalla scheda 👥 Personale.</div></div>`;
+        return `<div class="sh-sec">${head}${gridOf(members, cap)}<div class="sh-legend">${legendOf(members)}</div>${bandsOf(members, cap)}</div>`;
+      }).join('');
+      const managers = team.filter((e) => !need.includes(e.role));
+      const boss = managers.length ? `<div class="sh-sec"><h3 class="sh-dept"><i class="pat-m"></i>Manager</h3><div class="sh-legend">${legendOf(managers)}</div></div>` : '';
+      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${note('')}${dept}${boss}${training}
+        <div class="sh-sec"><h3 class="sh-dept">⏰ Tutta l'attività <span class="muted small">conta il reparto più lento</span></h3>${bandsOf(team.filter((e) => need.includes(e.role)), capOf(null))}</div>${explainTxt}</div>`;
+    }
     return shifts + money;
   }
 
