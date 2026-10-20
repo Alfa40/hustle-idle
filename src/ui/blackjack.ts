@@ -8,6 +8,7 @@
  * stessa lista sul server); al tavolo la partita è offline (`Game.enterAway`).
  */
 import type { Game } from '../game';
+import { previewPr } from '../preview';
 import { toast } from '../sim/bus';
 import { euro } from '../sim/state';
 import { buyBox, cardHtml, casino, claimPoker, colorOfName, initialsOf, wireBuyBox } from './poker';
@@ -419,14 +420,20 @@ export class BlackjackTable {
     if (this.exiting) return;
     this.exiting = true;
     this.el.innerHTML = '<div class="pk-closed"><div class="card"><p class="center">Esco dal tavolo…</p></div></div>';
+    let left = 0;
     if (!this.closed) {
       try {
-        await bj('leave', { code: this.code }, 20000);
+        left = (await bj<{ chips: number }>('leave', { code: this.code }, 20000)).chips || 0;
       } catch {
         /* se non risponde, il server toglie comunque chi sparisce e la vincita si ritira alla prossima apertura */
       }
     }
-    const got = await claimPoker(this.game, true);
+    // anteprime: tavolo di prova, le fiches rimaste tornano subito sul conto della partita di prova
+    if (previewPr !== null && left > 0) {
+      this.game.state.money += left;
+      this.game.save();
+    }
+    const got = previewPr !== null ? left : await claimPoker(this.game, true);
     clearInterval(this.timer);
     this.deal.stop();
     removeEventListener('resize', this.onResize);

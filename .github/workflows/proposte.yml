@@ -3,8 +3,10 @@ name: Proposte approvate dal gioco
 # I tester scrivono le proposte nel gioco (Opzioni → Proponi): restano private sul server delle classifiche
 # finché lo sviluppatore non le approva (Opzioni → Proposte, sul suo telefono). Ogni 10 minuti questo
 # workflow prende le approvate, le pubblica come proposta (issue) e fa partire Claude (claude.yml), chiude
-# le proposte la cui anteprima lo sviluppatore ha rifiutato (app developer → Anteprime → Rifiuta) e unisce al
-# gioco quelle accettate (app developer → Anteprime → Accetta e pubblica), poi fa partire la pubblicazione.
+# le proposte la cui anteprima lo sviluppatore ha rifiutato (app developer → Anteprime → Rifiuta), passa a Claude
+# le modifiche chieste dallo sviluppatore dopo aver provato un'anteprima (app developer → scheda dell'anteprima →
+# Chiedi le modifiche: Claude aggiorna lo stesso ramo) e unisce al gioco quelle accettate (Accetta e pubblica), poi
+# fa partire la pubblicazione.
 # Serve il segreto PROPOSTE_ROBOT_KEY (chiave del "robot": il server conosce solo la sua impronta).
 
 on:
@@ -85,6 +87,24 @@ jobs:
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/closed" -H 'Content-Type: application/json' \
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" '{key: $k, id: $id}')" > /dev/null
             echo "Proposta del gioco #$id rifiutata → issue #$issue chiusa"
+          done
+      - name: Modifiche chieste dallo sviluppatore → Claude (stesso ramo)
+        if: always()
+        run: |
+          if [ -z "$KEY" ]; then exit 0; fi
+          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/tochange" \
+            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > cambiare.json
+          jq -c '.proposals[]' cambiare.json | while read -r p; do
+            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p"); at=$(jq -r '.at' <<<"$p")
+            if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
+              # nella proposta resta scritto cosa ha chiesto lo sviluppatore (senza chiamare Claude con il commento)
+              jq -r '"✏️ **Lo sviluppatore ha provato l'"'"'anteprima e chiede queste modifiche** (dall'"'"'app developer):\n\n" + (.text | split("\n") | map("> " + .) | join("\n")) + "\n\nClaude le sta preparando sullo stesso ramo: l'"'"'anteprima si aggiorna da sola."' <<<"$p" > richiesta.md
+              gh issue comment "$issue" -R "$REPO" --body-file richiesta.md
+              gh workflow run claude.yml -R "$REPO" -f issue="$issue" -f richiesta="$(jq -r '.text' <<<"$p")"
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/changed" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --arg at "$at" '{key: $k, id: $id, at: $at}')" > /dev/null
+            echo "Proposta del gioco #$id (issue #$issue): modifiche passate a Claude"
           done
       - name: Anteprime accettate → unite nel gioco e pubblicate
         if: always()
