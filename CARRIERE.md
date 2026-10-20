@@ -122,7 +122,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### 🛎️ Ospitalità (hotel)
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Facchino d'albergo | porta ogni valigia alla porta col numero della sua etichetta | da 4 a 7 valigie, più piani | 2 min |
+| 1 | Facchino d'albergo | porta ogni valigia alla porta col numero della sua etichetta (subito l'avviso se la porta è sbagliata) | da 4 a 7 valigie, più piani | 2 min |
 | 10 | Cameriera ai piani | rifai le camere: letto, asciugamani puliti, cestino, polvere | da 2 a 3 camere | 2½–3 min |
 | 20 | Receptionist | col dito dai a ogni ospite la camera giusta (letti, vista, piano) | da 4 a 6 ospiti | 2 min |
 | 30 | Concierge | nella hall gli ospiti chiedono cose: prendi quella giusta e portala a chi l'ha chiesta | da 4 a 6 richieste | 2½ min |
@@ -131,7 +131,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### ☕ Bar
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Barista | al bancone: tazza → macchina del caffè → (latte montato) → servi i clienti in ordine di arrivo | da 4 a 7 ordini | 2 min |
+| 1 | Barista | al bancone: tazza → macchina del caffè → (latte montato) → servi i clienti in ordine di arrivo; la casella dice cosa manca e quando è pronto | da 4 a 7 ordini | 2 min |
 | 10 | Latte art | col dito disegni sulla schiuma come nella foto (cuore, foglia, cigno) | da 2 a 3 tazze, disegni più difficili | 1½ min |
 | 20 | Barman | cocktail: versi tenendo premuto fino alla tacca, nell'ordine della ricetta | da 2 a 3 cocktail | 2 min |
 | 30 | Barman acrobatico | a ritmo: lancia e riprendi la bottiglia | ritmo più veloce | 1½ min |

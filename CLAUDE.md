@@ -81,17 +81,23 @@
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; mai in classifica né in "sto giocando"), anteprime
   e tester; ogni anteprima si accetta ("Accetta e pubblica": il robot `proposte.yml` la unisce in main e pubblica) o si
   rifiuta da lì. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
-- **App tester** (`tester.html`, src/testerapp.ts): chiave tester + nome; anteprime da provare con voto 👍/👎 e commento
+- **App tester** (`tester.html`, src/testerapp.ts): chiave tester + nome; anteprime viste come nell'app developer (stessa
+  scheda), senza partita developer né Accetta/Rifiuta/modifiche: solo il consiglio 👍 Pubblicala / 👎 Scartala con commento
   (solo un parere, decide lo sviluppatore) e resoconti dei tester. Codice in comune con l'app developer in src/board.ts
   (avvisi "In preparazione", resoconti con solo rifiutate e nel gioco). Proposta poco chiara: etichetta `chiarimento` sulla
   issue e domanda nel testo tra `<!-- domanda -->` e `<!-- /domanda -->`: nelle app compare "❓ Serve un chiarimento"
-  con il riquadro per rispondere (risposte in `notes`, server `vote: "nota"`).
+  con il riquadro per rispondere (risposte in `notes`, server `vote: "nota"`; il robot le passa a Claude: `answers` di
+  `/tochange`, claude.yml input `risposta`, conferma `/answered`). claude.yml unisce main al ramo prima di Claude (conflitti: li risolve Claude).
   Toccando un'anteprima si apre la sua scheda (src/board.ts `detailHtml`): voti e commenti, "Cosa cambia" da GitHub;
   nell'app developer "Modifiche da fare" (`request_changes` → robot → `claude.yml` con `richiesta`, stesso ramo) e i tasti.
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
+  Claude ne prepara **una alla volta** (etichetta `in-coda`, il robot riparte alla fine di ogni `claude.yml`); il server
+  sveglia subito il robot alle decisioni dello sviluppatore (`GH_DISPATCH_TOKEN` su Render: token stretto, solo Actions del repo del gioco).
+  Tasto Proponi sempre sullo schermo (`.prop-fab`, `UI.openPropose`: finestra `top` sopra anche ai tavoli). Si sposta tenendolo premuto (`movableFab` in ui.ts, posizione in localStorage `hustle.propFab`).
+  Autista: pedali e frecce (`JobRide.pedals`, `Game.drivePedals`, `Game.pedalInput`, src/ui/pedals.ts; `Input.pedals` spegne joystick e azioni).
 - **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
   già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte. **Ogni proposta che cambia una parte
   precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): il tester parte subito nella situazione

@@ -159,8 +159,15 @@ export class Input {
   /** ultimo pointerdown (ms) */
   private lastDown = 0;
 
+  /** guida coi pedali (Autista): i tocchi sulla scena non fanno né joystick né azioni */
+  pedals = false;
+  /** tasto della tastiera tenuto premuto adesso (uno qualsiasi di questi) */
+  held(...codes: string[]) {
+    return this.enabled && codes.some((c) => this.keys.has(c));
+  }
+
   private down(e: PointerEvent) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.pedals) return;
     this.lastDown = performance.now();
     if (this.fp) {
       this.downFirstPerson(e);

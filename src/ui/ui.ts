@@ -26,7 +26,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -73,6 +73,8 @@ interface Panel {
   money?: boolean | (() => boolean);
   /** spiegazioni aperte col tasto "?" (restano aperte finché la finestra resta aperta) */
   help?: boolean;
+  /** sopra a tutto, anche ai tavoli delle sfide (finestra "Proponi") */
+  top?: boolean;
 }
 
 /**
@@ -261,6 +263,17 @@ export class UI {
     );
     this.hudMenuEl = right.querySelector('.hud-menu')!;
     this.hudMenuEl.querySelector('.hud-menu-btn')!.addEventListener('click', () => this.hudMenuEl.classList.toggle('open'));
+
+    // telefoni tester: tasto "Proponi" sempre sullo schermo (anche nei lavoretti, nei minigiochi e alle sfide)
+    if (canPropose()) {
+      const fab = document.createElement('button');
+      fab.className = 'prop-fab';
+      fab.setAttribute('aria-label', 'Proponi una modifica');
+      fab.innerHTML = '<span class="i">📝</span>';
+      fab.addEventListener('click', () => this.openPropose());
+      movableFab(fab);
+      document.body.appendChild(fab);
+    }
 
     const job = document.createElement('div');
     job.className = 'jobbar';
@@ -761,7 +774,7 @@ export class UI {
     this.game.paused = true;
     this.game.input.cancel();
     const modal = document.createElement('div');
-    modal.className = 'modal';
+    modal.className = p.top ? 'modal top' : 'modal';
     modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><span class="head-money" hidden></span><button class="help-q" hidden aria-label="Spiegazioni">?</button><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
@@ -1282,6 +1295,8 @@ export class UI {
       // si può evolvere in un'attività più grande (albero delle evoluzioni)
       ...(evolvesOf(b().type).length ? [['evoluzione', '🌱 Evoluzione']] : []),
     ];
+    // "Vendi l'attività" toccato una volta: si chiede conferma con un secondo tocco
+    let confirmSell = false;
     this.open({
       money: () => cur === 'migliorie' || cur === 'magazzino' || cur === 'personale',
       title: `${bizType(b().type).icon} ${bizType(b().type).name} · ${lotDef(b().lotId).name}`,
@@ -1294,15 +1309,34 @@ export class UI {
         const chain = cur === 'panoramica' && n >= 2
           ? `<button class="card chain-card" data-a="chain" style="--sc:${bizType(b().type).color}"><div class="icon-bubble" style="background:${bizType(b().type).color};color:#fff">🔗</div><div style="flex:1;text-align:left"><b>Catena: ${n} attività</b><div class="muted small">Modifiche a tutti i negozi insieme o a gruppi</div></div><span class="shop-go">›</span></button>`
           : '';
-        return head + chain + this.bizTab(b(), cur);
+        return head + chain + this.bizTab(b(), cur) + (cur === 'panoramica' ? this.sellHtml(b(), confirmSell) : '');
       },
       actions: {
+        sell: () => {
+          const biz = b();
+          const why = this.sellBlock(biz);
+          if (why) {
+            toast(why, 'bad');
+            return;
+          }
+          if (!confirmSell) {
+            confirmSell = true;
+            return;
+          }
+          this.close();
+          sellBusiness(s, biz);
+          this.game.setupLot(biz.lotId);
+          this.game.save();
+        },
+        tab: (k) => {
+          cur = k;
+          confirmSell = false;
+        },
         chain: () => {
           const t = b().type;
           this.close();
           this.openChain(t);
         },
-        tab: (k) => (cur = k),
         toggleProduct: (p) => {
           const biz = b();
           const pid = p as ProductId;
@@ -1365,6 +1399,24 @@ export class UI {
       },
       onClose: () => this.game.save(),
     });
+  }
+
+  /** perché adesso non si può vendere l'attività ('' = si può) */
+  private sellBlock(b: Business) {
+    const g = this.game;
+    if (g.interior?.biz.id === b.id) return "🚪 Esci dall'attività prima di venderla";
+    if (g.runOrder?.bizId === b.id || g.runSpecial?.bizId === b.id) return '⏳ Finisci prima il lavoro per questa attività';
+    return '';
+  }
+
+  /** In fondo alla panoramica: vendere l'attività per cambiarla con un'altra (due tocchi). */
+  private sellHtml(b: Business, confirm: boolean) {
+    const v = sellValue(b);
+    const staff = b.staff.length;
+    return `<div class="card sell-card"><h3>💰 Vendi l'attività</h3>
+      <p class="small" style="margin:0 0 4px">Ricevi <b>${euro(v.total)}</b>: metà di quanto hai speso (${euro(v.spent)})${v.stock ? `, più la merce in magazzino (${euro(v.stock)})` : ''}.</p>
+      <p class="muted small explain" style="margin:0 0 8px">Il posto torna libero e puoi aprirci un'altra attività. ${staff ? `${staff === 1 ? 'Il dipendente torna' : `I ${staff} dipendenti tornano`} tra i candidati di oggi: ${staff === 1 ? 'puoi riassumerlo' : 'puoi riassumerli'} in un'altra attività.` : ''} Migliorie, prodotti e statistiche di questa attività si perdono.</p>
+      <button class="btn ${confirm ? 'danger' : 'sec'} full" data-a="sell">${confirm ? `⚠️ Sicuro? Tocca ancora per vendere a ${euro(v.total)}` : "💰 Vendi l'attività"}</button></div>`;
   }
 
   /** Scheda dell'evoluzione: cosa manca (migliorie al massimo) e i rami in cui può diventare. */
@@ -3526,6 +3578,33 @@ export class UI {
     return (this.proposalsView ??= new Proposals(this.game, () => this.renderPanel()));
   }
 
+  /**
+   * Tasto "Proponi" (telefoni tester): la scheda per proporre una modifica, da qualsiasi punto del gioco. Se c'è
+   * già una finestra aperta la si mette da parte e alla chiusura si torna lì, com'era.
+   */
+  openPropose() {
+    if (this.panel?.top) return;
+    this.proposals.capture();
+    const prev = this.panel;
+    if (prev) {
+      this.modal?.remove();
+      this.modal = null;
+      this.panel = null;
+    }
+    const actions = this.proposals.actions();
+    this.open({
+      title: '📝 Proponi una modifica',
+      color: 'var(--gray)',
+      top: true,
+      render: () => this.proposals.formHtml(),
+      after: (body) => this.proposals.after(body),
+      actions,
+      onClose: () => {
+        if (prev) queueMicrotask(() => this.open(prev));
+      },
+    });
+  }
+
   openSettings() {
     let confirm = false;
     // nella partita developer si apre subito sui comandi rapidi
@@ -3742,4 +3821,68 @@ export class UI {
       },
     });
   }
+}
+
+
+/** Tasto "Proponi": tenendolo premuto si sposta dove si vuole; lasciandolo si attacca al bordo più vicino
+ *  (sinistra o destra) all'altezza scelta, e resta lì anche le volte dopo. */
+function movableFab(fab: HTMLElement) {
+  const KEY = 'hustle.propFab';
+  const place = (side: string, y: number) => {
+    fab.classList.toggle('right', side === 'r');
+    fab.style.top = `${Math.min(92, Math.max(8, y * 100))}%`;
+  };
+  try {
+    const p = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { side: string; y: number } | null;
+    if (p) place(p.side, p.y);
+  } catch { /* posizione di partenza */ }
+  let timer = 0;
+  let moving = false;
+  let skipClick = false;
+  let x0 = 0;
+  let y0 = 0;
+  const follow = (x: number, y: number) => {
+    fab.style.left = `${x}px`;
+    fab.style.top = `${y}px`;
+  };
+  fab.addEventListener('pointerdown', (e) => {
+    x0 = e.clientX;
+    y0 = e.clientY;
+    skipClick = false;
+    fab.setPointerCapture(e.pointerId);
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      moving = true;
+      fab.classList.add('moving');
+      navigator.vibrate?.(15);
+      follow(x0, y0);
+    }, 350);
+  });
+  fab.addEventListener('pointermove', (e) => {
+    if (moving) follow(e.clientX, e.clientY);
+    else if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) clearTimeout(timer);
+  });
+  const end = (e: PointerEvent) => {
+    clearTimeout(timer);
+    if (!moving) return;
+    moving = false;
+    // il "click" che arriva subito dopo il trascinamento non apre la finestra
+    skipClick = true;
+    setTimeout(() => (skipClick = false), 400);
+    fab.classList.remove('moving');
+    fab.style.left = '';
+    const side = e.clientX > innerWidth / 2 ? 'r' : 'l';
+    const y = e.clientY / innerHeight;
+    place(side, y);
+    try { localStorage.setItem(KEY, JSON.stringify({ side, y })); } catch { /* resta solo per ora */ }
+  };
+  fab.addEventListener('pointerup', end);
+  fab.addEventListener('pointercancel', end);
+  // dopo averlo spostato non si apre la finestra
+  fab.addEventListener('click', (e) => {
+    if (!skipClick) return;
+    skipClick = false;
+    e.stopImmediatePropagation();
+  }, true);
+  fab.addEventListener('contextmenu', (e) => e.preventDefault());
 }
