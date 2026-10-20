@@ -1556,7 +1556,22 @@ export class Game {
 
   start() {
     this.clock.start();
-    this.renderer.setAnimationLoop(() => this.frame());
+    this.renderer.setAnimationLoop(() => this.safeFrame());
+    // tornando sull'app (anche dopo ore in pausa sul telefono) il ciclo deve girare: lo si rimette in moto
+    window.addEventListener('pageshow', () => this.renderer.setAnimationLoop(() => this.safeFrame()));
+  }
+
+  private frameErrors = 0;
+  /**
+   * Un errore in un'immagine non deve fermare il gioco per sempre (il ciclo di three.js si interrompe alla prima
+   * eccezione e lo schermo resterebbe fermo, senza rispondere ai tocchi): lo si segna e si va avanti.
+   */
+  private safeFrame() {
+    try {
+      this.frame();
+    } catch (e) {
+      if (this.frameErrors++ < 5) console.error(e);
+    }
   }
 
   private titleAngle = 0.6;
