@@ -81,7 +81,8 @@
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; mai in classifica né in "sto giocando"), anteprime
   e tester; ogni anteprima si accetta ("Accetta e pubblica": il robot `proposte.yml` la unisce in main e pubblica) o si
   rifiuta da lì. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
-- **App tester** (`tester.html`, src/testerapp.ts): chiave tester + nome; anteprime da provare con voto 👍/👎 e commento
+- **App tester** (`tester.html`, src/testerapp.ts): chiave tester + nome; anteprime viste come nell'app developer (stessa
+  scheda), senza partita developer né Accetta/Rifiuta/modifiche: solo il consiglio 👍 Pubblicala / 👎 Scartala con commento
   (solo un parere, decide lo sviluppatore) e resoconti dei tester. Codice in comune con l'app developer in src/board.ts
   (avvisi "In preparazione", resoconti con solo rifiutate e nel gioco). Proposta poco chiara: etichetta `chiarimento` sulla
   issue e domanda nel testo tra `<!-- domanda -->` e `<!-- /domanda -->`: nelle app compare "❓ Serve un chiarimento"
