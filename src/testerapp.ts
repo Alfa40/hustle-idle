@@ -15,7 +15,7 @@ import './ui/layout';
 import { watchIcons } from './ui/icons';
 import { checkTesterLink, testerKey, tryTesterKey } from './tester';
 import { API, nickname as lbNickname, playerId } from './sim/leaderboard';
-import { esc, load, post, prepHtml, previewHead, previewLists, testersHtml, votesHtml, type Data, type PrevItem, type Prop } from './board';
+import { askHtml, esc, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesHtml, type Data, type PrevItem, type Prop } from './board';
 
 const NAME_KEY = 'hustle.testerName';
 const MAX_COMMENT = 500;
@@ -47,6 +47,11 @@ const drafts = new Map<number, string>();
 const editing = new Set<number>();
 let voting = 0;
 let voteMsg: { id: number; text: string } | null = null;
+/** risposte alle domande di chiarimento di Claude: bozze, invio in corso, errore, risposte che si stanno cambiando */
+const noteDrafts = new Map<number, string>();
+let noting = 0;
+let noteMsg: { id: number; text: string } | null = null;
+const noteEditing = new Set<number>();
 const openTesters = new Set<string>();
 
 function keyHtml() {
@@ -75,9 +80,16 @@ function voteBox(x: PrevItem) {
       <div class="dv-acts"><button class="btn sm danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Boccio</button><button class="btn sm good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Approvo'}</button></div>${msg}</div>${votesHtml(p, true)}`;
 }
 
+function asksHtml(d: Data) {
+  const { asks } = previewLists(d);
+  if (!asks.length) return '';
+  const hint = '<p class="small tp-hint">Claude non ha capito bene cosa fare: se sai cosa intendeva chi l\'ha scritta, rispondi tu.</p>';
+  return hint + asks.map((x) => askHtml(x, noteBoxHtml(x.prop, x.prop && noteDrafts.get(x.prop.id), noting === x.prop?.id, noteMsg && noteMsg.id === x.prop?.id ? noteMsg.text : '', !!x.prop && noteEditing.has(x.prop.id)))).join('');
+}
+
 function previewsHtml(d: Data) {
   const { ready } = previewLists(d);
-  const prep = prepHtml(d);
+  const prep = prepHtml(d) + asksHtml(d);
   const hint = '<p class="small tp-hint">Apri l\'anteprima, provala e poi dì se ti piace: lo sviluppatore legge voti e commenti prima di decidere.</p>';
   if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
   return prep + hint + ready.map((x) => `<div class="dv-prev">${previewHead(x)}${voteBox(x)}</div>`).join('');
@@ -123,6 +135,29 @@ async function vote(id: number, v: 'si' | 'no') {
   render();
 }
 
+async function sendNote(id: number) {
+  const comment = (noteDrafts.get(id) ?? '').trim();
+  noteMsg = null;
+  if (!comment) {
+    noteMsg = { id, text: 'Scrivi la risposta' };
+    render();
+    return;
+  }
+  noting = id;
+  render();
+  try {
+    await post(API, '/hustle/proposals/vote', { key: testerKey(), player_id: playerId(), nickname: savedName(), id, vote: 'nota', comment });
+    const p = data?.props.find((x) => x.id === id);
+    if (p) p.notes = [{ name: savedName() || 'Tester', comment, at: Date.now(), mine: true }, ...(p.notes ?? []).filter((x) => !x.mine)];
+    noteDrafts.delete(id);
+    noteEditing.delete(id);
+  } catch (e) {
+    noteMsg = { id, text: `Risposta non inviata: ${(e as Error).message}` };
+  }
+  noting = 0;
+  render();
+}
+
 async function refresh(force = false) {
   if (!testerKey() || loading || (!force && Date.now() - lastLoad < 60000)) return;
   loading = true;
@@ -141,6 +176,7 @@ async function refresh(force = false) {
 ui.addEventListener('input', (e) => {
   const t = e.target as HTMLTextAreaElement;
   if (t.dataset.c) drafts.set(Number(t.dataset.c), t.value);
+  if (t.dataset.n) noteDrafts.set(Number(t.dataset.n), t.value);
 });
 ui.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-a]');
@@ -154,6 +190,11 @@ ui.addEventListener('click', (e) => {
   if (a === 'tester') {
     if (openTesters.has(arg)) openTesters.delete(arg);
     else openTesters.add(arg);
+    render();
+  }
+  if (a === 'note') void sendNote(Number(arg));
+  if (a === 'noteedit') {
+    noteEditing.add(Number(arg));
     render();
   }
   if (a === 'edit') {

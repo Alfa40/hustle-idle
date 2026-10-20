@@ -16,8 +16,8 @@ import './ui/layout';
 import { watchIcons } from './ui/icons';
 import { DEV_SLOT, devKey, tryDevKey } from './dev';
 import { euro, loadState } from './sim/state';
-import { API } from './sim/leaderboard';
-import { esc, load, post, prepHtml, previewHead, previewLists, testersHtml, votesHtml, type Data, type PrevItem, type Prop } from './board';
+import { API, playerId } from './sim/leaderboard';
+import { askHtml, esc, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesHtml, type Data, type PrevItem, type Prop } from './board';
 
 const serverProps = () => post<{ proposals?: Prop[] }>(API, '/hustle/proposals/list', { key: devKey() }).then((j) => j.proposals ?? []);
 
@@ -36,6 +36,11 @@ let rejecting = 0;
 let confirmAccept = 0;
 let accepting = 0;
 const openTesters = new Set<string>();
+/** risposte alle domande di chiarimento di Claude: bozze, invio in corso, errore, risposte che si stanno cambiando */
+const noteDrafts = new Map<number, string>();
+let noting = 0;
+let noteMsg: { id: number; text: string } | null = null;
+const noteEditing = new Set<number>();
 
 function keyHtml() {
   return `<div class="card"><h3>🔑 Chiave developer</h3><p class="small" style="margin:0 0 8px">Scrivila una volta: questo telefono se la ricorda.</p>
@@ -60,8 +65,9 @@ function previewsHtml(d: Data) {
       : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}. Nella proposta su GitHub trovi cosa fare.</div>` : '';
     return `<div class="dv-prev">${previewHead(x)}${note}${votesHtml(prop)}${acc || rej ? `<div class="dv-acts">${rej}${acc}</div>` : ''}</div>`;
   };
-  // prima gli avvisi delle proposte in preparazione, poi le anteprime da provare
-  const prep = prepHtml(d);
+  // prima gli avvisi delle proposte in preparazione e le domande di Claude, poi le anteprime da provare
+  const asks = previewLists(d).asks.map((x) => askHtml(x, noteBoxHtml(x.prop, x.prop && noteDrafts.get(x.prop.id), noting === x.prop?.id, noteMsg && noteMsg.id === x.prop?.id ? noteMsg.text : '', !!x.prop && noteEditing.has(x.prop.id)))).join('');
+  const prep = prepHtml(d) + asks;
   if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
   return prep + ready.map(row).join('');
 }
@@ -126,6 +132,29 @@ async function reject(id: number) {
   render();
 }
 
+/** Risposta alla domanda di chiarimento di Claude (come i commenti dei tester, firmata "Sviluppatore"). */
+async function sendNote(id: number) {
+  const comment = (noteDrafts.get(id) ?? '').trim();
+  noteMsg = null;
+  if (!comment) {
+    noteMsg = { id, text: 'Scrivi la risposta' };
+    render();
+    return;
+  }
+  noting = id;
+  render();
+  try {
+    await post(API, '/hustle/proposals/vote', { key: devKey(), player_id: playerId(), nickname: 'Sviluppatore', id, vote: 'nota', comment });
+    await refresh(true);
+    noteDrafts.delete(id);
+    noteEditing.delete(id);
+  } catch (e) {
+    noteMsg = { id, text: `Risposta non inviata: ${(e as Error).message}` };
+  }
+  noting = 0;
+  render();
+}
+
 async function refresh(force = false) {
   if (!devKey() || loading || (!force && Date.now() - lastLoad < 60000)) return;
   loading = true;
@@ -141,6 +170,10 @@ async function refresh(force = false) {
   render();
 }
 
+ui.addEventListener('input', (e) => {
+  const t = e.target as HTMLTextAreaElement;
+  if (t.dataset.n) noteDrafts.set(Number(t.dataset.n), t.value);
+});
 ui.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement).closest<HTMLElement>('[data-a]');
   if (!el) return;
@@ -153,6 +186,11 @@ ui.addEventListener('click', (e) => {
   if (a === 'tester') {
     if (openTesters.has(arg)) openTesters.delete(arg);
     else openTesters.add(arg);
+    render();
+  }
+  if (a === 'note') void sendNote(Number(arg));
+  if (a === 'noteedit') {
+    noteEditing.add(Number(arg));
     render();
   }
   if (a === 'reject') {

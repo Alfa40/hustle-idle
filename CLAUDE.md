@@ -83,7 +83,9 @@
   rifiuta da lì. Ogni comando nuovo utile ai test va aggiunto nella scheda Developer.
 - **App tester** (`tester.html`, src/testerapp.ts): chiave tester + nome; anteprime da provare con voto 👍/👎 e commento
   (solo un parere, decide lo sviluppatore) e resoconti dei tester. Codice in comune con l'app developer in src/board.ts
-  (avvisi "In preparazione", resoconti con solo rifiutate e nel gioco).
+  (avvisi "In preparazione", resoconti con solo rifiutate e nel gioco). Proposta poco chiara: etichetta `chiarimento` sulla
+  issue e domanda nel testo tra `<!-- domanda -->` e `<!-- /domanda -->`: nelle app compare "❓ Serve un chiarimento"
+  con il riquadro per rispondere (risposte in `notes`, server `vote: "nota"`).
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";

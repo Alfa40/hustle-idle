@@ -18,6 +18,14 @@ export interface Vote {
   mine?: boolean;
 }
 
+/** risposta a una domanda di chiarimento di Claude (una per telefono, si può cambiare) */
+export interface Note {
+  name: string;
+  comment: string;
+  at: number;
+  mine?: boolean;
+}
+
 /** proposta come la vede il server */
 export interface Prop {
   id: number;
@@ -30,6 +38,7 @@ export interface Prop {
   /** perché l'ultima unione al gioco non è riuscita (torna da provare) */
   mergeError?: string;
   votes?: Vote[];
+  notes?: Note[];
 }
 export interface Issue {
   number: number;
@@ -38,6 +47,7 @@ export interface Issue {
   state: 'open' | 'closed';
   state_reason?: string | null;
   updated_at: string;
+  labels?: { name: string }[];
   pull_request?: unknown;
 }
 /** a che punto è una proposta, mettendo insieme server e GitHub */
@@ -127,6 +137,16 @@ export interface PrevItem {
   ready: boolean;
 }
 
+/**
+ * Claude non ha capito bene cosa fare e chiede un chiarimento: la proposta ha l'etichetta "chiarimento" e nel testo
+ * la domanda tra `<!-- domanda -->` e `<!-- /domanda -->`. Tester e sviluppatore rispondono dalle app.
+ */
+export const asksOf = (i: Issue) => !!i.labels?.some((l) => l.name === 'chiarimento');
+export function questionOf(i: Issue) {
+  const m = /<!-- domanda -->([\s\S]*?)<!-- \/domanda -->/.exec(i.body ?? '');
+  return (m?.[1] ?? '').replace(/^\s*#+ .*$/m, '').trim();
+}
+
 /** anteprime da provare (le più nuove prima) e proposte in preparazione (approvate o con Claude al lavoro) */
 export function previewLists(d: Data) {
   const propOf = new Map(d.props.filter((p) => p.issue).map((p) => [p.issue, p]));
@@ -134,10 +154,14 @@ export function previewLists(d: Data) {
   const open = [...d.issues.values()].filter((i) => i.state === 'open' && !d.merged.has(i.number) && !['rifiutata', 'pubblicata'].includes(propOf.get(i.number)?.status ?? ''));
   const items = open.map((i): PrevItem => ({ issue: i, prop: propOf.get(i.number), ready: d.branches.has(i.number) }));
   const ready = items.filter((x) => x.ready).sort((a, b) => Date.parse(b.issue.updated_at) - Date.parse(a.issue.updated_at));
-  const busy = items.filter((x) => !x.ready);
+  // senza anteprima perché Claude aspetta una risposta
+  const asks = items.filter((x) => !x.ready && asksOf(x.issue));
+  const busy = items.filter((x) => !x.ready && !asksOf(x.issue));
   // approvate dallo sviluppatore ma non ancora su GitHub: il robot le passa a Claude al suo prossimo giro
-  const queued = d.props.filter((p) => p.status === 'approvata').sort((a, b) => a.created - b.created);
-  return { ready, busy, queued };
+  // (quelle già su GitHub, se il server non lo sa ancora, stanno solo sopra)
+  const onGh = new Set([...d.issues.values()].map((i) => /<!-- proposta-gioco-(\d+) -->/.exec(i.body ?? '')?.[1]).filter(Boolean).map(Number));
+  const queued = d.props.filter((p) => p.status === 'approvata' && !onGh.has(p.id)).sort((a, b) => a.created - b.created);
+  return { ready, busy, queued, asks };
 }
 
 const shortTitle = (i: Issue) => i.title.replace(/^Proposta:\s*/i, '');
@@ -164,6 +188,33 @@ export function previewHead(x: PrevItem) {
   return `<a class="t-btn" href="${preview(i.number)}" target="_blank" rel="noopener">
       <span class="t-ico">📱</span><span class="l-txt"><b>#${i.number} · ${esc(shortTitle(i))}</b>
       <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}</small></span></a>`;
+}
+
+/** la scheda di una proposta per cui Claude chiede un chiarimento; sotto, il riquadro per rispondere (`box`) */
+export function askHtml(x: PrevItem, box: string) {
+  const name = nameOf(x);
+  const q = questionOf(x.issue);
+  const notes = (x.prop?.notes ?? []).filter((n) => !n.mine);
+  return `<div class="dv-prev dv-ask"><div class="t-btn dv-ask-head"><span class="t-ico">❓</span><span class="l-txt"><b>#${x.issue.number} · Serve un chiarimento</b>
+      <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}${ago(Date.parse(x.issue.updated_at))}</small></span></div>
+    <div class="dv-note"><b>La proposta</b><div class="dv-text">${esc(x.prop?.text ?? shortTitle(x.issue))}</div></div>
+    <div class="dv-note ask"><b>Claude chiede</b><div class="dv-text">${esc(q || 'Cosa intendi, di preciso?')}</div></div>
+    ${notes.map((n) => `<div class="dv-vote"><b>💬 ${esc(n.name)}</b> <span class="muted">${ago(n.at)}</span><div class="dv-text">${esc(n.comment)}</div></div>`).join('')}${box}</div>`;
+}
+
+/** il riquadro per rispondere alla domanda di Claude (`data-a="note:<id>"`, testo in `data-n`) */
+export function noteBoxHtml(p: Prop | undefined, draft: string | undefined, busy: boolean, msg: string, editing: boolean) {
+  if (!p) return '';
+  if (p.status !== 'importata') return '<div class="dv-note">⏳ Tra pochi minuti si può rispondere.</div>';
+  const mine = p.notes?.find((n) => n.mine);
+  const err = msg ? `<p class="small center bad" style="margin:4px 0 0">${esc(msg)}</p>` : '';
+  if (mine && !editing) {
+    return `<div class="dv-vote mine"><b>La tua risposta</b> <span class="muted">${ago(mine.at)}</span><div class="dv-text">${esc(mine.comment)}</div>
+      <div class="dv-acts"><button class="btn sm sec" data-a="noteedit:${p.id}">✏️ Cambia risposta</button></div></div>${err}`;
+  }
+  return `<div class="card tp-vote"><b>💬 Rispondi a Claude</b>
+      <textarea class="lb-input tp-com" data-n="${p.id}" maxlength="500" rows="3" placeholder="Spiega cosa intendevi: più è preciso, meglio è">${esc(draft ?? mine?.comment ?? '')}</textarea>
+      <div class="dv-acts"><button class="btn sm good" data-a="note:${p.id}" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : 'Invia risposta'}</button></div>${err}</div>`;
 }
 
 /** i voti dei tester su un'anteprima: quanti approvano e quanti bocciano, e i commenti */

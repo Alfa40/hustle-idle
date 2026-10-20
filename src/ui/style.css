@@ -1291,6 +1291,14 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .dv-vote.no { border-left-color: #ff5d73; }
 .dv-vote.mine { background: #fff; border-radius: 12px; padding: 8px 10px; border-left-width: 6px; }
 .dv-vote .dv-acts { margin-top: 6px; }
+/* proposta per cui Claude chiede un chiarimento (app developer e tester) */
+.dv-ask { background: rgba(255,255,255,.18); border-radius: 18px; padding: 6px; }
+.dv-ask .dv-note { background: #fff; color: var(--ink); }
+.dv-ask .dv-note.ask { background: #e4f0ff; color: #1d3f72; }
+.dv-ask .dv-note .dv-text { font-weight: 600; }
+.dv-ask-head { cursor: default; }
+.dv-ask > .dv-vote:not(.mine) { background: #fff; border-radius: 10px; padding: 6px 10px; border-left-color: #5b8def; }
+.dv-ask .dv-vote.mine { border-left-color: #5b8def; }
 .tp-vote { display: flex; flex-direction: column; gap: 8px; margin: 0; }
 .tp-com { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 15px; }
 .tp-hint { color: #fff; margin: 2px 4px; font-weight: 600; }
