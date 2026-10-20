@@ -153,9 +153,9 @@ export function previewLists(d: Data) {
   // aperte su GitHub, non ancora unite e non rifiutate (la chiusura su GitHub arriva qualche minuto dopo)
   const open = [...d.issues.values()].filter((i) => i.state === 'open' && !d.merged.has(i.number) && !['rifiutata', 'pubblicata'].includes(propOf.get(i.number)?.status ?? ''));
   const items = open.map((i): PrevItem => ({ issue: i, prop: propOf.get(i.number), ready: d.branches.has(i.number) }));
-  const ready = items.filter((x) => x.ready).sort((a, b) => Date.parse(b.issue.updated_at) - Date.parse(a.issue.updated_at));
-  // senza anteprima perché Claude aspetta una risposta
-  const asks = items.filter((x) => !x.ready && asksOf(x.issue));
+  // Claude aspetta una risposta (a volte con un'anteprima di prova, già pronta)
+  const asks = items.filter((x) => asksOf(x.issue));
+  const ready = items.filter((x) => x.ready && !asksOf(x.issue)).sort((a, b) => Date.parse(b.issue.updated_at) - Date.parse(a.issue.updated_at));
   const busy = items.filter((x) => !x.ready && !asksOf(x.issue));
   // approvate dallo sviluppatore ma non ancora su GitHub: il robot le passa a Claude al suo prossimo giro
   // (quelle già su GitHub, se il server non lo sa ancora, stanno solo sopra)
@@ -199,6 +199,7 @@ export function askHtml(x: PrevItem, box: string) {
       <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}${ago(Date.parse(x.issue.updated_at))}</small></span></div>
     <div class="dv-note"><b>La proposta</b><div class="dv-text">${esc(x.prop?.text ?? shortTitle(x.issue))}</div></div>
     <div class="dv-note ask"><b>Claude chiede</b><div class="dv-text">${esc(q || 'Cosa intendi, di preciso?')}</div></div>
+    ${x.ready ? previewHead(x).replace('</b>', ' · prova</b>') : ''}
     ${notes.map((n) => `<div class="dv-vote"><b>💬 ${esc(n.name)}</b> <span class="muted">${ago(n.at)}</span><div class="dv-text">${esc(n.comment)}</div></div>`).join('')}${box}</div>`;
 }
 
