@@ -130,7 +130,7 @@ jobs:
               else
                 git merge --abort || true
                 err="si scontra con altre modifiche del gioco fatte nel frattempo: va aggiornata prima di pubblicarla"
-                gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha accettato l'anteprima, ma la modifica non si unisce al gioco perché si scontra con altre modifiche fatte nel frattempo. Per sistemarla scrivi qui sotto un commento che inizia con @claude (per esempio: \"@claude aggiorna il ramo con main e risolvi i conflitti\"), poi riprova l'anteprima e accettala di nuovo dall'app developer."
+                gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha accettato l'anteprima, ma la modifica non si unisce al gioco perché si scontra con altre modifiche fatte nel frattempo. Per sistemarla scrivi nell'app developer, nel riquadro «Modifiche da fare»: \"aggiorna il ramo con il gioco e risolvi i conflitti\". Poi riprova l'anteprima e accettala di nuovo."
               fi
             fi
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/merged" -H 'Content-Type: application/json' \
@@ -152,7 +152,21 @@ jobs:
           curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/tochange" \
             -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > cambiare.json
           started=""
+          # 0) risposte alle domande di chiarimento di Claude (dalle app): si scrivono nella proposta e Claude riparte
           while read -r p; do
+            [ -n "$p" ] || continue
+            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p"); at=$(jq -r '.at' <<<"$p")
+            if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
+              jq -r '"💬 **Risposta al chiarimento** (dalle app):\n\n" + (.text | split("\n") | map("> " + .) | join("\n")) + "\n\nClaude riparte da qui: l'"'"'anteprima si aggiorna da sola."' <<<"$p" > risposta.md
+              gh issue comment "$issue" -R "$REPO" --body-file risposta.md
+              gh workflow run claude.yml -R "$REPO" -f issue="$issue" -f risposta="$(jq -r '.text' <<<"$p")"
+              started="risposta al chiarimento della proposta #$issue"
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/answered" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --arg at "$at" '{key: $k, id: $id, at: $at}')" > /dev/null
+            [ -z "$started" ] || break
+          done < <(jq -c '.answers // [] | .[]' cambiare.json)
+          if [ -z "$started" ]; then while read -r p; do
             [ -n "$p" ] || continue
             id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p"); at=$(jq -r '.at' <<<"$p")
             if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
@@ -165,7 +179,7 @@ jobs:
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/changed" -H 'Content-Type: application/json' \
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" --arg at "$at" '{key: $k, id: $id, at: $at}')" > /dev/null
             [ -z "$started" ] || break
-          done < <(jq -c '.proposals[]' cambiare.json)
+          done < <(jq -c '.proposals[]' cambiare.json); fi
           # 2) la proposta in coda da più tempo
           if [ -z "$started" ]; then
             issue=$(gh issue list -R "$REPO" --label in-coda --state open -L 100 --json number -q 'sort_by(.number) | .[0].number // empty')
