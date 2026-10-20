@@ -833,6 +833,8 @@ export class Game {
       g.add(mat);
       const service = def.kind === 'service';
       const craft = def.kind === 'craft';
+      // attività automatiche (ristorazione e ospitalità evolute, B&B): non si entra, si gestiscono dalla finestra
+      const auto = !craft && !service && !hasInterior(biz.type);
       const game = this;
       inter = this.addInteractable({
         pos: slot.pos, radius: 2.2,
@@ -840,12 +842,13 @@ export class Game {
         get label() {
           if (craft) return `${def.name}: lavori su richiesta`;
           if (service) return `Ufficio ${def.name.toLowerCase()}`;
+          if (auto) return `${def.name}: gestisci`;
           return isOpenHour(game.state) ? `Entra: ${def.name}` : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
         },
         get icon() {
-          return craft ? '🛠️' : service ? '📋' : isOpenHour(game.state) ? '🚪' : '🔒';
+          return craft ? '🛠️' : service ? '📋' : auto ? '📊' : isOpenHour(game.state) ? '🚪' : '🔒';
         },
-        action: () => (craft ? this.ui.openBusiness(biz.id, 'lavori') : service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
+        action: () => (craft ? this.ui.openBusiness(biz.id, 'lavori') : service ? this.ui.openBusiness(biz.id, 'ordini') : auto ? this.ui.openBusiness(biz.id) : this.enterBusiness(lotId)),
       });
     }
     this.trucks.set(lotId, { lotId, slot, group: g, inter, extra, built: !!biz, open: isOpenHour(this.state) });
@@ -897,6 +900,11 @@ export class Game {
     // laboratorio dell'artigiano: niente bancone, si apre la scheda dei lavori su richiesta
     if (biz && bizType(biz.type).kind === 'craft') {
       this.ui.openBusiness(biz.id, 'lavori');
+      return;
+    }
+    // attività automatiche (senza cucina da giocare): si gestiscono dalla finestra
+    if (biz && !hasInterior(biz.type)) {
+      this.ui.openBusiness(biz.id);
       return;
     }
     if (!biz || this.run) {

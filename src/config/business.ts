@@ -111,6 +111,37 @@ export interface BusinessTypeDef {
   evolveCost?: number;
   /** migliorie con il nome e il massimo di questa attività (es. "Bici elettriche" al posto di Attrezzatura) */
   upgrades?: Partial<Record<UpgradeId, { name?: string; icon?: string; desc?: string; max?: number }>>;
+  /**
+   * Attività automatica (Ristorazione e ospitalità evolute e B&B): niente di persona, parte con un dipendente per
+   * reparto e il manager e lavora da sola da subito (`ensureAutoStaff` in sim/economy.ts).
+   */
+  auto?: boolean;
+}
+
+/** massimo delle migliorie per gradino: attrezzatura, look, pubblicità, magazzino */
+const AUTO_MAX = [[3, 3, 2, 2], [4, 4, 3, 3], [5, 5, 4, 3], [6, 6, 5, 4]];
+
+/** Un'attività automatica di Ristorazione e ospitalità (vedi `auto`). */
+function autoBiz(o: {
+  name: string; icon: string; desc: string; products: ProductId[]; staff: [string, string]; color: string; rateMul: number;
+  tier: number; evolveCost?: number; evolvesTo?: string[]; setupCost?: number;
+  /** nomi propri delle migliorie: attrezzatura, look, pubblicità, magazzino, più prodotti */
+  upg: [[string, string], [string, string], [string, string], [string, string], [string, string]];
+}): BusinessTypeDef {
+  const m = AUTO_MAX[o.tier];
+  const [att, look, mkt, frigo, menu] = o.upg;
+  return {
+    name: o.name, icon: o.icon, desc: o.desc, kind: 'shop', lot: 'shop', setupCost: o.setupCost ?? 0, products: o.products,
+    roles: ['cucina', 'cassa'], roleNames: { cucina: o.staff[0], cassa: o.staff[1] }, skills: ['cucina', 'clientela'],
+    rateMul: o.rateMul, color: o.color, sector: 'cucina', tier: o.tier, evolveCost: o.evolveCost, evolvesTo: o.evolvesTo, auto: true,
+    upgrades: {
+      attrezzatura: { name: att[0], icon: att[1], desc: 'Il personale lavora più in fretta (+15% per livello).', max: m[0] },
+      look: { name: look[0], icon: look[1], desc: 'Più clienti (+15% di domanda per livello).', max: m[1] },
+      marketing: { name: mkt[0], icon: mkt[1], desc: '+10% di domanda per livello.', max: m[2] },
+      frigo: { name: frigo[0], icon: frigo[1], desc: '+40 posti per le scorte.', max: m[3] },
+      menu: { name: menu[0], icon: menu[1], desc: 'Un prodotto in più in vendita.' },
+    },
+  };
 }
 
 export const BUSINESS_TYPES = {
@@ -118,14 +149,14 @@ export const BUSINESS_TYPES = {
     name: 'Food truck', icon: '🚚', desc: 'Cibo di strada: economico da aprire, si lavora al bancone.',
     kind: 'truck', lot: 'truck', setupCost: 0, products: ['panini', 'hotdog', 'tacos', 'gelati'],
     roles: ['cucina', 'cassa'], roleNames: { cucina: 'Cuoco', cassa: 'Cassiere' }, skills: ['cucina', 'clientela'],
-    rateMul: 1, wall: 0xe8590c, color: '#e8590c', sector: 'cucina',
+    rateMul: 1, wall: 0xe8590c, color: '#e8590c', sector: 'cucina', tier: 0, evolvesTo: ['trattoria', 'bar_caffe', 'catering'],
     stations: { stock: '🧊 Frigo', work: '🔥 Piastra', counter: '🪟 Servi qui' },
   },
   panificio: {
     name: 'Panificio', icon: '🥖', desc: 'Pane e dolci: tanti clienti, prodotti economici.',
     kind: 'shop', lot: 'shop', setupCost: 2500, products: ['pane', 'cornetti', 'pizza', 'torte'],
     roles: ['cucina', 'cassa'], roleNames: { cucina: 'Fornaio', cassa: 'Commesso' }, skills: ['cucina', 'clientela'],
-    rateMul: 1.1, wall: 0xd4a373, color: '#b5793d', sector: 'cucina',
+    rateMul: 1.1, wall: 0xd4a373, color: '#b5793d', sector: 'cucina', tier: 0, evolvesTo: ['pasticceria', 'forno_caffe'],
     stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
   },
   artigianato: {
@@ -288,6 +319,107 @@ export const BUSINESS_TYPES = {
     tier: 2, evolveCost: 90000,
     upgrades: { attrezzatura: { name: 'Autobus nuovi', icon: '🚌', max: 5 }, look: { name: 'Fermate coperte', icon: '🚏', max: 5 }, marketing: { name: 'Più linee', icon: '🗺️', max: 4 }, frigo: { name: 'Carburante', icon: '⛽', max: 3 }, menu: { name: 'Giri turistici', icon: '🚌' } },
   },
+  // ---------------- 🍳 Ristorazione e ospitalità: alberi delle evoluzioni (CARRIERE.md), tutte automatiche ----------------
+  trattoria: autoBiz({
+    name: 'Trattoria', icon: '🍝', desc: 'Primi e secondi della casa, a pranzo e a cena.', products: ['primi', 'secondi'],
+    staff: ['Cuoco', 'Cameriere'], color: '#c0392b', rateMul: 1.0116, tier: 1, evolveCost: 24000, evolvesTo: ['ristorante'],
+    upg: [['Cucina professionale', '🔥'], ['Tovaglie e arredi', '🪑'], ['Insegna e recensioni', '📣'], ['Dispensa più grande', '🧊'], ['Secondi piatti', '🥩']],
+  }),
+  ristorante: autoBiz({
+    name: 'Ristorante', icon: '🍽️', desc: 'Cene curate e una carta dei vini.', products: ['cena_ristorante', 'vini'],
+    staff: ['Cuoco', 'Cameriere'], color: '#8e2b4f', rateMul: 1.6202, tier: 2, evolveCost: 75000, evolvesTo: ['stellato'],
+    upg: [['Cucina nuova', '🔥'], ['Sala elegante', '🕯️'], ['Guide e recensioni', '⭐'], ['Cantina e dispensa', '🍷'], ['Carta dei vini', '🍷']],
+  }),
+  stellato: autoBiz({
+    name: 'Ristorante stellato', icon: '⭐', desc: 'Menù degustazione e vini pregiati: il traguardo della cucina.', products: ['degustazione', 'vini_pregiati'],
+    staff: ['Chef', 'Maître'], color: '#3a2f55', rateMul: 0.9306, tier: 3, evolveCost: 210000,
+    upg: [['Brigata di cucina', '👨‍🍳'], ['Sala di lusso', '💎'], ['Stelle e premi', '🏆'], ['Cantina pregiata', '🍾'], ['Vini pregiati', '🍾']],
+  }),
+  bar_caffe: autoBiz({
+    name: 'Bar caffetteria', icon: '☕', desc: 'Caffè e colazioni dalla mattina presto.', products: ['caffe', 'colazioni'],
+    staff: ['Barista', 'Cassiere'], color: '#7a4a2a', rateMul: 4.0317, tier: 1, evolveCost: 22000, evolvesTo: ['cocktail_bar'],
+    upg: [['Macchina del caffè', '☕'], ['Tavolini e dehors', '🪑'], ['Insegna', '📣'], ['Scorte di caffè', '📦'], ['Colazioni', '🥐']],
+  }),
+  cocktail_bar: autoBiz({
+    name: 'Cocktail bar', icon: '🍸', desc: 'Cocktail e aperitivi la sera.', products: ['cocktail', 'aperitivi'],
+    staff: ['Barman', 'Cameriere'], color: '#2f6f8f', rateMul: 3.7387, tier: 2, evolveCost: 70000, evolvesTo: ['locale_eventi'],
+    upg: [['Bancone attrezzato', '🍸'], ['Luci e arredi', '✨'], ['Serate a tema', '📣'], ['Bottiglie di scorta', '🍾'], ['Aperitivi', '🥂']],
+  }),
+  locale_eventi: autoBiz({
+    name: 'Locale per eventi', icon: '🎉', desc: 'Serate con la musica e feste private.', products: ['serate', 'feste_private'],
+    staff: ['Barman', 'Addetto alla sala'], color: '#8e5bd6', rateMul: 2.1542, tier: 3, evolveCost: 200000,
+    upg: [['Impianto audio', '🎤'], ['Palco e luci', '🎆'], ['Artisti famosi', '🎸'], ['Magazzino bevande', '📦'], ['Feste private', '🎉']],
+  }),
+  catering: autoBiz({
+    name: 'Catering', icon: '🥂', desc: 'Buffet per feste e aperitivi per le aziende.', products: ['buffet', 'aperitivi_aziende'],
+    staff: ['Cuoco', 'Cameriere'], color: '#d4a017', rateMul: 0.0687, tier: 1, evolveCost: 26000, evolvesTo: ['banchetti'],
+    upg: [['Furgone frigo', '🚐'], ['Vassoi e tovaglie', '🍽️'], ['Passaparola', '📣'], ['Dispensa', '🧊'], ['Aperitivi aziendali', '🥂']],
+  }),
+  banchetti: autoBiz({
+    name: 'Banchetti e matrimoni', icon: '💍', desc: 'Pranzi di nozze e cene aziendali.', products: ['banchetto_nozze', 'cene_aziendali'],
+    staff: ['Cuoco', 'Cameriere'], color: '#e48aa8', rateMul: 0.0162, tier: 2, evolveCost: 80000, evolvesTo: ['grandi_eventi'],
+    upg: [['Cucina da campo', '🔥'], ['Allestimenti', '💐'], ['Fiere degli sposi', '💒'], ['Dispensa grande', '🧊'], ['Cene aziendali', '🍽️']],
+  }),
+  grandi_eventi: autoBiz({
+    name: 'Grandi eventi', icon: '🏛️', desc: 'Eventi in città, concerti e festival.', products: ['eventi_citta', 'concerti'],
+    staff: ['Cuoco', 'Organizzatore'], color: '#2d6cdb', rateMul: 0.0107, tier: 3, evolveCost: 220000,
+    upg: [['Squadre di cucina', '👨‍🍳'], ['Palchi e tendoni', '🏗️'], ['Contratti col comune', '📜'], ['Magazzino eventi', '📦'], ['Concerti', '🎸']],
+  }),
+  pasticceria: autoBiz({
+    name: 'Pasticceria', icon: '🧁', desc: 'Pasticcini e semifreddi in vetrina.', products: ['pasticcini', 'semifreddi'],
+    staff: ['Pasticcere', 'Commesso'], color: '#e8789a', rateMul: 3.091, tier: 1, evolveCost: 22000, evolvesTo: ['torte_ordinazione'],
+    upg: [['Forno e banchi', '🔥'], ['Vetrina', '✨'], ['Insegna', '📣'], ['Dispensa', '🧊'], ['Semifreddi', '🍨']],
+  }),
+  torte_ordinazione: autoBiz({
+    name: 'Torte su ordinazione', icon: '🎂', desc: 'Torte per le feste e torte nuziali.', products: ['torte_compleanno', 'torte_nuziali'],
+    staff: ['Pasticcere', 'Commesso'], color: '#c86b98', rateMul: 0.1132, tier: 2, evolveCost: 70000, evolvesTo: ['cioccolateria'],
+    upg: [['Laboratorio', '🎂'], ['Sala degustazione', '🪑'], ['Fiere degli sposi', '💒'], ['Dispensa', '🧊'], ['Torte nuziali', '🍰']],
+  }),
+  cioccolateria: autoBiz({
+    name: 'Cioccolateria', icon: '🍫', desc: 'Praline e cioccolato da regalo: il traguardo della pasticceria.', products: ['praline', 'cioccolato_regalo'],
+    staff: ['Cioccolatiere', 'Commesso'], color: '#5a3a22', rateMul: 1.0368, tier: 3, evolveCost: 190000,
+    upg: [['Temperatrici', '🌡️'], ['Boutique', '💎'], ['Regali aziendali', '🎁'], ['Cella del cioccolato', '🧊'], ['Cioccolato da regalo', '🎁']],
+  }),
+  forno_caffe: autoBiz({
+    name: 'Forno con caffè', icon: '🥐', desc: 'Colazioni appena sfornate e caffè.', products: ['colazione_forno', 'caffe'],
+    staff: ['Fornaio', 'Barista'], color: '#c8935a', rateMul: 3.7092, tier: 1, evolveCost: 22000, evolvesTo: ['forno_ingrosso'],
+    upg: [['Forno nuovo', '🔥'], ['Tavolini', '🪑'], ['Insegna', '📣'], ['Dispensa', '🌾'], ['Caffè', '☕']],
+  }),
+  forno_ingrosso: autoBiz({
+    name: "Forno all'ingrosso", icon: '🏭', desc: 'Pane per i negozi e forniture per i locali della città.', products: ['pane_ingrosso', 'forniture_locali'],
+    staff: ['Fornaio', 'Autista'], color: '#8a5a2b', rateMul: 0.1376, tier: 2, evolveCost: 75000,
+    upg: [['Forni industriali', '🔥'], ['Furgoni per le consegne', '🚚'], ['Contratti coi negozi', '🤝'], ['Silos di farina', '🌾'], ['Forniture per i locali', '🥖']],
+  }),
+  bnb: autoBiz({
+    name: 'Bed & breakfast', icon: '🛎️', desc: 'Poche camere con la colazione: lavora da solo col suo personale.', products: ['camere_bnb', 'camere_famiglia'],
+    staff: ['Cameriera ai piani', 'Receptionist'], color: '#2fa866', rateMul: 0.095, tier: 0, setupCost: 6000, evolvesTo: ['hotel', 'ostello'],
+    upg: [['Letti nuovi', '🛏️'], ['Camere arredate', '🖼️'], ['Siti di prenotazione', '📱'], ['Lenzuola e asciugamani', '🧺'], ['Camere per famiglie', '🧸']],
+  }),
+  hotel: autoBiz({
+    name: 'Hotel', icon: '🏨', desc: 'Più camere e la mezza pensione.', products: ['camere_hotel', 'mezza_pensione'],
+    staff: ['Cameriera ai piani', 'Receptionist'], color: '#2d9cdb', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['hotel4'],
+    upg: [['Camere rinnovate', '🛏️'], ['Hall elegante', '🛋️'], ['Agenzie di viaggio', '✈️'], ['Biancheria', '🧺'], ['Mezza pensione', '🍽️']],
+  }),
+  hotel4: autoBiz({
+    name: 'Hotel 4 stelle', icon: '🏨', desc: 'Suite e sale per i congressi.', products: ['suite', 'congressi'],
+    staff: ['Cameriera ai piani', 'Receptionist'], color: '#5b4bb7', rateMul: 0.0651, tier: 2, evolveCost: 90000, evolvesTo: ['resort'],
+    upg: [['Suite di lusso', '🛎️'], ['Piscina', '🌊'], ['Agenzie e aziende', '✈️'], ['Biancheria', '🧺'], ['Sale per congressi', '🤝']],
+  }),
+  resort: autoBiz({
+    name: 'Resort di lusso', icon: '🏰', desc: 'Soggiorni di lusso e spa: il traguardo dell\'ospitalità.', products: ['soggiorno_resort', 'spa'],
+    staff: ['Cameriera ai piani', 'Concierge'], color: '#1c6b5a', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Ville private', '🏡'], ['Giardini e piscine', '🌳'], ['Ospiti famosi', '🤩'], ['Biancheria di lusso', '🧺'], ['Pacchetti spa', '🧴']],
+  }),
+  ostello: autoBiz({
+    name: 'Ostello', icon: '🎒', desc: 'Tanti posti letto a poco prezzo e qualche camera privata.', products: ['posto_letto', 'camere_private'],
+    staff: ['Addetto alle pulizie', 'Receptionist'], color: '#ff8a3d', rateMul: 0.2612, tier: 1, evolveCost: 24000, evolvesTo: ['residence'],
+    upg: [['Letti a castello', '🛏️'], ['Sala comune', '🛋️'], ['Siti per giovani', '📱'], ['Lenzuola', '🧺'], ['Camere private', '🛏️']],
+  }),
+  residence: autoBiz({
+    name: 'Residence', icon: '🏢', desc: 'Appartamenti per le vacanze e per chi viene in città per lavoro.', products: ['appartamenti', 'soggiorni_lavoro'],
+    staff: ['Addetto alle pulizie', 'Receptionist'], color: '#6b7080', rateMul: 0.0959, tier: 2, evolveCost: 80000,
+    upg: [['Appartamenti nuovi', '🏢'], ['Portineria', '🛎️'], ['Siti di prenotazione', '📱'], ['Biancheria', '🧺'], ['Soggiorni di lavoro', '💼']],
+  }),
 } satisfies Record<string, BusinessTypeDef>;
 
 export type BusinessType = keyof typeof BUSINESS_TYPES;
@@ -339,6 +471,7 @@ export const bizType = (t: BusinessType): BusinessTypeDef => BUSINESS_TYPES[t];
  */
 export const BIZ_GROUPS: { id: string; name: string; icon?: string; roots: BusinessType[] }[] = [
   { id: 'ristorazione', name: 'Ristorazione', icon: '🍽️', roots: ['foodtruck', 'panificio'] },
+  { id: 'ospitalita', name: 'Ospitalità', icon: '🛎️', roots: ['bnb'] },
   { id: 'consegne', name: 'Consegne', roots: ['bici'] },
   { id: 'traslochi', name: 'Traslochi e trasporti', roots: ['traslochi'] },
   { id: 'persone', name: 'Trasporto persone', roots: ['navetta'] },
@@ -378,6 +511,14 @@ const RAW_CURVES: Partial<Record<BusinessType, number[]>> = {
   //            8    9    10   11   12   13   14   15   16   17   18   19   20   21
   foodtruck: [0.4, 0.5, 0.7, 1.1, 1.9, 1.8, 1.0, 0.6, 0.6, 0.8, 1.1, 1.6, 1.5, 0.8],
   panificio: [1.9, 1.7, 1.2, 0.9, 1.0, 0.9, 0.6, 0.7, 1.2, 1.3, 1.0, 0.6, 0.5, 0.4],
+  trattoria: [0.3, 0.4, 0.6, 1.1, 2.0, 1.9, 0.9, 0.4, 0.4, 0.6, 1.0, 1.9, 1.9, 1.0],
+  ristorante: [0.2, 0.2, 0.3, 0.6, 1.4, 1.4, 0.6, 0.3, 0.3, 0.6, 1.2, 2.2, 2.4, 1.6],
+  stellato: [0.1, 0.1, 0.2, 0.4, 1.2, 1.2, 0.4, 0.2, 0.2, 0.5, 1.2, 2.4, 2.8, 2.0],
+  bar_caffe: [2.2, 2.0, 1.4, 1.0, 1.0, 1.1, 1.0, 0.8, 0.8, 0.8, 0.7, 0.5, 0.4, 0.3],
+  cocktail_bar: [0.1, 0.1, 0.2, 0.3, 0.5, 0.5, 0.4, 0.5, 0.8, 1.4, 2.0, 2.2, 2.4, 2.3],
+  locale_eventi: [0.1, 0.1, 0.1, 0.2, 0.3, 0.3, 0.3, 0.4, 0.6, 1.0, 1.6, 2.4, 3.0, 3.2],
+  pasticceria: [1.4, 1.5, 1.2, 1.0, 0.9, 0.8, 0.7, 0.9, 1.4, 1.4, 1.1, 0.8, 0.6, 0.4],
+  forno_caffe: [2.2, 2.0, 1.4, 1.0, 0.9, 0.8, 0.6, 0.7, 1.1, 1.1, 0.8, 0.5, 0.4, 0.3],
   pulizie: [1.3, 1.5, 1.4, 1.2, 0.9, 0.7, 0.9, 1.0, 1.0, 0.9, 0.8, 0.7, 0.4, 0.3],
   traslochi: [1.4, 1.5, 1.4, 1.2, 0.8, 0.7, 1.0, 1.1, 1.0, 0.8, 0.7, 0.6, 0.5, 0.3],
 };

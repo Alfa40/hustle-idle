@@ -276,6 +276,23 @@ export function makeCandidate(s: GameState, role: Role): Employee {
   return e;
 }
 
+/** Attività automatica (Ristorazione e ospitalità evolute e B&B): niente di persona, lavora sempre col personale. */
+export const isAutoBiz = (t: BusinessType) => !!bizType(t).auto;
+
+/**
+ * Attività automatica: un dipendente per reparto più il manager, assunti da soli se mancano (apertura ed
+ * evoluzione), così lavora da subito.
+ */
+export function ensureAutoStaff(s: GameState, b: Business) {
+  if (!isAutoBiz(b.type)) return;
+  for (const r of [...bizType(b.type).roles, 'manager'] as Role[]) {
+    if (b.staff.some((e) => e.role === r)) continue;
+    const e = makeCandidate(s, r);
+    e.hiredDay = day(s);
+    b.staff.push(e);
+  }
+}
+
 export function salaryFor(e: Employee) {
   const base = ROLES[e.role].baseSalary;
   // lo stipendio sale come il lavoro che fa: un dipendente a stelle costa di più ma ne vale tanti
@@ -443,6 +460,7 @@ export function evolveBusiness(s: GameState, b: Business, target: BusinessType, 
   // i gruppi della catena non contano più il negozio vecchio
   for (const g of s.chainGroups ?? []) g.bizIds = g.bizIds.filter((id) => id !== b.id);
   if (nb.products[0]) buyStock(s, nb, nb.products[0], 20, true);
+  ensureAutoStaff(s, nb);
   toast(`🌱 ${bizType(b.type).icon} ${bizType(b.type).name} è diventata ${bizType(target).icon} ${bizType(target).name} in ${lotDef(lotId).name}!`, 'good');
   return nb;
 }
@@ -473,6 +491,7 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   s.businesses.push(b);
   // una scorta iniziale per partire subito
   if (b.products[0]) buyStock(s, b, b.products[0], 20, true);
+  ensureAutoStaff(s, b);
   toast(`Hai aperto: ${bizType(type).icon} ${bizType(type).name} in ${lot.name}!`, 'good');
   return b;
 }

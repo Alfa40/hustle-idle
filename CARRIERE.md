@@ -95,7 +95,7 @@ il titolare può fare da sé, sempre sotto i 5 minuti, con il minigioco della li
 
 ---
 
-## 🍳 Ristorazione e ospitalità (lavoretti ✅ nel gioco dal 15/10; attività da rifare ad albero)
+## 🍳 Ristorazione e ospitalità (lavoretti ✅ nel gioco dal 15/10; attività ad albero ✅ dal 20/10)
 
 Cinque linee scelte dall'utente: Cucina, Sala, Ospitalità, Bar, Forno e pasticceria (Pizza no). Regole come
 sempre: lavori con le mani, sotto i 5 minuti, si cresce in difficoltà e non in lunghezza, gli errori si possono
@@ -145,6 +145,49 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 | 20 | Torte su ordinazione | decora la torta uguale alla foto (somiglianza in %) | decorazioni da 4 a 6 | 2 min |
 | 30 | Torte nuziali | impila i piani che dondolano, ben centrati | 3 piani, dondolano più in fretta | 1½ min |
 | 40 | Maestro cioccolatiere | tieni il cioccolato alla temperatura giusta, poi versalo negli stampi fino al segno | più stampi, finestra più stretta | 2 min |
+
+### Attività (3 alberi, decisi il 20/10)
+
+Stesse regole dei Trasporti per evolvere (tutte le migliorie al massimo + ristrutturazione, un locale libero, un solo
+prezzo). **Differenza decisa dall'utente:** le attività evolute e il B&B sono **automatiche**: niente lavoretto di persona,
+aprono con **un dipendente per reparto e il manager** già assunti e lavorano da sole da subito. Food truck e panificio
+restano come sono (si lavora dentro, al bancone).
+
+#### 🚚 Albero del Food truck
+| Attività | Grado | Prodotti | Personale |
+|---|---|---|---|
+| 🚚 Food truck ✅ | base, posteggio | panini, hot dog, tacos, gelati | cuochi, cassieri |
+| 🍝 Trattoria | 1ª, bivio A | primi, secondi | cuoco, cameriere |
+| ⭐ Ristorante stellato | 3ª | menù degustazione, vini pregiati | chef, maître |
+| ☕ Bar caffetteria | 1ª, bivio B | caffè, colazioni | barista, cassiere |
+| 🍸 Cocktail bar | 2ª | cocktail, aperitivi | barman, cameriere |
+| 🎉 Locale per eventi | 3ª | serate con musica, feste private | barman, addetto alla sala |
+| 💍 Banchetti e matrimoni | 2ª | banchetti di nozze, cene aziendali | cuoco, cameriere |
+| 🏛️ Grandi eventi | 3ª | eventi in città, concerti e festival | cuoco, organizzatore |
+
+#### 🥖 Albero del Panificio
+| Attività | Grado | Prodotti | Personale |
+|---|---|---|---|
+| 🥖 Panificio ✅ | base, locale | pane, cornetti, pizza, torte | fornai, commessi |
+| 🧁 Pasticceria | 1ª, bivio A | pasticcini, semifreddi | pasticcere, commesso |
+| 🎂 Torte su ordinazione | 2ª | torte per le feste, torte nuziali | pasticcere, commesso |
+| 🍫 Cioccolateria | 3ª | praline, cioccolato da regalo | cioccolatiere, commesso |
+| 🥐 Forno con caffè | 1ª, bivio B | colazioni al forno, caffè | fornaio, barista |
+| 🏭 Forno all'ingrosso | 2ª | pane per i negozi, forniture per i locali | fornaio, autista |
+
+#### 🛎️ Albero del Bed & breakfast
+| Attività | Grado | Prodotti | Personale |
+|---|---|---|---|
+| 🛎️ Bed & breakfast | base, locale (€6.000 + locale) | camere, camere per famiglie | cameriera ai piani, receptionist |
+| 🏨 Hotel | 1ª, bivio A | camere d'albergo, mezza pensione | cameriera ai piani, receptionist |
+| 🏨 Hotel 4 stelle | 2ª | suite, sale per congressi | cameriera ai piani, receptionist |
+| 🏰 Resort di lusso | 3ª | soggiorni di lusso, pacchetti spa | cameriera ai piani, concierge |
+| 🎒 Ostello | 1ª, bivio B | posti letto, camere private | addetto alle pulizie, receptionist |
+| 🏢 Residence | 2ª | appartamenti, soggiorni di lavoro | addetto alle pulizie, receptionist |
+
+**Prezzi e guadagni:** ristrutturazioni 1ª €22–30 mila, 2ª €70–90 mila, 3ª €190–220 mila (+ il locale). Con due
+dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso gradino: base ~€5 mila, 1ª ~€11 mila,
+2ª ~€25 mila, 3ª ~€50 mila (dipende da zona, fama e stagione).
 
 ---
 
@@ -308,12 +351,8 @@ Gli alberi completi di ogni settore sono nella sezione del settore (Trasporti e 
 
 | Attività | Settore | Linee collegate | Evoluzioni (ampliamenti) | Stato |
 |---|---|---|---|---|
-| 🚚 Food truck | 🍳 | Cucina | furgone → furgone con magazzino → con tavolini → 🆕 chiosco fisso → 🆕 trattoria | ✅ |
-| 🥖 Panificio | 🍳 | Forno, Cucina | bancone → con magazzino → con sala → 🆕 pasticceria → 🆕 torte su ordinazione | ✅ |
 | 🧽 Impresa di pulizie | 🔨 | Pulizie 🆕 | case → uffici → vetri → 🆕 eventi → 🆕 sanificazione | ✅ |
 | 🎨 Laboratorio dell'artigiano | 🎨 | Ceramica, Falegnameria, Pittura | vasi ✅ → servizi da tavola → opere → mobili e restauro (sblocchi con le migliorie) | ✅ |
-| ☕ Bar / caffetteria | 🍳 | Bar | bancone → tavolini → cocktail serali → locale per eventi | 🆕 |
-| 🍕 Pizzeria | 🍳 | Cucina | asporto → sala → forno a legna → consegne a domicilio | 🆕 |
 | 🍽️ Ristorante | 🍳 | Cucina, Sala | trattoria → ristorante → ristorante stellato | 🆕 |
 | 🥂 Catering | 🍳 | Sala ed eventi | feste → matrimoni → grandi eventi | 🆕 |
 | 🏪 Minimarket | 🤝 | Vendita, Mercato | negozio di quartiere → minimarket → supermercato | 🆕 |

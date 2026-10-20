@@ -1030,7 +1030,8 @@ export class UI {
   private estStats(lotId: string, t: BusinessType) {
     const est = estimateLot(this.s, lotId, t);
     const unit = bizType(t).kind === 'service' ? 'ordini' : 'clienti';
-    return `<div class="grid3" style="margin-top:8px">
+    const auto = bizType(t).auto ? `<div class="small" style="margin-top:6px">🤖 <b>Automatica</b>: apre con ${bizType(t).roles.map((r) => roleName(t, r).toLowerCase()).join(', ')} e manager già assunti</div>` : '';
+    return `${auto}<div class="grid3" style="margin-top:8px">
         <div class="stat s-purple"><b>${est.demand.toFixed(1)}/h</b><span>${unit} (${PRODUCTS[est.best].icon})</span></div>
         <div class="stat s-green"><b class="money-t">${euro(est.revenue)}</b><span>incasso/mese*</span></div>
         <div class="stat ${est.profit >= 0 ? 's-yellow' : 's-red'}"><b class="${est.profit >= 0 ? 'good' : 'bad'}">${euro(est.profit)}</b><span>utile/mese*</span></div>
@@ -1261,7 +1262,8 @@ export class UI {
 
   private autoTag(b: Business) {
     if (bizType(b.type).kind === 'craft') return '<span class="tag y">Lavori su richiesta</span>';
-    return isAutonomous(b) ? '<span class="tag g">Autonoma</span>' : '<span class="tag y">Serve il titolare</span>';
+    if (isAutonomous(b)) return '<span class="tag g">Autonoma</span>';
+    return bizType(b.type).auto ? '<span class="tag y">Manca personale</span>' : '<span class="tag y">Serve il titolare</span>';
   }
 
   openBusiness(bizId: string, tab?: string) {
@@ -1890,7 +1892,7 @@ export class UI {
     let shifts: string;
     if (!team.length) {
       shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
-        <div class="small muted">Nessun dipendente: ${def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
+        <div class="small muted">Nessun dipendente: ${def.auto ? 'senza personale resta ferma' : def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
         <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
     } else {
       // più reparti (es. cuochi e cassieri): stessa griglia e stesse fasce, con i dati del reparto scelto sopra
@@ -2036,7 +2038,7 @@ export class UI {
       const fullSal = b.staff.reduce((a, e) => a + e.salary, 0);
       const dem = totalDemand(s, b);
       const cap = capacityAt(s, b, hourOf(s));
-      const alone = service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
+      const alone = type.auto ? 'Fino ad allora resta ferma.' : service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
       return `
         <div class="card ${isAutonomous(b) ? '' : 'hl'}"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
           ${missing.length ? `<p class="muted small" style="margin:0">Per farla lavorare da sola serve: <b>${missing.join(', ')}</b>. ${alone}</p>`

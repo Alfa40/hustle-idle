@@ -13,7 +13,15 @@ export type ProductId =
   | 'pianoforte' | 'opere_arte' | 'trasloco_ufficio'
   | 'custodia_box' | 'stoccaggio' | 'preparazione_ordini' | 'smistamento'
   | 'carico_camion' | 'carico_fresco' | 'trasporto_eccezionale'
-  | 'corsa_navetta' | 'corsa_vip' | 'matrimonio' | 'giro_turistico' | 'linea_urbana';
+  | 'corsa_navetta' | 'corsa_vip' | 'matrimonio' | 'giro_turistico' | 'linea_urbana'
+  // ristorazione e ospitalità: le attività evolute e il B&B (automatiche, vedi config/business.ts)
+  | 'primi' | 'secondi' | 'cena_ristorante' | 'vini' | 'degustazione' | 'vini_pregiati'
+  | 'caffe' | 'colazioni' | 'cocktail' | 'aperitivi' | 'serate' | 'feste_private'
+  | 'buffet' | 'aperitivi_aziende' | 'banchetto_nozze' | 'cene_aziendali' | 'eventi_citta' | 'concerti'
+  | 'pasticcini' | 'semifreddi' | 'torte_compleanno' | 'torte_nuziali' | 'praline' | 'cioccolato_regalo'
+  | 'colazione_forno' | 'pane_ingrosso' | 'forniture_locali'
+  | 'camere_bnb' | 'camere_famiglia' | 'camere_hotel' | 'mezza_pensione' | 'suite' | 'congressi'
+  | 'soggiorno_resort' | 'spa' | 'posto_letto' | 'camere_private' | 'appartamenti' | 'soggiorni_lavoro';
 
 export interface Product {
   name: string;
@@ -127,6 +135,53 @@ Object.assign(PRODUCTS, {
   matrimonio: svc('Matrimoni ed eventi', '🎩', 60, 900, 0.05, 'autista', 4, SUMMER),
   giro_turistico: svc('Giri turistici', '🚌', 15, 240, 0.14, 'autista', 2, SUMMER),
   linea_urbana: svc('Linee urbane', '🚏', 40, 560, 0.1, 'autista', 1),
+} satisfies Partial<Record<ProductId, Product>>);
+
+// ---- ristorazione e ospitalità: prodotti delle attività automatiche (prezzi più alti salendo nell'albero) ----
+const EVENING = [1, 1, 1, 1, 1.05, 1.15, 1.25, 1.2, 1.05, 1, 0.95, 1.1];
+const WEDDINGS = [0.3, 0.4, 0.7, 1, 1.4, 1.7, 1.6, 1.2, 1.5, 1, 0.5, 0.7];
+const XMAS = [0.9, 1.3, 1, 1.4, 0.9, 0.7, 0.6, 0.6, 0.9, 1, 1.2, 2];
+const food = (name: string, icon: string, cost: number, price: number, baseDemand: number, season = FLAT): Product => ({ name, icon, cost, price, baseDemand, season });
+Object.assign(PRODUCTS, {
+  primi: food('Primi piatti', '🍝', 3, 13, 1.51),
+  secondi: food('Secondi piatti', '🥩', 5, 17, 1.01),
+  cena_ristorante: food('Cene al ristorante', '🍽️', 9, 32, 2.03, EVENING),
+  vini: food('Vini della casa', '🍷', 5, 18, 1.35, EVENING),
+  degustazione: food('Menù degustazione', '🍽️', 30, 110, 1.16, EVENING),
+  vini_pregiati: food('Vini pregiati', '🍾', 15, 60, 0.873, EVENING),
+  caffe: food('Caffè', '☕', 0.3, 1.6, 9.26, WINTER),
+  colazioni: food('Colazioni', '🥐', 1.2, 4.5, 3.62),
+  cocktail: food('Cocktail', '🍸', 2, 9, 5.9, SUMMER),
+  aperitivi: food('Aperitivi', '🥂', 3.5, 12, 2.94, SUMMER),
+  serate: food('Serate con musica', '🎤', 4, 25, 3.36, EVENING),
+  feste_private: food('Feste private', '🎉', 12, 45, 1.68, EVENING),
+  buffet: food('Buffet per feste', '🍱', 90, 260, 0.0852, SUMMER),
+  aperitivi_aziende: food('Aperitivi aziendali', '🥂', 50, 150, 0.0852),
+  banchetto_nozze: food('Banchetti di nozze', '💍', 750, 2200, 0.0121, WEDDINGS),
+  cene_aziendali: food('Cene aziendali', '🍽️', 400, 1200, 0.0241, XMAS),
+  eventi_citta: food('Grandi eventi in città', '🏛️', 2000, 6000, 0.0106, SUMMER),
+  concerti: food('Concerti e festival', '🎸', 1100, 3500, 0.0159, SUMMER),
+  pasticcini: food('Pasticcini', '🧁', 0.6, 2.5, 6.23, XMAS),
+  semifreddi: food('Semifreddi', '🍨', 1.4, 5.5, 2.22, SUMMER),
+  torte_compleanno: food('Torte per le feste', '🎂', 28, 110, 0.214),
+  torte_nuziali: food('Torte nuziali', '🍰', 80, 320, 0.0571, WEDDINGS),
+  praline: food('Scatole di praline', '🍫', 7, 28, 2, XMAS),
+  cioccolato_regalo: food('Cioccolato da regalo', '🎁', 15, 60, 1, XMAS),
+  colazione_forno: food('Colazioni al forno', '🥐', 1.3, 5, 3.58),
+  pane_ingrosso: food('Pane per i negozi', '🍞', 35, 140, 0.213),
+  forniture_locali: food('Forniture per i locali', '🥖', 60, 220, 0.142),
+  camere_bnb: food('Camere', '🛏️', 15, 75, 0.15, SUMMER),
+  camere_famiglia: food('Camere per famiglie', '🧸', 22, 110, 0.0706, SUMMER),
+  camere_hotel: food('Camere d\'albergo', '🏨', 25, 130, 0.113, SUMMER),
+  mezza_pensione: food('Mezza pensione', '🍽️', 40, 170, 0.0753, SUMMER),
+  suite: food('Suite', '🛎️', 60, 320, 0.0898, SUMMER),
+  congressi: food('Sale per congressi', '🤝', 80, 380, 0.0718, WINTER),
+  soggiorno_resort: food('Soggiorni di lusso', '🏰', 180, 900, 0.0599, SUMMER),
+  spa: food('Pacchetti spa', '🧴', 90, 480, 0.0998, WINTER),
+  posto_letto: food('Posti letto', '🎒', 6, 32, 0.412, SUMMER),
+  camere_private: food('Camere private', '🛏️', 10, 55, 0.206, SUMMER),
+  appartamenti: food('Appartamenti', '🏢', 40, 210, 0.139, SUMMER),
+  soggiorni_lavoro: food('Soggiorni di lavoro', '💼', 50, 260, 0.0992, WINTER),
 } satisfies Partial<Record<ProductId, Product>>);
 
 export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];
