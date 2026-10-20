@@ -7,6 +7,7 @@
 //   { "cosa": "Nuova auto", "soldi": 50000, "apri": "concessionaria" }             → una finestra del gioco già aperta
 //   { "cosa": "Assicurazione", "sfida": "blackjack", "trucco": "asso-banco" }      → seduto al tavolo di prova
 //   { "cosa": "Rilancio", "sfida": "poker", "bot": 2 }                             → poker contro 2 bot
+//   { "cosa": "Tocca il tasto Proponi", "tester": true }                          → come su un telefono tester (senza invio)
 // "possiede" dà in più attività e veicoli già comprati; "soldi" i soldi in tasca. Il link "Gioca l'anteprima" delle
 // app (?subito) apre direttamente qui, senza menu. Nel gioco vero non si usa mai (solo con previewPr).
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
@@ -70,6 +71,8 @@ export interface PreviewStart {
   bot?: number;
   /** tavolo truccato per vedere subito la regola nuova: "asso-banco" = nel blackjack il banco mostra sempre un asso */
   trucco?: 'asso-banco';
+  /** come un telefono tester: tasto e scheda "Proponi" (nelle anteprime la proposta non si invia) */
+  tester?: boolean;
 }
 
 const files = import.meta.glob<PreviewStart>('./anteprime/*.json', { eager: true, import: 'default' });

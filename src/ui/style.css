@@ -1521,6 +1521,19 @@ body.in-poker .toasts { z-index: 31; }
 .prop-prog i { display: block; height: 100%; width: 0; background: #2fa866; transition: width .2s; }
 /* impastatrice del panettiere: riquadro trasparente, sotto si vede la ciotola vera dall'alto */
 .ovl.ovl-clear { background: transparent; box-shadow: none; }
+
+/* tasto "Proponi" dei telefoni tester: linguetta sul bordo sinistro, sempre sopra a tutto (anche alle sfide) */
+.prop-fab {
+  position: fixed; z-index: 35; left: 0; top: 50%; transform: translateY(-50%);
+  width: max(44px, calc(40px * var(--u))); height: max(48px, calc(46px * var(--u)));
+  padding: 0 0 0 calc(var(--sal) + 2px); box-sizing: content-box;
+  border: 3px solid #fff; border-left: 0; border-radius: 0 16px 16px 0;
+  background: #ff9f1c; box-shadow: 0 3px 0 #d97a00, 0 4px 10px rgba(0,0,0,.25);
+  display: flex; align-items: center; justify-content: center; opacity: .92;
+}
+.prop-fab .i { font-size: max(22px, calc(22px * var(--u))); line-height: 1; }
+.prop-fab:active { transform: translateY(-50%) scale(.94); }
+.modal.top { z-index: 40; }
 /* scheda di un'anteprima (app developer e tester) */
 .dv-open { width: 100%; text-align: left; font: inherit; }
 .dv-open .dv-go { margin-left: auto; font-size: 26px; color: var(--ink-2); padding-left: 6px; }

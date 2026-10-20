@@ -15,6 +15,7 @@ import { bizType } from '../config/business';
 import { devApp, devKey, isDevDevice } from '../dev';
 import { testerKey } from '../tester';
 import { previewPr } from '../preview';
+import { previewStart } from '../previewStart';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, day } from '../sim/state';
 import { photoPicker, shrinkImage } from '../logo';
@@ -44,7 +45,7 @@ interface Proposal {
 }
 
 /** si vede la scheda "Proponi" su questo telefono */
-export const canPropose = () => previewPr === null && !devApp && (testerKey() !== '' || isDevDevice());
+export const canPropose = () => (previewPr === null && !devApp && (testerKey() !== '' || isDevDevice())) || !!previewStart?.tester;
 /** si vede la scheda "Proposte" (lettura e approvazione); nelle anteprime no */
 export const canReview = () => previewPr === null && !devApp && isDevDevice();
 
@@ -113,7 +114,10 @@ export class Proposals {
       verso: layout.portrait ? 'verticale' : 'orizzontale',
       telefono: /iPhone|iPad/.test(navigator.userAgent) ? 'iPhone/iPad' : /Android/.test(navigator.userAgent) ? 'Android' : 'altro',
     };
-    if (!this.photo || this.photo.startsWith('auto:')) {
+    if (document.body.classList.contains('in-poker')) {
+      // al tavolo delle sfide la foto della città non serve: meglio uno screenshot scelto dalla galleria
+      if (this.photo?.startsWith('auto:')) this.photo = null;
+    } else if (!this.photo || this.photo.startsWith('auto:')) {
       const shot = this.game.snapshot();
       this.photo = shot ? 'auto:' + toJpeg(shot, shot.width, shot.height) : null;
       if (this.photo === 'auto:null') this.photo = null;
@@ -122,6 +126,8 @@ export class Proposals {
 
   private whereNow() {
     const g = this.game;
+    const table = document.querySelector('.pk');
+    if (table) return `Sfide: ${table.classList.contains('bj') ? 'blackjack' : 'poker'}`;
     if (g.run) return `Lavoretto: ${g.run.title}`;
     if (g.interior) return `Dentro l'attività: ${bizType(g.interior.biz.type).name}`;
     if (g.house) return 'Dentro una casa';
@@ -230,6 +236,10 @@ export class Proposals {
     if (this.sending) return;
     if (this.text.trim().length < 3) {
       this.error = 'Scrivi cosa vorresti cambiare.';
+      return;
+    }
+    if (previewPr !== null) {
+      this.error = 'Questa è un\'anteprima: qui le proposte non si inviano. Scrivile nel gioco vero.';
       return;
     }
     this.sending = true;

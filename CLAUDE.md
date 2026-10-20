@@ -95,6 +95,7 @@
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
   Claude ne prepara **una alla volta** (etichetta `in-coda`, il robot riparte alla fine di ogni `claude.yml`); il server
   sveglia subito il robot alle decisioni dello sviluppatore (`GH_DISPATCH_TOKEN` su Render: token stretto, solo Actions del repo del gioco).
+  Tasto Proponi sempre sullo schermo (`.prop-fab`, `UI.openPropose`: finestra `top` sopra anche ai tavoli).
 - **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
   già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte. **Ogni proposta che cambia una parte
   precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): il tester parte subito nella situazione
