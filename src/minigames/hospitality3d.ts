@@ -1144,16 +1144,37 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
   let wrong = 0;
   let delivered = 0;
   const done = new Set<(typeof bags)[number]>();
+  /** valigie lasciate alla porta sbagliata (finché non le riprendi) */
+  const misplaced = new Set<(typeof bags)[number]>();
   let run: PhasedRun;
+  // la valigia in mano ha la sua etichetta col numero, come quelle alla reception (si vede anche in mano)
+  const bagInHand = (b: (typeof bags)[number]) => {
+    const o = crate(0.45, 0x2d6cdb);
+    const lb = label(String(b.door.num), { bg: '#ffc21a', fg: '#3a2f55', scale: 0.3 });
+    lb.position.y = 0.62;
+    o.add(lb);
+    return o;
+  };
   const doorTasks = (b: (typeof bags)[number]): Task[] => doors.map((d) => ({
-    pos: d.pos.clone().add(new THREE.Vector3(-d.side * 0.5, 0, 0)), kind: 'tap', quiet: true, label: `Lascia alla porta ${d.num}`, icon: '🚪',
+    // la scritta dice il numero della valigia in mano: si confronta con la targa della porta
+    pos: d.pos.clone().add(new THREE.Vector3(-d.side * 0.5, 0, 0)), kind: 'tap', quiet: true, label: `Lascia qui la ${b.door.num}`, icon: '🧳',
     group: 'bag' + bags.indexOf(b), right: d === b.door,
     onDone: () => {
       done.add(b);
       holding = null;
       hold(game);
       delivered++;
+      if (d === b.door) toast(`✅ Camera ${d.num}: giusta!`, 'good');
+      else {
+        misplaced.add(b);
+        toast(`❌ Sbagliata: era la ${b.door.num}`, 'bad');
+      }
       const v = crate(0.4, 0x2d6cdb);
+      // con l'etichetta: una valigia alla porta sbagliata si riconosce anche dopo
+      const lb = label(String(b.door.num), { bg: '#ffc21a', fg: '#3a2f55', scale: 0.26 });
+      lb.position.y = 0.6;
+      lb.userData.noGlow = true;
+      v.add(lb);
       run.prop(v, d.pos.clone().add(new THREE.Vector3(-d.side * 0.45, 0, 0.5)), 0, 1).userData.noGlow = true;
       // alla porta sbagliata: si può riprendere e portare alla camera giusta (conta solo se resta lì alla fine)
       if (d !== b.door) {
@@ -1161,11 +1182,12 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
         run.retake(v, `Riprendi la valigia (camera ${b.door.num})`, '🧳', () => !holding, () => {
           v.visible = false;
           done.delete(b);
+          misplaced.delete(b);
           delivered--;
           wrong--;
           run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
           holding = b;
-          hold(game, crate(0.45, 0x2d6cdb));
+          hold(game, bagInHand(b));
         }, () => doorTasks(b));
       }
       run.starCap = wrong >= 2 ? 1 : wrong ? 2 : 3;
@@ -1174,13 +1196,13 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
   const phases: Phase[] = [
     {
       name: 'Porta le valigie in camera', icon: '🧳', count: () => [delivered, n],
-      tip: 'Prendi una <b>valigia</b> alla reception e leggi il <b>numero sull\'etichetta</b>: portala alla porta con quel numero (i numeri sono sulle porte). Porta sbagliata? Tocca la valigia per riprenderla',
+      tip: 'Prendi una <b>valigia</b> alla reception e leggi il <b>numero sull\'etichetta</b> (lo vedi anche in alto, <b>in mano</b>): portala alla porta con quel numero. Davanti alla porta guarda la <b>targa</b>: deve avere lo stesso numero. Porta sbagliata? Tocca la valigia per riprenderla',
       tasks: () => bags.map((b): Task => ({
         pos: b.at, kind: 'tap', quiet: true, label: `Prendi la valigia (camera ${b.door.num})`, icon: '🧳', enabled: () => !holding,
         onDone: () => {
           holding = b;
           b.obj!.visible = false;
-          hold(game, crate(0.45, 0x2d6cdb));
+          hold(game, bagInHand(b));
         },
         then: () => doorTasks(b),
       })),
@@ -1220,7 +1242,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     b.obj = run.prop(o, b.at, 0, 1);
   }
   // le camere in grande nel riquadro: quella della valigia in mano in giallo, le fatte in verde
-  run.chips = () => bags.map((b) => ({ t: `🚪 ${b.door.num}`, s: done.has(b) ? 'done' as const : holding === b ? 'next' as const : 'todo' as const }));
+  run.chips = () => bags.map((b) => ({ t: `${holding === b ? '🧳' : misplaced.has(b) ? '❌' : '🚪'} ${b.door.num}`, s: misplaced.has(b) ? 'todo' as const : done.has(b) ? 'done' as const : holding === b ? 'next' as const : 'todo' as const }));
   return run;
 }
 
