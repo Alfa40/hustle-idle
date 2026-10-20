@@ -1,6 +1,6 @@
 /**
- * Comandi da gioco di auto per i mezzi da lavoro con `pedals` (Autista): in basso a sinistra freno e
- * acceleratore, in basso a destra le frecce per girare. Si possono tenere premuti insieme (più dita).
+ * Comandi da gioco di auto per i mezzi da lavoro con `pedals` (Autista): in basso a sinistra acceleratore e
+ * freno (in quest'ordine), in basso a destra le frecce per girare. Si possono tenere premuti insieme (più dita).
  * Su PC: W/↑ acceleratore, S/↓ freno, A/← e D/→ per girare.
  */
 export interface PedalState {
@@ -25,46 +25,60 @@ export function createPedals(state: PedalState) {
   el.className = 'pedals';
   el.innerHTML = `
     <div class="pd-side pd-left">
-      <button class="pd pd-brake" data-k="brake" aria-label="Freno">${PEDAL(3)}<b>Freno</b></button>
       <button class="pd pd-gas" data-k="gas" aria-label="Acceleratore">${PEDAL(5)}<b>Gas</b></button>
+      <button class="pd pd-brake" data-k="brake" aria-label="Freno">${PEDAL(3)}<b>Freno</b></button>
     </div>
     <div class="pd-side pd-right">
       <button class="pd pd-turn" data-k="left" aria-label="Gira a sinistra">${ARROW(-1)}</button>
       <button class="pd pd-turn" data-k="right" aria-label="Gira a destra">${ARROW(1)}</button>
     </div>`;
-  // ogni tasto ricorda le dita che lo tengono premuto
-  const fingers = new Map<number, Key>();
-  const sync = () => {
-    for (const k of ['gas', 'brake', 'left', 'right'] as Key[]) state[k] = [...fingers.values()].includes(k);
+  // Col dito: a ogni tocco si guarda quali dita sono davvero sullo schermo e sopra quale tasto. Così un pedale
+  // non resta mai premuto se il telefono perde il "dito alzato" (prima il gas poteva restare giù), e si può
+  // far scivolare il dito da un tasto all'altro. Col mouse (PC) valgono i soliti clic tenuti premuti.
+  let mouse: Key | null = null;
+  const sync = (touches?: TouchList) => {
+    const on = new Set<Key>();
+    for (const t of Array.from(touches ?? [])) {
+      const b = document.elementFromPoint(t.clientX, t.clientY)?.closest<HTMLElement>('.pedals .pd');
+      if (b) on.add(b.dataset.k as Key);
+    }
+    if (mouse) on.add(mouse);
+    for (const k of ['gas', 'brake', 'left', 'right'] as Key[]) state[k] = on.has(k);
     el.querySelectorAll<HTMLElement>('.pd').forEach((b) => b.classList.toggle('on', state[b.dataset.k as Key]));
   };
+  const onTouch = (e: TouchEvent) => sync(e.touches);
+  for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) window.addEventListener(t, onTouch, { passive: true });
+  // sui tasti il tocco non deve far scorrere né zoomare la pagina
+  el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   el.querySelectorAll<HTMLElement>('.pd').forEach((b) => {
     b.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      b.setPointerCapture(e.pointerId);
-      fingers.set(e.pointerId, b.dataset.k as Key);
+      if (e.pointerType !== 'mouse') return;
+      mouse = b.dataset.k as Key;
       sync();
     });
-    const up = (e: PointerEvent) => {
-      fingers.delete(e.pointerId);
-      sync();
-    };
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointercancel', up);
-    b.addEventListener('lostpointercapture', up);
     b.addEventListener('contextmenu', (e) => e.preventDefault());
   });
+  const mouseUp = () => {
+    if (!mouse) return;
+    mouse = null;
+    sync();
+  };
+  window.addEventListener('pointerup', mouseUp);
   const off = () => {
-    fingers.clear();
+    mouse = null;
     sync();
   };
   window.addEventListener('blur', off);
+  document.addEventListener('visibilitychange', off);
   document.body.appendChild(el);
   document.body.classList.add('pedal-drive');
   return {
     el,
     remove() {
       window.removeEventListener('blur', off);
+      document.removeEventListener('visibilitychange', off);
+      window.removeEventListener('pointerup', mouseUp);
+      for (const t of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) window.removeEventListener(t, onTouch);
       el.remove();
       document.body.classList.remove('pedal-drive');
       off();
