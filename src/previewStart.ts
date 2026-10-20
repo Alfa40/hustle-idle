@@ -3,6 +3,7 @@
 //   { "cosa": "Prova la nuova velocità", "veicolo": "utilitaria" }          → in città, già in macchina
 //   { "cosa": "Clienti più lenti", "lavoretto": "bar", "gradino": 1 }       → dentro il lavoretto (gradino da 1)
 //   { "cosa": "Nuovo bancone", "attivita": "foodtruck" }                    → attività già comprata, dentro
+//   { "cosa": "Tocca il tasto Proponi", "tester": true }                    → come su un telefono tester (senza invio)
 // Nel gioco vero non si usa mai (solo con previewPr). Senza file: partita nuova normale.
 import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { careerLine } from './config/careers';
@@ -26,6 +27,8 @@ export interface PreviewStart {
   attivita?: BusinessType;
   /** soldi in tasca all'inizio */
   soldi?: number;
+  /** come un telefono tester: tasto e scheda "Proponi" (nelle anteprime la proposta non si invia) */
+  tester?: boolean;
 }
 
 const files = import.meta.glob<PreviewStart>('./anteprime/*.json', { eager: true, import: 'default' });

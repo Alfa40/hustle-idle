@@ -72,6 +72,8 @@ interface Panel {
   money?: boolean | (() => boolean);
   /** spiegazioni aperte col tasto "?" (restano aperte finché la finestra resta aperta) */
   help?: boolean;
+  /** sopra a tutto, anche ai tavoli delle sfide (finestra "Proponi") */
+  top?: boolean;
 }
 
 /**
@@ -260,6 +262,16 @@ export class UI {
     );
     this.hudMenuEl = right.querySelector('.hud-menu')!;
     this.hudMenuEl.querySelector('.hud-menu-btn')!.addEventListener('click', () => this.hudMenuEl.classList.toggle('open'));
+
+    // telefoni tester: tasto "Proponi" sempre sullo schermo (anche nei lavoretti, nei minigiochi e alle sfide)
+    if (canPropose()) {
+      const fab = document.createElement('button');
+      fab.className = 'prop-fab';
+      fab.setAttribute('aria-label', 'Proponi una modifica');
+      fab.innerHTML = '<span class="i">📝</span>';
+      fab.addEventListener('click', () => this.openPropose());
+      document.body.appendChild(fab);
+    }
 
     const job = document.createElement('div');
     job.className = 'jobbar';
@@ -760,7 +772,7 @@ export class UI {
     this.game.paused = true;
     this.game.input.cancel();
     const modal = document.createElement('div');
-    modal.className = 'modal';
+    modal.className = p.top ? 'modal top' : 'modal';
     modal.innerHTML = `<div class="sheet ${p.small ? 'small' : ''} ${p.wide ? 'wide' : ''}" style="--hc:${p.color ?? 'var(--blue)'}"><div class="sheet-head">${p.back ? '<button class="back" aria-label="Indietro">‹</button>' : ''}<h2></h2><span class="head-money" hidden></span><button class="help-q" hidden aria-label="Spiegazioni">?</button><button class="x">✕</button></div><div class="tabs-slot"></div><div class="sheet-body"></div></div>`;
     modal.querySelector('h2')!.textContent = p.title;
     modal.querySelector('.x')!.addEventListener('click', () => this.close());
@@ -3521,6 +3533,33 @@ export class UI {
   private proposalsView?: Proposals;
   private get proposals() {
     return (this.proposalsView ??= new Proposals(this.game, () => this.renderPanel()));
+  }
+
+  /**
+   * Tasto "Proponi" (telefoni tester): la scheda per proporre una modifica, da qualsiasi punto del gioco. Se c'è
+   * già una finestra aperta la si mette da parte e alla chiusura si torna lì, com'era.
+   */
+  openPropose() {
+    if (this.panel?.top) return;
+    this.proposals.capture();
+    const prev = this.panel;
+    if (prev) {
+      this.modal?.remove();
+      this.modal = null;
+      this.panel = null;
+    }
+    const actions = this.proposals.actions();
+    this.open({
+      title: '📝 Proponi una modifica',
+      color: 'var(--gray)',
+      top: true,
+      render: () => this.proposals.formHtml(),
+      after: (body) => this.proposals.after(body),
+      actions,
+      onClose: () => {
+        if (prev) queueMicrotask(() => this.open(prev));
+      },
+    });
   }
 
   openSettings() {
