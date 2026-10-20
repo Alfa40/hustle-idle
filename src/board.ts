@@ -149,6 +149,8 @@ export interface PrevItem {
  * la domanda tra `<!-- domanda -->` e `<!-- /domanda -->`. Tester e sviluppatore rispondono dalle app.
  */
 export const asksOf = (i: Issue) => !!i.labels?.some((l) => l.name === 'chiarimento');
+/** aspetta il suo turno: Claude prepara una proposta alla volta (etichetta messa dal robot proposte.yml) */
+export const waitsOf = (i: Issue) => !!i.labels?.some((l) => l.name === 'in-coda');
 export function questionOf(i: Issue) {
   const m = /<!-- domanda -->([\s\S]*?)<!-- \/domanda -->/.exec(i.body ?? '');
   return (m?.[1] ?? '').replace(/^\s*#+ .*$/m, '').trim();
@@ -163,7 +165,8 @@ export function previewLists(d: Data) {
   // Claude aspetta una risposta (a volte con un'anteprima di prova, già pronta)
   const asks = items.filter((x) => asksOf(x.issue));
   const ready = items.filter((x) => x.ready && !asksOf(x.issue)).sort((a, b) => Date.parse(b.issue.updated_at) - Date.parse(a.issue.updated_at));
-  const busy = items.filter((x) => !x.ready && !asksOf(x.issue));
+  // prima quella su cui Claude lavora, poi quelle in coda nell'ordine in cui le prenderà
+  const busy = items.filter((x) => !x.ready && !asksOf(x.issue)).sort((a, b) => +waitsOf(a.issue) - +waitsOf(b.issue) || a.issue.number - b.issue.number);
   // approvate dallo sviluppatore ma non ancora su GitHub: il robot le passa a Claude al suo prossimo giro
   // (quelle già su GitHub, se il server non lo sa ancora, stanno solo sopra)
   const onGh = new Set([...d.issues.values()].map((i) => /<!-- proposta-gioco-(\d+) -->/.exec(i.body ?? '')?.[1]).filter(Boolean).map(Number));
@@ -179,11 +182,15 @@ export function prepHtml(d: Data) {
   const { busy, queued } = previewLists(d);
   if (!busy.length && !queued.length) return '';
   const cut = (s: string) => (s.length > 90 ? s.slice(0, 88).trimEnd() + '…' : s);
+  let place = 0;
   const rows = [
-    ...busy.map((x) => `<a class="dv-prep" href="${issueUrl(x.issue.number)}" target="_blank" rel="noopener"><span class="t-ico">🛠️</span><span class="l-txt"><b>#${x.issue.number} in preparazione</b>
-      <small>${esc(cut(shortTitle(x.issue)))}${nameOf(x) ? ` · di ${esc(nameOf(x))}` : ''}</small><small>Claude sta scrivendo la modifica: l'anteprima arriva tra pochi minuti.</small></span></a>`),
-    ...queued.map((p) => `<div class="dv-prep"><span class="t-ico">⏳</span><span class="l-txt"><b>Proposta in preparazione</b>
-      <small>${esc(cut(p.text))}${p.nickname ? ` · di ${esc(p.nickname)}` : ''}</small><small>Approvata: tra poco Claude inizia a prepararla.</small></span></div>`),
+    ...busy.map((x) => {
+      const wait = waitsOf(x.issue) ? ++place : 0;
+      return `<a class="dv-prep" href="${issueUrl(x.issue.number)}" target="_blank" rel="noopener"><span class="t-ico">${wait ? '⏳' : '🛠️'}</span><span class="l-txt"><b>#${x.issue.number} ${wait ? `in coda · ${wait}° posto` : 'in preparazione'}</b>
+      <small>${esc(cut(shortTitle(x.issue)))}${nameOf(x) ? ` · di ${esc(nameOf(x))}` : ''}</small><small>${wait ? 'Claude prepara una proposta alla volta: parte da sola quando tocca a lei.' : "Claude sta scrivendo la modifica: l'anteprima arriva tra pochi minuti."}</small></span></a>`;
+    }),
+    ...queued.map((p) => `<div class="dv-prep"><span class="t-ico">⏳</span><span class="l-txt"><b>Proposta approvata</b>
+      <small>${esc(cut(p.text))}${p.nickname ? ` · di ${esc(p.nickname)}` : ''}</small><small>Tra poco il robot la mette in coda per Claude.</small></span></div>`),
   ];
   return `<div class="card dv-preps"><h3>🛠️ In preparazione</h3>${rows.join('')}</div>`;
 }
@@ -245,27 +252,27 @@ export function explainOf(issue: number, done: () => void): string | null | unde
 }
 
 /** la parte comune della scheda: indietro, tasto per giocare l'anteprima, la proposta, cosa cambia, modifiche chieste */
-export function detailHtml(x: PrevItem, explain: string | null | undefined, dev: boolean) {
+export function detailHtml(x: PrevItem, explain: string | null | undefined) {
   const i = x.issue;
   const p = x.prop;
   const name = nameOf(x);
   const ex = explain === undefined ? '<p class="small muted" style="margin:0">Carico…</p>' : explain ? mdLite(explain) : '<p class="small muted" style="margin:0">Nessuna spiegazione.</p>';
   const ch = p?.change
     ? `<div class="card dv-change"><h3>✏️ Modifiche chieste ${p.changeAt ? ago(p.changeAt) : ''}</h3><div class="dv-text">${esc(p.change)}</div>
-        <p class="small muted" style="margin:6px 0 0">${p.changeState === 'attesa' ? 'Entro una decina di minuti il robot le passa a Claude.' : 'Claude le sta preparando o le ha già fatte: l\'anteprima si aggiorna da sola (guarda "aggiornata").'}</p></div>`
+        <p class="small muted" style="margin:6px 0 0">${p.changeState === 'attesa' ? 'Il robot le passa a Claude appena è libero (prepara una cosa alla volta).' : 'Claude le sta preparando o le ha già fatte: l\'anteprima si aggiorna da sola (guarda "aggiornata").'}</p></div>`
     : '';
   return `<button class="dv-back" data-a="back">‹ Tutte le anteprime</button>
     <div class="card dv-detail-top"><h3>#${i.number} · ${esc(shortTitle(i))}</h3>
       <p class="small muted" style="margin:0 0 8px">${name ? `di <b>${esc(name)}</b> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}</p>
       <a class="btn good full" href="${preview(i.number)}?subito" target="_blank" rel="noopener">📱 Gioca l'anteprima</a></div>
     <div class="card"><h3>📝 La proposta</h3><div class="dv-text">${esc(p?.text ?? shortTitle(i))}</div>
-      ${dev && p?.why ? `<p class="small" style="margin:6px 0 0"><b>Perché:</b> ${esc(p.why)}</p>` : ''}${dev && p?.where ? `<p class="small muted" style="margin:4px 0 0">📍 ${esc(p.where)}</p>` : ''}</div>
+      ${p?.why ? `<p class="small" style="margin:6px 0 0"><b>Perché:</b> ${esc(p.why)}</p>` : ''}${p?.where ? `<p class="small muted" style="margin:4px 0 0">📍 ${esc(p.where)}</p>` : ''}</div>
     <div class="card dv-explain"><h3>🛠️ Cosa cambia</h3>${ex}</div>${ch}`;
 }
 
 /** i voti con i commenti, oppure "nessun voto" (nella scheda dell'anteprima) */
 export function votesBlock(p: Prop | undefined, skipMine = false) {
-  return votesHtml(p, skipMine) || '<div class="card"><p class="small muted center" style="margin:0">Nessun tester l\'ha ancora votata.</p></div>';
+  return votesHtml(p, skipMine) || '<div class="card"><p class="small muted center" style="margin:0">Nessun tester ha ancora dato un consiglio.</p></div>';
 }
 
 /** la scheda di una proposta per cui Claude chiede un chiarimento; sotto, il riquadro per rispondere (`box`) */
@@ -303,7 +310,7 @@ export function votesHtml(p: Prop | undefined, skipMine = false) {
   if (!all.length) return '';
   const yes = all.filter((v) => v.vote === 'si').length;
   const list = vs.map((v) => `<div class="dv-vote ${v.vote === 'si' ? 'yes' : 'no'}"><b>${v.vote === 'si' ? '👍' : '👎'} ${esc(v.name)}</b> <span class="muted">${ago(v.at)}</span>${v.comment ? `<div class="dv-text">${esc(v.comment)}</div>` : ''}</div>`).join('');
-  return `<div class="dv-votes"><div class="dv-vsum"><span class="s-green">👍 ${yes} approvano</span><span class="s-red">👎 ${all.length - yes} bocciano</span></div>${list}</div>`;
+  return `<div class="dv-votes"><div class="dv-vsum"><span class="s-green">👍 ${yes} sì</span><span class="s-red">👎 ${all.length - yes} no</span></div>${list}</div>`;
 }
 
 /** resoconti dei tester: per ognuno le proposte rifiutate e quelle entrate nel gioco */
