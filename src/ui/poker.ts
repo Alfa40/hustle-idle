@@ -15,6 +15,7 @@ import { previewPr } from '../preview';
 import { toast } from '../sim/bus';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, euro } from '../sim/state';
+import { chipsHtml, chipStackHtml, DealQueue } from './tablefx';
 
 /** puntate dei tavoli (piccolo e grande buio): le stesse del server */
 export const STAKES: [number, number][] = [
@@ -41,6 +42,8 @@ export interface PkSeat {
 export interface PkState {
   code: string;
   v: number;
+  /** numero della mano (per riconoscere le carte nuove) */
+  handId: number;
   sb: number;
   bb: number;
   minBuy: number;
@@ -187,11 +190,15 @@ const SUIT_PATH: Record<string, string> = {
 const suitSvg = (s: string) => `<svg viewBox="0 0 24 24" class="pk-suit"><path d="${SUIT_PATH[s]}"/></svg>`;
 const rankText = (r: string) => (r === 'T' ? '10' : r);
 
-/** una carta: scoperta (es. "As") o coperta (null); `hl` = fa parte della combinazione vincente */
-export function cardHtml(c: string | null, size: 'sm' | 'md' | 'lg' = 'md', hl = false) {
-  if (!c) return `<div class="pk-card back ${size}"></div>`;
+/**
+ * una carta: scoperta (es. "As") o coperta (null); `hl` = fa parte della combinazione vincente; `age` = da quanti ms
+ * il mazziere l'ha appena data (animazione dell'arrivo, -1 = ferma)
+ */
+export function cardHtml(c: string | null, size: 'sm' | 'md' | 'lg' = 'md', hl = false, age = -1) {
+  const anim = age >= 0 ? ` deal" style="animation-delay:-${Math.round(age)}ms` : '';
+  if (!c) return `<div class="pk-card back ${size}${anim}"></div>`;
   const red = c[1] === 'h' || c[1] === 'd';
-  return `<div class="pk-card ${size} ${red ? 'red' : ''} ${hl ? 'hl' : ''}"><b>${rankText(c[0])}</b>${suitSvg(c[1])}</div>`;
+  return `<div class="pk-card ${size} ${red ? 'red' : ''} ${hl ? 'hl' : ''}${anim}"><b>${rankText(c[0])}</b>${suitSvg(c[1])}</div>`;
 }
 
 const PAL = ['#e8590c', '#2d9cdb', '#27ae60', '#9b51e0', '#f2b705', '#eb5757', '#00a8a8', '#d35fb7'];
@@ -215,7 +222,9 @@ export class PokerTable {
   private polling = false;
   private fails = 0;
   private raiseOpen = false;
-  private raiseTo = 0;
+  /** rilancio fatto con le fiches: quanto hai aggiunto sopra la puntata da pareggiare, e le fiches toccate */
+  private raiseAdd = 0;
+  private raiseStack: number[] = [];
   private confirmExit = false;
   private busy = false;
   private msg = '';
@@ -224,6 +233,8 @@ export class PokerTable {
   private rebuyAmt = 0;
   /** fiches comprate in tutto (per dire quanto si è vinto o perso uscendo) */
   private bought: number;
+  /** il mazziere: le carte arrivano una alla volta */
+  private deal = new DealQueue(() => this.render());
 
   constructor(private game: Game, private code: string, first: PkState | null, bought: number, private onDone: () => void) {
     this.s = first;
@@ -231,14 +242,30 @@ export class PokerTable {
     this.el = document.createElement('div');
     this.el.className = 'pk';
     this.el.addEventListener('click', (e) => this.onClick(e));
-    this.el.addEventListener('input', (e) => {
-      const t = e.target as HTMLInputElement;
-      if (t.classList.contains('pk-range')) {
-        this.raiseTo = Number(t.value);
-        const b = this.el.querySelector('.pk-raise-go b');
-        if (b) b.textContent = euro(this.raiseTo);
-      }
-    });
+  }
+
+  /** le carte sul tavolo nell'ordine del mazziere: due giri di carte coperte dal primo dopo il bottone, poi il tavolo */
+  private dealKeys() {
+    const s = this.s;
+    if (!s || !s.handId) return [];
+    const order: number[] = [];
+    for (let k = 1; k <= 8; k++) {
+      const i = (s.button + k) % 8;
+      const p = s.seats[i];
+      if (p && (p.hasCards || p.cards)) order.push(i);
+    }
+    const keys: string[] = [];
+    for (let r = 0; r < 2; r++) for (const i of order) keys.push(this.holeKey(i, r));
+    s.board.forEach((_, i) => keys.push(`b${s.handId}-${i}`));
+    return keys;
+  }
+  private holeKey(seat: number, r: number) {
+    return `h${this.s!.handId}-${seat}-${r}`;
+  }
+  /** nuovo stato dal server: le carte nuove entrano nella coda del mazziere */
+  private setState(st: PkState, instant = false) {
+    this.s = st;
+    this.deal.sync(this.dealKeys(), instant);
   }
 
   private onResize = () => this.render();
@@ -248,6 +275,7 @@ export class PokerTable {
     addEventListener('resize', this.onResize);
     document.body.appendChild(this.el);
     document.body.classList.add('in-poker');
+    if (this.s) this.setState(this.s, true);
     this.render();
     void this.poll();
     this.timer = window.setInterval(() => void this.poll(), 1000);
@@ -266,8 +294,8 @@ export class PokerTable {
         if (this.s) this.s.turnLeft = j.turnLeft;
       } else {
         const turned = this.s?.toAct !== j.toAct || this.s?.street !== j.street;
-        this.s = j;
-        if (turned) this.raiseOpen = false;
+        this.setState(j, !this.s);
+        if (turned) this.closeRaise();
         this.render();
       }
     } catch {
@@ -281,9 +309,20 @@ export class PokerTable {
     return this.s && this.s.mySeat >= 0 ? this.s.seats[this.s.mySeat] : null;
   }
 
+  private closeRaise() {
+    this.raiseOpen = false;
+    this.raiseAdd = 0;
+    this.raiseStack = [];
+  }
+
+  /** il risultato della mano, solo quando il mazziere ha finito di girare le carte */
+  private result() {
+    return this.deal.busy ? null : this.s?.result ?? null;
+  }
+
   /** le carte della combinazione vincente (si illuminano sul tavolo) */
   private winBest() {
-    const r = this.s?.result;
+    const r = this.result();
     return r ? r.winners.flatMap((w) => r.shown[String(w.seat)]?.best ?? []) : [];
   }
 
@@ -292,15 +331,21 @@ export class PokerTable {
     const p = s.seats[i]!;
     const [x, y] = spots[spot];
     const turn = s.toAct === i;
-    const win = s.result?.winners.find((w) => w.seat === i);
-    const shown = s.result?.shown[String(i)];
+    const res = this.result();
+    const win = res?.winners.find((w) => w.seat === i);
+    const shown = res?.shown[String(i)];
     const best = this.winBest();
+    const k0 = this.holeKey(i, 0);
+    const k1 = this.holeKey(i, 1);
+    const has = [this.deal.has(k0), this.deal.has(k1)];
+    const one = (c: string | null, r: number, k: string) => (has[r] ? cardHtml(c, 'sm', !!c && best.includes(c), this.deal.age(k)) : '');
     const tag = win ? `+${euro(win.amount)}` : p.sitOut ? 'in pausa' : p.allin && p.inHand ? 'all-in' : p.folded && s.street !== 'done' ? 'fuori' : p.last;
     const cards = p.me
       ? ''
-      : p.cards
-        ? `<div class="pk-scards">${p.cards.map((c) => cardHtml(c, 'sm', best.includes(c))).join('')}</div>`
-        : p.hasCards ? `<div class="pk-scards">${cardHtml(null, 'sm')}${cardHtml(null, 'sm')}</div>` : '';
+      : !has[0] ? ''
+        : p.cards && !this.deal.busy
+          ? `<div class="pk-scards">${one(p.cards[0], 0, k0)}${one(p.cards[1], 1, k1)}</div>`
+          : p.hasCards || p.cards ? `<div class="pk-scards">${one(null, 0, k0)}${one(null, 1, k1)}</div>` : '';
     const timer = turn && s.turnLeft > 0 ? `<i class="pk-timer" style="animation-duration:${s.turnLeft}ms;--w:${Math.round((s.turnLeft / s.turnMs) * 100)}%"></i>` : '';
     // la puntata davanti al giocatore, verso il centro del tavolo
     const bx = 50 + (x - 50) * 0.58;
@@ -317,10 +362,15 @@ export class PokerTable {
   private centerHtml() {
     const s = this.s!;
     const best = this.winBest();
-    const board = Array.from({ length: 5 }, (_, i) => (s.board[i] ? cardHtml(s.board[i], 'md', best.includes(s.board[i])) : '<div class="pk-card slot md"></div>')).join('');
+    const board = Array.from({ length: 5 }, (_, i) => {
+      const k = `b${s.handId}-${i}`;
+      return s.board[i] && this.deal.has(k) ? cardHtml(s.board[i], 'md', best.includes(s.board[i]), this.deal.age(k)) : '<div class="pk-card slot md"></div>';
+    }).join('');
     const players = s.seats.filter(Boolean).length;
+    const res = this.result();
     let line = '';
-    if (s.result) line = s.result.winners.map((w) => `<b>${esc(w.name)}</b> vince ${euro(w.amount)}${w.hand ? ` con ${esc(w.hand)}` : ''}`).join('<br>');
+    if (this.deal.busy && (s.street === 'preflop' || s.street === 'done') && !s.board.some((_, i) => this.deal.has(`b${s.handId}-${i}`))) line = 'Il mazziere dà le carte…';
+    else if (res) line = res.winners.map((w) => `<b>${esc(w.name)}</b> vince ${euro(w.amount)}${w.hand ? ` con ${esc(w.hand)}` : ''}`).join('<br>');
     else if (!s.started || (s.street === 'wait' || s.street === 'done')) line = players < 2 ? 'Aspettiamo un altro giocatore…' : 'Si danno le carte…';
     return `<div class="pk-center">${s.pot > 0 ? `<div class="pk-pot">Piatto <b>${euro(s.pot)}</b></div>` : ''}<div class="pk-board">${board}</div>${line ? `<div class="pk-line">${line}</div>` : ''}</div>`;
   }
@@ -341,21 +391,26 @@ export class PokerTable {
     const my = s.my;
     if (!my) {
       if (s.toAct >= 0 && s.seats[s.toAct]) return `<div class="pk-note">Tocca a <b>${esc(s.seats[s.toAct]!.name)}</b>…</div>`;
+      if (this.deal.busy) return '<div class="pk-note">Il mazziere dà le carte…</div>';
       if (s.result || s.street === 'done') return `<div class="pk-note">${s.nextHandIn > 0 ? 'Tra poco la prossima mano' : 'Si danno le carte…'}</div>`;
       if (s.seats.filter(Boolean).length < 2) return `<div class="pk-note">Manda il codice <b>${s.code}</b> ai tuoi amici: si gioca appena entra qualcuno.</div>`;
       return '';
     }
+    // le carte stanno ancora arrivando: si gioca quando il mazziere ha finito
+    if (this.deal.busy) return '<div class="pk-note">Il mazziere dà le carte…</div>';
     const busy = this.busy ? 'disabled' : '';
     if (this.raiseOpen && my.canRaise) {
-      const cb = me.bet + my.toCall;
-      const after = s.pot + my.toCall;
-      const clamp = (n: number) => Math.max(my.minTo, Math.min(my.maxTo, Math.round(n)));
-      if (!this.raiseTo) this.raiseTo = my.minTo;
-      const step = Math.max(1, s.sb);
+      // rilancio con le fiches: ogni fiche toccata si aggiunge sopra la puntata da pareggiare
+      const base = me.bet + my.toCall;
+      const room = my.maxTo - base;
+      const to = base + this.raiseAdd;
+      const ok = to >= my.minTo || to === my.maxTo;
+      const verb = my.isBet ? 'Punta' : 'Rilancia a';
       return `<div class="pk-raise">
-          <div class="pk-presets"><button class="pk-chip" data-p="to:${my.minTo}">Minimo</button><button class="pk-chip" data-p="to:${clamp(cb + after / 2)}">½ piatto</button><button class="pk-chip" data-p="to:${clamp(cb + after)}">Piatto</button><button class="pk-chip" data-p="to:${my.maxTo}">All-in</button></div>
-          <input type="range" class="pk-range" min="${my.minTo}" max="${my.maxTo}" step="${step}" value="${this.raiseTo}">
-          <div class="pk-acts"><button class="pk-btn" data-p="raiseClose">Annulla</button><button class="pk-btn good pk-raise-go" data-p="raiseGo" ${busy}>${my.isBet ? 'Punta' : 'Rilancia a'} <b>${euro(this.raiseTo)}</b></button></div></div>`;
+          <div class="tbet">${chipStackHtml(this.raiseStack, s.bb, this.raiseAdd)}<span class="tbet-min">${ok ? `${my.isBet ? 'Puntata' : 'Rilancio'} totale ${euro(to)}` : `Almeno ${euro(my.minTo - base)} di fiches`}</span></div>
+          ${chipsHtml(s.bb, room, room - this.raiseAdd)}
+          <div class="pk-presets"><button class="pk-chip" data-p="raiseClose">Annulla</button><button class="pk-chip" data-p="clear" ${this.raiseAdd ? '' : 'disabled'}>Togli</button><button class="pk-chip" data-p="allin">All-in</button></div>
+          <div class="pk-acts"><button class="pk-btn good" data-p="raiseGo" ${busy} ${ok ? '' : 'disabled'}>${verb} <b>${euro(to)}</b></button></div></div>`;
     }
     const callAll = my.toCall >= me.chips;
     return `<div class="pk-acts">
@@ -383,15 +438,19 @@ export class PokerTable {
     const seats = order.map((i, k) => this.seatHtml(i, Math.round((k * 8) / order.length) % 8, spots)).join('');
     const me = this.me();
     const myCards = me?.cards ?? null;
-    const shownMe = s.result?.shown[String(s.mySeat)];
-    const hand = s.myHand || shownMe?.hand || '';
+    const shownMe = this.result()?.shown[String(s.mySeat)];
+    const hand = this.deal.busy ? '' : s.myHand || shownMe?.hand || '';
+    const mk = [this.holeKey(Math.max(0, s.mySeat), 0), this.holeKey(Math.max(0, s.mySeat), 1)];
+    const mineHtml = myCards && this.deal.has(mk[0])
+      ? myCards.map((c, r) => (this.deal.has(mk[r]) ? cardHtml(c, 'lg', this.winBest().includes(c), this.deal.age(mk[r])) : '<div class="pk-card slot lg"></div>')).join('')
+      : '<div class="pk-card slot lg"></div><div class="pk-card slot lg"></div>';
     const exitTxt = this.confirmExit ? (me?.inHand && !me.folded ? 'Sicuro? Lasci la mano' : 'Sicuro? Tocca ancora') : '‹ Esci';
     this.el.innerHTML = `
       <div class="pk-top"><button class="pk-exit ${this.confirmExit ? 'warn' : ''}" data-p="exit">${exitTxt}</button>
         <button class="pk-code" data-p="share">Stanza <b>${s.code}</b> 🔗</button><span class="pk-blinds">Bui ${euro(s.sb)}/${euro(s.bb)}</span></div>
       <div class="pk-felt"><div class="pk-oval"></div>${this.centerHtml()}${seats}</div>
       <div class="pk-me">
-        <div class="pk-hand">${myCards ? myCards.map((c) => cardHtml(c, 'lg', this.winBest().includes(c))).join('') : '<div class="pk-card slot lg"></div><div class="pk-card slot lg"></div>'}
+        <div class="pk-hand">${mineHtml}
           <div class="pk-hinfo">${hand ? `<b>${esc(hand)}</b>` : ''}<span>Fiches <b>${euro(me?.chips ?? 0)}</b></span><span class="muted">Conto ${euro(this.game.state.money)}</span></div></div>
         ${this.fails >= 3 ? '<div class="pk-note bad">Connessione persa: riprovo…</div>' : ''}${this.msg ? `<div class="pk-note bad">${esc(this.msg)}</div>` : ''}
         ${this.actionsHtml()}
@@ -410,12 +469,11 @@ export class PokerTable {
     try {
       const j = await pk<PkState & { closed?: string }>('act', { code: this.code, ...body }, 15000);
       if (j.closed) this.closed = j.closed;
-      else this.s = j;
-      this.raiseOpen = false;
-      this.raiseTo = 0;
+      else this.setState(j);
+      this.closeRaise();
     } catch (e) {
       const d = (e as Error & { data?: { state?: PkState } }).data;
-      if (d?.state) this.s = d.state;
+      if (d?.state) this.setState(d.state);
       this.msg = (e as Error).message;
     }
     this.busy = false;
@@ -437,7 +495,7 @@ export class PokerTable {
         this.bought += j.bought;
         this.game.save();
       }
-      this.s = j.state;
+      this.setState(j.state);
       this.msg = '';
     } catch (e) {
       this.msg = (e as Error).message;
@@ -459,6 +517,7 @@ export class PokerTable {
     }
     const got = await claimPoker(this.game, true);
     clearInterval(this.timer);
+    this.deal.stop();
     removeEventListener('resize', this.onResize);
     this.el.remove();
     document.body.classList.remove('in-poker');
@@ -491,16 +550,38 @@ export class PokerTable {
     else if (a === 'share') this.share();
     else if (a === 'fold' || a === 'check' || a === 'call') void this.send({ action: a });
     else if (a === 'raiseOpen') {
+      this.closeRaise();
       this.raiseOpen = true;
-      this.raiseTo = this.s?.my?.minTo ?? 0;
       this.render();
     } else if (a === 'raiseClose') {
-      this.raiseOpen = false;
+      this.closeRaise();
       this.render();
-    } else if (a === 'to') {
-      this.raiseTo = Number(arg);
+    } else if (a === 'chip' || a === 'allin' || a === 'clear') {
+      const s = this.s;
+      const me = this.me();
+      const my = s?.my;
+      if (!s || !me || !my) return;
+      const room = my.maxTo - (me.bet + my.toCall);
+      if (a === 'clear') {
+        this.raiseAdd = 0;
+        this.raiseStack = [];
+      } else if (a === 'allin') {
+        this.raiseAdd = room;
+        this.raiseStack = [];
+      } else {
+        // la stessa fiche toccata più volte si punta più volte
+        const v = Number(arg);
+        if (this.raiseAdd + v <= room) {
+          this.raiseAdd += v;
+          this.raiseStack.push(v);
+        }
+      }
       this.render();
-    } else if (a === 'raiseGo') void this.send({ action: 'raise', amount: this.raiseTo });
+    } else if (a === 'raiseGo') {
+      const me = this.me();
+      const my = this.s?.my;
+      if (me && my) void this.send({ action: 'raise', amount: me.bet + my.toCall + this.raiseAdd });
+    }
     else if (a === 'rebuy') {
       const box = this.el.querySelector<HTMLElement>('.pk-amt');
       const v = this.rebuyAmt;
