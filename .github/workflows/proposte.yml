@@ -58,7 +58,9 @@ jobs:
                 (if .why != "" then "### Perché\n\n\(.why)\n\n" else "" end) +
                 "### Dove nel gioco\n\n\(.where)\n\n" +
                 ((.ctx | to_entries | map("\(.key): \(.value)") | join(" · ")) as $c | if $c != "" then "<sub>\($c)</sub>\n\n" else "" end) +
-                (if .photo then "### Foto dello schermo\n\n![Foto dello schermo](\($api)/hustle/proposal-photo/\(.id).jpg)\n" else "" end)
+                (if .photo then "### Foto dello schermo\n\n![Foto dello schermo](\($api)/hustle/proposal-photo/\(.id).jpg)\n\n" else "" end) +
+                (if (.video == "mp4" or .video == "webm") then "### Video\n\n[Guarda il video](\($api)/hustle/proposal-video/\(.id).\(.video)) (senza audio)\n\n" +
+                  (if .frames then "Quattro fotogrammi del video, in ordine, riga per riga da sinistra a destra:\n\n![Fotogrammi del video](\($api)/hustle/proposal-frames/\(.id).jpg)\n" else "" end) else "" end)
               ' <<<"$p" > body.md
               url=$(gh issue create -R "$REPO" --title "$title" --body-file body.md --label proposta --label claude)
               issue=${url##*/}
