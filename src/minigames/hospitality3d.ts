@@ -801,6 +801,52 @@ const DRINKS = {
 type Drink = keyof typeof DRINKS;
 
 /**
+ * La tazza che il barista tiene in mano, diversa per ogni passo: vuota (bianca dentro), caffè (scuro),
+ * cappuccino (schiuma bianca alta col cuore di cacao), tè (ambra con la bustina). Così si vede cosa c'è dentro.
+ */
+function barCup(what: 'cup' | Drink) {
+  const g = new THREE.Group();
+  const white = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.16, 18, 1, true), white);
+  body.material.side = THREE.DoubleSide;
+  body.position.y = 0.08;
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.08, 18), white);
+  bottom.rotation.x = -Math.PI / 2;
+  bottom.position.y = 0.002;
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.014, 6, 12), white);
+  handle.position.set(0.12, 0.08, 0);
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.015, 20), white);
+  g.add(body, bottom, handle, plate);
+  const top = (color: number, y: number) => {
+    const m = new THREE.Mesh(new THREE.CircleGeometry(0.105, 18), new THREE.MeshLambertMaterial({ color }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = y;
+    g.add(m);
+    return m;
+  };
+  if (what === 'espresso') top(0x4a2a12, 0.12);
+  if (what === 'cappuccino') {
+    // la schiuma sale sopra il bordo, col cuore di cacao
+    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.108, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), white);
+    foam.scale.y = 0.45;
+    foam.position.y = 0.155;
+    g.add(foam);
+    const heart = new THREE.Mesh(new THREE.CircleGeometry(0.04, 12), new THREE.MeshLambertMaterial({ color: 0x8a5a2b }));
+    heart.rotation.x = -Math.PI / 2;
+    heart.position.y = 0.205;
+    g.add(heart);
+  }
+  if (what === 'te') {
+    top(0xc9741a, 0.13);
+    const tag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.005), new THREE.MeshLambertMaterial({ color: 0xffc21a }));
+    tag.position.set(-0.12, 0.12, 0);
+    g.add(tag);
+  }
+  g.scale.setScalar(1.6);
+  return g;
+}
+
+/**
  * Barista: i clienti in fila al bancone ordinano (fumetto). Tazza → macchina del caffè (tieni premuto) →
  * per il cappuccino il latte montato; per il tè il bollitore. Si serve il primo della fila: la bevanda
  * sbagliata si può dare, ma conta alla fine.
@@ -845,14 +891,21 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
     c.root.add(s);
     bubbles[i] = s;
   };
+  // ogni passo cambia la tazza in mano; quando c'è proprio quello che chiede il primo della fila lo si dice subito
+  const fill = (what: 'cup' | Drink) => {
+    holding = what;
+    hold(game, barCup(what));
+    const want = orders[served];
+    if (what === want) toast(`✅ ${DRINKS[want].name[0].toUpperCase() + DRINKS[want].name.slice(1)} pronto: servilo al bancone!`, 'good');
+  };
   const phases: Phase[] = [{
     name: 'Servi i clienti in ordine', icon: '☕', count: () => [served, n],
     tip: 'Guarda cosa chiede il <b>primo della fila</b>: prendi una <b>tazza</b>, fai il caffè alla <b>macchina</b> (tieni premuto). Cappuccino: poi il <b>latte montato</b>. Tè: il <b>bollitore</b>. Poi servi al bancone',
     tasks: () => [
-      { pos: cupsAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi una tazza', icon: '☕', obj: cups.obj, enabled: () => !holding && served < n, onDone: () => { holding = 'cup'; hold(game, crate(0.2, 0xffffff)); } },
-      { pos: machineAt, kind: 'hold', sec: 1.4, repeat: true, quiet: true, label: 'Fai il caffè', icon: '⚙️', obj: machine.obj, fx: 'bubble', fxColor: 0x6b3e1e, enabled: () => holding === 'cup', onDone: () => { holding = 'espresso'; } },
-      { pos: milkAt, kind: 'hold', sec: 1.2, repeat: true, quiet: true, label: 'Monta il latte', icon: '🥛', obj: milk.obj, fx: 'bubble', enabled: () => holding === 'espresso', onDone: () => { holding = 'cappuccino'; } },
-      { pos: kettleAt, kind: 'hold', sec: 1.2, repeat: true, quiet: true, label: 'Acqua calda per il tè', icon: '🍵', obj: kettle.obj, fx: 'bubble', enabled: () => holding === 'cup', onDone: () => { holding = 'te'; } },
+      { pos: cupsAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi una tazza', icon: '☕', obj: cups.obj, enabled: () => !holding && served < n, onDone: () => fill('cup') },
+      { pos: machineAt, kind: 'hold', sec: 1.4, repeat: true, quiet: true, label: 'Fai il caffè', icon: '⚙️', obj: machine.obj, fx: 'bubble', fxColor: 0x6b3e1e, enabled: () => holding === 'cup', onDone: () => fill('espresso') },
+      { pos: milkAt, kind: 'hold', sec: 1.2, repeat: true, quiet: true, label: 'Monta il latte', icon: '🥛', obj: milk.obj, fx: 'bubble', enabled: () => holding === 'espresso', onDone: () => fill('cappuccino') },
+      { pos: kettleAt, kind: 'hold', sec: 1.2, repeat: true, quiet: true, label: 'Acqua calda per il tè', icon: '🍵', obj: kettle.obj, fx: 'bubble', enabled: () => holding === 'cup', onDone: () => fill('te') },
       {
         pos: serveAt, kind: 'tap', repeat: true, quiet: true, label: 'Servi il cliente', icon: '🙋', enabled: () => holding === 'espresso' || holding === 'cappuccino' || holding === 'te',
         onDone: () => {
@@ -890,11 +943,20 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   // la fila in ordine nella barra: il primo (quello da servire) e i prossimi
   // in grande: l'ordine del primo della fila (col nome) e i prossimi
   // il primo: blu da iniziare, giallo in preparazione, verde quando in mano c'è proprio quello che vuole
-  run.chips = () => orders.slice(served, served + 4).map((d, i): Chip => ({
-    t: i ? DRINKS[d].icon : `${DRINKS[d].icon} ${DRINKS[d].name}`,
-    s: i || !holding ? 'todo' : holding === d ? 'ready' : 'prep',
-  }));
-  run.extraStatus = () => (holding === 'cup' ? 'tazza vuota in mano' : '');
+  // il primo dice anche a che punto sei: cosa manca, o "pronto" quando è da servire
+  const missing = (d: Drink): string => {
+    if (!holding || holding === d) return '';
+    if (holding === 'cup') return d === 'te' ? 'acqua calda' : 'caffè';
+    if (holding === 'espresso' && d === 'cappuccino') return 'latte';
+    return 'sbagliato';
+  };
+  run.chips = () => orders.slice(served, served + 4).map((d, i): Chip => {
+    const name = `${DRINKS[d].icon} ${DRINKS[d].name}`;
+    if (i) return { t: DRINKS[d].icon, s: 'todo' };
+    if (!holding) return { t: name, s: 'todo' };
+    if (holding === d) return { t: `✅ ${DRINKS[d].name} pronto`, s: 'ready' };
+    return { t: `${name} · ${missing(d) === 'sbagliato' ? 'sbagliato!' : 'manca ' + missing(d)}`, s: 'prep' };
+  });
   return run;
 }
 

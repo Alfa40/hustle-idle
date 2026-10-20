@@ -131,7 +131,7 @@ fare ma costano alla fine (come il magazziniere). Tra parentesi la durata per ch
 ### ☕ Bar
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Barista | al bancone: tazza → macchina del caffè → (latte montato) → servi i clienti in ordine di arrivo | da 4 a 7 ordini | 2 min |
+| 1 | Barista | al bancone: tazza → macchina del caffè → (latte montato) → servi i clienti in ordine di arrivo; la casella dice cosa manca e quando è pronto | da 4 a 7 ordini | 2 min |
 | 10 | Latte art | col dito disegni sulla schiuma come nella foto (cuore, foglia, cigno) | da 2 a 3 tazze, disegni più difficili | 1½ min |
 | 20 | Barman | cocktail: versi tenendo premuto fino alla tacca, nell'ordine della ricetta | da 2 a 3 cocktail | 2 min |
 | 30 | Barman acrobatico | a ritmo: lancia e riprendi la bottiglia | ritmo più veloce | 1½ min |
