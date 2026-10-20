@@ -14,7 +14,7 @@ import { loadState } from './sim/state';
 import { checkTesterLink } from './tester';
 import { claimPoker } from './ui/poker';
 import { previewPr } from './preview';
-import { applyPreviewStart, previewStart } from './previewStart';
+import { applyPreviewStart, previewNow, previewStart } from './previewStart';
 import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
 
@@ -56,9 +56,9 @@ async function boot() {
       if (!nickname()) setNickname(`Prova ${previewPr}`);
       game.state.logoChosen = true;
     }
-    // "Gioca subito" in un'anteprima con punto di partenza: niente benvenuto, si va dritti alla parte cambiata
+    // "Gioca subito" in un'anteprima: niente benvenuto, si va dritti alla parte cambiata (se c'è il suo file)
     const jump = previewStart && quick ? previewStart : null;
-    if (jump) game.state.tutorialDone = true;
+    if (previewPr !== null && quick) game.state.tutorialDone = true;
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
     if (!devApp && game.ui.needsIdentity()) game.ui.openLogoEditor(true);
@@ -75,6 +75,12 @@ async function boot() {
   // app developer (developer.html → ./?app=dev): subito la partita developer, senza menu iniziale
   if (devApp) {
     start(DEV_SLOT, loadState(DEV_SLOT) ? undefined : '🛠️ Developer');
+    return;
+  }
+  // anteprima aperta da "Gioca l'anteprima" nelle app (?subito): niente menu, una partita nuova già nella situazione
+  // della modifica (ricaricando la pagina riparte da capo; "torna al menu" toglie ?subito e porta al menu dell'anteprima)
+  if (previewNow) {
+    start(1, `Anteprima #${previewPr}`, true);
     return;
   }
   // schermata iniziale: si entra in partita solo dopo aver scelto lo slot
