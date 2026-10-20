@@ -122,6 +122,14 @@ function previewsHtml(d: Data) {
   return prep + ready.map(row).join('');
 }
 
+/** la pagina scorre dentro .launcher-screen (fisso a tutto schermo), non nella finestra */
+const scroller = () => ui.querySelector<HTMLElement>('.launcher-screen');
+const getY = () => scroller()?.scrollTop ?? 0;
+const setY = (y: number) => {
+  const s = scroller();
+  if (s) s.scrollTop = y;
+};
+
 function render() {
   let body: string;
   if (!testerKey() || editName) body = keyHtml();
@@ -136,12 +144,12 @@ function render() {
       <div class="t-row"><button class="t-btn t-small" data-a="reload" ${loading ? 'disabled' : ''}><span class="t-ico">🔄</span><b>${loading ? 'Carico…' : 'Aggiorna'}</b></button>
       <button class="t-btn t-small" data-a="name"><span class="t-ico">👤</span><b>${esc(savedName() || 'Il tuo nome')}</b></button></div>`;
   }
-  const y = scrollY;
+  const y = getY();
   ui.innerHTML = `<div class="title launcher-screen">
     <div class="t-logo"><div class="t-name">HUSTLE TESTER</div><div class="t-sub">Anteprime da provare e proposte dei tester</div></div>
     <div class="t-menu">${body}</div></div>`;
   // ridisegnare non deve far perdere dove si era scorsi
-  scrollTo(0, y);
+  setY(y);
 }
 
 async function vote(id: number, v: 'si' | 'no') {
@@ -222,15 +230,15 @@ ui.addEventListener('click', (e) => {
     render();
   }
   if (a === 'open') {
-    listY = scrollY;
+    listY = getY();
     openIssue = Number(arg);
     render();
-    scrollTo(0, 0);
+    setY(0);
   }
   if (a === 'back') {
     openIssue = 0;
     render();
-    scrollTo(0, listY);
+    setY(listY);
   }
   if (a === 'note') void sendNote(Number(arg));
   if (a === 'noteedit') {

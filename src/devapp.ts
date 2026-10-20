@@ -96,6 +96,14 @@ function previewsHtml(d: Data) {
   return prep + ready.map(row).join('');
 }
 
+/** la pagina scorre dentro .launcher-screen (fisso a tutto schermo), non nella finestra */
+const scroller = () => ui.querySelector<HTMLElement>('.launcher-screen');
+const getY = () => scroller()?.scrollTop ?? 0;
+const setY = (y: number) => {
+  const s = scroller();
+  if (s) s.scrollTop = y;
+};
+
 function render() {
   const dev = loadState(DEV_SLOT);
   let body: string;
@@ -111,12 +119,12 @@ function render() {
       ${tabs}${content}
       <div class="t-row"><button class="t-btn t-small" data-a="reload" ${loading ? 'disabled' : ''}><span class="t-ico">🔄</span><b>${loading ? 'Carico…' : 'Aggiorna'}</b></button></div>`;
   }
-  const y = scrollY;
+  const y = getY();
   ui.innerHTML = `<div class="title launcher-screen">
     <div class="t-logo"><div class="t-name">HUSTLE DEV</div><div class="t-sub">Partita developer, anteprime e tester</div></div>
     <div class="t-menu">${body}</div></div>`;
   // ridisegnare non deve far perdere dove si era scorsi
-  scrollTo(0, y);
+  setY(y);
 }
 
 /** Anteprima piaciuta: accettata sul server; il robot di GitHub la unisce al gioco e la pubblica entro una decina di minuti. */
@@ -240,17 +248,17 @@ ui.addEventListener('click', (e) => {
     render();
   }
   if (a === 'open') {
-    listY = scrollY;
+    listY = getY();
     openIssue = Number(arg);
     confirmAccept = confirmReject = 0;
     changeMsg = null;
     render();
-    scrollTo(0, 0);
+    setY(0);
   }
   if (a === 'back') {
     openIssue = 0;
     render();
-    scrollTo(0, listY);
+    setY(listY);
   }
   if (a === 'change') void requestChanges(Number(arg));
   if (a === 'note') void sendNote(Number(arg));
