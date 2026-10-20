@@ -97,6 +97,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 Altre attività verranno aggiunte in futuro.
 
 ### 7.2 Gestione
+- **Vendere un'attività** (per cambiarla con un'altra): in fondo alla 📊 Panoramica c'è **💰 Vendi l'attività** (due tocchi, il secondo dice la cifra). Si riceve **metà di quanto si è speso** per aprirla, evolverla e migliorarla, più la merce in magazzino al prezzo d'acquisto (`sellValue`/`sellBusiness` in sim/economy.ts, `SELL_SHARE` = 0,5). Il posto torna libero, i dipendenti tornano tra i candidati di oggi (si riassumono altrove), migliorie, prodotti e statistiche si perdono; esce anche dai gruppi della catena. Non si vende mentre ci sei dentro o mentre fai un lavoro per lei.
 - **Cosa vendere lo sceglie il player:** ogni attività ha un catalogo di prodotti (per esempio il food truck: panini, hot dog, tacos, gelati…). Il player decide quali mettere in vendita guardando la domanda del periodo, e può cambiarli.
 - **Lavoro di persona:** mini-giochi **stile Overcooked semplificato** (prendi l'ordine, prepara, servi, incassa).
 - **Costi fissi:** affitto (o mutuo), bollette, stipendi. Si può andare **in perdita**.

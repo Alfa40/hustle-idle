@@ -26,7 +26,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
 } from '../sim/economy';
@@ -1281,6 +1281,8 @@ export class UI {
       // si può evolvere in un'attività più grande (albero delle evoluzioni)
       ...(evolvesOf(b().type).length ? [['evoluzione', '🌱 Evoluzione']] : []),
     ];
+    // "Vendi l'attività" toccato una volta: si chiede conferma con un secondo tocco
+    let confirmSell = false;
     this.open({
       money: () => cur === 'migliorie' || cur === 'magazzino' || cur === 'personale',
       title: `${bizType(b().type).icon} ${bizType(b().type).name} · ${lotDef(b().lotId).name}`,
@@ -1293,15 +1295,34 @@ export class UI {
         const chain = cur === 'panoramica' && n >= 2
           ? `<button class="card chain-card" data-a="chain" style="--sc:${bizType(b().type).color}"><div class="icon-bubble" style="background:${bizType(b().type).color};color:#fff">🔗</div><div style="flex:1;text-align:left"><b>Catena: ${n} attività</b><div class="muted small">Modifiche a tutti i negozi insieme o a gruppi</div></div><span class="shop-go">›</span></button>`
           : '';
-        return head + chain + this.bizTab(b(), cur);
+        return head + chain + this.bizTab(b(), cur) + (cur === 'panoramica' ? this.sellHtml(b(), confirmSell) : '');
       },
       actions: {
+        sell: () => {
+          const biz = b();
+          const why = this.sellBlock(biz);
+          if (why) {
+            toast(why, 'bad');
+            return;
+          }
+          if (!confirmSell) {
+            confirmSell = true;
+            return;
+          }
+          this.close();
+          sellBusiness(s, biz);
+          this.game.setupLot(biz.lotId);
+          this.game.save();
+        },
+        tab: (k) => {
+          cur = k;
+          confirmSell = false;
+        },
         chain: () => {
           const t = b().type;
           this.close();
           this.openChain(t);
         },
-        tab: (k) => (cur = k),
         toggleProduct: (p) => {
           const biz = b();
           const pid = p as ProductId;
@@ -1364,6 +1385,24 @@ export class UI {
       },
       onClose: () => this.game.save(),
     });
+  }
+
+  /** perché adesso non si può vendere l'attività ('' = si può) */
+  private sellBlock(b: Business) {
+    const g = this.game;
+    if (g.interior?.biz.id === b.id) return "🚪 Esci dall'attività prima di venderla";
+    if (g.runOrder?.bizId === b.id || g.runSpecial?.bizId === b.id) return '⏳ Finisci prima il lavoro per questa attività';
+    return '';
+  }
+
+  /** In fondo alla panoramica: vendere l'attività per cambiarla con un'altra (due tocchi). */
+  private sellHtml(b: Business, confirm: boolean) {
+    const v = sellValue(b);
+    const staff = b.staff.length;
+    return `<div class="card sell-card"><h3>💰 Vendi l'attività</h3>
+      <p class="small" style="margin:0 0 4px">Ricevi <b>${euro(v.total)}</b>: metà di quanto hai speso (${euro(v.spent)})${v.stock ? `, più la merce in magazzino (${euro(v.stock)})` : ''}.</p>
+      <p class="muted small explain" style="margin:0 0 8px">Il posto torna libero e puoi aprirci un'altra attività. ${staff ? `${staff === 1 ? 'Il dipendente torna' : `I ${staff} dipendenti tornano`} tra i candidati di oggi: ${staff === 1 ? 'puoi riassumerlo' : 'puoi riassumerli'} in un'altra attività.` : ''} Migliorie, prodotti e statistiche di questa attività si perdono.</p>
+      <button class="btn ${confirm ? 'danger' : 'sec'} full" data-a="sell">${confirm ? `⚠️ Sicuro? Tocca ancora per vendere a ${euro(v.total)}` : "💰 Vendi l'attività"}</button></div>`;
   }
 
   /** Scheda dell'evoluzione: cosa manca (migliorie al massimo) e i rami in cui può diventare. */
