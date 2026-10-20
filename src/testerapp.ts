@@ -15,7 +15,7 @@ import './ui/layout';
 import { watchIcons } from './ui/icons';
 import { checkTesterLink, testerKey, tryTesterKey } from './tester';
 import { API, nickname as lbNickname, playerId } from './sim/leaderboard';
-import { askHtml, esc, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesHtml, type Data, type PrevItem, type Prop } from './board';
+import { askHtml, detailHtml, esc, explainOf, forgetExplains, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesBlock, votesHtml, type Data, type PrevItem, type Prop } from './board';
 
 const NAME_KEY = 'hustle.testerName';
 const MAX_COMMENT = 500;
@@ -52,6 +52,9 @@ const noteDrafts = new Map<number, string>();
 let noting = 0;
 let noteMsg: { id: number; text: string } | null = null;
 const noteEditing = new Set<number>();
+/** scheda dell'anteprima aperta (numero della proposta su GitHub, 0 = elenco) e dove era scorso l'elenco */
+let openIssue = 0;
+let listY = 0;
 const openTesters = new Set<string>();
 
 function keyHtml() {
@@ -62,22 +65,22 @@ function keyHtml() {
     <button class="btn good full" data-a="key" style="margin-top:8px">${first ? 'Entra' : 'Salva'}</button>${keyMsg ? `<p class="small center bad" style="margin:6px 0 0">${esc(keyMsg)}</p>` : ''}</div>`;
 }
 
-function voteBox(x: PrevItem) {
+function voteBox(x: PrevItem, withOthers = true) {
   const p = x.prop;
   // aperta a mano su GitHub (non dal gioco): niente voti
   if (!p) return '';
-  if (p.status === 'accettata') return `<div class="dv-note ok">⏳ Lo sviluppatore l'ha accettata: tra poco entra nel gioco.</div>${votesHtml(p)}`;
+  if (p.status === 'accettata') return `<div class="dv-note ok">⏳ Lo sviluppatore l'ha accettata: tra poco entra nel gioco.</div>${withOthers ? votesHtml(p) : ''}`;
   const mine = p.votes?.find((v) => v.mine);
   const msg = voteMsg?.id === p.id ? `<p class="small center bad" style="margin:4px 0 0">${esc(voteMsg.text)}</p>` : '';
   if (mine && !editing.has(p.id)) {
     return `<div class="dv-vote mine ${mine.vote === 'si' ? 'yes' : 'no'}"><b>Il tuo voto: ${mine.vote === 'si' ? '👍 Approvata' : '👎 Bocciata'}</b>${mine.comment ? `<div class="dv-text">${esc(mine.comment)}</div>` : ''}
-      <div class="dv-acts"><button class="btn sm sec" data-a="edit:${p.id}">✏️ Cambia voto</button></div></div>${votesHtml(p, true)}${msg}`;
+      <div class="dv-acts"><button class="btn sm sec" data-a="edit:${p.id}">✏️ Cambia voto</button></div></div>${withOthers ? votesHtml(p, true) : ''}${msg}`;
   }
   const busy = voting === p.id;
   const draft = drafts.get(p.id) ?? mine?.comment ?? '';
   return `<div class="card tp-vote"><b>💬 Ti piace? Dillo dopo averla provata</b>
       <textarea class="lb-input tp-com" data-c="${p.id}" maxlength="${MAX_COMMENT}" rows="2" placeholder="Commento (facoltativo): cosa va bene, cosa cambieresti">${esc(draft)}</textarea>
-      <div class="dv-acts"><button class="btn sm danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Boccio</button><button class="btn sm good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Approvo'}</button></div>${msg}</div>${votesHtml(p, true)}`;
+      <div class="dv-acts"><button class="btn sm danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Boccio</button><button class="btn sm good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Approvo'}</button></div>${msg}</div>${withOthers ? votesHtml(p, true) : ''}`;
 }
 
 function asksHtml(d: Data) {
@@ -87,12 +90,25 @@ function asksHtml(d: Data) {
   return hint + asks.map((x) => askHtml(x, noteBoxHtml(x.prop, x.prop && noteDrafts.get(x.prop.id), noting === x.prop?.id, noteMsg && noteMsg.id === x.prop?.id ? noteMsg.text : '', !!x.prop && noteEditing.has(x.prop.id)))).join('');
 }
 
+/** scheda di un'anteprima: la proposta, cosa cambia, il tuo voto con commento e quelli degli altri */
+function detailView(x: PrevItem) {
+  const others = x.prop?.votes?.some((v) => !v.mine) ? votesHtml(x.prop, true) : votesBlock(undefined);
+  return detailHtml(x, explainOf(x.issue.number, render), false) + voteBox(x, false) + `<h3 class="dv-sec">👥 Voti degli altri tester</h3>${others}`;
+}
+
 function previewsHtml(d: Data) {
   const { ready } = previewLists(d);
+  const open = openIssue ? ready.find((x) => x.issue.number === openIssue) : undefined;
+  if (open) return detailView(open);
   const prep = prepHtml(d) + asksHtml(d);
-  const hint = '<p class="small tp-hint">Apri l\'anteprima, provala e poi dì se ti piace: lo sviluppatore legge voti e commenti prima di decidere.</p>';
+  const hint = '<p class="small tp-hint">Tocca un\'anteprima: la provi, la voti e leggi cosa ne pensano gli altri. Lo sviluppatore legge voti e commenti prima di decidere.</p>';
   if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
-  return prep + hint + ready.map((x) => `<div class="dv-prev">${previewHead(x)}${voteBox(x)}</div>`).join('');
+  // nell'elenco: l'anteprima e il tuo voto (se c'è); si vota e si leggono i commenti nella scheda
+  const mineTag = (x: PrevItem) => {
+    const v = x.prop?.votes?.find((y) => y.mine);
+    return v ? `<div class="dv-note">${v.vote === 'si' ? '👍 Hai approvato' : '👎 Hai bocciato'}</div>` : '<div class="dv-note">Da votare: aprila, provala e dì cosa ne pensi</div>';
+  };
+  return prep + hint + ready.map((x) => `<div class="dv-prev">${previewHead(x)}${mineTag(x)}</div>`).join('');
 }
 
 function render() {
@@ -164,6 +180,7 @@ async function refresh(force = false) {
   error = '';
   render();
   try {
+    forgetExplains();
     data = await load(serverProps);
     lastLoad = Date.now();
   } catch (e) {
@@ -185,12 +202,24 @@ ui.addEventListener('click', (e) => {
   if (a === 'reload') void refresh(true);
   if (a === 'tab') {
     tab = arg as typeof tab;
+    openIssue = 0;
     render();
   }
   if (a === 'tester') {
     if (openTesters.has(arg)) openTesters.delete(arg);
     else openTesters.add(arg);
     render();
+  }
+  if (a === 'open') {
+    listY = scrollY;
+    openIssue = Number(arg);
+    render();
+    scrollTo(0, 0);
+  }
+  if (a === 'back') {
+    openIssue = 0;
+    render();
+    scrollTo(0, listY);
   }
   if (a === 'note') void sendNote(Number(arg));
   if (a === 'noteedit') {
