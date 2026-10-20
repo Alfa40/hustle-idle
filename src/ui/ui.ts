@@ -43,6 +43,7 @@ import {
 import { stripLeadIcon } from './icons';
 import { buyBox, casino, MAX_BUY_BB, MIN_BUY_BB, pokerBlocked, pokerName, PokerTable, STAKE_FAME, STAKES, wireBuyBox, type CasinoGame, type PkInfo, type PkState } from './poker';
 import { BJ_MAX_BET_X, BJ_MAX_BUY_X, BJ_MIN_BUY_X, BlackjackTable, type BjInfo, type BjState } from './blackjack';
+import { previewPr } from '../preview';
 
 
 type Actions = Record<string, (arg: string) => void>;
@@ -2450,8 +2451,10 @@ export class UI {
         const intro = isBj
           ? 'Blackjack contro il banco, con i soldi della tua partita: arriva più vicino a 21 del banco senza superarlo. Puoi giocare da solo o mandare il codice agli amici (fino a 7 allo stesso tavolo): ognuno gioca contro il banco. Il blackjack (asso e figura) paga 3 a 2, il banco sta su 17; puoi raddoppiare sulle prime due carte e dividere due carte uguali. Uscendo, le fiches che hai tornano sul conto. Mentre giochi la tua partita è offline: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo. Il primo collegamento può metterci fino a un minuto.'
           : "Texas Hold'em senza limite, da 2 a 8 giocatori, con i soldi della tua partita. Chi crea la stanza sceglie le puntate e manda il codice agli amici; si può entrare anche a partita iniziata e uscire quando si vuole. Uscendo, le fiches che hai tornano sul conto. Se al tavolo restano meno di 2 giocatori la stanza si chiude. Mentre giochi la tua partita è offline: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo. Il primo collegamento può metterci fino a un minuto.";
+        // anteprime: tavoli di prova del server (fiches finte, nel poker si gioca contro un bot)
+        const practice = previewPr !== null ? `<div class="card hl"><p class="small" style="margin:0">🎯 Anteprima: tavolo di prova con fiches finte${isBj ? '' : ', contro un bot'}. I soldi che porti tornano uscendo.</p></div>` : '';
         return `${explain(intro)}
-          ${back}${err ? `<p class="small center bad">${esc(err)}</p>` : ''}${create}${join}`;
+          ${practice}${back}${err ? `<p class="small center bad">${esc(err)}</p>` : ''}${create}${join}`;
       },
       actions: {
         stake: (i) => {
@@ -3614,6 +3617,8 @@ export class UI {
           this.game.resetting = true;
           // app developer: si torna alla sua schermata (anteprime, tester)
           if (devApp) location.href = './developer.html';
+          // anteprima aperta con ?subito: al menu dell'anteprima, senza ripartire subito
+          else if (previewPr !== null && location.search) location.href = location.pathname;
           else location.reload();
         },
         reset: () => {
