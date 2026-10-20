@@ -120,8 +120,10 @@ jobs:
               if git merge -q --no-ff "origin/$branch" -m "Proposta #$issue: $title" -m "Accettata dallo sviluppatore dall'app developer. Closes #$issue"; then
                 if git push -q origin main; then
                   ok=true; touch pubblica
+                  # "Closes #N" nell'unione la chiude già da sola: allora si lascia solo il commento
                   gh issue close "$issue" -R "$REPO" --reason completed \
-                    --comment "Lo sviluppatore ha provato l'anteprima e l'ha accettata: la modifica è nel gioco (si pubblica in 2–3 minuti)."
+                    --comment "Lo sviluppatore ha provato l'anteprima e l'ha accettata: la modifica è nel gioco (si pubblica in 2–3 minuti)." \
+                    || gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha provato l'anteprima e l'ha accettata: la modifica è nel gioco (si pubblica in 2–3 minuti)." || true
                 else
                   err="non riesco a salvare la modifica nel gioco (riprova)"
                 fi
