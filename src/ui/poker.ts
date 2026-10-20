@@ -91,7 +91,7 @@ export async function casino<T>(game: CasinoGame, path: string, body: object, ti
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...body }), signal: ctl.signal });
+    const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...(previewPr !== null ? { practice: true } : {}), ...body }), signal: ctl.signal });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(j.error || `errore ${r.status}`), { data: j });
     return j as T;
@@ -105,7 +105,6 @@ export async function casino<T>(game: CasinoGame, path: string, body: object, ti
 
 /** perché qui non si può giocare a poker (null = si può) */
 export function pokerBlocked(): string | null {
-  if (previewPr !== null) return 'Nelle anteprime il multigiocatore non c\'è: si gioca nel gioco vero.';
   if (currentSlot === DEV_SLOT) return 'Con la partita developer non si gioca contro gli amici (avresti un miliardo di fiches).';
   return null;
 }
@@ -117,7 +116,8 @@ export const pokerName = (game: Game) => lbNickname() || game.state.saveName || 
  * tavolo, stanza chiusa…): sul conto.
  */
 export async function claimPoker(game: Game, quiet = false) {
-  if (pokerBlocked()) return 0;
+  // anteprime: tavoli di prova, le fiches tornano subito uscendo (niente da ritirare)
+  if (pokerBlocked() || previewPr !== null) return 0;
   try {
     const j = await pk<{ amount: number }>('claim', { slot: currentSlot }, 30000);
     if (j.amount > 0) {
@@ -517,14 +517,20 @@ export class PokerTable {
     this.game.leaveAway();
     this.onDone();
     // uscita dal tavolo e ritiro delle fiches proseguono dietro le quinte: si torna subito in città
+    let left = 0;
     if (!wasClosed) {
       try {
-        await pk('leave', { code: this.code }, 20000);
+        left = (await pk<{ chips: number }>('leave', { code: this.code }, 20000)).chips || 0;
       } catch {
         /* se non risponde, il server toglie comunque chi sparisce e la vincita si ritira alla prossima apertura */
       }
     }
-    const got = await claimPoker(this.game, true);
+    // anteprime: tavolo di prova, le fiches rimaste tornano subito sul conto della partita di prova
+    if (previewPr !== null && left > 0) {
+      this.game.state.money += left;
+      this.game.save();
+    }
+    const got = previewPr !== null ? left : await claimPoker(this.game, true);
     const diff = got - bought;
     if (got > 0 || bought > 0) toast(diff > 0 ? `Poker: hai vinto ${euro(diff)}!` : diff < 0 ? `Poker: hai perso ${euro(-diff)}` : 'Poker: sei uscito pari', diff > 0 ? 'money' : 'info');
   }

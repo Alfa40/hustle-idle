@@ -1291,6 +1291,14 @@ body.launcher { background: linear-gradient(180deg, #ff9d4d, #6a4a9c 70%, #2b235
 .dv-vote.no { border-left-color: #ff5d73; }
 .dv-vote.mine { background: #fff; border-radius: 12px; padding: 8px 10px; border-left-width: 6px; }
 .dv-vote .dv-acts { margin-top: 6px; }
+/* proposta per cui Claude chiede un chiarimento (app developer e tester) */
+.dv-ask { background: rgba(255,255,255,.18); border-radius: 18px; padding: 6px; }
+.dv-ask .dv-note { background: #fff; color: var(--ink); }
+.dv-ask .dv-note.ask { background: #e4f0ff; color: #1d3f72; }
+.dv-ask .dv-note .dv-text { font-weight: 600; }
+.dv-ask-head { cursor: default; }
+.dv-ask > .dv-vote:not(.mine) { background: #fff; border-radius: 10px; padding: 6px 10px; border-left-color: #5b8def; }
+.dv-ask .dv-vote.mine { border-left-color: #5b8def; }
 .tp-vote { display: flex; flex-direction: column; gap: 8px; margin: 0; }
 .tp-com { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 15px; }
 .tp-hint { color: #fff; margin: 2px 4px; font-weight: 600; }
@@ -1513,3 +1521,19 @@ body.in-poker .toasts { z-index: 31; }
 .prop-prog i { display: block; height: 100%; width: 0; background: #2fa866; transition: width .2s; }
 /* impastatrice del panettiere: riquadro trasparente, sotto si vede la ciotola vera dall'alto */
 .ovl.ovl-clear { background: transparent; box-shadow: none; }
+/* scheda di un'anteprima (app developer e tester) */
+.dv-open { width: 100%; text-align: left; font: inherit; }
+.dv-open .dv-go { margin-left: auto; font-size: 26px; color: var(--ink-2); padding-left: 6px; }
+.dv-back { align-self: flex-start; font: inherit; font-weight: 700; font-size: 15px; color: #fff; background: rgba(0,0,0,.18); border: 0; border-radius: 14px; min-height: 44px; padding: 0 14px; }
+.dv-detail-top h3 { margin: 0 0 2px; }
+.dv-sec { color: #fff; margin: 6px 4px 0; font-size: 16px; }
+.dv-explain { font-size: 13.5px; line-height: 1.35; }
+.dv-explain .dv-li { padding-left: 4px; margin: 1px 0; }
+.dv-explain .dv-gap { height: 6px; }
+.dv-change { background: #e4f0ff; }
+.dv-change h3 { margin: 0 0 4px; }
+.dv-decide { gap: 8px; }
+.dv-decide .btn { flex: 1; min-height: 48px; }
+.dv-detail-top .btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; box-sizing: border-box; min-height: 50px; text-decoration: none; font-size: 17px; margin-top: 4px; }
+.dv-detail-top p { line-height: 1.3; }
+.dv-prev > .dv-note:not(.ok):not(.bad) { background: rgba(255,255,255,.85); color: var(--ink); }
