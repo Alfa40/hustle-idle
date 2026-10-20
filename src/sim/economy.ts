@@ -496,6 +496,39 @@ export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   return b;
 }
 
+/** quanto si recupera vendendo un'attività: metà della spesa (apertura, evoluzioni, migliorie), più la merce in magazzino al prezzo d'acquisto */
+export const SELL_SHARE = 0.5;
+
+/** Valore di vendita di un'attività e da cosa viene. */
+export function sellValue(b: Business) {
+  let upgrades = 0;
+  for (const [id, lvl] of Object.entries(b.upgrades) as [UpgradeId, number][]) {
+    const def = upgOf(b.type, id);
+    for (let l = 0; l < (lvl ?? 0); l++) upgrades += def.cost(l);
+  }
+  const stock = Object.entries(b.stock).reduce((a, [pid, n]) => a + (n ?? 0) * (PRODUCTS[pid as ProductId]?.cost ?? 0), 0);
+  const spent = b.boughtFor + upgrades;
+  return { spent, stock: Math.round(stock), total: Math.round(spent * SELL_SHARE + stock) };
+}
+
+/**
+ * Vende un'attività (per cambiarla con un'altra): i soldi tornano sul conto (`sellValue`), il posto torna libero e
+ * si può comprare di nuovo, i dipendenti tornano tra i candidati di oggi (si possono riassumere altrove).
+ */
+export function sellBusiness(s: GameState, b: Business) {
+  if (!s.businesses.includes(b)) return 0;
+  const v = sellValue(b).total;
+  addMoney(s, v);
+  for (const e of b.staff) {
+    e.trainingEnd = undefined;
+    s.candidates.push(e);
+  }
+  s.businesses = s.businesses.filter((x) => x !== b);
+  for (const g of s.chainGroups ?? []) g.bizIds = g.bizIds.filter((id) => id !== b.id);
+  toast(`💰 Hai venduto ${bizType(b.type).icon} ${bizType(b.type).name} in ${lotDef(b.lotId).name}: +${euro(v)}`, 'good');
+  return v;
+}
+
 export function buyStock(s: GameState, b: Business, pid: ProductId, qty: number, free = false) {
   const have = b.stock[pid] ?? 0;
   const room = stockCap(b) - have;

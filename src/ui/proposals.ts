@@ -15,6 +15,7 @@ import { bizType } from '../config/business';
 import { devApp, devKey, isDevDevice } from '../dev';
 import { testerKey } from '../tester';
 import { previewPr } from '../preview';
+import { previewStart } from '../previewStart';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, day } from '../sim/state';
 import { photoPicker, shrinkImage } from '../logo';
@@ -44,7 +45,7 @@ interface Proposal {
 }
 
 /** si vede la scheda "Proponi" su questo telefono */
-export const canPropose = () => previewPr === null && !devApp && (testerKey() !== '' || isDevDevice());
+export const canPropose = () => (previewPr === null && !devApp && (testerKey() !== '' || isDevDevice())) || !!previewStart?.tester;
 /** si vede la scheda "Proposte" (lettura e approvazione); nelle anteprime no */
 export const canReview = () => previewPr === null && !devApp && isDevDevice();
 
@@ -113,7 +114,10 @@ export class Proposals {
       verso: layout.portrait ? 'verticale' : 'orizzontale',
       telefono: /iPhone|iPad/.test(navigator.userAgent) ? 'iPhone/iPad' : /Android/.test(navigator.userAgent) ? 'Android' : 'altro',
     };
-    if (!this.photo || this.photo.startsWith('auto:')) {
+    if (document.body.classList.contains('in-poker')) {
+      // al tavolo delle sfide la foto della città non serve: meglio uno screenshot scelto dalla galleria
+      if (this.photo?.startsWith('auto:')) this.photo = null;
+    } else if (!this.photo || this.photo.startsWith('auto:')) {
       const shot = this.game.snapshot();
       this.photo = shot ? 'auto:' + toJpeg(shot, shot.width, shot.height) : null;
       if (this.photo === 'auto:null') this.photo = null;
@@ -122,6 +126,8 @@ export class Proposals {
 
   private whereNow() {
     const g = this.game;
+    const table = document.querySelector('.pk');
+    if (table) return `Sfide: ${table.classList.contains('bj') ? 'blackjack' : 'poker'}`;
     if (g.run) return `Lavoretto: ${g.run.title}`;
     if (g.interior) return `Dentro l'attività: ${bizType(g.interior.biz.type).name}`;
     if (g.house) return 'Dentro una casa';
@@ -137,7 +143,7 @@ export class Proposals {
         <button class="btn blue full" data-a="propNew">📝 Scrivi un'altra proposta</button>`;
     }
     const photo = this.photo ? this.photo.replace(/^auto:/, '') : '';
-    return `<p class="muted small explain">Scrivi cosa vorresti cambiare nel gioco, come lo diresti a voce. La foto dello schermo e il posto in cui eri vengono aggiunti da soli: puoi toglierli o scegliere un'altra foto. Puoi aggiungere anche un video dalla galleria, per esempio una registrazione dello schermo: si tengono i primi ${VIDEO_MAX_SEC} secondi, senza audio. Non cambia niente nella tua partita.</p>
+    return `<p class="muted small explain">Scrivi cosa vorresti cambiare nel gioco, come lo diresti a voce. La foto dello schermo e il posto in cui eri vengono aggiunti da soli: puoi toglierli o scegliere un'altra foto. Puoi aggiungere anche un video dalla galleria, per esempio una registrazione dello schermo: si tengono i primi ${VIDEO_MAX_SEC} secondi, senza audio. Non cambia niente nella tua partita. Se il tasto 📝 ti copre qualcosa, tienilo premuto e trascinalo dove vuoi.</p>
       <div class="card"><h3>📝 Cosa vorresti cambiare?</h3>
         <textarea class="lb-input prop-in" data-p="text" maxlength="${MAX_TEXT}" rows="4" placeholder="Es. Nel lavoretto del barista i clienti arrivano troppo in fretta">${esc(this.text)}</textarea></div>
       <div class="card"><h3>💡 Perché? <span class="muted small">(facoltativo)</span></h3>
@@ -230,6 +236,10 @@ export class Proposals {
     if (this.sending) return;
     if (this.text.trim().length < 3) {
       this.error = 'Scrivi cosa vorresti cambiare.';
+      return;
+    }
+    if (previewPr !== null) {
+      this.error = 'Questa è un\'anteprima: qui le proposte non si inviano. Scrivile nel gioco vero.';
       return;
     }
     this.sending = true;

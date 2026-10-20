@@ -59,11 +59,11 @@ function keyHtml() {
 function detailView(x: PrevItem) {
   const prop = x.prop;
   const accepted = prop?.status === 'accettata';
-  const head = detailHtml(x, explainOf(x.issue.number, render), true);
+  const head = detailHtml(x, explainOf(x.issue.number, render));
   const note = accepted
-    ? '<div class="dv-note ok">⏳ Accettata: entro una decina di minuti il robot la mette nel gioco e la pubblica.</div>'
+    ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
     : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}. Chiedi a Claude di aggiornarla qui sotto ("aggiorna il ramo con il gioco e risolvi i conflitti").</div>` : '';
-  const votes = `<h3 class="dv-sec">👥 Voti e commenti dei tester</h3>${votesBlock(prop)}`;
+  const votes = `<h3 class="dv-sec">👥 Consigli dei tester</h3>${votesBlock(prop)}`;
   if (!prop || accepted) return head + note + votes;
   const msg = changeMsg?.id === prop.id ? `<p class="small center ${changeMsg.ok ? 'good' : 'bad'}" style="margin:4px 0 0">${esc(changeMsg.text)}</p>` : '';
   const busy = changing === prop.id;
@@ -84,7 +84,7 @@ function previewsHtml(d: Data) {
   const row = (x: PrevItem) => {
     const prop = x.prop;
     const note = prop?.status === 'accettata'
-      ? '<div class="dv-note ok">⏳ Accettata: entro una decina di minuti il robot la mette nel gioco e la pubblica.</div>'
+      ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
       : prop?.mergeError ? '<div class="dv-note bad">⚠️ Non pubblicata: apri la scheda per sistemarla.</div>' : '';
     const ch = prop?.change ? '<div class="dv-note">✏️ Modifiche chieste a Claude</div>' : '';
     return `<div class="dv-prev">${previewHead(x)}${note}${ch}</div>`;
@@ -95,6 +95,14 @@ function previewsHtml(d: Data) {
   if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
   return prep + ready.map(row).join('');
 }
+
+/** la pagina scorre dentro .launcher-screen (fisso a tutto schermo), non nella finestra */
+const scroller = () => ui.querySelector<HTMLElement>('.launcher-screen');
+const getY = () => scroller()?.scrollTop ?? 0;
+const setY = (y: number) => {
+  const s = scroller();
+  if (s) s.scrollTop = y;
+};
 
 function render() {
   const dev = loadState(DEV_SLOT);
@@ -111,12 +119,12 @@ function render() {
       ${tabs}${content}
       <div class="t-row"><button class="t-btn t-small" data-a="reload" ${loading ? 'disabled' : ''}><span class="t-ico">🔄</span><b>${loading ? 'Carico…' : 'Aggiorna'}</b></button></div>`;
   }
-  const y = scrollY;
+  const y = getY();
   ui.innerHTML = `<div class="title launcher-screen">
     <div class="t-logo"><div class="t-name">HUSTLE DEV</div><div class="t-sub">Partita developer, anteprime e tester</div></div>
     <div class="t-menu">${body}</div></div>`;
   // ridisegnare non deve far perdere dove si era scorsi
-  scrollTo(0, y);
+  setY(y);
 }
 
 /** Anteprima piaciuta: accettata sul server; il robot di GitHub la unisce al gioco e la pubblica entro una decina di minuti. */
@@ -195,7 +203,7 @@ async function requestChanges(id: number) {
     const p = data?.props.find((x) => x.id === id);
     if (p) Object.assign(p, { change: text, changeAt: Date.now(), changeState: 'attesa', mergeError: '' });
     changeDrafts.delete(id);
-    changeMsg = { id, text: 'Inviate: entro una decina di minuti Claude ci lavora.', ok: true };
+    changeMsg = { id, text: 'Inviate: Claude ci lavora appena è libero (una cosa alla volta).', ok: true };
   } catch (e) {
     changeMsg = { id, text: `Non inviate: ${(e as Error).message}` };
   }
@@ -240,17 +248,17 @@ ui.addEventListener('click', (e) => {
     render();
   }
   if (a === 'open') {
-    listY = scrollY;
+    listY = getY();
     openIssue = Number(arg);
     confirmAccept = confirmReject = 0;
     changeMsg = null;
     render();
-    scrollTo(0, 0);
+    setY(0);
   }
   if (a === 'back') {
     openIssue = 0;
     render();
-    scrollTo(0, listY);
+    setY(listY);
   }
   if (a === 'change') void requestChanges(Number(arg));
   if (a === 'note') void sendNote(Number(arg));

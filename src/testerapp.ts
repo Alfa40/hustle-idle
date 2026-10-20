@@ -1,8 +1,8 @@
 /**
  * App dei tester (tester.html, da aggiungere alla schermata Home, separata dal gioco):
- * - Anteprime: in cima gli avvisi delle proposte in preparazione, poi le anteprime da provare sul telefono. Per
- *   ognuna il tester approva o boccia, con un commento facoltativo (si può cambiare finché è da provare), e vede i
- *   voti degli altri. È un parere: accettare o rifiutare resta allo sviluppatore (app developer, src/devapp.ts).
+ * - Anteprime: le stesse dell'app developer (src/devapp.ts), con la stessa scheda; al posto delle modifiche da chiedere
+ *   e dei tasti Accetta/Rifiuta il tester dà solo il suo consiglio (la pubblicherei / non la pubblicherei, con un
+ *   commento, cambiabile finché è da provare) e legge quelli degli altri. Decide sempre lo sviluppatore.
  * - Tester: per ogni tester le sue proposte finite, cioè rifiutate o entrate nel gioco (src/board.ts).
  * Serve la chiave tester (una volta per telefono, o il link `tester.html?tester=<chiave>`) e un nome. Le proposte
  * si scrivono sempre nel gioco (Opzioni → "Proponi"), dove c'è la foto dello schermo.
@@ -15,7 +15,7 @@ import './ui/layout';
 import { watchIcons } from './ui/icons';
 import { checkTesterLink, testerKey, tryTesterKey } from './tester';
 import { API, nickname as lbNickname, playerId } from './sim/leaderboard';
-import { askHtml, detailHtml, esc, explainOf, forgetExplains, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesBlock, votesHtml, type Data, type PrevItem, type Prop } from './board';
+import { askHtml, detailHtml, esc, explainOf, forgetExplains, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesBlock, type Data, type PrevItem, type Prop } from './board';
 
 const NAME_KEY = 'hustle.testerName';
 const MAX_COMMENT = 500;
@@ -65,22 +65,20 @@ function keyHtml() {
     <button class="btn good full" data-a="key" style="margin-top:8px">${first ? 'Entra' : 'Salva'}</button>${keyMsg ? `<p class="small center bad" style="margin:6px 0 0">${esc(keyMsg)}</p>` : ''}</div>`;
 }
 
-function voteBox(x: PrevItem, withOthers = true) {
-  const p = x.prop;
-  // aperta a mano su GitHub (non dal gioco): niente voti
-  if (!p) return '';
-  if (p.status === 'accettata') return `<div class="dv-note ok">⏳ Lo sviluppatore l'ha accettata: tra poco entra nel gioco.</div>${withOthers ? votesHtml(p) : ''}`;
+/** il consiglio del tester (pubblicarla o no, con un commento): decide sempre lo sviluppatore */
+function adviceBox(p: Prop) {
   const mine = p.votes?.find((v) => v.mine);
   const msg = voteMsg?.id === p.id ? `<p class="small center bad" style="margin:4px 0 0">${esc(voteMsg.text)}</p>` : '';
   if (mine && !editing.has(p.id)) {
-    return `<div class="dv-vote mine ${mine.vote === 'si' ? 'yes' : 'no'}"><b>Il tuo voto: ${mine.vote === 'si' ? '👍 Approvata' : '👎 Bocciata'}</b>${mine.comment ? `<div class="dv-text">${esc(mine.comment)}</div>` : ''}
-      <div class="dv-acts"><button class="btn sm sec" data-a="edit:${p.id}">✏️ Cambia voto</button></div></div>${withOthers ? votesHtml(p, true) : ''}${msg}`;
+    return `<div class="dv-vote mine ${mine.vote === 'si' ? 'yes' : 'no'}"><b>Il tuo consiglio: ${mine.vote === 'si' ? '👍 la pubblicherei' : '👎 non la pubblicherei'}</b>${mine.comment ? `<div class="dv-text">${esc(mine.comment)}</div>` : ''}
+      <div class="dv-acts"><button class="btn sm sec" data-a="edit:${p.id}">✏️ Cambia consiglio</button></div></div>${msg}`;
   }
   const busy = voting === p.id;
   const draft = drafts.get(p.id) ?? mine?.comment ?? '';
-  return `<div class="card tp-vote"><b>💬 Ti piace? Dillo dopo averla provata</b>
-      <textarea class="lb-input tp-com" data-c="${p.id}" maxlength="${MAX_COMMENT}" rows="2" placeholder="Commento (facoltativo): cosa va bene, cosa cambieresti">${esc(draft)}</textarea>
-      <div class="dv-acts"><button class="btn sm danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Boccio</button><button class="btn sm good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Approvo'}</button></div>${msg}</div>${withOthers ? votesHtml(p, true) : ''}`;
+  return `<div class="card tp-vote"><b>💬 Il tuo consiglio</b>
+      <p class="small muted" style="margin:0">Dopo averla provata: la metteresti nel gioco? Scrivi cosa va bene e cosa cambieresti. Decide lo sviluppatore, leggendo i consigli di tutti.</p>
+      <textarea class="lb-input tp-com" data-c="${p.id}" maxlength="${MAX_COMMENT}" rows="3" placeholder="Es. Mi piace, ma la linguetta è troppo grande">${esc(draft)}</textarea>
+      <div class="dv-acts dv-decide"><button class="btn danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Scartala</button><button class="btn good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Pubblicala'}</button></div>${msg}</div>`;
 }
 
 function asksHtml(d: Data) {
@@ -90,26 +88,47 @@ function asksHtml(d: Data) {
   return hint + asks.map((x) => askHtml(x, noteBoxHtml(x.prop, x.prop && noteDrafts.get(x.prop.id), noting === x.prop?.id, noteMsg && noteMsg.id === x.prop?.id ? noteMsg.text : '', !!x.prop && noteEditing.has(x.prop.id)))).join('');
 }
 
-/** scheda di un'anteprima: la proposta, cosa cambia, il tuo voto con commento e quelli degli altri */
+/** scheda di un'anteprima, come nell'app developer: la proposta, cosa cambia, i consigli dei tester e il tuo (niente
+ * modifiche da chiedere né tasti per pubblicare o rifiutare: quelli sono dello sviluppatore) */
 function detailView(x: PrevItem) {
-  const others = x.prop?.votes?.some((v) => !v.mine) ? votesHtml(x.prop, true) : votesBlock(undefined);
-  return detailHtml(x, explainOf(x.issue.number, render), false) + voteBox(x, false) + `<h3 class="dv-sec">👥 Voti degli altri tester</h3>${others}`;
+  const prop = x.prop;
+  const accepted = prop?.status === 'accettata';
+  const head = detailHtml(x, explainOf(x.issue.number, render));
+  const note = accepted
+    ? '<div class="dv-note ok">⏳ Lo sviluppatore l\'ha accettata: tra pochi minuti entra nel gioco.</div>'
+    : prop?.mergeError ? '<div class="dv-note bad">⚠️ Accettata, ma va sistemata prima di entrare nel gioco: ci pensa lo sviluppatore.</div>' : '';
+  const votes = `<h3 class="dv-sec">👥 Consigli dei tester</h3>${votesBlock(prop, true)}`;
+  // aperta a mano su GitHub (non dal gioco) o già accettata: niente consiglio da dare
+  return head + note + votes + (prop && !accepted ? adviceBox(prop) : '');
 }
 
 function previewsHtml(d: Data) {
   const { ready } = previewLists(d);
   const open = openIssue ? ready.find((x) => x.issue.number === openIssue) : undefined;
   if (open) return detailView(open);
-  const prep = prepHtml(d) + asksHtml(d);
-  const hint = '<p class="small tp-hint">Tocca un\'anteprima: la provi, la voti e leggi cosa ne pensano gli altri. Lo sviluppatore legge voti e commenti prima di decidere.</p>';
-  if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
-  // nell'elenco: l'anteprima e il tuo voto (se c'è); si vota e si leggono i commenti nella scheda
-  const mineTag = (x: PrevItem) => {
-    const v = x.prop?.votes?.find((y) => y.mine);
-    return v ? `<div class="dv-note">${v.vote === 'si' ? '👍 Hai approvato' : '👎 Hai bocciato'}</div>` : '<div class="dv-note">Da votare: aprila, provala e dì cosa ne pensi</div>';
+  // come nell'app developer: nell'elenco solo il riassunto (più il tuo consiglio), il resto nella scheda
+  const row = (x: PrevItem) => {
+    const prop = x.prop;
+    const note = prop?.status === 'accettata'
+      ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti entra nel gioco.</div>'
+      : prop?.mergeError ? '<div class="dv-note bad">⚠️ Accettata, ma va sistemata: ci pensa lo sviluppatore.</div>' : '';
+    const ch = prop?.change ? '<div class="dv-note">✏️ Lo sviluppatore ha chiesto delle modifiche a Claude</div>' : '';
+    const v = prop?.votes?.find((y) => y.mine);
+    const mine = !prop || prop.status === 'accettata' ? '' : `<div class="dv-note">${v ? (v.vote === 'si' ? '👍 Hai consigliato di pubblicarla' : '👎 Hai consigliato di non pubblicarla') : '💬 Da provare: aprila e dai il tuo consiglio'}</div>`;
+    return `<div class="dv-prev">${previewHead(x)}${note}${ch}${mine}</div>`;
   };
-  return prep + hint + ready.map((x) => `<div class="dv-prev">${previewHead(x)}${mineTag(x)}</div>`).join('');
+  const prep = prepHtml(d) + asksHtml(d);
+  if (!ready.length) return prep || '<div class="card"><p class="small center" style="margin:0">Nessuna anteprima da provare in questo momento.</p></div>';
+  return prep + ready.map(row).join('');
 }
+
+/** la pagina scorre dentro .launcher-screen (fisso a tutto schermo), non nella finestra */
+const scroller = () => ui.querySelector<HTMLElement>('.launcher-screen');
+const getY = () => scroller()?.scrollTop ?? 0;
+const setY = (y: number) => {
+  const s = scroller();
+  if (s) s.scrollTop = y;
+};
 
 function render() {
   let body: string;
@@ -125,12 +144,12 @@ function render() {
       <div class="t-row"><button class="t-btn t-small" data-a="reload" ${loading ? 'disabled' : ''}><span class="t-ico">🔄</span><b>${loading ? 'Carico…' : 'Aggiorna'}</b></button>
       <button class="t-btn t-small" data-a="name"><span class="t-ico">👤</span><b>${esc(savedName() || 'Il tuo nome')}</b></button></div>`;
   }
-  const y = scrollY;
+  const y = getY();
   ui.innerHTML = `<div class="title launcher-screen">
     <div class="t-logo"><div class="t-name">HUSTLE TESTER</div><div class="t-sub">Anteprime da provare e proposte dei tester</div></div>
     <div class="t-menu">${body}</div></div>`;
   // ridisegnare non deve far perdere dove si era scorsi
-  scrollTo(0, y);
+  setY(y);
 }
 
 async function vote(id: number, v: 'si' | 'no') {
@@ -211,15 +230,15 @@ ui.addEventListener('click', (e) => {
     render();
   }
   if (a === 'open') {
-    listY = scrollY;
+    listY = getY();
     openIssue = Number(arg);
     render();
-    scrollTo(0, 0);
+    setY(0);
   }
   if (a === 'back') {
     openIssue = 0;
     render();
-    scrollTo(0, listY);
+    setY(listY);
   }
   if (a === 'note') void sendNote(Number(arg));
   if (a === 'noteedit') {

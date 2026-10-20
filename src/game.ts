@@ -26,6 +26,7 @@ import { buildLandscape, Clouds, Sky } from './world/scenery';
 import { OutlineRenderer } from './render/outline';
 import { Particles } from './world/particles';
 import { firstPersonFov, ViewControl, LOOK_SENS } from './world/viewcam';
+import { createPedals, type PedalState } from './ui/pedals';
 import { RouteLine } from './world/guideline';
 import { Occluder } from './world/occlusion';
 import { board, exclamation, label, playerDot, ring, saleSign } from './world/props';
@@ -159,6 +160,10 @@ export interface JobRide {
   accel?: number;
   /** camera più lontana (mezzi grandi: si vede la strada davanti) */
   camZoom?: number;
+  /** comandi da gioco di auto: pedali (gas, freno) e frecce per girare, camera dietro al mezzo */
+  pedals?: boolean;
+  /** quanto gira (radianti al secondo, a velocità piena di sterzo) */
+  turn?: number;
 }
 
 export interface FriendBiz {
@@ -199,6 +204,12 @@ export class Game {
   private rideObj: THREE.Object3D | null = null;
   /** mezzo da lavoro del lavoretto in corso (vedi JobRide) */
   jobRide: JobRide | null = null;
+  /** pedali e frecce della guida (vedi JobRide.pedals) */
+  pedal: PedalState = { gas: false, brake: false, left: false, right: false };
+  private pedalPad: ReturnType<typeof createPedals> | null = null;
+  /** velocità lungo il muso del mezzo coi pedali (m/s, negativa in retromarcia) */
+  private rideSpeed = 0;
+  private brakeHold = 0;
   /** velocità attuale col mezzo da lavoro (con l'inerzia) */
   rideVel = new THREE.Vector3();
   /** Rimbalzo del veicolo contro ostacoli ed edifici della città (come se fossero di gomma). */
@@ -1451,6 +1462,15 @@ export class Game {
     for (const o of this.jobRide?.fpHide ?? []) o.visible = true;
     this.jobRide = r;
     this.rideVel.set(0, 0, 0);
+    this.rideSpeed = 0;
+    // pedali e frecce solo coi mezzi da guidare come in un gioco di auto
+    if (r?.pedals && !this.pedalPad) this.pedalPad = createPedals(this.pedal);
+    if (!r?.pedals && this.pedalPad) {
+      this.pedalPad.remove();
+      this.pedalPad = null;
+      this.view.yaw = 0;
+    }
+    this.input.pedals = !!r?.pedals;
     this.applyRide();
   }
 
@@ -1556,7 +1576,22 @@ export class Game {
 
   start() {
     this.clock.start();
-    this.renderer.setAnimationLoop(() => this.frame());
+    this.renderer.setAnimationLoop(() => this.safeFrame());
+    // tornando sull'app (anche dopo ore in pausa sul telefono) il ciclo deve girare: lo si rimette in moto
+    window.addEventListener('pageshow', () => this.renderer.setAnimationLoop(() => this.safeFrame()));
+  }
+
+  private frameErrors = 0;
+  /**
+   * Un errore in un'immagine non deve fermare il gioco per sempre (il ciclo di three.js si interrompe alla prima
+   * eccezione e lo schermo resterebbe fermo, senza rispondere ai tocchi): lo si segna e si va avanti.
+   */
+  private safeFrame() {
+    try {
+      this.frame();
+    } catch (e) {
+      if (this.frameErrors++ < 5) console.error(e);
+    }
   }
 
   private titleAngle = 0.6;
@@ -1893,7 +1928,8 @@ export class Game {
     const mz = v.y;
     const len = Math.hypot(mx, mz);
     const jr = this.jobRide;
-    if (jr?.inertia) {
+    if (jr?.pedals) this.drivePedals(dt, jr);
+    else if (jr?.inertia) {
       // mezzo da lavoro con l'inerzia: la velocità va verso quella voluta senza scatti
       const want = new THREE.Vector3(mx, 0, mz).multiplyScalar(jr.speed * Math.min(1, len));
       const dv = want.sub(this.rideVel);
@@ -1965,6 +2001,64 @@ export class Game {
   }
 
 
+
+  /** Comandi dei pedali e delle frecce (con la tastiera anche W/S/A/D o le frecce). */
+  pedalInput() {
+    const i = this.input;
+    const pd = this.pedal;
+    return {
+      gas: pd.gas || i.held('KeyW', 'ArrowUp'),
+      brake: pd.brake || i.held('KeyS', 'ArrowDown'),
+      steer: (pd.right || i.held('KeyD', 'ArrowRight') ? 1 : 0) - (pd.left || i.held('KeyA', 'ArrowLeft') ? 1 : 0),
+    };
+  }
+
+  /**
+   * Guida da gioco di auto: l'acceleratore spinge in avanti lungo il muso, il freno rallenta (e, da fermo e
+   * tenuto premuto, fa la retromarcia piano), senza pedali il mezzo rallenta da solo. Le frecce girano il muso,
+   * di più quando si va veloci (da fermi non si gira). La camera si mette piano dietro al mezzo.
+   */
+  private drivePedals(dt: number, jr: JobRide) {
+    const p = this.player.root.position;
+    const { gas, brake, steer } = this.pedalInput();
+    const max = jr.speed;
+    const acc = jr.accel ?? 6;
+    let v = this.rideSpeed;
+    // freno tenuto da fermo (o già in retromarcia): dopo un attimo si va indietro
+    this.brakeHold = brake && v < 0.3 ? this.brakeHold + dt : 0;
+    if (gas && !brake) v = v < 0 ? Math.min(0, v + acc * 2.2 * dt) : Math.min(max, v + acc * dt);
+    else if (brake) {
+      if (v > 0.05) v = Math.max(0, v - acc * 2.2 * dt);
+      else if (this.brakeHold > 0.4) v = Math.max(-max * 0.3, v - acc * 0.6 * dt);
+      else v = Math.min(0, v + acc * 2.2 * dt);
+    } else v -= Math.sign(v) * Math.min(Math.abs(v), acc * 0.35 * dt);
+    const turn = jr.turn ?? 1.5;
+    let h = this.player.root.rotation.y;
+    h -= steer * turn * Math.min(1, Math.abs(v) / 2.5) * Math.sign(v) * dt;
+    this.player.root.rotation.y = h;
+    const dx = Math.sin(h);
+    const dz = Math.cos(h);
+    if (Math.abs(v) > 0.01) {
+      const want = v * dt;
+      const ox = p.x;
+      const oz = p.z;
+      p.x += dx * want;
+      p.z += dz * want;
+      if (!this.arena) this.city.collide(p, jr.radius);
+      this.run?.collide?.(p, jr.radius);
+      this.arena?.collide(p, jr.radius);
+      if (!this.arena) this.traffic.pushOut(p, jr.radius);
+      // contro un muro o un'auto: il mezzo si ferma quasi del tutto
+      const moved = (p.x - ox) * dx + (p.z - oz) * dz;
+      if (Math.abs(want) > 0.02 && moved / want < 0.4) v *= 0.3;
+    }
+    this.rideSpeed = v;
+    this.rideVel.set(dx * v, 0, dz * v);
+    // camera dietro al mezzo: il muso guarda sempre verso l'alto dello schermo
+    let d = h + Math.PI - this.view.yaw;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    this.view.yaw += d * Math.min(1, dt * 3);
+  }
 
   private updateJobs(dt: number) {
     const s = this.state;
