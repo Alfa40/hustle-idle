@@ -37,6 +37,13 @@ export interface Prop {
   issue: number;
   /** perché l'ultima unione al gioco non è riuscita (torna da provare) */
   mergeError?: string;
+  /** perché (solo nell'app developer) e posto nel gioco */
+  why?: string;
+  where?: string;
+  /** modifiche chieste dallo sviluppatore dopo aver provato l'anteprima, quando, e se il robot le ha passate a Claude */
+  change?: string;
+  changeAt?: number;
+  changeState?: '' | 'attesa' | 'inviata';
   votes?: Vote[];
   notes?: Note[];
 }
@@ -181,13 +188,84 @@ export function prepHtml(d: Data) {
   return `<div class="card dv-preps"><h3>🛠️ In preparazione</h3>${rows.join('')}</div>`;
 }
 
-/** la scheda di un'anteprima da provare (sotto: avvisi, voti e tasti, diversi tra le due app) */
-export function previewHead(x: PrevItem) {
+/** un'anteprima nell'elenco: toccandola si apre la sua scheda (`data-a="open:<numero>"`), con un riassunto dei voti */
+export function previewHead(x: PrevItem, link = false) {
   const i = x.issue;
   const name = nameOf(x);
-  return `<a class="t-btn" href="${preview(i.number)}" target="_blank" rel="noopener">
-      <span class="t-ico">📱</span><span class="l-txt"><b>#${i.number} · ${esc(shortTitle(i))}</b>
-      <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}</small></span></a>`;
+  const vs = x.prop?.votes ?? [];
+  const yes = vs.filter((v) => v.vote === 'si').length;
+  const com = vs.filter((v) => v.comment).length;
+  const sum = vs.length ? ` · 👍 ${yes} · 👎 ${vs.length - yes}${com ? ` · 💬 ${com}` : ''}` : '';
+  const inner = `<span class="t-ico">📱</span><span class="l-txt"><b>#${i.number} · ${esc(shortTitle(i))}</b>
+      <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}${sum}</small></span>`;
+  return link
+    ? `<a class="t-btn" href="${preview(i.number)}" target="_blank" rel="noopener">${inner}</a>`
+    : `<button class="t-btn dv-open" data-a="open:${i.number}">${inner}<span class="dv-go">›</span></button>`;
+}
+
+// ---------------- scheda di un'anteprima ----------------
+
+/** testo dei commenti di GitHub reso leggibile: grassetti, elenchi, link senza indirizzo */
+function mdLite(md: string) {
+  return md.split('\n').map((line) => {
+    let l = esc(line.trim());
+    l = l.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '$1');
+    if (/^#+ /.test(l)) return `<b>${l.replace(/^#+ /, '')}</b>`;
+    if (/^[-*] /.test(l)) return `<div class="dv-li">• ${l.slice(2)}</div>`;
+    if (/^\d+\. /.test(l)) return `<div class="dv-li">${l}</div>`;
+    return l ? `<div>${l}</div>` : '<div class="dv-gap"></div>';
+  }).join('');
+}
+
+const explains = new Map<number, string | null>();
+const loadingExplain = new Set<number>();
+/** dopo "Aggiorna": le spiegazioni si rileggono (Claude può aver cambiato la proposta) */
+export const forgetExplains = () => explains.clear();
+/**
+ * Cosa ha cambiato Claude (e come provarlo): l'ultima spiegazione scritta nella proposta su GitHub. `done` ridisegna
+ * quando arriva; finché non c'è dà `undefined`, se non c'è nessuna spiegazione `null`.
+ */
+export function explainOf(issue: number, done: () => void): string | null | undefined {
+  if (explains.has(issue)) return explains.get(issue);
+  if (loadingExplain.has(issue)) return undefined;
+  loadingExplain.add(issue);
+  void gh<{ body: string; user: { login: string } }[]>(`/issues/${issue}/comments?per_page=100`)
+    .then((cs) => {
+      const ok = cs.filter((c) => c.user.login !== 'claude' && !c.body.startsWith('<!--') && !c.body.startsWith('Nota:') && !c.body.startsWith('✏️') && c.body.length > 150);
+      const best = [...ok].reverse().find((c) => /Come provarlo|Cosa cambia/i.test(c.body)) ?? ok[ok.length - 1];
+      // via i link per accettare o cambiare (nelle app ci sono i tasti)
+      explains.set(issue, best ? best.body.split('\n').filter((l) => !/^(📱|✅|✏️) \*\*/.test(l.trim())).join('\n').trim() : null);
+    })
+    .catch(() => explains.set(issue, null))
+    .finally(() => {
+      loadingExplain.delete(issue);
+      done();
+    });
+  return undefined;
+}
+
+/** la parte comune della scheda: indietro, tasto per giocare l'anteprima, la proposta, cosa cambia, modifiche chieste */
+export function detailHtml(x: PrevItem, explain: string | null | undefined, dev: boolean) {
+  const i = x.issue;
+  const p = x.prop;
+  const name = nameOf(x);
+  const ex = explain === undefined ? '<p class="small muted" style="margin:0">Carico…</p>' : explain ? mdLite(explain) : '<p class="small muted" style="margin:0">Nessuna spiegazione.</p>';
+  const ch = p?.change
+    ? `<div class="card dv-change"><h3>✏️ Modifiche chieste ${p.changeAt ? ago(p.changeAt) : ''}</h3><div class="dv-text">${esc(p.change)}</div>
+        <p class="small muted" style="margin:6px 0 0">${p.changeState === 'attesa' ? 'Entro una decina di minuti il robot le passa a Claude.' : 'Claude le sta preparando o le ha già fatte: l\'anteprima si aggiorna da sola (guarda "aggiornata").'}</p></div>`
+    : '';
+  return `<button class="dv-back" data-a="back">‹ Tutte le anteprime</button>
+    <div class="card dv-detail-top"><h3>#${i.number} · ${esc(shortTitle(i))}</h3>
+      <p class="small muted" style="margin:0 0 8px">${name ? `di <b>${esc(name)}</b> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}</p>
+      <a class="btn good full" href="${preview(i.number)}" target="_blank" rel="noopener">📱 Gioca l'anteprima</a></div>
+    <div class="card"><h3>📝 La proposta</h3><div class="dv-text">${esc(p?.text ?? shortTitle(i))}</div>
+      ${dev && p?.why ? `<p class="small" style="margin:6px 0 0"><b>Perché:</b> ${esc(p.why)}</p>` : ''}${dev && p?.where ? `<p class="small muted" style="margin:4px 0 0">📍 ${esc(p.where)}</p>` : ''}</div>
+    <div class="card dv-explain"><h3>🛠️ Cosa cambia</h3>${ex}</div>${ch}`;
+}
+
+/** i voti con i commenti, oppure "nessun voto" (nella scheda dell'anteprima) */
+export function votesBlock(p: Prop | undefined, skipMine = false) {
+  return votesHtml(p, skipMine) || '<div class="card"><p class="small muted center" style="margin:0">Nessun tester l\'ha ancora votata.</p></div>';
 }
 
 /** la scheda di una proposta per cui Claude chiede un chiarimento; sotto, il riquadro per rispondere (`box`) */
@@ -199,7 +277,7 @@ export function askHtml(x: PrevItem, box: string) {
       <small>${name ? `di <span class="dv-who">${esc(name)}</span> · ` : ''}${ago(Date.parse(x.issue.updated_at))}</small></span></div>
     <div class="dv-note"><b>La proposta</b><div class="dv-text">${esc(x.prop?.text ?? shortTitle(x.issue))}</div></div>
     <div class="dv-note ask"><b>Claude chiede</b><div class="dv-text">${esc(q || 'Cosa intendi, di preciso?')}</div></div>
-    ${x.ready ? previewHead(x).replace('</b>', ' · prova</b>') : ''}
+    ${x.ready ? previewHead(x, true).replace('</b>', ' · prova</b>') : ''}
     ${notes.map((n) => `<div class="dv-vote"><b>💬 ${esc(n.name)}</b> <span class="muted">${ago(n.at)}</span><div class="dv-text">${esc(n.comment)}</div></div>`).join('')}${box}</div>`;
 }
 

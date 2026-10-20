@@ -86,6 +86,8 @@
   (avvisi "In preparazione", resoconti con solo rifiutate e nel gioco). Proposta poco chiara: etichetta `chiarimento` sulla
   issue e domanda nel testo tra `<!-- domanda -->` e `<!-- /domanda -->`: nelle app compare "❓ Serve un chiarimento"
   con il riquadro per rispondere (risposte in `notes`, server `vote: "nota"`).
+  Toccando un'anteprima si apre la sua scheda (src/board.ts `detailHtml`): voti e commenti, "Cosa cambia" da GitHub;
+  nell'app developer "Modifiche da fare" (`request_changes` → robot → `claude.yml` con `richiesta`, stesso ramo) e i tasti.
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
