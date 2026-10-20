@@ -624,7 +624,7 @@ function mixerModel(run: PhasedRun, at: THREE.Vector3): MixerView & { group: THR
 /**
  * Panettiere notturno: si preparano gli impasti per la mattina, niente forno. Il foglio degli ordini dice cosa
  * fare, uno dopo l'altro: farina → nell'impastatrice (la camera va dall'alto sulla vasca: acqua, lievito e sale al
- * momento giusto e nella quantità della ricetta, vedi MixerStation) → per i cornetti il burro dal frigo → banco
+ * momento giusto e nella quantità della ricetta, trascinando brocca, lievito e saliera sulla vasca: vedi MixerStation) → per i cornetti il burro dal frigo → banco
  * (dai la forma, tieni premuto) → la cella di lievitazione, sul ripiano del suo tipo. Il ripiano sbagliato si
  * può scegliere, ma conta alla fine (meno stelle e paga).
  */
@@ -696,7 +696,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
-    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b> e mettila nell\'<b>impastatrice</b>. Mentre gira, aggiungi <b>acqua</b>, <b>lievito</b> e <b>sale</b> quando arriva il loro momento sulla barra: tieni premuto e lascia sul numero della ricetta. Per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
+    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b> e mettila nell\'<b>impastatrice</b>. Mentre gira, quando arriva il loro momento sulla barra, prendi col dito la <b>brocca dell\'acqua</b>, la <b>manciata di lievito</b> e la <b>saliera</b> e trascinale sopra la vasca: versano finché restano lì. Allontanale quando il misurino arriva sulla tacca della ricetta. Per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
     tasks: () => [
       { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1, r: recipes[next] }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
       {

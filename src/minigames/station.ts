@@ -789,10 +789,13 @@ export interface MixerView {
 
 /**
  * L'impastatrice gira da sola per `dur` secondi (la barra in alto, con le finestre di ogni ingrediente: prima
- * l'acqua, poi il lievito, per ultimo il sale). Tieni premuto il tasto di un ingrediente per versarlo: il numero
- * sale finché tieni il dito, lascia quando arrivi alla quantità della ricetta. Versare fuori dalla sua finestra o
- * sbagliare la quantità abbassa la qualità; un ingrediente mai messo la fa crollare. Il riquadro è trasparente in
- * mezzo: si vede la ciotola vera, dall'alto.
+ * l'acqua, poi il lievito, per ultimo il sale). In basso, sul ripiano, ci sono la **brocca** dell'acqua, la
+ * **manciata di lievito** e la **saliera**: si prendono col dito e si trascinano sopra la vasca. Lì si inclinano e
+ * versano (il numero sale finché restano sopra la vasca); si allontanano o si lasciano quando si arriva alla dose
+ * della ricetta, e tornano da sole sul ripiano. Mentre versi, accanto all'oggetto c'è un misurino grande con la
+ * tacca della ricetta e la fascia verde. Versare fuori dalla sua finestra o sbagliare la quantità abbassa la
+ * qualità; un ingrediente mai messo la fa crollare. Il riquadro è trasparente in mezzo: si vede la vasca vera,
+ * dall'alto.
  */
 export class MixerStation extends Station {
   private p = 0;
@@ -800,12 +803,17 @@ export class MixerStation extends Station {
   /** quanto è stato versato fuori dalla sua finestra (0–1 della quantità giusta) */
   private off: Record<MixIng, number> = { acqua: 0, lievito: 0, sale: 0 };
   private pouring: MixIng | null = null;
+  /** oggetto preso col dito (segue il dito, un po' più in alto perché il dito non lo copra) */
+  private drag: MixIng | null = null;
+  /** inclinazione di ogni oggetto (0 dritto, 1 versa), morbida */
+  private tilt: Record<MixIng, number> = { acqua: 0, lievito: 0, sale: 0 };
   private msg = '';
   private msgT = 0;
   private tail = 0;
+  private t = 0;
   /** com'è andata, una riga per il messaggio finale */
   verdict = '';
-  private btns: Record<MixIng, { x: number; y: number; w: number; h: number }> = {} as never;
+  private slots: Record<MixIng, { x: number; y: number; w: number; h: number }> = {} as never;
 
   constructor(
     private o: { title: string; recipe: Record<MixIng, number>; dur: number; win: Record<MixIng, [number, number]>; tol: number; rate: Record<MixIng, number>; view: MixerView },
@@ -815,36 +823,55 @@ export class MixerStation extends Station {
     this.root.classList.add('ovl-clear');
   }
 
-  /** spazio trasparente tra la ricetta in alto e i tasti in basso (coordinate dello schermo): lì si vede la vasca */
+  private static TOP_H = 112;
+
+  /** spazio trasparente tra la ricetta in alto e il ripiano in basso (coordinate dello schermo): lì si vede la vasca */
   viewRect() {
     const r = this.cv.getBoundingClientRect();
-    const b = this.btns.acqua;
-    if (!r.width || !b) return null;
-    const top = r.top + 6 + 104 + 6;
-    const bottom = r.top + b.y - 6;
-    return { x: r.left, y: top, w: r.width, h: Math.max(40, bottom - top) };
+    const v = this.bowlArea();
+    if (!r.width || !v) return null;
+    return { x: r.left, y: r.top + v.top, w: r.width, h: v.bottom - v.top };
+  }
+
+  /** zona della vasca nel riquadro (la camera la mette al centro di questo spazio) */
+  private bowlArea() {
+    const b = this.slots.acqua;
+    if (!b) return null;
+    const top = 6 + MixerStation.TOP_H + 6;
+    const bottom = Math.max(top + 40, b.y - 6);
+    const cx = this.w / 2;
+    const cy = (top + bottom) / 2;
+    return { top, bottom, cx, cy, r: Math.min(this.w, bottom - top) * 0.3 };
   }
 
   private hit(x: number, y: number): MixIng | null {
     for (const k of MIX_ORDER) {
-      const b = this.btns[k];
+      const b = this.slots[k];
       if (b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return k;
     }
     return null;
   }
 
-  protected down(x: number, y: number) {
-    this.pouring = this.p < 1 ? this.hit(x, y) : null;
-    if (!this.pouring) return;
-    const [a, b] = this.o.win[this.pouring];
-    if (this.p < a) this.say(`Troppo presto per ${MIX_INGS[this.pouring].name.toLowerCase()}!`);
-    else if (this.p > b) this.say(`Troppo tardi per ${MIX_INGS[this.pouring].name.toLowerCase()}!`);
+  /** dove sta l'oggetto preso: sopra il dito */
+  private held() {
+    const f = this.finger!;
+    return { x: f.x, y: f.y - this.objSize() * 1.1 };
   }
-  protected move(x: number, y: number) {
-    // il dito scivola fuori dal tasto: si smette di versare
-    if (this.pouring && this.hit(x, y) !== this.pouring) this.pouring = null;
+
+  private objSize() {
+    const b = this.slots.acqua;
+    return b ? Math.min(34, b.h * 0.3, b.w * 0.28) : 30;
+  }
+
+  protected down(x: number, y: number) {
+    this.drag = this.p < 1 ? this.hit(x, y) : null;
+    if (!this.drag) return;
+    const [a, b] = this.o.win[this.drag];
+    if (this.p < a) this.say(`Troppo presto per ${MIX_INGS[this.drag].name.toLowerCase()}!`);
+    else if (this.p > b) this.say(`Troppo tardi per ${MIX_INGS[this.drag].name.toLowerCase()}!`);
   }
   protected up() {
+    this.drag = null;
     this.pouring = null;
   }
 
@@ -881,9 +908,18 @@ export class MixerStation extends Station {
 
   step(dt: number) {
     const o = this.o;
+    this.t += dt;
+    // versa solo se l'oggetto preso è sopra la vasca
+    const v = this.bowlArea();
+    if (this.drag && this.finger && v) {
+      const h = this.held();
+      this.pouring = Math.hypot(h.x - v.cx, h.y - v.cy) < v.r * 1.25 ? this.drag : null;
+    } else this.pouring = null;
+    for (const k of MIX_ORDER) this.tilt[k] += ((this.pouring === k ? 1 : 0) - this.tilt[k]) * Math.min(1, dt * 12);
     if (this.p < 1) {
       this.p = Math.min(1, this.p + dt / o.dur);
-      if (this.pouring) {
+      // si versa quando l'oggetto è già inclinato (non appena arriva sopra la vasca)
+      if (this.pouring && this.tilt[this.pouring] > 0.6) {
         const k = this.pouring;
         const add = o.rate[k] * dt;
         this.amt[k] += add;
@@ -893,96 +929,378 @@ export class MixerStation extends Station {
       // finestra passata senza l'ingrediente: avviso (si può ancora mettere, in ritardo)
       for (const k of MIX_ORDER) if (this.amt[k] <= 0 && this.p > o.win[k][1] && this.p - dt / o.dur <= o.win[k][1]) this.say(`${MIX_INGS[k].icon} Hai dimenticato ${MIX_INGS[k].name.toLowerCase()}!`);
     } else {
+      this.drag = null;
       this.pouring = null;
       this.tail += dt;
       if (this.tail > 0.7) return this.finish();
     }
     this.msgT -= dt;
-    o.view.frame(dt, this.p, this.amt.acqua / o.recipe.acqua, this.pouring);
-    this.draw();
+    const flowing = this.pouring && this.tilt[this.pouring] > 0.6 ? this.pouring : null;
+    o.view.frame(dt, this.p, this.amt.acqua / o.recipe.acqua, flowing);
+    this.draw(flowing);
   }
 
-  private draw() {
+  private now(k: MixIng) {
+    const [a, b] = this.o.win[k];
+    return this.p >= a && this.p <= b;
+  }
+
+  private draw(flowing: MixIng | null) {
     const g = this.g;
     const { w, h } = this;
     const o = this.o;
     g.clearRect(0, 0, w, h);
-    // in alto: titolo, ricetta e barra del tempo con le finestre
-    const topH = 104;
-    g.fillStyle = 'rgba(255,248,236,.94)';
+    // ---- in alto: titolo, ricetta grande e barra del tempo con le finestre
+    const topH = MixerStation.TOP_H;
+    g.fillStyle = 'rgba(255,248,236,.95)';
     g.beginPath();
     g.roundRect(6, 6, w - 12, topH, 14);
     g.fill();
-    this.text(o.title, w / 2, 22, 16);
-    this.text(MIX_ORDER.map((k) => `${MIX_INGS[k].icon} ${o.recipe[k]} ${MIX_INGS[k].unit}`).join('   '), w / 2, 46, 15, '#3a2f55', 700);
+    this.text(o.title, w / 2, 20, 15);
+    // ricetta: tre caselle con dose grande, quella del momento colorata
+    const cw = (w - 24 - 12) / 3;
+    MIX_ORDER.forEach((k, i) => {
+      const x = 12 + i * (cw + 6);
+      const on = this.now(k) && this.p < 1;
+      const ok = this.amt[k] > 0 && Math.abs(this.amt[k] - o.recipe[k]) / o.recipe[k] <= o.tol;
+      g.fillStyle = on ? MIX_INGS[k].color : ok ? 'rgba(53,196,106,.18)' : 'rgba(58,47,85,.07)';
+      g.beginPath();
+      g.roundRect(x, 32, cw, 30, 9);
+      g.fill();
+      this.text(`${ok ? '✅' : MIX_INGS[k].icon} ${o.recipe[k]} ${MIX_INGS[k].unit}`, x + cw / 2, 47, 16, on ? '#ffffff' : '#3a2f55', 700);
+    });
     const bx = 18;
     const bw = w - 36;
-    const by = 64;
+    const by = 70;
     g.fillStyle = 'rgba(58,47,85,.12)';
     g.beginPath();
-    g.roundRect(bx, by, bw, 18, 9);
+    g.roundRect(bx, by, bw, 16, 8);
     g.fill();
     for (const k of MIX_ORDER) {
       const [a, b] = o.win[k];
       g.fillStyle = MIX_INGS[k].color;
-      g.globalAlpha = this.amt[k] > 0 ? 0.45 : 0.85;
+      g.globalAlpha = this.amt[k] > 0 ? 0.4 : 0.85;
       g.beginPath();
-      g.roundRect(bx + a * bw, by, (b - a) * bw, 18, 6);
+      g.roundRect(bx + a * bw, by, (b - a) * bw, 16, 6);
       g.fill();
       g.globalAlpha = 1;
-      this.text(MIX_INGS[k].icon, bx + ((a + b) / 2) * bw, by + 9, 13);
+      this.text(MIX_INGS[k].icon, bx + ((a + b) / 2) * bw, by + 8, 12);
     }
-    // cursore
     const cx = bx + this.p * bw;
     g.fillStyle = '#3a2f55';
-    g.fillRect(cx - 2, by - 5, 4, 28);
+    g.fillRect(cx - 2, by - 5, 4, 26);
     const line = this.msgT > 0 ? this.msg : this.p >= 1 ? 'Impasto pronto!' : this.hint();
-    this.text(line, w / 2, 96, 13, this.msgT > 0 ? '#e5484d' : '#7a6f8f', 600);
-    // in basso: i tre tasti, da tenere premuti
+    const nowK = MIX_ORDER.find((k) => this.now(k));
+    this.text(line, w / 2, 102, 14, this.msgT > 0 ? '#e5484d' : nowK && this.p < 1 ? MIX_INGS[nowK].color : '#7a6f8f', 700);
+
+    // ---- in basso: il ripiano con brocca, lievito e saliera
     const gap = 8;
-    const bh = Math.min(96, Math.max(76, h * 0.17));
-    const bwid = (w - 12 - gap * 2) / 3;
+    const bh = Math.min(118, Math.max(92, h * 0.2));
+    const sw = (w - 12 - gap * 2) / 3;
     const y0 = h - bh - 6;
+    const s = this.objSize();
     MIX_ORDER.forEach((k, i) => {
-      const x = 6 + i * (bwid + gap);
-      this.btns[k] = { x, y: y0, w: bwid, h: bh };
-      const [a, b] = o.win[k];
-      const now = this.p >= a && this.p <= b;
-      const on = this.pouring === k;
-      g.fillStyle = on ? MIX_INGS[k].color : now ? '#ffffff' : 'rgba(255,248,236,.9)';
+      const x = 6 + i * (sw + gap);
+      this.slots[k] = { x, y: y0, w: sw, h: bh };
+      const on = this.now(k) && this.p < 1;
+      const pulse = on ? 0.5 + 0.5 * Math.sin(this.t * 7) : 0;
+      g.fillStyle = on ? '#ffffff' : 'rgba(255,248,236,.9)';
       g.beginPath();
-      g.roundRect(x, y0, bwid, bh, 14);
+      g.roundRect(x, y0, sw, bh, 14);
       g.fill();
-      g.lineWidth = now ? 4 : 2;
-      g.strokeStyle = now ? MIX_INGS[k].color : 'rgba(58,47,85,.25)';
+      g.lineWidth = on ? 3 + 2 * pulse : 2;
+      g.strokeStyle = on ? MIX_INGS[k].color : 'rgba(58,47,85,.25)';
       g.stroke();
-      const ink = on ? '#ffffff' : '#3a2f55';
-      this.text(`${MIX_INGS[k].icon} ${MIX_INGS[k].name}`, x + bwid / 2, y0 + 18, 14, ink, 700);
-      // quantità versata e indicatore con la tacca della ricetta
+      // l'oggetto sta sul ripiano (o il suo posto vuoto, tratteggiato, se è in mano)
+      const ox = x + sw / 2;
+      const oy = y0 + 8 + s * 0.85;
+      if (this.drag === k) {
+        g.setLineDash([5, 4]);
+        g.strokeStyle = 'rgba(58,47,85,.3)';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.ellipse(ox, oy + s * 0.55, s * 0.7, s * 0.2, 0, 0, Math.PI * 2);
+        g.stroke();
+        g.setLineDash([]);
+      } else this.drawObj(k, ox, oy - (on ? 3 * pulse : 0), s, 0);
       const want = o.recipe[k];
-      const val = Math.round(this.amt[k]);
-      this.text(`${val} / ${want} ${MIX_INGS[k].unit}`, x + bwid / 2, y0 + 40, 13, ink, 600);
-      const gx = x + 10;
-      const gw = bwid - 20;
-      const gy = y0 + 54;
-      const max = want * 1.5;
-      g.fillStyle = on ? 'rgba(255,255,255,.35)' : 'rgba(58,47,85,.12)';
-      g.fillRect(gx, gy, gw, 10);
-      // fascia giusta
-      g.fillStyle = 'rgba(53,196,106,.55)';
-      g.fillRect(gx + ((want * (1 - o.tol)) / max) * gw, gy, ((want * 2 * o.tol) / max) * gw, 10);
-      const err = Math.abs(this.amt[k] - want) / want;
-      g.fillStyle = this.amt[k] <= 0 ? 'transparent' : err <= o.tol ? '#1f9a4c' : this.amt[k] > want ? '#e5484d' : (on ? '#ffffff' : MIX_INGS[k].color);
-      g.fillRect(gx, gy, Math.min(1, this.amt[k] / max) * gw, 10);
-      g.fillStyle = '#3a2f55';
-      g.fillRect(gx + (want / max) * gw - 1, gy - 3, 2, 16);
-      if (bh > 80) this.text(now ? 'ORA!' : this.p < a ? 'non ancora' : 'passato', x + bwid / 2, y0 + bh - 12, 11, on ? '#ffffff' : now ? MIX_INGS[k].color : '#9a90ad', 600);
+      this.text(`${Math.round(this.amt[k])} / ${want} ${MIX_INGS[k].unit}`, ox, y0 + bh - 32, 14, '#3a2f55', 700);
+      this.gauge(k, x + 10, y0 + bh - 20, sw - 20, 9);
+      if (on && !this.drag) this.text('ORA!', x + sw - 20, y0 + 14, 12, MIX_INGS[k].color, 800);
     });
+
+    // ---- la vasca: cerchio tratteggiato dove portare l'oggetto (solo mentre ne hai uno in mano)
+    const v = this.bowlArea();
+    if (this.drag && v) {
+      g.setLineDash([8, 6]);
+      g.lineWidth = 3;
+      g.strokeStyle = this.pouring ? 'rgba(53,196,106,.9)' : 'rgba(255,255,255,.85)';
+      g.beginPath();
+      g.arc(v.cx, v.cy, v.r * 1.25, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+      if (!this.pouring) this.text('Portalo sopra la vasca', v.cx, v.cy - v.r * 1.25 - 12, 13, '#ffffff', 700);
+    }
+
+    // ---- l'oggetto in mano: segue il dito, sopra la vasca si inclina e versa; accanto il misurino grande
+    if (this.drag && this.finger) {
+      const k = this.drag;
+      const hp = this.held();
+      const big = s * 1.35;
+      this.drawObj(k, hp.x, hp.y, big, this.tilt[k]);
+      if (flowing) this.drawFlow(k, hp.x, hp.y, big);
+      this.bigGauge(k, hp.x, hp.y, big);
+    }
+  }
+
+  /** barretta della dose: fascia verde giusta, tacca della ricetta, colore rosso se troppo */
+  private gauge(k: MixIng, x: number, y: number, gw: number, gh: number) {
+    const g = this.g;
+    const o = this.o;
+    const want = o.recipe[k];
+    const max = want * 1.5;
+    g.fillStyle = 'rgba(58,47,85,.12)';
+    g.fillRect(x, y, gw, gh);
+    g.fillStyle = 'rgba(53,196,106,.55)';
+    g.fillRect(x + ((want * (1 - o.tol)) / max) * gw, y, ((want * 2 * o.tol) / max) * gw, gh);
+    g.fillStyle = this.doseColor(k);
+    g.fillRect(x, y, Math.min(1, this.amt[k] / max) * gw, gh);
+    g.fillStyle = '#3a2f55';
+    g.fillRect(x + (want / max) * gw - 1, y - 3, 2, gh + 6);
+  }
+
+  private doseColor(k: MixIng) {
+    const want = this.o.recipe[k];
+    const err = Math.abs(this.amt[k] - want) / want;
+    return this.amt[k] <= 0 ? 'transparent' : err <= this.o.tol ? '#1f9a4c' : this.amt[k] > want ? '#e5484d' : MIX_INGS[k].color;
+  }
+
+  /** misurino grande accanto all'oggetto in mano: numero grosso e colonna con la fascia verde */
+  private bigGauge(k: MixIng, x: number, y: number, s: number) {
+    const g = this.g;
+    const o = this.o;
+    const want = o.recipe[k];
+    const max = want * 1.5;
+    const gw = 26;
+    const gh = Math.min(130, Math.max(90, this.h * 0.2));
+    // a destra dell'oggetto (si versa verso sinistra), a sinistra solo se a destra non ci sta
+    const right = x + s * 0.9 + 8 + gw + 80 < this.w;
+    const gx = right ? x + s * 0.9 + 8 : x - s * 0.9 - 8 - gw - 70;
+    const gy = Math.max(8, Math.min(this.h - gh - 8, y - gh / 2));
+    g.fillStyle = 'rgba(255,248,236,.95)';
+    g.beginPath();
+    g.roundRect(gx - 6, gy - 6, gw + 82, gh + 12, 12);
+    g.fill();
+    g.fillStyle = 'rgba(58,47,85,.12)';
+    g.beginPath();
+    g.roundRect(gx, gy, gw, gh, 6);
+    g.fill();
+    const yOf = (v: number) => gy + gh - (Math.min(max, v) / max) * gh;
+    g.fillStyle = 'rgba(53,196,106,.5)';
+    g.fillRect(gx, yOf(want * (1 + o.tol)), gw, yOf(want * (1 - o.tol)) - yOf(want * (1 + o.tol)));
+    g.fillStyle = this.doseColor(k);
+    g.fillRect(gx + 4, yOf(this.amt[k]), gw - 8, gy + gh - yOf(this.amt[k]));
+    g.fillStyle = '#3a2f55';
+    g.fillRect(gx - 4, yOf(want) - 1.5, gw + 8, 3);
+    const err = Math.abs(this.amt[k] - want) / want;
+    const col = this.amt[k] <= 0 ? '#3a2f55' : err <= o.tol ? '#1f9a4c' : this.amt[k] > want ? '#e5484d' : '#3a2f55';
+    const tx = gx + gw + 40;
+    this.text(`${Math.round(this.amt[k])}`, tx, gy + gh / 2 - 16, 26, col, 800);
+    this.text(`di ${want} ${MIX_INGS[k].unit}`, tx, gy + gh / 2 + 8, 12, '#7a6f8f', 700);
+    const tag = this.amt[k] <= 0 ? '' : err <= o.tol ? 'Giusto!' : this.amt[k] > want ? 'Troppo!' : 'Ancora…';
+    if (tag) this.text(tag, tx, gy + gh / 2 + 28, 13, col, 800);
+  }
+
+  /** angolo massimo di ogni oggetto quando versa */
+  private static TILT: Record<MixIng, number> = { acqua: 1.25, lievito: 1.4, sale: 2.4 };
+
+  /** l'ingrediente che scende dall'oggetto (dal beccuccio, dai buchi o dalle dita) giù nella vasca */
+  private drawFlow(k: MixIng, x: number, y: number, s: number) {
+    const g = this.g;
+    // punto da cui esce, nell'oggetto dritto, poi girato come l'oggetto
+    const loc = k === 'acqua' ? [-s * 0.63, -s * 0.85] : k === 'sale' ? [0, -s * 0.75] : [-s * 0.62, -s * 0.15];
+    const a = -this.tilt[k] * MixerStation.TILT[k];
+    const sx = x + loc[0] * Math.cos(a) - loc[1] * Math.sin(a);
+    const sy = y + loc[0] * Math.sin(a) + loc[1] * Math.cos(a);
+    const fall = s * 1.6;
+    if (k === 'acqua') {
+      g.strokeStyle = 'rgba(110,198,255,.95)';
+      g.lineCap = 'round';
+      for (const [lw, col] of [[9, 'rgba(255,255,255,.8)'], [6, 'rgba(70,170,240,.95)']] as const) {
+        g.lineWidth = lw;
+        g.strokeStyle = col;
+        g.beginPath();
+        g.moveTo(sx, sy);
+        g.quadraticCurveTo(sx - 8, sy + fall * 0.4, sx - 4 + Math.sin(this.t * 20) * 1.5, sy + fall);
+        g.stroke();
+      }
+      g.lineCap = 'butt';
+      // schizzi dove cade
+      g.fillStyle = 'rgba(160,215,255,.9)';
+      for (let i = 0; i < 5; i++) {
+        const f = (this.t * 3 + i / 5) % 1;
+        g.beginPath();
+        g.arc(sx - 4 + Math.cos(i * 2.4) * 14 * f, sy + fall - 6 * Math.sin(f * Math.PI), 2.4 * (1 - f) + 0.6, 0, Math.PI * 2);
+        g.fill();
+      }
+      return;
+    }
+    // granelli di sale o di lievito che cadono
+    for (let i = 0; i < 16; i++) {
+      const f = (this.t * 2.4 + i / 16) % 1;
+      const px = sx + Math.sin(i * 7.3) * (3 + 8 * f);
+      const py = sy + fall * f;
+      g.fillStyle = k === 'sale' ? '#ffffff' : '#c9a26b';
+      g.strokeStyle = 'rgba(58,47,85,.5)';
+      g.lineWidth = 1;
+      g.beginPath();
+      g.arc(px, py, k === 'sale' ? 2.2 : 3, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
+  }
+
+  /** disegna brocca, manciata di lievito o saliera (centro in x,y, grande s); tilt 0–1 = inclinato per versare */
+  private drawObj(k: MixIng, x: number, y: number, s: number, tilt: number) {
+    const g = this.g;
+    const ink = '#3a2f55';
+    g.save();
+    g.translate(x, y);
+    g.rotate(-tilt * MixerStation.TILT[k]);
+    g.lineWidth = 2.5;
+    g.strokeStyle = ink;
+    g.lineJoin = 'round';
+    if (k === 'acqua') {
+      // brocca di vetro con l'acqua, beccuccio a sinistra, manico a destra
+      const wt = s * 0.55;
+      const hb = s * 0.75;
+      g.beginPath();
+      g.moveTo(-wt * 0.8, -hb);
+      g.lineTo(wt * 0.8, -hb);
+      g.lineTo(wt, hb);
+      g.lineTo(-wt, hb);
+      g.closePath();
+      g.fillStyle = 'rgba(220,240,255,.95)';
+      g.fill();
+      // acqua dentro (cala versando)
+      const lvl = Math.max(0.15, 1 - Math.min(1, this.amt.acqua / (this.o.recipe.acqua * 1.4)));
+      const top = hb - 2 * hb * 0.8 * lvl;
+      g.beginPath();
+      g.moveTo(-wt + (wt * 0.2 * (hb - top)) / (2 * hb), top);
+      g.lineTo(wt - (wt * 0.2 * (hb - top)) / (2 * hb), top);
+      g.lineTo(wt, hb);
+      g.lineTo(-wt, hb);
+      g.closePath();
+      g.fillStyle = '#6ec6ff';
+      g.fill();
+      g.beginPath();
+      g.moveTo(-wt * 0.8, -hb);
+      g.lineTo(wt * 0.8, -hb);
+      g.lineTo(wt, hb);
+      g.lineTo(-wt, hb);
+      g.closePath();
+      g.stroke();
+      // beccuccio
+      g.beginPath();
+      g.moveTo(-wt * 0.8, -hb);
+      g.lineTo(-wt * 1.15, -hb - s * 0.12);
+      g.lineTo(-wt * 0.55, -hb);
+      g.stroke();
+      // manico
+      g.beginPath();
+      g.moveTo(wt * 0.85, -hb * 0.6);
+      g.quadraticCurveTo(wt * 1.6, -hb * 0.3, wt * 0.95, hb * 0.5);
+      g.lineWidth = 4;
+      g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.7)';
+      g.fillRect(-wt * 0.55, -hb * 0.6, s * 0.08, hb * 1.2);
+    } else if (k === 'sale') {
+      // saliera: corpo bianco con fascia blu, tappo grigio coi buchi
+      const wt = s * 0.42;
+      const hb = s * 0.7;
+      g.beginPath();
+      g.roundRect(-wt, -hb * 0.45, wt * 2, hb * 1.45, 7);
+      g.fillStyle = '#ffffff';
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#2d9cdb';
+      g.fillRect(-wt + 1.5, hb * 0.2, wt * 2 - 3, hb * 0.28);
+      g.beginPath();
+      g.moveTo(-wt * 0.9, -hb * 0.45);
+      g.lineTo(-wt * 0.6, -hb);
+      g.lineTo(wt * 0.6, -hb);
+      g.lineTo(wt * 0.9, -hb * 0.45);
+      g.closePath();
+      g.fillStyle = '#c4cadb';
+      g.fill();
+      g.stroke();
+      g.fillStyle = ink;
+      for (const dx of [-0.25, 0.25]) {
+        g.beginPath();
+        g.arc(dx * wt * 2, -hb * 0.72, 1.6, 0, Math.PI * 2);
+        g.fill();
+      }
+    } else {
+      // manciata di lievito: mano a coppa vista di lato (dita a sinistra, polso a destra), granelli sopra
+      const r = s * 0.62;
+      // polso e manica
+      g.fillStyle = '#ffcf9e';
+      g.beginPath();
+      g.roundRect(r * 0.55, -r * 0.05, r * 0.75, r * 0.6, r * 0.2);
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#2d9cdb';
+      g.beginPath();
+      g.roundRect(r * 1.05, -r * 0.15, r * 0.4, r * 0.8, r * 0.12);
+      g.fill();
+      g.stroke();
+      // palmo a coppa con le dita piegate in su
+      g.fillStyle = '#ffcf9e';
+      g.beginPath();
+      g.moveTo(r * 0.7, 0);
+      g.lineTo(-r * 0.55, 0);
+      g.quadraticCurveTo(-r * 1.05, -r * 0.05, -r * 1.0, -r * 0.42);
+      g.quadraticCurveTo(-r * 0.85, -r * 0.55, -r * 0.72, -r * 0.3);
+      g.quadraticCurveTo(-r * 0.6, -r * 0.12, -r * 0.4, -r * 0.12);
+      g.lineTo(r * 0.5, -r * 0.12);
+      g.quadraticCurveTo(r * 0.75, -r * 0.12, r * 0.8, r * 0.2);
+      g.quadraticCurveTo(r * 0.8, r * 0.55, r * 0.4, r * 0.55);
+      g.lineTo(-r * 0.6, r * 0.55);
+      g.quadraticCurveTo(-r * 1.1, r * 0.5, -r * 1.0, -r * 0.05);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      // pieghe delle dita
+      g.lineWidth = 1.5;
+      for (const yy of [0.18, 0.36]) {
+        g.beginPath();
+        g.moveTo(-r * 0.95, r * yy);
+        g.lineTo(-r * 0.55, r * yy);
+        g.stroke();
+      }
+      // il mucchietto di lievito nel palmo
+      g.lineWidth = 2;
+      g.fillStyle = '#c9a26b';
+      g.beginPath();
+      g.moveTo(-r * 0.62, -r * 0.12);
+      g.quadraticCurveTo(-r * 0.1, -r * 0.75 * Math.max(0.3, 1 - this.amt.lievito / (this.o.recipe.lievito * 1.5)), r * 0.5, -r * 0.12);
+      g.closePath();
+      g.fill();
+      g.stroke();
+      g.fillStyle = '#e8c58f';
+      for (const [dx, dy] of [[-0.3, -0.25], [0, -0.33], [0.25, -0.22]]) {
+        g.beginPath();
+        g.arc(r * dx, r * dy, r * 0.06, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    g.restore();
   }
 
   private hint() {
-    const k = MIX_ORDER.find((x) => this.p >= this.o.win[x][0] && this.p <= this.o.win[x][1]);
-    if (k) return `Ora: ${MIX_INGS[k].icon} ${MIX_INGS[k].name.toLowerCase()}, tieni premuto e lascia sul numero giusto`;
+    if (this.drag) return this.pouring ? 'Versa… allontanalo sul numero giusto' : `Porta ${MIX_INGS[this.drag].name.toLowerCase()} sopra la vasca`;
+    const k = MIX_ORDER.find((x) => this.now(x));
+    if (k) return `Ora: ${MIX_INGS[k].icon} ${MIX_INGS[k].name.toLowerCase()}! Trascinalo sulla vasca`;
     const nxt = MIX_ORDER.find((x) => this.p < this.o.win[x][0]);
     return nxt ? `Aspetta: tra poco ${MIX_INGS[nxt].icon} ${MIX_INGS[nxt].name.toLowerCase()}` : 'Lascia girare l\'impasto';
   }
