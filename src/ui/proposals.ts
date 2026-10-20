@@ -143,7 +143,7 @@ export class Proposals {
         <button class="btn blue full" data-a="propNew">📝 Scrivi un'altra proposta</button>`;
     }
     const photo = this.photo ? this.photo.replace(/^auto:/, '') : '';
-    return `<p class="muted small explain">Scrivi cosa vorresti cambiare nel gioco, come lo diresti a voce. La foto dello schermo e il posto in cui eri vengono aggiunti da soli: puoi toglierli o scegliere un'altra foto. Puoi aggiungere anche un video dalla galleria, per esempio una registrazione dello schermo: si tengono i primi ${VIDEO_MAX_SEC} secondi, senza audio. Non cambia niente nella tua partita.</p>
+    return `<p class="muted small explain">Scrivi cosa vorresti cambiare nel gioco, come lo diresti a voce. La foto dello schermo e il posto in cui eri vengono aggiunti da soli: puoi toglierli o scegliere un'altra foto. Puoi aggiungere anche un video dalla galleria, per esempio una registrazione dello schermo: si tengono i primi ${VIDEO_MAX_SEC} secondi, senza audio. Non cambia niente nella tua partita. Se il tasto 📝 ti copre qualcosa, tienilo premuto e trascinalo dove vuoi.</p>
       <div class="card"><h3>📝 Cosa vorresti cambiare?</h3>
         <textarea class="lb-input prop-in" data-p="text" maxlength="${MAX_TEXT}" rows="4" placeholder="Es. Nel lavoretto del barista i clienti arrivano troppo in fretta">${esc(this.text)}</textarea></div>
       <div class="card"><h3>💡 Perché? <span class="muted small">(facoltativo)</span></h3>

@@ -271,6 +271,7 @@ export class UI {
       fab.setAttribute('aria-label', 'Proponi una modifica');
       fab.innerHTML = '<span class="i">📝</span>';
       fab.addEventListener('click', () => this.openPropose());
+      movableFab(fab);
       document.body.appendChild(fab);
     }
 
@@ -3820,4 +3821,68 @@ export class UI {
       },
     });
   }
+}
+
+
+/** Tasto "Proponi": tenendolo premuto si sposta dove si vuole; lasciandolo si attacca al bordo più vicino
+ *  (sinistra o destra) all'altezza scelta, e resta lì anche le volte dopo. */
+function movableFab(fab: HTMLElement) {
+  const KEY = 'hustle.propFab';
+  const place = (side: string, y: number) => {
+    fab.classList.toggle('right', side === 'r');
+    fab.style.top = `${Math.min(92, Math.max(8, y * 100))}%`;
+  };
+  try {
+    const p = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { side: string; y: number } | null;
+    if (p) place(p.side, p.y);
+  } catch { /* posizione di partenza */ }
+  let timer = 0;
+  let moving = false;
+  let skipClick = false;
+  let x0 = 0;
+  let y0 = 0;
+  const follow = (x: number, y: number) => {
+    fab.style.left = `${x}px`;
+    fab.style.top = `${y}px`;
+  };
+  fab.addEventListener('pointerdown', (e) => {
+    x0 = e.clientX;
+    y0 = e.clientY;
+    skipClick = false;
+    fab.setPointerCapture(e.pointerId);
+    clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      moving = true;
+      fab.classList.add('moving');
+      navigator.vibrate?.(15);
+      follow(x0, y0);
+    }, 350);
+  });
+  fab.addEventListener('pointermove', (e) => {
+    if (moving) follow(e.clientX, e.clientY);
+    else if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) clearTimeout(timer);
+  });
+  const end = (e: PointerEvent) => {
+    clearTimeout(timer);
+    if (!moving) return;
+    moving = false;
+    // il "click" che arriva subito dopo il trascinamento non apre la finestra
+    skipClick = true;
+    setTimeout(() => (skipClick = false), 400);
+    fab.classList.remove('moving');
+    fab.style.left = '';
+    const side = e.clientX > innerWidth / 2 ? 'r' : 'l';
+    const y = e.clientY / innerHeight;
+    place(side, y);
+    try { localStorage.setItem(KEY, JSON.stringify({ side, y })); } catch { /* resta solo per ora */ }
+  };
+  fab.addEventListener('pointerup', end);
+  fab.addEventListener('pointercancel', end);
+  // dopo averlo spostato non si apre la finestra
+  fab.addEventListener('click', (e) => {
+    if (!skipClick) return;
+    skipClick = false;
+    e.stopImmediatePropagation();
+  }, true);
+  fab.addEventListener('contextmenu', (e) => e.preventDefault());
 }

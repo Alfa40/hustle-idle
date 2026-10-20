@@ -1533,6 +1533,11 @@ body.in-poker .toasts { z-index: 31; }
 }
 .prop-fab .i { font-size: max(22px, calc(22px * var(--u))); line-height: 1; }
 .prop-fab:active { transform: translateY(-50%) scale(.94); }
+.prop-fab { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: top .15s; }
+/* spostato sul bordo destro */
+.prop-fab.right { left: auto; right: 0; padding: 0 calc(var(--sar) + 2px) 0 0; border-left: 3px solid #fff; border-right: 0; border-radius: 16px 0 0 16px; }
+/* tenuto premuto: segue il dito, tondo e un po' più grande */
+.prop-fab.moving, .prop-fab.moving:active { right: auto; padding: 0; border: 3px solid #fff; border-radius: 50%; transform: translate(-50%, -50%) scale(1.15); opacity: 1; transition: none; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
 .modal.top { z-index: 40; }
 /* scheda di un'anteprima (app developer e tester) */
 .dv-open { width: 100%; text-align: left; font: inherit; }
