@@ -397,8 +397,17 @@ export class BlackjackTable {
   private async exit() {
     if (this.exiting) return;
     this.exiting = true;
-    this.el.innerHTML = '<div class="pk-closed"><div class="card"><p class="center">Esco dal tavolo…</p></div></div>';
-    if (!this.closed) {
+    const wasClosed = this.closed;
+    const bought = this.bought;
+    clearInterval(this.timer);
+    this.deal.stop();
+    removeEventListener('resize', this.onResize);
+    this.el.remove();
+    document.body.classList.remove('in-poker');
+    this.game.leaveAway();
+    this.onDone();
+    // uscita dal tavolo e ritiro delle fiches proseguono dietro le quinte: si torna subito in città
+    if (!wasClosed) {
       try {
         await bj('leave', { code: this.code }, 20000);
       } catch {
@@ -406,15 +415,8 @@ export class BlackjackTable {
       }
     }
     const got = await claimPoker(this.game, true);
-    clearInterval(this.timer);
-    this.deal.stop();
-    removeEventListener('resize', this.onResize);
-    this.el.remove();
-    document.body.classList.remove('in-poker');
-    this.game.leaveAway();
-    const diff = got - this.bought;
-    if (got > 0 || this.bought > 0) toast(diff > 0 ? `Blackjack: hai vinto ${euro(diff)}!` : diff < 0 ? `Blackjack: hai perso ${euro(-diff)}` : 'Blackjack: sei uscito pari', diff > 0 ? 'money' : 'info');
-    this.onDone();
+    const diff = got - bought;
+    if (got > 0 || bought > 0) toast(diff > 0 ? `Blackjack: hai vinto ${euro(diff)}!` : diff < 0 ? `Blackjack: hai perso ${euro(-diff)}` : 'Blackjack: sei uscito pari', diff > 0 ? 'money' : 'info');
   }
 
   private share() {
