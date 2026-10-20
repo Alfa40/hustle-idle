@@ -254,13 +254,21 @@ export const SHAPE_PATHS: Record<string, { hint: string; paths: Pt[][] }> = {
   cornetti: { hint: 'segui il triangolo, poi arrotola dalla base alla punta', paths: [[[0.15, 0.25], [0.85, 0.25], [0.5, 0.85], [0.15, 0.25]], [[0.5, 0.3], [0.5, 0.78]]] },
 };
 
-/** Dai la forma: segui la sagoma tratteggiata; si accende dove passi. Precisione e copertura fanno la qualità. */
+/**
+ * Dai la forma: il dito deve passare **esattamente sulla linea** della sagoma (la fascia chiara attorno alla linea
+ * è tutto il margine che c'è). Dove passi sulla linea si accende di verde; se esci il tuo tratto diventa rosso,
+ * compare "Fuori dalla linea!" e la precisione scende. Qualità = precisione (pesa tanto) × quanta sagoma hai
+ * coperto: uscire spesso dà una forma storta e meno stelle e paga.
+ */
 export class ShapeStation extends Station {
   private samples: { p: Pt; hit: boolean }[][];
-  private stroke: Pt[] = [];
-  private strokes: Pt[][] = [];
+  private stroke: { p: Pt; ok: boolean }[] = [];
+  private strokes: { p: Pt; ok: boolean }[][] = [];
   private inside = 0;
   private total = 0;
+  private offT = 0;
+  /** com'è andata, una riga per il messaggio finale (vuota se bene) */
+  verdict = '';
 
   constructor(private name: string, private icon: string, private shape: { hint: string; paths: Pt[][] }, private tol: number, onEnd: (q: number) => void) {
     super(onEnd);
@@ -272,6 +280,10 @@ export class ShapeStation extends Station {
     return all.filter((x) => x.hit).length / Math.max(1, all.length);
   }
 
+  private acc() {
+    return this.total ? this.inside / this.total : 1;
+  }
+
   protected down(x: number, y: number) {
     this.stroke = [];
     this.move(x, y);
@@ -281,28 +293,32 @@ export class ShapeStation extends Station {
     const sq = this.square(70, 34);
     const p: Pt = [(x - sq.x) / sq.s, (y - sq.y) / sq.s];
     // il dito veloce salta dei punti: si riempie il tratto tra l'ultimo punto e questo
-    const last = this.stroke[this.stroke.length - 1];
+    const last = this.stroke[this.stroke.length - 1]?.p;
     if (last) {
       const n = Math.min(40, Math.floor(Math.hypot(p[0] - last[0], p[1] - last[1]) / (this.tol / 2)));
-      for (let k = 1; k <= n; k++) this.touch([last[0] + ((p[0] - last[0]) * k) / (n + 1), last[1] + ((p[1] - last[1]) * k) / (n + 1)]);
+      for (let k = 1; k <= n; k++) this.touch([last[0] + ((p[0] - last[0]) * k) / (n + 1), last[1] + ((p[1] - last[1]) * k) / (n + 1)], false);
     }
-    this.stroke.push(p);
-    this.touch(p);
+    this.touch(p, true);
   }
 
-  private touch(p: Pt) {
-    let near = false;
+  /** un punto del dito: sulla linea accende la sagoma, fuori conta come errore */
+  private touch(p: Pt, keep: boolean) {
+    let ok = false;
     for (const path of this.samples) {
       for (const sm of path) {
-        const d = Math.hypot(sm.p[0] - p[0], sm.p[1] - p[1]);
-        if (d < this.tol) {
+        if (Math.hypot(sm.p[0] - p[0], sm.p[1] - p[1]) < this.tol) {
           sm.hit = true;
-          near = true;
-        } else if (d < this.tol * 1.6) near = true;
+          ok = true;
+        }
       }
     }
     this.total++;
-    if (near) this.inside++;
+    if (ok) this.inside++;
+    else {
+      if (this.offT <= 0) navigator.vibrate?.(30);
+      this.offT = 0.9;
+    }
+    if (keep || !ok) this.stroke.push({ p, ok });
   }
 
   protected up() {
@@ -310,18 +326,21 @@ export class ShapeStation extends Station {
     this.stroke = [];
     // tutta la sagoma, e ogni tratto quasi tutto (il cornetto va anche arrotolato)
     if (this.cover() >= 0.9 && this.samples.every((path) => path.filter((x) => x.hit).length / path.length >= 0.8)) {
-      const acc = this.total ? this.inside / this.total : 0;
-      this.end(Math.min(1, 0.55 * this.cover() + 0.45 * acc));
+      const acc = this.acc();
+      this.verdict = acc < 0.8 ? `Sei uscito dalla linea (precisione ${Math.round(acc * 100)}%): forma storta` : '';
+      this.end(Math.min(1, acc ** 1.5 * (0.6 + 0.4 * this.cover())));
     }
   }
 
-  step() {
+  step(dt: number) {
+    this.offT -= dt;
     const g = this.g;
     const { w, h } = this;
     g.fillStyle = '#fff8ec';
     g.fillRect(0, 0, w, h);
     this.text(`👐 Forma: ${this.icon} ${this.name}`, w / 2, 24, 20);
-    this.text(this.shape.hint, w / 2, 48, 13, '#7a6f8f', 500);
+    const off = this.offT > 0;
+    this.text(off ? 'Fuori dalla linea! Resta sopra la linea' : this.shape.hint, w / 2, 48, 13, off ? '#e5484d' : '#7a6f8f', off ? 700 : 500);
     const sq = this.square(70, 34);
     const P = (p: Pt) => [sq.x + p[0] * sq.s, sq.y + p[1] * sq.s] as const;
     g.fillStyle = '#d9a46a';
@@ -334,11 +353,20 @@ export class ShapeStation extends Station {
     g.ellipse(sq.x + sq.s / 2, sq.y + sq.s * 0.52, sq.s * 0.4, sq.s * 0.36, 0, 0, Math.PI * 2);
     g.fill();
     g.lineCap = 'round';
+    g.lineJoin = 'round';
+    // la fascia dove il dito è "sulla linea": tutto il margine che c'è
+    g.strokeStyle = 'rgba(255,255,255,.55)';
+    g.lineWidth = this.tol * 2 * sq.s;
+    for (const path of this.samples) {
+      g.beginPath();
+      path.forEach((x, i) => (i ? g.lineTo(...P(x.p)) : g.moveTo(...P(x.p))));
+      g.stroke();
+    }
     for (const path of this.samples) {
       for (let i = 0; i < path.length - 1; i++) {
         const [ax, ay] = P(path[i].p);
         const [bx, by] = P(path[i + 1].p);
-        g.strokeStyle = path[i].hit ? 'rgba(53,196,106,.95)' : 'rgba(58,47,85,.5)';
+        g.strokeStyle = path[i].hit ? 'rgba(53,196,106,.95)' : 'rgba(58,47,85,.6)';
         g.lineWidth = path[i].hit ? 6 : 3;
         g.setLineDash(path[i].hit ? [] : [6, 6]);
         g.beginPath();
@@ -355,14 +383,20 @@ export class ShapeStation extends Station {
       g.fill();
     }
     g.setLineDash([]);
-    g.strokeStyle = '#b5793d';
+    // il tratto del dito: marrone sulla linea, rosso dove sei uscito
     g.lineWidth = Math.max(5, sq.s * 0.025);
-    for (const s of [...this.strokes, this.stroke]) {
-      if (s.length < 2) continue;
-      g.beginPath();
-      s.forEach((p, i) => (i ? g.lineTo(...P(p)) : g.moveTo(...P(p))));
-      g.stroke();
+    for (const st of [...this.strokes, this.stroke]) {
+      for (let i = 1; i < st.length; i++) {
+        g.strokeStyle = st[i].ok && st[i - 1].ok ? '#b5793d' : '#e5484d';
+        g.beginPath();
+        g.moveTo(...P(st[i - 1].p));
+        g.lineTo(...P(st[i].p));
+        g.stroke();
+      }
     }
+    // precisione e quanta sagoma manca
+    const acc = this.acc();
+    this.text(`🎯 Precisione ${Math.round(acc * 100)}%`, w / 2, h - 30, 13, acc >= 0.9 ? '#1f9a4c' : acc >= 0.8 ? '#d97a00' : '#e5484d', 700);
     this.bar(this.cover() / 0.9);
   }
 }

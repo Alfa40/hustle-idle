@@ -732,12 +732,14 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         enabled: () => !!holding && (holding.stage === 'butter' || (holding.stage === 'dough' && !BREADS[holding.b].butter)),
         onDone: () => {
           const b = holding!.b;
-          run.openStation(new ShapeStation(BREADS[b].name, BREADS[b].icon, SHAPE_PATHS[b], tol, (q) => {
+          const st = new ShapeStation(BREADS[b].name, BREADS[b].icon, SHAPE_PATHS[b], tol, (q) => {
             if (!holding) return;
             holding = { stage: 'shaped', b, q: (holding.q + q) / 2, r: holding.r };
             hold(game, doughM(b));
-            if (q < 0.7) toast(`👐 ${BREADS[b].icon} Forma un po' storta`, 'bad');
-          }));
+            if (st.verdict) toast(`👐 ${BREADS[b].icon} ${st.verdict}`, 'bad');
+            else if (q < 0.7) toast(`👐 ${BREADS[b].icon} Forma un po' storta`, 'bad');
+          });
+          run.openStation(st);
         },
       },
       ...racks.map((r): Task => ({

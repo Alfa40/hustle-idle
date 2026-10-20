@@ -1555,3 +1555,31 @@ body.in-poker .toasts { z-index: 31; }
 .dv-detail-top .btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; box-sizing: border-box; min-height: 50px; text-decoration: none; font-size: 17px; margin-top: 4px; }
 .dv-detail-top p { line-height: 1.3; }
 .dv-prev > .dv-note:not(.ok):not(.bad) { background: rgba(255,255,255,.85); color: var(--ink); }
+
+/* Autista: guida da gioco di auto, pedali in basso a sinistra e frecce in basso a destra (src/ui/pedals.ts) */
+.pedals { position: fixed; inset: auto 0 0 0; z-index: 30; pointer-events: none; }
+.pd-side { position: absolute; bottom: calc(var(--sab) + 14px); display: flex; align-items: flex-end; gap: max(10px, calc(12px * var(--u))); pointer-events: none; }
+.pd-left { left: calc(var(--sal) + 14px); }
+.pd-right { right: calc(var(--sar) + 14px); }
+.pd {
+  pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 3px solid #fff; border-radius: 18px; background: rgba(40,30,70,.55); color: #fff; padding: 6px;
+  box-shadow: 0 4px 0 rgba(0,0,0,.25); font: inherit; font-weight: 700; font-size: max(12px, calc(13px * var(--u)));
+  transition: transform .06s;
+}
+.pd svg { display: block; }
+.pd b { line-height: 1; }
+.pd-brake { width: max(64px, calc(70px * var(--u))); height: max(78px, calc(86px * var(--u))); }
+.pd-brake svg { width: 60%; height: 64%; }
+.pd-gas { width: max(64px, calc(70px * var(--u))); height: max(108px, calc(122px * var(--u))); }
+.pd-gas svg { width: 60%; height: 74%; }
+.pd-turn { width: max(70px, calc(80px * var(--u))); height: max(70px, calc(80px * var(--u))); border-radius: 50%; }
+.pd-turn svg { width: 56%; height: 56%; }
+.pd.on { transform: scale(.93) translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+.pd-gas.on { background: rgba(53,196,106,.85); }
+.pd-brake.on { background: rgba(229,72,77,.85); }
+.pd-turn.on { background: rgba(45,156,219,.85); }
+/* coi pedali niente joystick né pulsante azione, e niente Sali/Scendi del veicolo tuo */
+body.pedal-drive .joy, body.pedal-drive .act-zone, body.pedal-drive .action, body.pedal-drive .ride-btn { display: none !important; }
+body.overlay-job .pedals { display: none; }

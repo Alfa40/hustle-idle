@@ -141,6 +141,7 @@ export class DriveRun extends BaseRun {
     this.add(lbl);
     this.parked.userData.tag = lbl;
     this.plan();
+    this.parked.rotation.y = this.roadHeading(this.carAt, this.stops[0]?.pos);
     // tempo: strada da fare alla velocità del mezzo, con margine, più le soste (mai oltre i 5 minuti)
     let len = 0;
     let prev = this.carAt;
@@ -175,6 +176,22 @@ export class DriveRun extends BaseRun {
       }
     }
     return best.clone();
+  }
+
+  /**
+   * Verso del mezzo parcheggiato: lungo la strada (dove ci sono altri pezzi di strada accanto), girato dalla
+   * parte della prima fermata. Così coi pedali si parte dritti, senza il muso contro un palazzo.
+   */
+  private roadHeading(at: THREE.Vector3, to?: THREE.Vector3) {
+    const near = (ax: 'x' | 'z') => this.game.city.roadTiles.filter((r) => {
+      const along = Math.abs(ax === 'x' ? r.x - at.x : r.z - at.z);
+      const across = Math.abs(ax === 'x' ? r.z - at.z : r.x - at.x);
+      return across < 1 && along > 0.5 && along < 14;
+    }).length;
+    const alongX = near('x') >= near('z');
+    const d = to ? (alongX ? to.x - at.x : to.z - at.z) : 1;
+    // muso verso +Z = 0, verso +X = π/2
+    return alongX ? (d >= 0 ? Math.PI / 2 : -Math.PI / 2) : d >= 0 ? 0 : Math.PI;
   }
 
   /** Un punto di strada tra `min` e `max` metri (in linea d'aria) da `from`, dentro la città vecchia se si può. */
@@ -380,24 +397,19 @@ export class DriveRun extends BaseRun {
     if (this.kind !== 'turistico' && this.kind !== 'privato' && this.kind !== 'limousine') return;
     const ride = this.game.jobRide;
     if (!ride) return;
-    // lasciare il joystick fa rallentare piano (va bene); brusco è girare forte mentre vai veloce
-    // o tirare all'indietro per inchiodare
-    const mv = this.game.moveVector();
-    const push = Math.hypot(mv.x, mv.y);
-    const vel = this.game.rideVel;
+    // brusco: girare o frenare mentre si va oltre la tacca del tachimetro (bisogna rallentare prima,
+    // lasciando l'acceleratore); lasciare i pedali fa rallentare piano e va bene
+    const pd = this.game.pedalInput();
     const sp = this.speed;
-    let harsh = false;
-    if (push > 0.3 && sp > 2) {
-      const cos = (mv.x * vel.x + mv.y * vel.z) / (push * sp);
-      const ang = Math.acos(THREE.MathUtils.clamp(cos, -1, 1));
-      harsh = (ang > 1.2 && sp > ride.speed * 0.55) || (ang > 2.4 && sp > 3);
-    }
+    const fast = sp > ride.speed * 0.55;
+    const harsh = fast && (pd.steer !== 0 || pd.brake);
+    const what = pd.brake ? 'Frenata brusca' : 'Curva brusca';
     if (harsh && !this.harshCool) {
       this.harshCool = 1.4;
       const loss = this.kind === 'privato' ? 18 : 12;
       this.meter = Math.max(0, this.meter - loss);
       this.starCap = this.meter < 40 ? 1 : this.meter < 70 ? 2 : 3;
-      toast(this.kind === 'privato' ? `💦 Brusco! L'acqua si rovescia (${Math.round(this.meter)}%)` : `😖 Frenata brusca: gradimento ${Math.round(this.meter)}%`, 'bad');
+      toast(this.kind === 'privato' ? `💦 ${what}! L'acqua si rovescia (${Math.round(this.meter)}%)` : `😖 ${what}: gradimento ${Math.round(this.meter)}%`, 'bad');
     }
     void dt;
   }
@@ -462,12 +474,16 @@ export class DriveRun extends BaseRun {
     this.boarded = true;
     this.objsRemove(this.parked);
     (this.parked.userData.tag as THREE.Object3D).visible = false;
+    const facing = this.parked.rotation.y;
     this.parked.position.set(0, 0, 0);
     this.parked.rotation.set(0, 0, 0);
     const r = RIDES[this.kind];
-    const jr: JobRide = { obj: this.parked, speed: r.speed, radius: r.radius, inertia: true, accel: r.accel, camZoom: this.kind === 'autobus' || this.kind === 'turistico' ? 1.45 : 1.25 };
+    const big = this.kind === 'autobus' || this.kind === 'turistico';
+    // si guida come in un gioco di auto: pedali a sinistra, frecce a destra (i bus girano più piano)
+    const jr: JobRide = { obj: this.parked, speed: r.speed, radius: r.radius, inertia: true, pedals: true, turn: big ? 1.15 : 1.55, accel: r.accel, camZoom: big ? 1.45 : 1.25 };
     p.copy(this.carAt);
     this.game.setJobRide(jr);
+    this.game.player.root.rotation.y = facing;
     this.idx = 0;
     this.game.prompt = null;
   }
@@ -480,11 +496,11 @@ export class DriveRun extends BaseRun {
 
   guide(): RunGuide | null {
     const tips: Record<DriveKind, string> = {
-      navetta: 'Guida fino al <b>cerchio della fermata</b> e <b>fermati dentro</b>: i passeggeri salgono da soli. Il mezzo frena piano: guarda il <b>tachimetro</b> e lascia il comando un po\' prima di arrivare',
+      navetta: 'Si guida come in un gioco di auto: <b>acceleratore</b> e <b>freno</b> in basso a sinistra, <b>frecce</b> in basso a destra per girare. Guida fino al <b>cerchio della fermata</b> e <b>fermati dentro</b>: i passeggeri salgono da soli. Lascia l\'acceleratore e frena un po\' prima di arrivare. Tenendo premuto il freno da fermo vai in retromarcia',
       autobus: 'Fermati a ogni fermata della linea <b>in orario</b>: se sei in anticipo aspetta, se arrivi tardi perdi stelle. 🔔 = prenotata',
-      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: niente frenate o curve brusche (il gradimento 😊 scende). Sul <b>tachimetro</b>, oltre la <b>tacca</b> (barra arancione) le curve sono brusche: rallenta prima di girare',
-      privato: 'Guida <b>dolce</b>: il bicchiere d\'acqua 🥛 non deve rovesciarsi. Il cliente può <b>cambiare destinazione</b>. Oltre la <b>tacca</b> del tachimetro le curve sono brusche',
-      limousine: 'Prendi la sposa, poi <b>segui l\'auto dello sposo</b> né troppo vicino né troppo lontano, e fermati sul <b>tappeto rosso</b>. Oltre la <b>tacca</b> del tachimetro le curve sono brusche',
+      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: niente frenate o curve brusche (il gradimento 😊 scende). Sul <b>tachimetro</b>, oltre la <b>tacca</b> (barra arancione) girare o frenare è brusco: lascia l\'acceleratore prima delle curve e delle fermate',
+      privato: 'Guida <b>dolce</b>: il bicchiere d\'acqua 🥛 non deve rovesciarsi. Il cliente può <b>cambiare destinazione</b>. Oltre la <b>tacca</b> del tachimetro girare o frenare è brusco',
+      limousine: 'Prendi la sposa, poi <b>segui l\'auto dello sposo</b> né troppo vicino né troppo lontano, e fermati sul <b>tappeto rosso</b>. Oltre la <b>tacca</b> del tachimetro girare o frenare è brusco',
     };
     const p = this.game.player.root.position;
     if (!this.boarded) {
