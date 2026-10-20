@@ -7,12 +7,21 @@ name: Proposte approvate dal gioco
 # le modifiche chieste dallo sviluppatore dopo aver provato un'anteprima (app developer → scheda dell'anteprima →
 # Chiedi le modifiche: Claude aggiorna lo stesso ramo) e unisce al gioco quelle accettate (Accetta e pubblica), poi
 # fa partire la pubblicazione.
+# Claude lavora a una proposta alla volta: le approvate vanno in coda (etichetta "in-coda") e alla fine di ogni lavoro
+# claude.yml fa ripartire questo robot, che passa a Claude la prossima (prima le modifiche chieste, poi le proposte
+# più vecchie) oppure si ferma finché non arriva altro. Il server lo fa partire subito quando lo sviluppatore decide
+# qualcosa nell'app (segreto GH_DISPATCH_TOKEN su Render); il giro ogni 10 minuti resta come riserva.
 # Serve il segreto PROPOSTE_ROBOT_KEY (chiave del "robot": il server conosce solo la sua impronta).
 
 on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
+    inputs:
+      dopo:
+        description: Lavoro di Claude appena finito (non conta come "occupato")
+        required: false
+        default: ''
 
 concurrency:
   group: proposte
@@ -47,6 +56,7 @@ jobs:
           [ "$n" -gt 0 ] || exit 0
           gh label create proposta -R "$REPO" --color 1D76DB --description "Proposta di modifica di un tester" 2>/dev/null || true
           gh label create claude -R "$REPO" --color D97757 --description "Claude prepara la modifica proposta" 2>/dev/null || true
+          gh label create in-coda -R "$REPO" --color FBCA04 --description "Aspetta il suo turno: Claude prepara una proposta alla volta" 2>/dev/null || true
           jq -c '.proposals[]' approvate.json | while read -r p; do
             id=$(jq -r '.id' <<<"$p")
             # già pubblicata (es. la conferma al server non era arrivata): si riprende quella
@@ -64,9 +74,9 @@ jobs:
                 (if (.video == "mp4" or .video == "webm") then "### Video\n\n[Guarda il video](\($api)/hustle/proposal-video/\(.id).\(.video)) (senza audio)\n\n" +
                   (if .frames then "Quattro fotogrammi del video, in ordine, riga per riga da sinistra a destra:\n\n![Fotogrammi del video](\($api)/hustle/proposal-frames/\(.id).jpg)\n" else "" end) else "" end)
               ' <<<"$p" > body.md
-              url=$(gh issue create -R "$REPO" --title "$title" --body-file body.md --label proposta --label claude)
+              # in coda: Claude la prende quando tocca a lei (ultimo passo di questo robot)
+              url=$(gh issue create -R "$REPO" --title "$title" --body-file body.md --label proposta --label claude --label in-coda)
               issue=${url##*/}
-              gh workflow run claude.yml -R "$REPO" -f issue="$issue"
             fi
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/imported" -H 'Content-Type: application/json' \
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" --argjson n "$issue" '{key: $k, id: $id, issue: $n}')" > /dev/null
@@ -87,24 +97,6 @@ jobs:
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/closed" -H 'Content-Type: application/json' \
               -d "$(jq -n --arg k "$KEY" --argjson id "$id" '{key: $k, id: $id}')" > /dev/null
             echo "Proposta del gioco #$id rifiutata → issue #$issue chiusa"
-          done
-      - name: Modifiche chieste dallo sviluppatore → Claude (stesso ramo)
-        if: always()
-        run: |
-          if [ -z "$KEY" ]; then exit 0; fi
-          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/tochange" \
-            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > cambiare.json
-          jq -c '.proposals[]' cambiare.json | while read -r p; do
-            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p"); at=$(jq -r '.at' <<<"$p")
-            if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
-              # nella proposta resta scritto cosa ha chiesto lo sviluppatore (senza chiamare Claude con il commento)
-              jq -r '"✏️ **Lo sviluppatore ha provato l'"'"'anteprima e chiede queste modifiche** (dall'"'"'app developer):\n\n" + (.text | split("\n") | map("> " + .) | join("\n")) + "\n\nClaude le sta preparando sullo stesso ramo: l'"'"'anteprima si aggiorna da sola."' <<<"$p" > richiesta.md
-              gh issue comment "$issue" -R "$REPO" --body-file richiesta.md
-              gh workflow run claude.yml -R "$REPO" -f issue="$issue" -f richiesta="$(jq -r '.text' <<<"$p")"
-            fi
-            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/changed" -H 'Content-Type: application/json' \
-              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --arg at "$at" '{key: $k, id: $id, at: $at}')" > /dev/null
-            echo "Proposta del gioco #$id (issue #$issue): modifiche passate a Claude"
           done
       - name: Anteprime accettate → unite nel gioco e pubblicate
         if: always()
@@ -144,3 +136,41 @@ jobs:
             echo "Proposta del gioco #$id (issue #$issue, ramo $branch): unita=$ok $err"
           done
           if [ -f pubblica ]; then gh workflow run deploy.yml -R "$REPO" --ref main; fi
+      - name: Prossimo lavoro per Claude (uno alla volta)
+        if: always()
+        env:
+          DOPO: ${{ inputs.dopo }}
+        run: |
+          if [ -z "$KEY" ]; then exit 0; fi
+          # Claude sta già lavorando (o sta per partire): toccherà alla prossima quando finisce
+          busy=$(gh run list -R "$REPO" -w claude.yml -L 30 --json databaseId,status \
+            -q "[.[] | select(.status != \"completed\" and (.databaseId | tostring) != \"$DOPO\")] | length")
+          if [ "$busy" -gt 0 ]; then echo "Claude è al lavoro: la prossima parte quando finisce"; exit 0; fi
+          # 1) modifiche chieste dallo sviluppatore dopo aver provato un'anteprima (stesso ramo)
+          curl -sSf --retry 3 --retry-delay 20 --max-time 90 -X POST "$API/hustle/proposals/tochange" \
+            -H 'Content-Type: application/json' -d "$(jq -n --arg k "$KEY" '{key: $k}')" > cambiare.json
+          started=""
+          while read -r p; do
+            [ -n "$p" ] || continue
+            id=$(jq -r '.id' <<<"$p"); issue=$(jq -r '.issue' <<<"$p"); at=$(jq -r '.at' <<<"$p")
+            if [ "$issue" -gt 0 ] && [ "$(gh issue view "$issue" -R "$REPO" --json state -q .state)" = "OPEN" ]; then
+              # nella proposta resta scritto cosa ha chiesto lo sviluppatore (senza chiamare Claude con il commento)
+              jq -r '"✏️ **Lo sviluppatore ha provato l'"'"'anteprima e chiede queste modifiche** (dall'"'"'app developer):\n\n" + (.text | split("\n") | map("> " + .) | join("\n")) + "\n\nClaude le sta preparando sullo stesso ramo: l'"'"'anteprima si aggiorna da sola."' <<<"$p" > richiesta.md
+              gh issue comment "$issue" -R "$REPO" --body-file richiesta.md
+              gh workflow run claude.yml -R "$REPO" -f issue="$issue" -f richiesta="$(jq -r '.text' <<<"$p")"
+              started="modifiche alla proposta #$issue"
+            fi
+            curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/changed" -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg k "$KEY" --argjson id "$id" --arg at "$at" '{key: $k, id: $id, at: $at}')" > /dev/null
+            [ -z "$started" ] || break
+          done < <(jq -c '.proposals[]' cambiare.json)
+          # 2) la proposta in coda da più tempo
+          if [ -z "$started" ]; then
+            issue=$(gh issue list -R "$REPO" --label in-coda --state open -L 100 --json number -q 'sort_by(.number) | .[0].number // empty')
+            if [ -n "$issue" ]; then
+              gh issue edit "$issue" -R "$REPO" --remove-label in-coda
+              gh workflow run claude.yml -R "$REPO" -f issue="$issue"
+              started="proposta #$issue"
+            fi
+          fi
+          if [ -n "$started" ]; then echo "Claude parte: $started"; else echo "Niente da preparare: il robot dorme finché non arriva altro"; fi

@@ -61,7 +61,7 @@ function detailView(x: PrevItem) {
   const accepted = prop?.status === 'accettata';
   const head = detailHtml(x, explainOf(x.issue.number, render), true);
   const note = accepted
-    ? '<div class="dv-note ok">⏳ Accettata: entro una decina di minuti il robot la mette nel gioco e la pubblica.</div>'
+    ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
     : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}. Chiedi a Claude di aggiornarla qui sotto ("aggiorna il ramo con il gioco e risolvi i conflitti").</div>` : '';
   const votes = `<h3 class="dv-sec">👥 Voti e commenti dei tester</h3>${votesBlock(prop)}`;
   if (!prop || accepted) return head + note + votes;
@@ -84,7 +84,7 @@ function previewsHtml(d: Data) {
   const row = (x: PrevItem) => {
     const prop = x.prop;
     const note = prop?.status === 'accettata'
-      ? '<div class="dv-note ok">⏳ Accettata: entro una decina di minuti il robot la mette nel gioco e la pubblica.</div>'
+      ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
       : prop?.mergeError ? '<div class="dv-note bad">⚠️ Non pubblicata: apri la scheda per sistemarla.</div>' : '';
     const ch = prop?.change ? '<div class="dv-note">✏️ Modifiche chieste a Claude</div>' : '';
     return `<div class="dv-prev">${previewHead(x)}${note}${ch}</div>`;
@@ -195,7 +195,7 @@ async function requestChanges(id: number) {
     const p = data?.props.find((x) => x.id === id);
     if (p) Object.assign(p, { change: text, changeAt: Date.now(), changeState: 'attesa', mergeError: '' });
     changeDrafts.delete(id);
-    changeMsg = { id, text: 'Inviate: entro una decina di minuti Claude ci lavora.', ok: true };
+    changeMsg = { id, text: 'Inviate: Claude ci lavora appena è libero (una cosa alla volta).', ok: true };
   } catch (e) {
     changeMsg = { id, text: `Non inviate: ${(e as Error).message}` };
   }

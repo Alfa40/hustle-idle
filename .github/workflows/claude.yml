@@ -141,3 +141,10 @@ jobs:
           fi
           printf '%s%s\n' "$msg" "$extra" | sed 's/^          //' > comment.md
           gh issue comment "$N" -R "$REPO" --body-file comment.md
+      # una proposta alla volta: finito questo lavoro il robot guarda se c'è la prossima (o torna a dormire)
+      - name: Avanti con la prossima proposta
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh workflow run proposte.yml -R "$REPO" --ref main -f dopo="${{ github.run_id }}" || true

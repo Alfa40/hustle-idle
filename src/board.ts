@@ -149,6 +149,8 @@ export interface PrevItem {
  * la domanda tra `<!-- domanda -->` e `<!-- /domanda -->`. Tester e sviluppatore rispondono dalle app.
  */
 export const asksOf = (i: Issue) => !!i.labels?.some((l) => l.name === 'chiarimento');
+/** aspetta il suo turno: Claude prepara una proposta alla volta (etichetta messa dal robot proposte.yml) */
+export const waitsOf = (i: Issue) => !!i.labels?.some((l) => l.name === 'in-coda');
 export function questionOf(i: Issue) {
   const m = /<!-- domanda -->([\s\S]*?)<!-- \/domanda -->/.exec(i.body ?? '');
   return (m?.[1] ?? '').replace(/^\s*#+ .*$/m, '').trim();
@@ -163,7 +165,8 @@ export function previewLists(d: Data) {
   // Claude aspetta una risposta (a volte con un'anteprima di prova, già pronta)
   const asks = items.filter((x) => asksOf(x.issue));
   const ready = items.filter((x) => x.ready && !asksOf(x.issue)).sort((a, b) => Date.parse(b.issue.updated_at) - Date.parse(a.issue.updated_at));
-  const busy = items.filter((x) => !x.ready && !asksOf(x.issue));
+  // prima quella su cui Claude lavora, poi quelle in coda nell'ordine in cui le prenderà
+  const busy = items.filter((x) => !x.ready && !asksOf(x.issue)).sort((a, b) => +waitsOf(a.issue) - +waitsOf(b.issue) || a.issue.number - b.issue.number);
   // approvate dallo sviluppatore ma non ancora su GitHub: il robot le passa a Claude al suo prossimo giro
   // (quelle già su GitHub, se il server non lo sa ancora, stanno solo sopra)
   const onGh = new Set([...d.issues.values()].map((i) => /<!-- proposta-gioco-(\d+) -->/.exec(i.body ?? '')?.[1]).filter(Boolean).map(Number));
@@ -179,11 +182,15 @@ export function prepHtml(d: Data) {
   const { busy, queued } = previewLists(d);
   if (!busy.length && !queued.length) return '';
   const cut = (s: string) => (s.length > 90 ? s.slice(0, 88).trimEnd() + '…' : s);
+  let place = 0;
   const rows = [
-    ...busy.map((x) => `<a class="dv-prep" href="${issueUrl(x.issue.number)}" target="_blank" rel="noopener"><span class="t-ico">🛠️</span><span class="l-txt"><b>#${x.issue.number} in preparazione</b>
-      <small>${esc(cut(shortTitle(x.issue)))}${nameOf(x) ? ` · di ${esc(nameOf(x))}` : ''}</small><small>Claude sta scrivendo la modifica: l'anteprima arriva tra pochi minuti.</small></span></a>`),
-    ...queued.map((p) => `<div class="dv-prep"><span class="t-ico">⏳</span><span class="l-txt"><b>Proposta in preparazione</b>
-      <small>${esc(cut(p.text))}${p.nickname ? ` · di ${esc(p.nickname)}` : ''}</small><small>Approvata: tra poco Claude inizia a prepararla.</small></span></div>`),
+    ...busy.map((x) => {
+      const wait = waitsOf(x.issue) ? ++place : 0;
+      return `<a class="dv-prep" href="${issueUrl(x.issue.number)}" target="_blank" rel="noopener"><span class="t-ico">${wait ? '⏳' : '🛠️'}</span><span class="l-txt"><b>#${x.issue.number} ${wait ? `in coda · ${wait}° posto` : 'in preparazione'}</b>
+      <small>${esc(cut(shortTitle(x.issue)))}${nameOf(x) ? ` · di ${esc(nameOf(x))}` : ''}</small><small>${wait ? 'Claude prepara una proposta alla volta: parte da sola quando tocca a lei.' : "Claude sta scrivendo la modifica: l'anteprima arriva tra pochi minuti."}</small></span></a>`;
+    }),
+    ...queued.map((p) => `<div class="dv-prep"><span class="t-ico">⏳</span><span class="l-txt"><b>Proposta approvata</b>
+      <small>${esc(cut(p.text))}${p.nickname ? ` · di ${esc(p.nickname)}` : ''}</small><small>Tra poco il robot la mette in coda per Claude.</small></span></div>`),
   ];
   return `<div class="card dv-preps"><h3>🛠️ In preparazione</h3>${rows.join('')}</div>`;
 }
@@ -252,7 +259,7 @@ export function detailHtml(x: PrevItem, explain: string | null | undefined, dev:
   const ex = explain === undefined ? '<p class="small muted" style="margin:0">Carico…</p>' : explain ? mdLite(explain) : '<p class="small muted" style="margin:0">Nessuna spiegazione.</p>';
   const ch = p?.change
     ? `<div class="card dv-change"><h3>✏️ Modifiche chieste ${p.changeAt ? ago(p.changeAt) : ''}</h3><div class="dv-text">${esc(p.change)}</div>
-        <p class="small muted" style="margin:6px 0 0">${p.changeState === 'attesa' ? 'Entro una decina di minuti il robot le passa a Claude.' : 'Claude le sta preparando o le ha già fatte: l\'anteprima si aggiorna da sola (guarda "aggiornata").'}</p></div>`
+        <p class="small muted" style="margin:6px 0 0">${p.changeState === 'attesa' ? 'Il robot le passa a Claude appena è libero (prepara una cosa alla volta).' : 'Claude le sta preparando o le ha già fatte: l\'anteprima si aggiorna da sola (guarda "aggiornata").'}</p></div>`
     : '';
   return `<button class="dv-back" data-a="back">‹ Tutte le anteprime</button>
     <div class="card dv-detail-top"><h3>#${i.number} · ${esc(shortTitle(i))}</h3>
