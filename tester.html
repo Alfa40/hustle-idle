@@ -12,6 +12,36 @@
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
     <title>Hustle Idle · Tester</title>
+    <script>
+      // App sulla schermata Home: dopo un aggiornamento il telefono può riaprire la pagina vecchia, che chiede file
+      // del gioco che non ci sono più (il gioco resterebbe fermo, senza rispondere ai tocchi). Se un file del gioco
+      // non arriva si ricarica la pagina nuova, al massimo una volta al minuto (senza rete non gira a vuoto).
+      (function () {
+        var u = new URL(location.href);
+        if (u.searchParams.has('v')) {
+          u.searchParams.delete('v');
+          history.replaceState(null, '', u.pathname + u.search + u.hash);
+        }
+        function fresh() {
+          try {
+            var last = +sessionStorage.getItem('hustle.reload') || 0;
+            if (Date.now() - last < 60000) return;
+            sessionStorage.setItem('hustle.reload', String(Date.now()));
+          } catch (e) {}
+          var n = new URL(location.href);
+          n.searchParams.set('v', Date.now().toString(36));
+          location.replace(n.toString());
+        }
+        addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && (t.tagName === 'SCRIPT' || (t.tagName === 'LINK' && /preload|stylesheet/.test(t.rel)))) fresh();
+        }, true);
+        addEventListener('vite:preloadError', function (e) {
+          e.preventDefault();
+          fresh();
+        });
+      })();
+    </script>
   </head>
   <body class="launcher">
     <div id="ui"></div>
