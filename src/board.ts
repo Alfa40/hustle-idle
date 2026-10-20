@@ -257,7 +257,7 @@ export function detailHtml(x: PrevItem, explain: string | null | undefined, dev:
   return `<button class="dv-back" data-a="back">‹ Tutte le anteprime</button>
     <div class="card dv-detail-top"><h3>#${i.number} · ${esc(shortTitle(i))}</h3>
       <p class="small muted" style="margin:0 0 8px">${name ? `di <b>${esc(name)}</b> · ` : ''}aggiornata ${ago(Date.parse(i.updated_at))}</p>
-      <a class="btn good full" href="${preview(i.number)}" target="_blank" rel="noopener">📱 Gioca l'anteprima</a></div>
+      <a class="btn good full" href="${preview(i.number)}?subito" target="_blank" rel="noopener">📱 Gioca l'anteprima</a></div>
     <div class="card"><h3>📝 La proposta</h3><div class="dv-text">${esc(p?.text ?? shortTitle(i))}</div>
       ${dev && p?.why ? `<p class="small" style="margin:6px 0 0"><b>Perché:</b> ${esc(p.why)}</p>` : ''}${dev && p?.where ? `<p class="small muted" style="margin:4px 0 0">📍 ${esc(p.where)}</p>` : ''}</div>
     <div class="card dv-explain"><h3>🛠️ Cosa cambia</h3>${ex}</div>${ch}`;

@@ -94,8 +94,9 @@
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
 - **Anteprime** (`src/preview.ts`): sito a parte `proposta-N.hustle-anteprime.pages.dev`, fuori classifica, con nome e logo
   già pronti, "Gioca subito" e Partita developer. L'app developer le elenca tutte. **Ogni proposta che cambia una parte
-  precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): "Gioca subito" parte già lì
-  (`veicolo`, `lavoretto`+`gradino`, `attivita`, più `cosa` e `soldi`).
+  precisa del gioco ha il suo `src/anteprime/<numero>.json`** (src/previewStart.ts): il tester parte subito nella situazione
+  della modifica (`soldi`, `possiede`, poi `veicolo`, `lavoretto`+`gradino`, `attivita`+`scheda`, `apri` o `sfida` con
+  tavolo di prova e bot). "Gioca l'anteprima" nelle app apre `?subito`: niente menu, dritti lì.
 
 - **Multigiocatore** (pulsante 🎮 Sfide): minigiochi contro gli amici per categoria; categoria Casinò con poker (`src/ui/poker.ts`, server
   `hustle-poker.js` nel repo della classifica, chiavi `hustle:poker:…`) e blackjack contro il banco (`src/ui/blackjack.ts`,
