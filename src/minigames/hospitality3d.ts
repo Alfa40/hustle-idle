@@ -11,7 +11,7 @@ import { PhasedRun, type Chip, type Phase, type Task } from './jobs';
 import { crate } from './warehouse';
 import { Room } from './room';
 import { BurgerStation, DISHWARE, GrillStation, SAUCES, TOPPINGS, WashStation, type Dish, type Rack, type Sauce, type Step, type Topping } from './kitchen';
-import { CutStation, KneadStation, SHAPE_PATHS, ShapeStation, VEGGIES, type Veggie } from './station';
+import { CutStation, MixerStation, SHAPE_PATHS, ShapeStation, VEGGIES, type MixIng, type MixerView, type Veggie } from './station';
 import { fillTextIco } from '../ui/icons';
 
 /**
@@ -525,17 +525,106 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
 // Forno: panettiere notturno
 // ======================================================================================
 
-/** Impasti del panettiere notturno: icona, nome, se serve il burro (sfoglia) e colore dell'impasto. */
+/**
+ * Impasti del panettiere notturno: icona, nome, se serve il burro (sfoglia), colore dell'impasto e ricetta di base
+ * per l'impastatrice (acqua in ml, lievito e sale in grammi; ogni ordine del foglio la cambia un po').
+ */
 const BREADS = {
-  pagnotta: { icon: '🍞', name: 'pagnotta', butter: false, color: 0xe2c08d },
-  filone: { icon: '🥖', name: 'filone', butter: false, color: 0xe8cf9f },
-  cornetti: { icon: '🥐', name: 'cornetti', butter: true, color: 0xf2d27a },
+  pagnotta: { icon: '🍞', name: 'pagnotta', butter: false, color: 0xe2c08d, recipe: { acqua: 600, lievito: 12, sale: 18 } },
+  filone: { icon: '🥖', name: 'filone', butter: false, color: 0xe8cf9f, recipe: { acqua: 540, lievito: 10, sale: 15 } },
+  cornetti: { icon: '🥐', name: 'cornetti', butter: true, color: 0xf2d27a, recipe: { acqua: 300, lievito: 20, sale: 8 } },
 } as const;
 type Bread = keyof typeof BREADS;
 
 /**
+ * Impastatrice a spirale in 3D sopra il mobile: vasca d'acciaio che gira, gancio a spirale, l'impasto che da
+ * mucchio di farina diventa una palla liscia, e gli ingredienti che cadono dentro mentre si versano.
+ */
+function mixerModel(run: PhasedRun, at: THREE.Vector3): MixerView & { group: THREE.Group; reset: () => void } {
+  const steel = new THREE.MeshLambertMaterial({ color: 0xc9d0d8, side: THREE.DoubleSide });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x66708a });
+  const g = new THREE.Group();
+  // base e vasca (aperta in alto)
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.5, 0.08, 28), dark);
+  base.position.y = 0.04;
+  g.add(base);
+  const bowl = new THREE.Group();
+  const pts = [new THREE.Vector2(0, 0.08), new THREE.Vector2(0.3, 0.08), new THREE.Vector2(0.4, 0.16), new THREE.Vector2(0.42, 0.42), new THREE.Vector2(0.44, 0.44)];
+  bowl.add(new THREE.Mesh(new THREE.LatheGeometry(pts, 32), steel));
+  // segni sul bordo: si vede che la vasca gira
+  for (let i = 0; i < 6; i++) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.04), dark);
+    const a = (i / 6) * Math.PI * 2;
+    m.position.set(Math.cos(a) * 0.43, 0.445, Math.sin(a) * 0.43);
+    m.rotation.y = -a;
+    bowl.add(m);
+  }
+  g.add(bowl);
+  // impasto: mucchio di farina all'inizio
+  const doughMat = new THREE.MeshLambertMaterial({ color: 0xf3ead7 });
+  const dough = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 14), doughMat);
+  dough.position.y = 0.13;
+  bowl.add(dough);
+  // gancio a spirale, fisso, un po' fuori centro
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.022, 6, 16, Math.PI * 1.4), dark);
+  hook.rotation.x = Math.PI / 2;
+  hook.position.set(0.1, 0.36, 0);
+  g.add(hook);
+  g.scale.setScalar(0.78);
+  run.prop(g, at.clone(), 0, 1).userData.noGlow = true;
+  const drops: { m: THREE.Mesh; v: number }[] = [];
+  const colors: Record<MixIng, number> = { acqua: 0x6ec6ff, lievito: 0xc9a26b, sale: 0xffffff };
+  const dropGeo = new THREE.SphereGeometry(0.022, 6, 4);
+  let spawn = 0;
+  const flour = new THREE.Color(0xf3ead7);
+  const wetC = new THREE.Color(0xe2c08d);
+  const reset = () => {
+    dough.scale.set(1, 0.45, 1);
+    doughMat.color.copy(flour);
+    for (const d of drops) g.remove(d.m);
+    drops.length = 0;
+  };
+  reset();
+  return {
+    group: g,
+    reset,
+    frame(dt, p, wet, pouring) {
+      // la vasca gira sempre più in fretta, il gancio gira al contrario
+      bowl.rotation.y += dt * (2 + 3 * p);
+      hook.rotation.z -= dt * 7;
+      // l'impasto: più acqua = palla più alta e liscia, più scura (fino a un po' troppo bagnata)
+      const w = Math.min(1.3, wet);
+      dough.scale.set(1 - 0.12 * Math.min(1, w), 0.45 + 0.4 * Math.min(1, w), 1 - 0.12 * Math.min(1, w));
+      doughMat.color.copy(flour).lerp(wetC, Math.min(1, w));
+      if (w > 1.1) doughMat.color.offsetHSL(0, 0, 0.06);
+      // ingredienti che cadono dentro dall'alto
+      if (pouring) {
+        spawn += dt * (pouring === 'acqua' ? 40 : 22);
+        while (spawn >= 1) {
+          spawn--;
+          const m = new THREE.Mesh(dropGeo, new THREE.MeshLambertMaterial({ color: colors[pouring] }));
+          m.position.set(-0.12 + (Math.random() - 0.5) * 0.08, 0.75, 0.12 + (Math.random() - 0.5) * 0.08);
+          g.add(m);
+          drops.push({ m, v: 0 });
+        }
+      }
+      for (let i = drops.length - 1; i >= 0; i--) {
+        const d = drops[i];
+        d.v += 9 * dt;
+        d.m.position.y -= d.v * dt;
+        if (d.m.position.y < 0.3) {
+          g.remove(d.m);
+          drops.splice(i, 1);
+        }
+      }
+    },
+  };
+}
+
+/**
  * Panettiere notturno: si preparano gli impasti per la mattina, niente forno. Il foglio degli ordini dice cosa
- * fare, uno dopo l'altro: farina → impastatrice (tieni premuto) → per i cornetti il burro dal frigo → banco
+ * fare, uno dopo l'altro: farina → nell'impastatrice (la camera va dall'alto sulla vasca: acqua, lievito e sale al
+ * momento giusto e nella quantità della ricetta, vedi MixerStation) → per i cornetti il burro dal frigo → banco
  * (dai la forma, tieni premuto) → la cella di lievitazione, sul ripiano del suo tipo. Il ripiano sbagliato si
  * può scegliere, ma conta alla fine (meno stelle e paga).
  */
@@ -549,11 +638,23 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   for (let i = kinds.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [orders[i], orders[k]] = [orders[k], orders[i]]; }
   type Stage = 'flour' | 'dough' | 'butter' | 'shaped';
   // q: qualità dell'impasto (impastare e forma, col dito)
-  let holding: { stage: Stage; b: Bread; q: number } | null = null;
+  let holding: { stage: Stage; b: Bread; q: number; r: Record<MixIng, number> } | null = null;
   const qs: number[] = [];
-  // ai livelli alti più pieghe e sagoma più precisa
-  const folds = Math.round(8 + 4 * t);
+  // ai livelli alti impastatrice più veloce, finestre più strette, quantità più precise e sagoma più precisa
   const tol = 0.075 - 0.025 * t;
+  const mixDur = 15 - 4 * t;
+  const mixTol = 0.1 - 0.04 * t;
+  // secondi per versare la quantità giusta tenendo premuto (sempre meno della finestra)
+  const pourSec = 1.8 - 0.6 * t;
+  const winW = 1 - 0.4 * t;
+  const win = (c: number, wd: number): [number, number] => [c - (wd * winW) / 2, c + (wd * winW) / 2];
+  const mixWin: Record<MixIng, [number, number]> = { acqua: win(0.2, 0.3), lievito: win(0.48, 0.24), sale: win(0.76, 0.24) };
+  // ogni ordine del foglio ha la sua ricetta (un po' diversa da quella di base): va letta
+  const vary = (v: number, unit: number) => Math.max(unit, Math.round((v * (0.85 + Math.random() * 0.3)) / unit) * unit);
+  const recipes = orders.map((b) => {
+    const r = BREADS[b].recipe;
+    return { acqua: vary(r.acqua, 10), lievito: vary(r.lievito, 1), sale: vary(r.sale, 1) } as Record<MixIng, number>;
+  });
   let next = 0;
   let done = 0;
   let wrong = 0;
@@ -562,6 +663,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const flourAt = room.at(-3.5, -2.3);
   const mixer = room.furn('kitchenCabinet', -1.8, -3.0, 0);
   const mixerAt = room.near(-1.8, -3.0, 0, 0.6);
+  let mix: ReturnType<typeof mixerModel>;
   const fridge = room.furn('kitchenFridge', 1.0, -3.0, 0);
   const fridgeAt = room.near(1.0, -3.0, 0, 0.7);
   const table = room.furn('table', 0, -0.4, 0);
@@ -594,18 +696,34 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
-    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b>, <b>impasta</b> col dito avanti e indietro senza fermarti, per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
+    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b> e mettila nell\'<b>impastatrice</b>. Mentre gira, aggiungi <b>acqua</b>, <b>lievito</b> e <b>sale</b> quando arriva il loro momento sulla barra: tieni premuto e lascia sul numero della ricetta. Per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
     tasks: () => [
-      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1 }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
+      { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1, r: recipes[next] }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
       {
-        // impastare è un minigioco col dito (avanti e indietro sull'impasto)
-        pos: mixerAt, kind: 'tap', repeat: true, quiet: true, label: 'Impasta', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour',
-        onDone: () => run.openStation(new KneadStation(folds, (q) => {
-          if (!holding) return;
-          holding = { stage: 'dough', b: holding.b, q };
-          hold(game, crate(0.28, 0xf6e7c8));
-          if (q < 0.7) toast('🌀 Impasto un po\' grumoso: non fermarti mentre impasti', 'bad');
-        })),
+        // la farina nell'impastatrice: la camera va dall'alto sulla vasca e si aggiungono acqua, lievito e sale
+        pos: mixerAt, kind: 'tap', repeat: true, quiet: true, label: 'Metti la farina nell\'impastatrice', icon: '🌀', obj: mixer.obj, enabled: () => holding?.stage === 'flour',
+        onDone: () => {
+          const h = holding!;
+          hold(game);
+          mix.reset();
+          mixTag.visible = false;
+          const st = new MixerStation({
+            title: `🌀 Impastatrice · ${BREADS[h.b].icon} ${BREADS[h.b].name}`,
+            recipe: h.r, dur: mixDur, win: mixWin, tol: mixTol,
+            // versare la quantità giusta dura `pourSec`: lasciare il dito al momento giusto conta
+            rate: Object.fromEntries((Object.keys(mixWin) as MixIng[]).map((k) => [k, h.r[k] / pourSec])) as Record<MixIng, number>,
+            view: mix,
+          }, (q) => {
+            mixTag.visible = true;
+            if (!holding) return;
+            holding = { stage: 'dough', b: h.b, q, r: h.r };
+            hold(game, crate(0.28, 0xf6e7c8));
+            if (st.verdict) toast(`🌀 ${st.verdict}`, 'bad');
+            else if (q >= 0.85) toast('🌀 Impasto perfetto!', 'good');
+          });
+          run.openStation(st);
+          game.camFocus = { at: mix.group.getWorldPosition(new THREE.Vector3()).setY(mix.group.position.y + 0.25), size: 1.1, rect: () => st.viewRect(), alive: () => !st.closed };
+        },
       },
       { pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi il burro per la sfoglia', icon: '🧈', obj: fridge.obj, enabled: () => holding?.stage === 'dough' && BREADS[holding.b].butter, onDone: () => { holding = { ...holding!, stage: 'butter' }; } },
       {
@@ -616,7 +734,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
           const b = holding!.b;
           run.openStation(new ShapeStation(BREADS[b].name, BREADS[b].icon, SHAPE_PATHS[b], tol, (q) => {
             if (!holding) return;
-            holding = { stage: 'shaped', b, q: (holding.q + q) / 2 };
+            holding = { stage: 'shaped', b, q: (holding.q + q) / 2, r: holding.r };
             hold(game, doughM(b));
             if (q < 0.7) toast(`👐 ${BREADS[b].icon} Forma un po' storta`, 'bad');
           }));
@@ -644,7 +762,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
               d.visible = false;
               r.slots[k] = null;
               done--;
-              holding = { stage: 'shaped', b, q };
+              holding = { stage: 'shaped', b, q, r: recipes[0] };
               hold(game, doughM(b));
               score();
             });
@@ -658,10 +776,11 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
       })),
     ],
   }];
-  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 30 });
+  run = new PhasedRun(game, 1, title, phases, { time: 40 + n * 36 });
+  mix = mixerModel(run, room.at(-1.8, -3.0).add(new THREE.Vector3(0, mixer.top, 0)));
   run.prop(sack, flourAt.clone().add(new THREE.Vector3(0, 0, -0.5)), 0, 1);
   tag(run, '🌾 Farina', flourAt, 1.4);
-  tag(run, '🌀 Impastatrice', mixerAt, 1.7);
+  const mixTag = tag(run, '🌀 Impastatrice', mixerAt, 1.7);
   if (kinds.includes('cornetti')) tag(run, '🧈 Burro', fridgeAt, 2.2);
   tag(run, '👐 Banco', tableAt, 1.5);
   for (const r of racks) tag(run, `${BREADS[r.b].icon} Lievitazione`, r.pos, 1.8, '#8e5bd6');

@@ -1511,3 +1511,5 @@ body.in-poker .toasts { z-index: 31; }
 .pk-rebuy { background: #fff; border-radius: 16px; padding: 8px 10px; color: var(--ink); }
 .prop-prog { height: 10px; border-radius: 6px; background: #e4e4ef; overflow: hidden; }
 .prop-prog i { display: block; height: 100%; width: 0; background: #2fa866; transition: width .2s; }
+/* impastatrice del panettiere: riquadro trasparente, sotto si vede la ciotola vera dall'alto */
+.ovl.ovl-clear { background: transparent; box-shadow: none; }

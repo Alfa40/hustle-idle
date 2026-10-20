@@ -1620,6 +1620,7 @@ export class Game {
         if (this.firstPerson) this.updateFirstPerson(dt);
         else this.updateCamera(dt);
         this.applyCamBlend(dt);
+        this.applyCamFocus(dt);
       }
     } else {
       this.input.consumeTap();
@@ -1806,6 +1807,48 @@ export class Game {
     // in prima persona niente centro spostato (vedi centerInFreeArea)
     this.centerInFreeArea(dt);
   }
+
+  /**
+   * Vista dall'alto su un punto (es. l'impastatrice del panettiere) finché `alive()`: la camera sale e guarda giù,
+   * con il punto al centro della zona libera dello schermo; poi torna in prima persona con lo stesso passaggio morbido.
+   */
+  camFocus: { at: THREE.Vector3; size: number; rect: () => { x: number; y: number; w: number; h: number } | null; alive: () => boolean } | null = null;
+  private camFocusK = 0;
+
+  private applyCamFocus(dt: number) {
+    const f = this.camFocus;
+    if (f && !f.alive()) this.camFocus = null;
+    const on = !!this.camFocus;
+    this.camFocusK = THREE.MathUtils.clamp(this.camFocusK + (on ? dt : -dt) / 0.6, 0, 1);
+    if (!this.camFocusK) {
+      if (this.camera.view?.enabled) {
+        this.camera.clearViewOffset();
+        this.camera.updateProjectionMatrix();
+      }
+      return;
+    }
+    this.lastFocus = f ?? this.lastFocus;
+    const g = this.lastFocus;
+    if (!g) return;
+    const cam = this.camera;
+    // il punto sta al centro dello spazio libero che gli lascia chi lo usa (es. tra la ricetta e i tasti
+    // dell'impastatrice), oppure della zona libera dello schermo; l'altezza fa entrare `size` metri in quello spazio
+    const r = g.rect() ?? layout.freeRect([{ sel: '.jobbar.on', dock: layout.panelDock }, { sel: '.hud-right .hud-btns', dock: 'right' }]);
+    const tan = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    const vh = (g.size * innerHeight) / Math.max(80, Math.min(r.w, r.h) * 0.92);
+    const height = vh / (2 * tan);
+    // la camera resta sopra il punto; per metterlo al centro dello spazio libero si sposta solo l'inquadratura
+    const pos = new THREE.Vector3(g.at.x, g.at.y + height, g.at.z + height * 0.04);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, g.at, new THREE.Vector3(0, 1, 0)));
+    const e = 1 - Math.pow(1 - this.camFocusK, 3);
+    cam.position.lerp(pos, e);
+    cam.quaternion.slerp(q, e);
+    const dx = (r.x + r.w / 2 - innerWidth / 2) * e;
+    const dy = (r.y + r.h / 2 - innerHeight / 2) * e;
+    cam.setViewOffset(innerWidth, innerHeight, -dx, -dy, innerWidth, innerHeight);
+    cam.updateProjectionMatrix();
+  }
+  private lastFocus: NonNullable<Game['camFocus']> | null = null;
 
   /** Passaggio morbido della camera dopo un cambio di visuale. */
   private applyCamBlend(dt: number) {

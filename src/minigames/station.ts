@@ -768,3 +768,222 @@ export class CutStation extends Station {
 export function stationOpen(game: Game) {
   return !!(game.run as { station?: Station | null } | null)?.station;
 }
+
+// ======================================================================================
+// Impastatrice: acqua, lievito e sale al momento giusto e nella quantità giusta (panettiere)
+// ======================================================================================
+
+export type MixIng = 'acqua' | 'lievito' | 'sale';
+export const MIX_INGS: Record<MixIng, { icon: string; name: string; unit: string; color: string }> = {
+  acqua: { icon: '💧', name: 'Acqua', unit: 'ml', color: '#2d9cdb' },
+  lievito: { icon: '🫧', name: 'Lievito', unit: 'g', color: '#8e5bd6' },
+  sale: { icon: '🧂', name: 'Sale', unit: 'g', color: '#66708a' },
+};
+const MIX_ORDER: MixIng[] = ['acqua', 'lievito', 'sale'];
+
+/** Cosa succede nella ciotola (in 3D, vista dall'alto): la vasca gira, cadono gli ingredienti, l'impasto si forma. */
+export interface MixerView {
+  /** ogni fotogramma: avanzamento dell'impasto (0–1), quanto è bagnato (0–1+), ingrediente che sta cadendo */
+  frame(dt: number, p: number, wet: number, pouring: MixIng | null): void;
+}
+
+/**
+ * L'impastatrice gira da sola per `dur` secondi (la barra in alto, con le finestre di ogni ingrediente: prima
+ * l'acqua, poi il lievito, per ultimo il sale). Tieni premuto il tasto di un ingrediente per versarlo: il numero
+ * sale finché tieni il dito, lascia quando arrivi alla quantità della ricetta. Versare fuori dalla sua finestra o
+ * sbagliare la quantità abbassa la qualità; un ingrediente mai messo la fa crollare. Il riquadro è trasparente in
+ * mezzo: si vede la ciotola vera, dall'alto.
+ */
+export class MixerStation extends Station {
+  private p = 0;
+  private amt: Record<MixIng, number> = { acqua: 0, lievito: 0, sale: 0 };
+  /** quanto è stato versato fuori dalla sua finestra (0–1 della quantità giusta) */
+  private off: Record<MixIng, number> = { acqua: 0, lievito: 0, sale: 0 };
+  private pouring: MixIng | null = null;
+  private msg = '';
+  private msgT = 0;
+  private tail = 0;
+  /** com'è andata, una riga per il messaggio finale */
+  verdict = '';
+  private btns: Record<MixIng, { x: number; y: number; w: number; h: number }> = {} as never;
+
+  constructor(
+    private o: { title: string; recipe: Record<MixIng, number>; dur: number; win: Record<MixIng, [number, number]>; tol: number; rate: Record<MixIng, number>; view: MixerView },
+    onEnd: (q: number) => void,
+  ) {
+    super(onEnd);
+    this.root.classList.add('ovl-clear');
+  }
+
+  /** spazio trasparente tra la ricetta in alto e i tasti in basso (coordinate dello schermo): lì si vede la vasca */
+  viewRect() {
+    const r = this.cv.getBoundingClientRect();
+    const b = this.btns.acqua;
+    if (!r.width || !b) return null;
+    const top = r.top + 6 + 104 + 6;
+    const bottom = r.top + b.y - 6;
+    return { x: r.left, y: top, w: r.width, h: Math.max(40, bottom - top) };
+  }
+
+  private hit(x: number, y: number): MixIng | null {
+    for (const k of MIX_ORDER) {
+      const b = this.btns[k];
+      if (b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return k;
+    }
+    return null;
+  }
+
+  protected down(x: number, y: number) {
+    this.pouring = this.p < 1 ? this.hit(x, y) : null;
+    if (!this.pouring) return;
+    const [a, b] = this.o.win[this.pouring];
+    if (this.p < a) this.say(`Troppo presto per ${MIX_INGS[this.pouring].name.toLowerCase()}!`);
+    else if (this.p > b) this.say(`Troppo tardi per ${MIX_INGS[this.pouring].name.toLowerCase()}!`);
+  }
+  protected move(x: number, y: number) {
+    // il dito scivola fuori dal tasto: si smette di versare
+    if (this.pouring && this.hit(x, y) !== this.pouring) this.pouring = null;
+  }
+  protected up() {
+    this.pouring = null;
+  }
+
+  private say(t: string) {
+    this.msg = t;
+    this.msgT = 1.6;
+  }
+
+  /** qualità di un ingrediente: quantità (perfetta dentro la tolleranza) × momento giusto */
+  private score(k: MixIng) {
+    const want = this.o.recipe[k];
+    if (this.amt[k] <= 0) return 0;
+    const err = Math.abs(this.amt[k] - want) / want;
+    const qty = err <= this.o.tol ? 1 : Math.max(0, 1 - (err - this.o.tol) / 0.35);
+    const time = 1 - 0.6 * Math.min(1, this.off[k]);
+    return qty * time;
+  }
+
+  private finish() {
+    const qs = MIX_ORDER.map((k) => this.score(k));
+    const q = qs.reduce((a, b) => a + b, 0) / qs.length;
+    const missing = MIX_ORDER.filter((k) => this.amt[k] <= 0);
+    const bad = MIX_ORDER.filter((k) => this.amt[k] > 0 && Math.abs(this.amt[k] - this.o.recipe[k]) / this.o.recipe[k] > this.o.tol);
+    const late = MIX_ORDER.filter((k) => this.off[k] > 0.15);
+    this.verdict = missing.length
+      ? `Manca ${missing.map((k) => MIX_INGS[k].icon + ' ' + MIX_INGS[k].name.toLowerCase()).join(' e ')}: impasto rovinato`
+      : bad.length
+        ? `Quantità sbagliata: ${bad.map((k) => MIX_INGS[k].icon + ' ' + MIX_INGS[k].name.toLowerCase()).join(', ')}`
+        : late.length
+          ? `Al momento sbagliato: ${late.map((k) => MIX_INGS[k].icon + ' ' + MIX_INGS[k].name.toLowerCase()).join(', ')}`
+          : '';
+    this.end(q);
+  }
+
+  step(dt: number) {
+    const o = this.o;
+    if (this.p < 1) {
+      this.p = Math.min(1, this.p + dt / o.dur);
+      if (this.pouring) {
+        const k = this.pouring;
+        const add = o.rate[k] * dt;
+        this.amt[k] += add;
+        const [a, b] = o.win[k];
+        if (this.p < a || this.p > b) this.off[k] += add / o.recipe[k];
+      }
+      // finestra passata senza l'ingrediente: avviso (si può ancora mettere, in ritardo)
+      for (const k of MIX_ORDER) if (this.amt[k] <= 0 && this.p > o.win[k][1] && this.p - dt / o.dur <= o.win[k][1]) this.say(`${MIX_INGS[k].icon} Hai dimenticato ${MIX_INGS[k].name.toLowerCase()}!`);
+    } else {
+      this.pouring = null;
+      this.tail += dt;
+      if (this.tail > 0.7) return this.finish();
+    }
+    this.msgT -= dt;
+    o.view.frame(dt, this.p, this.amt.acqua / o.recipe.acqua, this.pouring);
+    this.draw();
+  }
+
+  private draw() {
+    const g = this.g;
+    const { w, h } = this;
+    const o = this.o;
+    g.clearRect(0, 0, w, h);
+    // in alto: titolo, ricetta e barra del tempo con le finestre
+    const topH = 104;
+    g.fillStyle = 'rgba(255,248,236,.94)';
+    g.beginPath();
+    g.roundRect(6, 6, w - 12, topH, 14);
+    g.fill();
+    this.text(o.title, w / 2, 22, 16);
+    this.text(MIX_ORDER.map((k) => `${MIX_INGS[k].icon} ${o.recipe[k]} ${MIX_INGS[k].unit}`).join('   '), w / 2, 46, 15, '#3a2f55', 700);
+    const bx = 18;
+    const bw = w - 36;
+    const by = 64;
+    g.fillStyle = 'rgba(58,47,85,.12)';
+    g.beginPath();
+    g.roundRect(bx, by, bw, 18, 9);
+    g.fill();
+    for (const k of MIX_ORDER) {
+      const [a, b] = o.win[k];
+      g.fillStyle = MIX_INGS[k].color;
+      g.globalAlpha = this.amt[k] > 0 ? 0.45 : 0.85;
+      g.beginPath();
+      g.roundRect(bx + a * bw, by, (b - a) * bw, 18, 6);
+      g.fill();
+      g.globalAlpha = 1;
+      this.text(MIX_INGS[k].icon, bx + ((a + b) / 2) * bw, by + 9, 13);
+    }
+    // cursore
+    const cx = bx + this.p * bw;
+    g.fillStyle = '#3a2f55';
+    g.fillRect(cx - 2, by - 5, 4, 28);
+    const line = this.msgT > 0 ? this.msg : this.p >= 1 ? 'Impasto pronto!' : this.hint();
+    this.text(line, w / 2, 96, 13, this.msgT > 0 ? '#e5484d' : '#7a6f8f', 600);
+    // in basso: i tre tasti, da tenere premuti
+    const gap = 8;
+    const bh = Math.min(96, Math.max(76, h * 0.17));
+    const bwid = (w - 12 - gap * 2) / 3;
+    const y0 = h - bh - 6;
+    MIX_ORDER.forEach((k, i) => {
+      const x = 6 + i * (bwid + gap);
+      this.btns[k] = { x, y: y0, w: bwid, h: bh };
+      const [a, b] = o.win[k];
+      const now = this.p >= a && this.p <= b;
+      const on = this.pouring === k;
+      g.fillStyle = on ? MIX_INGS[k].color : now ? '#ffffff' : 'rgba(255,248,236,.9)';
+      g.beginPath();
+      g.roundRect(x, y0, bwid, bh, 14);
+      g.fill();
+      g.lineWidth = now ? 4 : 2;
+      g.strokeStyle = now ? MIX_INGS[k].color : 'rgba(58,47,85,.25)';
+      g.stroke();
+      const ink = on ? '#ffffff' : '#3a2f55';
+      this.text(`${MIX_INGS[k].icon} ${MIX_INGS[k].name}`, x + bwid / 2, y0 + 18, 14, ink, 700);
+      // quantità versata e indicatore con la tacca della ricetta
+      const want = o.recipe[k];
+      const val = Math.round(this.amt[k]);
+      this.text(`${val} / ${want} ${MIX_INGS[k].unit}`, x + bwid / 2, y0 + 40, 13, ink, 600);
+      const gx = x + 10;
+      const gw = bwid - 20;
+      const gy = y0 + 54;
+      const max = want * 1.5;
+      g.fillStyle = on ? 'rgba(255,255,255,.35)' : 'rgba(58,47,85,.12)';
+      g.fillRect(gx, gy, gw, 10);
+      // fascia giusta
+      g.fillStyle = 'rgba(53,196,106,.55)';
+      g.fillRect(gx + ((want * (1 - o.tol)) / max) * gw, gy, ((want * 2 * o.tol) / max) * gw, 10);
+      const err = Math.abs(this.amt[k] - want) / want;
+      g.fillStyle = this.amt[k] <= 0 ? 'transparent' : err <= o.tol ? '#1f9a4c' : this.amt[k] > want ? '#e5484d' : (on ? '#ffffff' : MIX_INGS[k].color);
+      g.fillRect(gx, gy, Math.min(1, this.amt[k] / max) * gw, 10);
+      g.fillStyle = '#3a2f55';
+      g.fillRect(gx + (want / max) * gw - 1, gy - 3, 2, 16);
+      if (bh > 80) this.text(now ? 'ORA!' : this.p < a ? 'non ancora' : 'passato', x + bwid / 2, y0 + bh - 12, 11, on ? '#ffffff' : now ? MIX_INGS[k].color : '#9a90ad', 600);
+    });
+  }
+
+  private hint() {
+    const k = MIX_ORDER.find((x) => this.p >= this.o.win[x][0] && this.p <= this.o.win[x][1]);
+    if (k) return `Ora: ${MIX_INGS[k].icon} ${MIX_INGS[k].name.toLowerCase()}, tieni premuto e lascia sul numero giusto`;
+    const nxt = MIX_ORDER.find((x) => this.p < this.o.win[x][0]);
+    return nxt ? `Aspetta: tra poco ${MIX_INGS[nxt].icon} ${MIX_INGS[nxt].name.toLowerCase()}` : 'Lascia girare l\'impasto';
+  }
+}

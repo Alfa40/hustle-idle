@@ -75,8 +75,8 @@ export const JOBS: Record<JobType, JobDef> = {
   },
   forno: {
     name: 'Panettiere notturno', icon: '🥖', skill: 'cucina', basePay: 28, xp: 13, fame: 1, where: 'shop',
-    intro: "Di notte al forno: prendi la farina, impastala, dai la forma al pane, infornalo e toglilo quando è dorato (prima è crudo, dopo brucia). Poi sullo scaffale.",
-    steps: [['🌾', 'Prendi la farina', 'tap'], ['🌀', "Impasta all'impastatrice", 'hold'], ['🥖', 'Dai la forma al pane', 'hold'], ['🔥', 'Inforna e togli quando è dorato', 'tap']],
+    intro: "Di notte al forno prepari gli impasti per la mattina: metti la farina nell'impastatrice e, mentre gira, aggiungi acqua, lievito e sale al momento giusto e nella quantità della ricetta. Poi dai la forma e metti l'impasto a lievitare sul ripiano giusto.",
+    steps: [['🌾', "Metti la farina nell'impastatrice", 'tap'], ['💧', 'Acqua, lievito e sale: tieni premuto e lascia sul numero giusto', 'hold'], ['🥖', 'Dai la forma al pane', 'hold'], ['🧺', 'A lievitare sul ripiano del suo tipo', 'tap']],
   },
   imbianchino: {
     name: 'Dipingere la recinzione', icon: '🖌️', skill: 'artigianato', basePay: 34, xp: 15, fame: 1.2, where: 'house',
