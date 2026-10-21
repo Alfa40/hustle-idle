@@ -282,10 +282,11 @@ dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso g
 
 ## 🔨 Costruzione e manualità (PROPOSTA del 21/10, da approvare)
 
-Come la Ristorazione: **5 linee × 5 gradini = 25 lavoretti**, sempre con le mani e sotto i 5 minuti. Giardinaggio e
-Auto (che c'erano già con i minigiochi vecchi) si rifanno come gli altri lavoretti nuovi: terza persona, fasi,
+**4 linee × 5 gradini = 20 lavoretti**, sempre con le mani e sotto i 5 minuti. **Niente lavori con le auto** (deciso
+dall'utente il 21/10): lavaggio, carrozzeria, officina e corse potranno avere una categoria tutta loro (🚗 Auto, sotto
+"Da decidere"); la linea Auto del registro resta spenta. Giardinaggio (che c'era già con i minigiochi vecchi) si rifà come gli altri lavoretti nuovi: terza persona, fasi,
 postazioni col dito e tutorial passo passo. Scene: giardini e case vere del quartiere (come le Consegne), locale senza
-tetto per officina e appartamenti (come la cucina), facciata del palazzo per i vetri.
+tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 
 ### 🌿 Giardinaggio
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
@@ -295,15 +296,6 @@ tetto per officina e appartamenti (come la cucina), facciata del palazzo per i v
 | 20 | Progettare giardini | pianta fiori, cespugli e alberi come nel disegno del cliente, poi annaffia | più piante; piante che vogliono sole o ombra | 2–3 min |
 | 30 | Parchi pubblici | un parco con una squadra: dici a ogni aiutante cosa fare (prato, siepi, panchine, fontanella) e fai tu il resto | da 2 a 3 aiutanti, parco più grande | 3 min |
 | 40 | Paesaggista | villa: vialetto di pietre a incastro, fontana, luci del giardino da accendere come nel progetto | progetto più ricco, meno tempo | 3–4 min |
-
-### 🚗 Auto
-| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
-|---|---|---|---|---|
-| 1 | Lavaggio auto | schiuma, spugna col dito sulle macchie (come il lavapiatti), risciacquo, asciugatura | auto più sporche; dal Liv. 5 anche gli interni (aspirapolvere, tappetini) | 1½–2½ min |
-| 10 | Carrozzeria e lucidatura | stucco sui graffi, carta vetrata col dito, lucidatrice a cerchi finché brilla | più graffi, ammaccature da tirare fuori | 2–3 min |
-| 20 | Meccanico in officina | si accende una spia: guarda e ascolta l'auto, trova il pezzo rotto (scelte sbagliate costano tempo), svita i bulloni a stella e cambialo | guasti più nascosti, due guasti insieme | 2–3 min |
-| 30 | Restauro di auto d'epoca | smonta i pezzi, sistema quelli rovinati al banco, rimontali nell'ordine inverso | più pezzi, pezzi fragili | 3 min |
-| 40 | Preparatore da corsa | regola gomme e assetto, poi un giro di prova in pista contro il tempo (guida come l'Autista) | tempo da battere più stretto | 3–4 min |
 
 ### 🔧 Lavori in casa
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
@@ -338,16 +330,6 @@ Stesse regole per evolvere (tutte le migliorie al massimo + ristrutturazione, un
 **Da decidere:** le evolute automatiche come nella Ristorazione (aprono con un dipendente per reparto e il manager,
 niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le basi restano col lavoretto di persona.
 
-#### 🧼 Albero dell'Autolavaggio
-| Attività | Grado | Prodotti | Personale | Di persona |
-|---|---|---|---|---|
-| 🧼 Autolavaggio | base, posteggio (nuova) | lavaggio esterno, lavaggio completo | lavatori, cassiere | Lavaggio auto |
-| 🔩 Officina | 1ª, bivio A | tagliandi, riparazioni | meccanici, accettazione | Meccanico in officina |
-| 🏎️ Officina di auto di lusso | 2ª | auto sportive, carrozzeria su misura | meccanici, carrozziere | Carrozzeria e lucidatura |
-| 🏁 Preparatore da corsa | 3ª | auto da pista, restauri d'epoca | meccanici, pilota collaudatore | Preparatore da corsa |
-| 🚿 Autolavaggio a tunnel | 1ª, bivio B | tunnel veloce, abbonamenti | addetti, cassiere | Lavaggio auto |
-| ✨ Centro cura auto | 2ª | lucidatura, interni come nuovi | lucidatori, accettazione | Carrozzeria e lucidatura |
-
 #### 🌿 Albero del Giardiniere
 | Attività | Grado | Prodotti | Personale | Di persona |
 |---|---|---|---|---|
@@ -363,12 +345,19 @@ niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le bas
 |---|---|---|---|---|
 | 🧽 Impresa di pulizie ✅ | base, locale | pulizie di case, pulizie di uffici | addetti pulizie | Pulizie di casa |
 | 🏢 Pulizie industriali | 1ª, bivio A | uffici, vetri dei palazzi | addetti, caposquadra | Vetri dei palazzi |
-| 🧪 Sanificazione | 2ª | ospedali, laboratori, dopo gli eventi | tecnici, caposquadra | Sanificazione |
-| 🔧 Tuttofare | 1ª, bivio B | montaggi, riparazioni in casa | tuttofare | Riparazioni in casa |
-| 🏠 Ristrutturazioni | 2ª | bagni e cucine, appartamenti interi | muratori, piastrellista | Ristrutturazioni |
-| 🏗️ Impresa edile | 3ª | case nuove, palazzi | muratori, gruista | Capocantiere |
-| ⚡ Ditta di impianti | 1ª, bivio C | impianti idraulici ed elettrici | idraulico, elettricista | Elettricista |
-| ☀️ Energia e casa intelligente | 2ª | pannelli solari, domotica | tecnici, installatori | Pannelli solari |
+| 🧪 Sanificazione | 2ª | ospedali, laboratori | tecnici, caposquadra | Sanificazione |
+| 🎪 Pulizie per eventi | 1ª, bivio B | concerti, fiere, stadi | addetti, caposquadra | Pulizie dopo un concerto |
+
+#### 🔧 Albero del Tuttofare
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🔧 Tuttofare | base, posteggio (nuova, furgoncino) | montaggi, riparazioni in casa | tuttofare | Montaggio mobili, Riparazioni in casa |
+| 🏠 Ristrutturazioni | 1ª, bivio A | bagni e cucine, appartamenti interi | muratori, piastrellista | Ristrutturazioni |
+| 🧱 Costruzioni | 2ª | case nuove | muratori, carpentiere | Costruire una casa |
+| 🏗️ Impresa edile | 3ª | palazzi, grandi cantieri | muratori, gruista | Capocantiere |
+| ⚡ Ditta di impianti | 1ª, bivio B | impianti idraulici ed elettrici | idraulico, elettricista | Aiuto idraulico, Elettricista |
+| 🔥 Caldaie e clima | 2ª | caldaie, termosifoni, condizionatori | tecnici | Caldaie e termosifoni |
+| ☀️ Energia e casa intelligente | 3ª | pannelli solari, domotica | tecnici, installatori | Pannelli solari, Casa intelligente |
 
 **Prezzi e guadagni (proposta):** come Trasporti e Ristorazione. Basi nuove circa €4–6 mila + posteggio;
 ristrutturazioni 1ª €22–30 mila, 2ª €70–90 mila, 3ª €190–220 mila (+ il locale). Con due dipendenti per reparto: base
@@ -429,6 +418,7 @@ Gli alberi completi di ogni settore sono nella sezione del settore (Trasporti e 
 ---
 
 ## Da decidere
+- 🚗 **Auto** come categoria a parte (tolta da Costruzione e manualità il 21/10): lavaggio, carrozzeria, officina, restauro, corse; attività Autolavaggio → Officina → Officina di lusso → Preparatore da corsa
 - Quante linee per settore all'inizio (oggi 3, qui ne propongo 4–5)
 - Se le linee arrivano a 5 gradini (Liv. 40) o restano a 3
 - Prezzi delle evoluzioni delle attività (indicativi in Trasporti e logistica)
