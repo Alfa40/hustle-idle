@@ -330,8 +330,9 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 ### Attività (3 alberi)
 
 Stesse regole per evolvere (tutte le migliorie al massimo + ristrutturazione, un locale libero, un solo prezzo).
-**Da decidere:** le evolute automatiche come nella Ristorazione (aprono con un dipendente per reparto e il manager,
-niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le basi restano col lavoretto di persona.
+**Deciso il 21/10:** tutte automatiche (anche le basi, e anche quelle vecchie degli altri settori): aprono con un
+dipendente per reparto e il manager e lavorano da sole; non si entra dentro. La colonna "Di persona" dice solo quale
+lavoretto dà esperienza a quell'attività.
 
 #### 🌿 Albero del Giardiniere
 | Attività | Grado | Prodotti | Personale | Di persona |
