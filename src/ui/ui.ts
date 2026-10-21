@@ -1514,8 +1514,8 @@ export class UI {
     const targets = evolvesOf(b.type);
     const cards = targets.map((t) => {
       const d = bizType(t);
-      const lots = evolveLots(s, t);
-      const from = lots.length ? Math.min(...lots.map((l) => evolvePrice(l, t))) : 0;
+      const lots = evolveLots(s, t, b.lotId);
+      const from = lots.length ? Math.min(...lots.map((l) => evolvePrice(l, t, b.lotId))) : 0;
       // anteprima nel locale libero che rende di più (come all'acquisto)
       const bestLot = lots.map((l) => ({ l, p: estimateLot(s, l, t).profit })).sort((x, y) => y.p - x.p)[0]?.l;
       const next = evolvesOf(t).map((x) => `${bizType(x).icon} ${bizType(x).name}`).join(' o ');
@@ -1523,10 +1523,13 @@ export class UI {
           <div style="flex:1"><h3 style="margin:0">${d.name}</h3><div class="small">${d.products.map((p) => PRODUCTS[p].icon).join(' ')} · ${(d.tier ?? 1)}ª evoluzione</div></div></div>
         <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
         ${bestLot ? `${this.estStats(bestLot, t)}<div class="muted small center" style="margin:4px 0 8px">nel locale libero migliore: ${esc(lotDef(bestLot).name)}</div>` : ''}
-        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button></div>`;
+        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button>
+        ${!ready ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi ancora evolvere: ${miss.length === 1 ? 'manca' : 'mancano'} ${miss.map((x) => `${x.def.icon} ${x.def.name} (${x.lvl}/${x.def.max})`).join(', ')}.</div>`
+          : !lots.length ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi evolvere: ${d.name} ha bisogno di un locale di tipo diverso dal tuo e non ce n'è nessuno libero, tutti sono già tuoi. Chiudi o vendi un'attività di quel tipo per liberarne uno.</div>`
+          : s.money < from ? `<div class="small center" style="margin-top:6px;color:#e0a030">Ti mancano ${euro(from - s.money)} per il locale più economico.</div>` : ''}</div>`;
     }).join('');
     return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
-        <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
+        <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero (o resta dove sei, pagando solo la ristrutturazione) e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e, se cambi locale, il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
         ${reqs}</div>
       <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}${this.estNote()}`;
   }
@@ -1542,15 +1545,17 @@ export class UI {
       render: () => {
         const b = s.businesses.find((x) => x.id === bizId);
         if (!b) return '<p>Attività non trovata.</p>';
-        const lots = evolveLots(s, target).sort((x, y) => evolvePrice(x, target) - evolvePrice(y, target));
+        const own = b.lotId;
+        const lots = evolveLots(s, target, own).sort((x, y) => evolvePrice(x, target, own) - evolvePrice(y, target, own));
         return `<div class="card row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div><div style="flex:1"><b>${d.name}</b><div class="small">🏗️ ristrutturazione ${euro(d.evolveCost ?? 0)} + locale</div></div></div>` + explain(`Il prezzo comprende il locale e la ristrutturazione (${euro(d.evolveCost ?? 0)}). In centro ci sono più clienti ma costa di più.`) +
           lots.map((l) => {
             const lot = lotDef(l);
-            const price = evolvePrice(l, target);
-            return `<div class="card"><b>${esc(lot.name)}</b><div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div>
+            const price = evolvePrice(l, target, own);
+            return `<div class="card"><b>${esc(lot.name)}</b>${l === own ? ' <span class="tag g">Sul posto</span>' : ''}<div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div>
               ${this.estStats(l, target)}
               <button class="btn good full" style="margin-top:10px" data-a="go:${l}" ${s.money < price ? 'disabled' : ''}>🏗️ Evolvi qui per ${euro(price)}</button>
-              <div class="muted small center" style="margin-top:4px">Locale ${euro(price - (d.evolveCost ?? 0))} + ristrutturazione ${euro(d.evolveCost ?? 0)}</div></div>`;
+              ${s.money < price ? `<div class="small center" style="margin-top:4px;color:#e0a030">Ti mancano ${euro(price - s.money)}</div>` : ''}
+              <div class="muted small center" style="margin-top:4px">${l === own ? `Il locale è già tuo: solo la ristrutturazione ${euro(d.evolveCost ?? 0)}` : `Locale ${euro(price - (d.evolveCost ?? 0))} + ristrutturazione ${euro(d.evolveCost ?? 0)}`}</div></div>`;
           }).join('') + this.estNote();
       },
       actions: {

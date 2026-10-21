@@ -419,12 +419,19 @@ export function evolveMissing(b: Business) {
     .filter((x) => x.lvl < x.def.max);
 }
 
-/** Prezzo unico per evolvere in `target` nel locale `lotId`: il locale nuovo più la ristrutturazione. */
-export const evolvePrice = (lotId: string, target: BusinessType) => lotDef(lotId).price + (bizType(target).evolveCost ?? 0);
+/**
+ * Prezzo unico per evolvere in `target` nel locale `lotId`: il locale nuovo più la ristrutturazione.
+ * Se si evolve sul posto (`own` = il locale dell'attività di adesso) il locale è già tuo: si paga solo la ristrutturazione.
+ */
+export const evolvePrice = (lotId: string, target: BusinessType, own?: string) =>
+  (lotId === own ? 0 : lotDef(lotId).price) + (bizType(target).evolveCost ?? 0);
 
-/** Locali liberi dove si può aprire l'attività evoluta (dello stesso tipo di lotto, non già tuoi). */
-export const evolveLots = (s: GameState, target: BusinessType) =>
-  LOTS.filter((l) => l.kind === bizType(target).lot && !bizAtLot(s, l.id)).map((l) => l.id);
+/**
+ * Locali dove si può aprire l'attività evoluta (dello stesso tipo di lotto): quelli liberi e, se il tipo va bene,
+ * il suo stesso locale (`own`), così si evolve anche quando tutti i locali sono già tuoi.
+ */
+export const evolveLots = (s: GameState, target: BusinessType, own?: string) =>
+  LOTS.filter((l) => l.kind === bizType(target).lot && (l.id === own || !bizAtLot(s, l.id))).map((l) => l.id);
 
 /**
  * Evolve un'attività: quella vecchia si trasforma (il suo posto torna libero) e la nuova apre nel locale
@@ -432,8 +439,8 @@ export const evolveLots = (s: GameState, target: BusinessType) =>
  * scorte e statistiche ripartono da zero (è un'attività nuova, più grande).
  */
 export function evolveBusiness(s: GameState, b: Business, target: BusinessType, lotId: string) {
-  const price = evolvePrice(lotId, target);
-  if (!evolvesOf(b.type).includes(target) || evolveMissing(b).length || bizAtLot(s, lotId) || s.money < price) return null;
+  const price = evolvePrice(lotId, target, b.lotId);
+  if (!evolvesOf(b.type).includes(target) || evolveMissing(b).length || (lotId !== b.lotId && bizAtLot(s, lotId)) || s.money < price) return null;
   if (bizType(target).lot !== lotDef(lotId).kind) return null;
   addMoney(s, -price);
   const nb: Business = {
