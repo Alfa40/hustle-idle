@@ -1518,7 +1518,10 @@ export class UI {
           <div style="flex:1"><h3 style="margin:0">${d.name}</h3><div class="small">${d.products.map((p) => PRODUCTS[p].icon).join(' ')} · ${(d.tier ?? 1)}ª evoluzione</div></div></div>
         <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
         ${bestLot ? `${this.estStats(bestLot, t)}<div class="muted small center" style="margin:4px 0 8px">nel locale libero migliore: ${esc(lotDef(bestLot).name)}</div>` : ''}
-        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button></div>`;
+        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button>
+        ${!ready ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi ancora evolvere: ${miss.length === 1 ? 'manca' : 'mancano'} ${miss.map((x) => `${x.def.icon} ${x.def.name} (${x.lvl}/${x.def.max})`).join(', ')}.</div>`
+          : !lots.length ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi evolvere: non c'è nessun locale libero di questo tipo, tutti sono già tuoi.</div>`
+          : s.money < from ? `<div class="small center" style="margin-top:6px;color:#e0a030">Ti mancano ${euro(from - s.money)} per il locale più economico.</div>` : ''}</div>`;
     }).join('');
     return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
         <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
@@ -1545,6 +1548,7 @@ export class UI {
             return `<div class="card"><b>${esc(lot.name)}</b><div class="muted small">📍 ${ZONES[lotZone[l]].name} · clienti ×${ZONES[lotZone[l]].demand} · affitto ${euro(lot.rent)}/mese</div>
               ${this.estStats(l, target)}
               <button class="btn good full" style="margin-top:10px" data-a="go:${l}" ${s.money < price ? 'disabled' : ''}>🏗️ Evolvi qui per ${euro(price)}</button>
+              ${s.money < price ? `<div class="small center" style="margin-top:4px;color:#e0a030">Ti mancano ${euro(price - s.money)}</div>` : ''}
               <div class="muted small center" style="margin-top:4px">Locale ${euro(price - (d.evolveCost ?? 0))} + ristrutturazione ${euro(d.evolveCost ?? 0)}</div></div>`;
           }).join('') + this.estNote();
       },
