@@ -1299,7 +1299,8 @@ export class UI {
       ...(service ? [['ordini', '📋 Ordini']] : []),
       ['panoramica', '📊 Panoramica'],
       ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
-      ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ['personale', '👥 Personale'], ['migliorie', '⬆️ Migliorie'],
+      // il personale si apre dal resoconto (tasto 👥 Personale accanto ai turni) o dalla catena: la scheda c'è solo arrivando da lì
+      ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ...(tab === 'personale' ? [['personale', '👥 Personale']] : []), ['migliorie', '⬆️ Migliorie'],
       // si può evolvere in un'attività più grande (albero delle evoluzioni)
       ...(evolvesOf(b().type).length ? [['evoluzione', '🌱 Evoluzione']] : []),
     ];

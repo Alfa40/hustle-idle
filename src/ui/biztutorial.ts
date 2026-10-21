@@ -32,7 +32,7 @@ const DOT: Partial<Record<StationKind, string>> = { source: '🔵', timed: '🟠
 const TIPS: { stage: 'tips' | 'go'; head: string; line: string; long: string }[] = [
   { stage: 'tips', head: '🎉 Cliente servito!', line: '🍽️ Senza clienti prepara in anticipo: metti sul ripiano dei pronti', long: 'Quando non ci sono clienti puoi <b>preparare in anticipo</b> e appoggiare i prodotti sul <b>ripiano dei pronti</b>: dal bancone li servi subito.' },
   { stage: 'tips', head: '🌡️ Caldo e freddo', line: '🌡️ Un prodotto resta caldo 45 s, poi va nel 🗑️ cestino', long: 'Un prodotto pronto resta caldo <b>45 secondi</b>, poi è ❄️ freddo e va buttato nel 🗑️ <b>cestino</b>.' },
-  { stage: 'go', head: '👥 Fatti aiutare', line: '👥 Assumi personale: Attività → Personale', long: 'Assumi <b>dipendenti</b> (Attività → 👥 Personale): i cuochi preparano, i cassieri servono. Con un <b>manager</b> l\'attività lavora anche senza di te. In ⬆️ <b>Migliorie</b> puoi provare fuochi e banchi con <b>👁️ Prova</b> prima di comprarli.' },
+  { stage: 'go', head: '👥 Fatti aiutare', line: '👥 Assumi personale: Attività → resoconto → Personale', long: 'Assumi <b>dipendenti</b> (Attività → Le mie → tocca l\'attività → 👥 Personale accanto ai turni): i cuochi preparano, i cassieri servono. Con un <b>manager</b> l\'attività lavora anche senza di te. In ⬆️ <b>Migliorie</b> puoi provare fuochi e banchi con <b>👁️ Prova</b> prima di comprarli.' },
 ];
 
 export class KitchenTutorial {
