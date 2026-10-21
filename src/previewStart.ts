@@ -10,14 +10,14 @@
 //   { "cosa": "Tocca il tasto Proponi", "tester": true }                          → come su un telefono tester (senza invio)
 // "possiede" dà in più attività e veicoli già comprati; "soldi" i soldi in tasca. Il link "Gioca l'anteprima" delle
 // app (?subito) apre direttamente qui, senza menu. Nel gioco vero non si usa mai (solo con previewPr).
-import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
+import { BUSINESS_TYPES, bizType, upgOf, upgradeIdsFor, type BusinessType } from './config/business';
 import { careerLine } from './config/careers';
 import { hasInterior } from './config/recipes';
 import { VEHICLES, type VehicleId } from './config/vehicles';
 import type { Game } from './game';
 import { previewPr } from './preview';
 import { toast } from './sim/bus';
-import { bizAtLot, buyLot, isOpenHour, lotPrice } from './sim/economy';
+import { bizAtLot, buyLot, hasCashUpgrade, isOpenHour, lotPrice, typesForLot } from './sim/economy';
 import { currentSlot } from './sim/state';
 import { BJ_MAX_BUY_X, BlackjackTable, type BjState } from './ui/blackjack';
 import { casino, MAX_BUY_BB, pokerName, PokerTable, STAKES, type CasinoGame, type PkState } from './ui/poker';
@@ -63,6 +63,8 @@ export interface PreviewStart {
   attivita?: BusinessType;
   /** con "attivita": scheda della sua finestra (es. "panoramica", "migliorie", "ordini", "lavori") */
   scheda?: string;
+  /** con "attivita": migliorie al massimo, un sacco di soldi e tutti gli altri locali già comprati (nessun locale libero) */
+  tuttoPieno?: boolean;
   /** apre subito questa finestra del gioco */
   apri?: PreviewScreen;
   /** seduto subito a un tavolo di prova del casinò (fiches finte; nel poker contro i bot) */
@@ -84,9 +86,9 @@ export const previewStart: PreviewStart | null = previewPr === null ? null : fil
 export const previewNow = previewPr !== null && new URLSearchParams(location.search).has('subito');
 
 /** compra un'attività su un posto libero (soldi dati apposta) */
-function giveBusiness(game: Game, type: BusinessType) {
+function giveBusiness(game: Game, type: BusinessType, lotId?: string) {
   const s = game.state;
-  const lot = game.city.lots.find((l) => l.kind === bizType(type).lot && !bizAtLot(s, l.id));
+  const lot = game.city.lots.find((l) => (lotId ? l.id === lotId : l.kind === bizType(type).lot) && !bizAtLot(s, l.id));
   if (!lot) return null;
   s.money += lotPrice(lot.id, type);
   return buyLot(s, lot.id, type);
@@ -130,6 +132,15 @@ export function applyPreviewStart(game: Game, p: PreviewStart) {
   else if (p.attivita && p.attivita in BUSINESS_TYPES) {
     const type = p.attivita;
     const b = giveBusiness(game, type);
+    if (b && p.tuttoPieno) {
+      // migliorie al massimo e tutti gli altri locali già comprati: niente locale libero per evolvere
+      for (const id of upgradeIdsFor(type, hasInterior(type), hasCashUpgrade(type))) b.upgrades[id] = upgOf(type, id).max;
+      for (const lot of game.city.lots) {
+        const t = typesForLot(lot.id)[0];
+        if (t && !bizAtLot(s, lot.id)) giveBusiness(game, t, lot.id);
+      }
+      s.money = Math.max(s.money, 1_000_000);
+    }
     if (b) {
       const kind = bizType(type).kind;
       if (p.scheda) game.ui.openBusiness(b.id, p.scheda);
