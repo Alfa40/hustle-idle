@@ -17,6 +17,7 @@ import { previewPr } from './preview';
 import { applyPreviewStart, previewNow, previewStart } from './previewStart';
 import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
+import { startUpdateCheck } from './update';
 
 async function boot() {
   // niente emoji: ogni emoji nella pagina diventa un'icona disegnata del gioco
@@ -38,6 +39,17 @@ async function boot() {
   setTimeout(() => loading.remove(), 400);
   // aperto dal browser: consiglio di aggiungerlo alla schermata Home
   showInstallTip();
+  // versione nuova pubblicata: si aggiorna da solo (vedi src/update.ts)
+  startUpdateCheck({
+    canReload: (resumed) => {
+      // schermata iniziale: subito; in partita solo tornando nel gioco e se non si sta facendo nulla di importante
+      if (!game.ui) return true;
+      return resumed && !game.run && !game.interior && !game.house && !document.body.classList.contains('in-poker') && !game.ui.guide.active;
+    },
+    beforeReload: () => {
+      if (game.ui) game.save();
+    },
+  });
 
   // accesso da console per i test
   (window as unknown as { game: Game }).game = game;

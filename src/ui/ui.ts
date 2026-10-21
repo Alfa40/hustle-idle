@@ -759,6 +759,14 @@ export class UI {
         }
       }
     }
+    // versione nuova (src/update.ts): in verticale nella colonna dei riquadri in alto a sinistra, subito sotto
+    const upd = document.querySelector<HTMLElement>('.upd-pill');
+    if (upd && !document.body.classList.contains('is-landscape')) {
+      upd.classList.add('in-stack');
+      upd.style.left = `${left}px`;
+      upd.style.top = `${top + 6}px`;
+      top = upd.getBoundingClientRect().bottom;
+    }
     // messaggi rapidi: al centro dello schermo, un po' sopra la metà e comunque sotto i riquadri in alto;
     // non vanno mai sopra la colonna dei pulsanti a destra né (in orizzontale) sopra il pannello a sinistra
     const { w } = layout.info;

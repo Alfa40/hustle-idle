@@ -1622,3 +1622,12 @@ h3.row.between { gap: 8px; }
 /* schermata iniziale: account collegato */
 .t-acc { text-align: center; font-size: 13px; font-weight: 700; color: var(--ink-2); background: rgba(255,255,255,.75); border-radius: 12px; padding: 8px 10px; }
 body.is-landscape .prof-bar { grid-template-columns: repeat(6, 1fr); }
+
+/* versione nuova pubblicata (src/update.ts): in alto al centro, sopra a tutto */
+.upd-pill {
+  position: fixed; z-index: 160; left: 50%; top: calc(var(--sat) + 8px); transform: translateX(-50%);
+  border: 2px solid #fff; border-radius: 999px; background: #2d9cdb; color: #fff; font: 700 14px Fredoka, system-ui, sans-serif;
+  padding: 8px 14px; box-shadow: 0 4px 12px rgba(0,0,0,.3); white-space: nowrap; max-width: calc(100vw - 24px);
+}
+.upd-pill.in-stack { transform: none; white-space: normal; text-align: left; max-width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 28px); }
+body.is-landscape .upd-pill { left: 50% !important; top: calc(var(--sat) + 8px) !important; }

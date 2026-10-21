@@ -1,7 +1,20 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+/** numero della versione: cambia a ogni build (il gioco lo confronta con version.json per sapere se ce n'è una nuova) */
+const BUILD = String(Date.now());
+
+/** version.json accanto al gioco: lo legge src/update.ts (senza cache) */
+const versionFile = (): Plugin => ({
+  name: 'hustle-version',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build: BUILD }) });
+  },
+});
 
 export default defineConfig({
   base: './',
+  define: { __BUILD__: JSON.stringify(BUILD) },
+  plugins: [versionFile()],
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 900,
