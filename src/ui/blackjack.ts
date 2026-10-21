@@ -235,7 +235,8 @@ export class BlackjackTable {
     const from = hands.slice(0, k).reduce((a, x) => a + x.cards.length, 0);
     const vis = this.visible(seat, h.cards, hands.flatMap((x) => x.cards), from);
     const done = !this.deal.busy;
-    const result = done ? h.result : '';
+    // com'è andata (sballato, perso…) solo dopo aver visto l'ultima carta
+    const result = this.deal.settled ? h.result : '';
     const pts = points(vis.map((x) => x.c!));
     const tag = result ? `<span class="bj-res ${result}">${RESULT[result] ?? result}${h.win > 0 && result !== 'pari' ? ` +${euro(h.win - h.bet)}` : ''}</span>` : '';
     const total = !vis.length ? '' : h.bj && vis.length === h.cards.length ? 'BJ' : totalText(pts);
@@ -247,7 +248,7 @@ export class BlackjackTable {
     const s = this.s!;
     const p = s.seats[i]!;
     const turn = s.toAct === i;
-    const line = this.deal.busy ? undefined : s.result?.lines.find((l) => l.seat === i);
+    const line = this.deal.settled ? s.result?.lines.find((l) => l.seat === i) : undefined;
     const hands = p.hands.length
       ? `<div class="bj-shands">${p.hands.map((_, k) => this.handHtml(i, k, 'sm', turn && s.hand === k)).join('')}</div>`
       : p.bet > 0 ? `<div class="pk-tag">punta ${euro(p.bet)}</div>` : '';
@@ -262,7 +263,7 @@ export class BlackjackTable {
     const s = this.s!;
     const d = s.dealer;
     const vis = this.visible('d', d.cards);
-    const busy = this.deal.busy;
+    const busy = s.phase === 'done' ? !this.deal.settled : this.deal.busy;
     const cards = vis.length ? vis.map((x) => cardHtml(x.c, 'md', false, this.deal.age(x.k))).join('') : '<div class="pk-card slot md"></div><div class="pk-card slot md"></div>';
     const faces = vis.filter((x) => x.c).map((x) => x.c!);
     const total = faces.length ? `<b class="bj-total">${s.result?.dealerBJ && !busy ? 'BJ' : totalText(points(faces))}</b>` : '';
@@ -285,7 +286,7 @@ export class BlackjackTable {
     const busy = this.busy ? 'disabled' : '';
     const money = this.game.state.money;
     const inRound = me.hands.length > 0 && s.phase === 'play';
-    if (this.deal.busy && s.phase !== 'bet') return `<div class="pk-note">${s.phase === 'done' ? 'Gioca il banco…' : 'Il mazziere dà le carte…'}</div>`;
+    if ((s.phase === 'done' ? !this.deal.settled : this.deal.busy) && s.phase !== 'bet') return `<div class="pk-note">${s.phase === 'done' ? 'Gioca il banco…' : 'Il mazziere dà le carte…'}</div>`;
     // asso scoperto del banco: assicurazione (metà della puntata, paga 2 a 1 se il banco ha blackjack)
     if (s.phase === 'insure') {
       const secs = `<b class="bj-secs">${Math.ceil(s.turnLeft / 1000)}</b> s`;
@@ -328,9 +329,9 @@ export class BlackjackTable {
         <div class="pk-acts"><button class="pk-btn good bj-bet-go" data-p="bet" ${busy} ${ok ? '' : 'disabled'}>Punta <b>${euro(this.betAmt)}</b></button></div>`;
     }
     if (s.phase === 'done') {
-      const line = this.deal.busy ? undefined : s.result?.lines.find((l) => l.seat === s.mySeat);
+      const line = this.deal.settled ? s.result?.lines.find((l) => l.seat === s.mySeat) : undefined;
       // con l'assicurazione il conto della mano la comprende: si dice anche com'è andata lei
-      const ins = !this.deal.busy && me.ins ? (me.insWin ? ` 🛡️ L'assicurazione ti ha pagato ${euro(me.insWin)}.` : ' 🛡️ Assicurazione persa.') : '';
+      const ins = this.deal.settled && me.ins ? (me.insWin ? ` 🛡️ L'assicurazione ti ha pagato ${euro(me.insWin)}.` : ' 🛡️ Assicurazione persa.') : '';
       const even = ins ? 'Sei pari.' : 'Pari: riprendi la puntata';
       const txt = (line ? (line.net > 0 ? `Hai vinto <b>${euro(line.net)}</b>!` : line.net < 0 ? `Hai perso ${euro(-line.net)}.` : even) : 'Prossima mano tra poco') + ins;
       return `<div class="pk-note">${txt}</div>`;

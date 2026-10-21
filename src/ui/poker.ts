@@ -319,7 +319,7 @@ export class PokerTable {
 
   /** il risultato della mano, solo quando il mazziere ha finito di girare le carte */
   private result() {
-    return this.deal.busy ? null : this.s?.result ?? null;
+    return this.deal.settled ? this.s?.result ?? null : null;
   }
 
   /** le carte della combinazione vincente (si illuminano sul tavolo) */

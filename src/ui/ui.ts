@@ -1130,6 +1130,8 @@ export class UI {
   private shiftView = new Map<string, string>();
   /** resoconto: dipendente toccato nei turni, per attività (si vede cosa succederebbe senza di lui) */
   private shiftOff = new Map<string, number>();
+  /** resoconto: "Licenzia" toccato una volta sul dipendente oscurato (al secondo tocco si licenzia) */
+  private fireAsk: number | null = null;
 
   /** Agenzia affari: quelle in vendita, le tue attività, i resoconti e il mercato. Senza tab: chi non ha
    *  ancora attività vede quelle in vendita, gli altri le proprie. */
@@ -1297,7 +1299,17 @@ export class UI {
       const where = `<div class="card"><h3>📊 Entrate e spese del mese</h3>${bar('💰 Incassi', mRev, 'var(--green)')}${spend.map(([n, v]) => bar(n, v, '#eb5757')).join('')}
         <div class="row between" style="margin-top:6px"><b>Spese fisse al mese</b><b>${euro(fixed)}</b></div>
         <div class="small muted">stipendi ${euro(sal)} + affitto ${euro(rent)} + bollette ${euro(bills)}${veh ? ` + veicoli ${euro(veh)}` : ''}</div></div>`;
-      return money + where;
+      // in alto, grande: quanto incassano e quanto spendono tutte le attività insieme, e cosa resta
+      const sOut = mGoods + (fixed * dom) / D;
+      const tOut = tGoods + fixed / D;
+      const totals = `<div class="card tint" data-g="totals"><div class="row between"><h3 style="margin:0">💶 Tutte le attività</h3><span class="muted small">mese ${dom}/${D}</span></div>
+        <div class="grid3" style="margin-top:8px">
+          <div class="stat s-green"><b class="money-t">${euro(mRev)}</b><span>💰 guadagni</span></div>
+          <div class="stat s-red"><b class="bad">−${euro(sOut)}</b><span>💸 spese</span></div>
+          <div class="stat ${pMonth >= 0 ? 's-yellow' : 's-red'}"><b class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</b><span>📊 utile</span></div>
+        </div>
+        <div class="small muted center" style="margin-top:6px">Oggi: <b class="money-t">${euro(tRev)}</b> guadagni · <b class="bad">−${euro(tOut)}</b> spese · <b class="${pToday >= 0 ? 'good' : 'bad'}">${euro(pToday)}</b> utile</div></div>`;
+      return totals + money + where;
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
@@ -1619,8 +1631,23 @@ export class UI {
         go: (tab) => this.openBusiness(bizId, tab),
         shv: (v) => this.shiftView.set(bizId, v),
         shx: (id) => {
+          this.fireAsk = null;
           if (this.shiftOff.get(bizId) === +id) this.shiftOff.delete(bizId);
           else this.shiftOff.set(bizId, +id);
+        },
+        // licenzia il dipendente oscurato: al primo tocco si chiede conferma
+        shf: (id) => {
+          if (this.fireAsk !== +id) {
+            this.fireAsk = +id;
+            return;
+          }
+          const e = b().staff.find((x) => x.id === +id);
+          this.fireAsk = null;
+          this.shiftOff.delete(bizId);
+          if (!e) return;
+          fire(s, b(), +id);
+          toast(`${e.name} non lavora più qui`, 'info');
+          this.game.save();
         },
       },
     });
@@ -2124,7 +2151,7 @@ export class UI {
         what = `<div class="sh-what"><b>👁️ Senza ${esc(off.name)}</b> <span class="muted">(${esc(roleName(biz.type, off.role).toLowerCase())}, turno ${shiftFor(off) ? shiftText(shiftFor(off)!) : 'riposo'})</span><br>
           ${extra > 0.05 ? `Oggi si perderebbero circa <b class="bad">${fmtRate(extra)} ${unit} in più</b>${holes.length ? ` (ore scoperte: ${holes.join(', ')})` : ''}, cioè circa ${euro(extra * margin)} di guadagno al giorno.` : `Oggi non si perderebbe nessun ${unit === 'ordini' ? 'ordine' : 'cliente'} in più: gli altri bastano.`}
           Lo stipendio risparmiato è ${euro(off.salary)} al mese.<br><b class="${net >= 0 ? 'good' : 'bad'}">In un mese: ${net >= 0 ? '+' : '−'}${euro(Math.abs(net))}</b> <span class="muted small">${off.role === 'manager' ? 'ma senza manager l\'attività non lavora da sola' : net >= 0 ? 'licenziare conviene' : 'licenziare non conviene'}</span>
-          <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm sec" data-a="shx:${off.id}">↩️ Rimetti</button>${staffBtn}</div></div>`;
+          <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm sec" data-a="shx:${off.id}">↩️ Rimetti</button><button class="btn sm danger" data-a="shf:${off.id}">${this.fireAsk === off.id ? 'Sicuro? Tocca ancora' : 'Licenzia'}</button>${staffBtn}</div></div>`;
       }
       shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>${segs}<div class="small muted sh-tap explain">👆 Tocca il turno di un dipendente per vedere cosa succederebbe senza quella persona (tocca di nuovo per rimetterla).</div>${what}${gridOf(members, cap, cap2)}${empty}
         ${view ? '' : `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>`}${note(view ? '' : ' e la trama il lavoro', cap)}

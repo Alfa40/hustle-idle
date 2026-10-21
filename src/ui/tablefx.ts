@@ -10,6 +10,8 @@ import { euro } from '../sim/state';
 export const DEAL_MS = 450;
 /** quanto dura l'animazione della carta che arriva */
 const ANIM_MS = 400;
+/** dopo l'ultima carta: un attimo per guardarla prima di mostrare com'è andata (vinto, perso, sballato) */
+const SETTLE_MS = ANIM_MS + 650;
 
 export class DealQueue {
   /** carte già sul tavolo: chiave → quando è arrivata (0 = c'era già, senza animazione) */
@@ -17,6 +19,7 @@ export class DealQueue {
   private queue: string[] = [];
   private timer = 0;
   private lastAt = 0;
+  private settleTimer = 0;
 
   constructor(private onStep: () => void) {}
 
@@ -47,6 +50,8 @@ export class DealQueue {
       }
       this.onStep();
       this.pump();
+      // ultima carta data: quando la si è vista si ridisegna (compare il risultato)
+      if (!this.queue.length) this.settleTimer = window.setTimeout(this.onStep, SETTLE_MS + 20);
     };
     this.timer = window.setTimeout(step, Math.max(0, this.lastAt + DEAL_MS - performance.now()));
   }
@@ -61,6 +66,11 @@ export class DealQueue {
     return this.queue.length > 0;
   }
 
+  /** carte date e ultima carta già vista: si può mostrare il risultato della mano */
+  get settled() {
+    return !this.busy && performance.now() - this.lastAt >= SETTLE_MS;
+  }
+
   /** da quanti ms è arrivata (per l'animazione); -1 se c'era già o non è ancora arrivata */
   age(k: string) {
     const t = this.shown.get(k);
@@ -70,6 +80,7 @@ export class DealQueue {
   }
 
   stop() {
+    clearTimeout(this.settleTimer);
     clearTimeout(this.timer);
     this.timer = 0;
   }

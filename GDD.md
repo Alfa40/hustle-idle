@@ -587,3 +587,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Offerte d'acquisto casuali per le attività redditizie
 - Missioni settimanali, veicoli (bici → scooter → auto), più case acquistabili
 - Personalizzazione del personaggio, suoni e musica
+- **Resoconto generale, totali in alto** (21/10/2026): in cima alla scheda 📊 Resoconto di Attività un riquadro "💶 Tutte le attività" con i numeri grandi del mese (💰 guadagni, 💸 spese = merce + stipendi, affitto, bollette e veicoli maturati, 📊 utile) e sotto una riga con gli stessi numeri di oggi
+- **Licenzia dal resoconto** (21/10/2026): nel riquadro "👁️ Senza …" (dipendente oscurato nei turni) c'è anche **Licenzia**, accanto a Rimetti e Personale; al primo tocco diventa "Sicuro? Tocca ancora", al secondo licenzia (con la liquidazione, come dal Personale)
+- **Blackjack e poker: il risultato dopo l'ultima carta** (21/10/2026): "Sballato", "Persa", la mano scurita e i soldi vinti o persi compaiono solo quando l'ultima carta è arrivata e si è vista (circa un secondo dopo), mai mentre la carta sta ancora arrivando (`DealQueue.settled` in tablefx.ts)
+

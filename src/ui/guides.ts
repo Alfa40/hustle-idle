@@ -160,6 +160,7 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
     'agency/tab:resoconti': {
       when: hasBiz,
       steps: [
+        { at: g('totals'), say: '💶 Guadagni, spese e utile di tutte le attività' },
         { at: `${M} .lv-head`, say: 'Oggi e il mese, uno accanto all\'altro' },
         { at: `${M} .lv-tot`, say: '📊 Utile: verde guadagni, rosso perdi' },
         { at: `${M} .sheet-body > .card + .card`, say: '💸 Dove vanno i soldi del mese' },
@@ -195,6 +196,7 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: `${M} .shg-wrap`, say: '🗓️ I turni: chi lavora e a che ora' },
         { at: `${M} .shg-who`, say: 'Tocca un dipendente', tap: true },
         { at: `${M} .sh-what`, say: 'Ecco cosa succede senza quella persona' },
+        { at: `${M} .sh-what [data-a^="shf:"]`, say: 'Licenzia: serve un secondo tocco' },
         { at: `${M} .sh-what [data-a^="shx:"]`, say: '↩️ Rimettilo', tap: true },
       ],
     },
