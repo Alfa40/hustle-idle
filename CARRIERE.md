@@ -280,47 +280,105 @@ dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso g
 
 ---
 
-## 🔨 Costruzione e manualità
+## 🔨 Costruzione e manualità (PROPOSTA del 21/10, da approvare)
 
-### 🌿 Giardinaggio ✅
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Sistemare il giardino ✅ | taglia l'erba, raccogli le foglie |
-| 10 | Potatura di siepi e alberi ✅ | taglia punte e rami in eccesso |
-| 20 | Progettare giardini 🟡 | pianta aiuole e alberi come nel progetto |
-| 30 | Parchi pubblici 🆕 | sistema un parco intero con una squadra |
-| 40 | Paesaggista 🆕 | giardini delle ville: fontane, vialetti, luci |
+Come la Ristorazione: **5 linee × 5 gradini = 25 lavoretti**, sempre con le mani e sotto i 5 minuti. Giardinaggio e
+Auto (che c'erano già con i minigiochi vecchi) si rifanno come gli altri lavoretti nuovi: terza persona, fasi,
+postazioni col dito e tutorial passo passo. Scene: giardini e case vere del quartiere (come le Consegne), locale senza
+tetto per officina e appartamenti (come la cucina), facciata del palazzo per i vetri.
 
-### 🚗 Auto ✅
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Lavaggio auto ✅ | togli le macchie con la spugna |
-| 10 | Carrozzeria e lucidatura 🟡 | ripara i graffi, lucida a specchio |
-| 20 | Officina di auto di lusso 🟡 | trova il guasto e cambia il pezzo |
-| 30 | Restauro di auto d'epoca 🆕 | smonta, ripara, rimonta pezzo per pezzo |
-| 40 | Preparatore da corsa 🆕 | regola l'auto per battere il tempo |
+### 🌿 Giardinaggio
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Sistemare il giardino | giardino di una casa del quartiere: col tosaerba passi sull'erba alta (quella tagliata cambia colore), poi rastrello e foglie nel sacco | giardino più grande, aiuole e giochi dei bambini da non investire | 1½–2½ min |
+| 10 | Potatura di siepi e alberi | col dito segui la sagoma della siepe col tagliasiepi (senza tagliare dentro), poi i rami secchi degli alberi | forme più difficili (palla, cubo, animale), più alberi | 2 min |
+| 20 | Progettare giardini | pianta fiori, cespugli e alberi come nel disegno del cliente, poi annaffia | più piante; piante che vogliono sole o ombra | 2–3 min |
+| 30 | Parchi pubblici | un parco con una squadra: dici a ogni aiutante cosa fare (prato, siepi, panchine, fontanella) e fai tu il resto | da 2 a 3 aiutanti, parco più grande | 3 min |
+| 40 | Paesaggista | villa: vialetto di pietre a incastro, fontana, luci del giardino da accendere come nel progetto | progetto più ricco, meno tempo | 3–4 min |
 
-### 🔧 Lavori in casa 🟡
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Montaggio mobili 🟡 | segui le istruzioni, pezzo per pezzo |
-| 10 | Riparazioni in casa 🟡 | rubinetti, porte, prese: trova cosa non va |
-| 20 | Ristrutturazioni 🟡 | butta giù, rifai pavimento e pareti |
-| 30 | Costruire una casa 🆕 | fondamenta, muri, tetto |
-| 40 | Impresa edile 🆕 | palazzi con più squadre |
+### 🚗 Auto
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Lavaggio auto | schiuma, spugna col dito sulle macchie (come il lavapiatti), risciacquo, asciugatura | auto più sporche; dal Liv. 5 anche gli interni (aspirapolvere, tappetini) | 1½–2½ min |
+| 10 | Carrozzeria e lucidatura | stucco sui graffi, carta vetrata col dito, lucidatrice a cerchi finché brilla | più graffi, ammaccature da tirare fuori | 2–3 min |
+| 20 | Meccanico in officina | si accende una spia: guarda e ascolta l'auto, trova il pezzo rotto (scelte sbagliate costano tempo), svita i bulloni a stella e cambialo | guasti più nascosti, due guasti insieme | 2–3 min |
+| 30 | Restauro di auto d'epoca | smonta i pezzi, sistema quelli rovinati al banco, rimontali nell'ordine inverso | più pezzi, pezzi fragili | 3 min |
+| 40 | Preparatore da corsa | regola gomme e assetto, poi un giro di prova in pista contro il tempo (guida come l'Autista) | tempo da battere più stretto | 3–4 min |
 
-### 🧽 Pulizie 🆕 (c'è già l'attività Impresa di pulizie, ma nessun lavoretto)
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Pulizie di casa 🆕 | polvere, pavimenti, letti in ordine |
-| 10 | Pulizie di uffici 🆕 | tante stanze in poco tempo |
-| 20 | Vetri dei palazzi 🆕 | sulla piattaforma, finestre senza aloni |
-| 30 | Pulizie dopo gli eventi 🆕 | stadio o piazza dopo il concerto |
-| 40 | Sanificazione 🆕 | ospedali e laboratori, zone da non saltare |
+### 🔧 Lavori in casa
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Montaggio mobili | foglio delle istruzioni: pezzo giusto al posto giusto, viti girate col dito | da 1 a 2 mobili, più pezzi simili tra loro | 1½–2½ min |
+| 10 | Riparazioni in casa | rubinetto che perde, porta che cigola, presa rotta: scegli l'attrezzo giusto dalla cassetta e ripara | da 2 a 4 guasti, attrezzi simili | 2 min |
+| 20 | Ristrutturazioni | piastrelle allineate sulla griglia, poi pareti col rullo senza lasciare buchi né sbavature | stanze più grandi, angoli e finestre | 2½–3½ min |
+| 30 | Costruire una casa | muri di mattoni a ritmo (malta, mattone, livella), poi il tetto | muri più alti, finestre da lasciare libere | 3 min |
+| 40 | Capocantiere | cantiere con la gru: porta i carichi col gancio al piano giusto senza farli dondolare (vento) | più piani, vento più forte | 3–4 min |
 
-### ⚡ Impianti 🆕
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
+### 🧽 Pulizie
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Pulizie di casa | appartamento: polvere col panno, aspirapolvere, letti, oggetti al loro posto | più stanze, più disordine | 1½–2½ min |
+| 10 | Pulizie di uffici | carrello delle pulizie, tante scrivanie e cestini: conta il giro più corto | più uffici, bagni | 2–3 min |
+| 20 | Vetri dei palazzi | piattaforma che sale e scende sulla facciata: tergivetro col dito senza lasciare aloni | più piani, vento che fa dondolare | 2–3 min |
+| 30 | Pulizie dopo un concerto | piazza dopo l'evento: ogni rifiuto nel bidone giusto della differenziata | più rifiuti, rifiuti difficili da capire | 2 min |
+| 40 | Sanificazione | ospedale: tuta, poi le zone nell'ordine giusto senza saltare nessun punto | più zone, ordine più lungo | 3 min |
+
+### ⚡ Impianti
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
+|---|---|---|---|---|
+| 1 | Aiuto idraulico | ruota i pezzi di tubo finché l'acqua arriva al rubinetto, poi apri e controlla che non perda | griglia più grande, più rubinetti | 1½–2 min |
+| 10 | Elettricista | prima stacca la corrente (se no prendi la scossa), poi ogni filo al morsetto del suo colore e prova la luce | più fili, colori simili | 2 min |
+| 20 | Caldaie e termosifoni | carica la caldaia fino alla tacca della pressione, sfiata i termosifoni al momento giusto | più termosifoni, tacca più stretta | 2–3 min |
+| 30 | Pannelli solari | sul tetto: monta i pannelli e girali verso il sole, poi collegali | più pannelli, il sole che si sposta | 3 min |
+| 40 | Casa intelligente | luci, allarme e sensori: collega ognuno alla centralina come vuole il cliente, poi la prova finale | più richieste, collegamenti che si incrociano | 3–4 min |
+
+### Attività (3 alberi)
+
+Stesse regole per evolvere (tutte le migliorie al massimo + ristrutturazione, un locale libero, un solo prezzo).
+**Da decidere:** le evolute automatiche come nella Ristorazione (aprono con un dipendente per reparto e il manager,
+niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le basi restano col lavoretto di persona.
+
+#### 🧼 Albero dell'Autolavaggio
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🧼 Autolavaggio | base, posteggio (nuova) | lavaggio esterno, lavaggio completo | lavatori, cassiere | Lavaggio auto |
+| 🔩 Officina | 1ª, bivio A | tagliandi, riparazioni | meccanici, accettazione | Meccanico in officina |
+| 🏎️ Officina di auto di lusso | 2ª | auto sportive, carrozzeria su misura | meccanici, carrozziere | Carrozzeria e lucidatura |
+| 🏁 Preparatore da corsa | 3ª | auto da pista, restauri d'epoca | meccanici, pilota collaudatore | Preparatore da corsa |
+| 🚿 Autolavaggio a tunnel | 1ª, bivio B | tunnel veloce, abbonamenti | addetti, cassiere | Lavaggio auto |
+| ✨ Centro cura auto | 2ª | lucidatura, interni come nuovi | lucidatori, accettazione | Carrozzeria e lucidatura |
+
+#### 🌿 Albero del Giardiniere
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🌿 Giardiniere di quartiere | base, posteggio (nuova) | prati, siepi | giardinieri | Sistemare il giardino |
+| 🌳 Ditta di giardinaggio | 1ª, bivio A | giardini nuovi, potature | giardinieri, progettista | Progettare giardini |
+| 🏞️ Manutenzione parchi | 2ª | appalti del comune per i parchi | squadre di giardinieri | Parchi pubblici |
+| 🏛️ Studio di paesaggistica | 3ª | giardini delle ville, hotel e resort | paesaggisti, giardinieri | Paesaggista |
+| 🪴 Vivaio | 1ª, bivio B | piante, fiori | vivaisti, commesso | Progettare giardini |
+| 🌺 Garden center | 2ª | piante, attrezzi, arredo da giardino | commessi, vivaisti | Sistemare il giardino |
+
+#### 🧽 Albero dell'Impresa di pulizie (c'è già: diventa la base)
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🧽 Impresa di pulizie ✅ | base, locale | pulizie di case, pulizie di uffici | addetti pulizie | Pulizie di casa |
+| 🏢 Pulizie industriali | 1ª, bivio A | uffici, vetri dei palazzi | addetti, caposquadra | Vetri dei palazzi |
+| 🧪 Sanificazione | 2ª | ospedali, laboratori, dopo gli eventi | tecnici, caposquadra | Sanificazione |
+| 🔧 Tuttofare | 1ª, bivio B | montaggi, riparazioni in casa | tuttofare | Riparazioni in casa |
+| 🏠 Ristrutturazioni | 2ª | bagni e cucine, appartamenti interi | muratori, piastrellista | Ristrutturazioni |
+| 🏗️ Impresa edile | 3ª | case nuove, palazzi | muratori, gruista | Capocantiere |
+| ⚡ Ditta di impianti | 1ª, bivio C | impianti idraulici ed elettrici | idraulico, elettricista | Elettricista |
+| ☀️ Energia e casa intelligente | 2ª | pannelli solari, domotica | tecnici, installatori | Pannelli solari |
+
+**Prezzi e guadagni (proposta):** come Trasporti e Ristorazione. Basi nuove circa €4–6 mila + posteggio;
+ristrutturazioni 1ª €22–30 mila, 2ª €70–90 mila, 3ª €190–220 mila (+ il locale). Con due dipendenti per reparto: base
+~€5 mila al mese, 1ª ~€11 mila, 2ª ~€25 mila, 3ª ~€50 mila.
+
+**Agganci con gli altri settori (proposta):** la Ditta traslochi chiama il Tuttofare per i montaggi; Ristrutturazioni
+e Impresa edile danno uno sconto quando evolvi una tua attività; Pulizie industriali puliscono hotel e ristoranti tuoi
+(meno costi); i Trasporti eccezionali portano le gru al cantiere.
+
+---|---|---|
 | 1 | Aiuto idraulico 🆕 | collega i tubi senza perdite |
 | 10 | Elettricista 🆕 | collega i fili ai posti giusti |
 | 20 | Impianti di riscaldamento 🆕 | caldaia e termosifoni |
