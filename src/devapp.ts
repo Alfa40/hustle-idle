@@ -17,7 +17,7 @@ import { watchIcons } from './ui/icons';
 import { DEV_SLOT, devKey, tryDevKey } from './dev';
 import { euro, loadState } from './sim/state';
 import { API, playerId } from './sim/leaderboard';
-import { askHtml, detailHtml, esc, explainOf, forgetExplains, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesBlock, type Data, type PrevItem, type Prop } from './board';
+import { askHtml, detailHtml, esc, explainOf, forgetExplains, load, noteBoxHtml, post, prepHtml, previewHead, previewLists, testersHtml, votesBlock, type Data, type PrevItem, type Prop, type Vote } from './board';
 
 const serverProps = () => post<{ proposals?: Prop[] }>(API, '/hustle/proposals/list', { key: devKey() }).then((j) => j.proposals ?? []);
 
@@ -48,6 +48,23 @@ let listY = 0;
 const changeDrafts = new Map<number, string>();
 let changing = 0;
 let changeMsg: { id: number; text: string; ok?: boolean } | null = null;
+/** consiglio di un tester che si sta mandando a Claude ("<proposta>|<posto del voto>") */
+let tipping = '';
+
+/** il consiglio del tester, scritto per Claude: chi è, cosa consiglia e cosa scrive */
+const tipText = (v: Vote) =>
+  `Il tester ${v.name} ha provato l'anteprima e consiglia di ${v.vote === 'si' ? 'pubblicarla' : 'non pubblicarla'}. Ecco cosa scrive:\n\n«${v.comment.trim()}»\n\n` +
+  'Capisci qual è il vero problema che descrive e sistema l\'anteprima di conseguenza, anche cambiando come funziona il gioco se serve.';
+/** il consiglio è già nelle modifiche chieste a Claude */
+const tipSent = (p: Prop, v: Vote) => !!p.change && p.change.includes(v.comment.trim().slice(0, 60));
+
+/** sotto ogni consiglio con un commento: il tasto per mandarlo a Claude (finché l'anteprima è da provare) */
+function tipBtn(p: Prop, v: Vote, i: number) {
+  if (!v.comment.trim() || p.status !== 'importata') return '';
+  if (tipSent(p, v)) return '<div class="dv-acts"><span class="small good">✅ Mandato a Claude</span></div>';
+  const busy = tipping === `${p.id}|${i}`;
+  return `<div class="dv-acts"><button class="btn sm blue" data-a="tip:${p.id}|${i}" ${busy || changing === p.id ? 'disabled' : ''}>${busy ? 'Invio…' : '📨 Manda a Claude'}</button></div>`;
+}
 
 function keyHtml() {
   return `<div class="card"><h3>🔑 Chiave developer</h3><p class="small" style="margin:0 0 8px">Scrivila una volta: questo telefono se la ricorda.</p>
@@ -63,7 +80,7 @@ function detailView(x: PrevItem) {
   const note = accepted
     ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
     : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}${/scontra/.test(prop.mergeError) ? '' : '. Se non si sistema, chiedi a Claude qui sotto di aggiornarla'}.</div>` : '';
-  const votes = `<h3 class="dv-sec">👥 Consigli dei tester</h3>${votesBlock(prop)}`;
+  const votes = `<h3 class="dv-sec">👥 Consigli dei tester</h3>${votesBlock(prop, false, prop ? (v, i) => tipBtn(prop, v, i) : undefined)}`;
   if (!prop || accepted) return head + note + votes;
   const msg = changeMsg?.id === prop.id ? `<p class="small center ${changeMsg.ok ? 'good' : 'bad'}" style="margin:4px 0 0">${esc(changeMsg.text)}</p>` : '';
   const busy = changing === prop.id;
@@ -211,6 +228,31 @@ async function requestChanges(id: number) {
   render();
 }
 
+/**
+ * Manda a Claude il consiglio di un tester (come le "Modifiche da fare": il robot di GitHub lo passa a Claude, che
+ * aggiorna l'anteprima). Se c'erano modifiche non ancora passate a Claude, il consiglio si aggiunge sotto.
+ */
+async function sendTip(id: number, i: number) {
+  const p = data?.props.find((x) => x.id === id);
+  const v = p?.votes?.[i];
+  if (!p || !v) return;
+  const tip = tipText(v);
+  const before = p.change && p.changeState === 'attesa' ? `${p.change}\n\n---\n\n` : '';
+  const text = (before + tip).length <= 2000 ? before + tip : tip;
+  tipping = `${id}|${i}`;
+  changeMsg = null;
+  render();
+  try {
+    await post(API, '/hustle/proposals/decide', { key: devKey(), id, action: 'request_changes', text });
+    Object.assign(p, { change: text, changeAt: Date.now(), changeState: 'attesa', mergeError: '' });
+    changeMsg = { id, text: `Consiglio di ${v.name} mandato: Claude ci lavora appena è libero.`, ok: true };
+  } catch (e) {
+    changeMsg = { id, text: `Non mandato: ${(e as Error).message}` };
+  }
+  tipping = '';
+  render();
+}
+
 async function refresh(force = false) {
   if (!devKey() || loading || (!force && Date.now() - lastLoad < 60000)) return;
   loading = true;
@@ -261,6 +303,10 @@ ui.addEventListener('click', (e) => {
     setY(listY);
   }
   if (a === 'change') void requestChanges(Number(arg));
+  if (a === 'tip') {
+    const [id, i] = arg.split('|').map(Number);
+    void sendTip(id, i);
+  }
   if (a === 'note') void sendNote(Number(arg));
   if (a === 'noteedit') {
     noteEditing.add(Number(arg));

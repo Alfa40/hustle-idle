@@ -102,6 +102,8 @@
   `/tochange`, claude.yml input `risposta`, conferma `/answered`). claude.yml unisce main al ramo prima di Claude (conflitti: li risolve Claude). Se all'accettazione proposte.yml trova conflitti, lancia da solo claude.yml con la richiesta di aggiornare il ramo.
   Toccando un'anteprima si apre la sua scheda (src/board.ts `detailHtml`): voti e commenti, "Cosa cambia" da GitHub;
   nell'app developer "Modifiche da fare" (`request_changes` → robot → `claude.yml` con `richiesta`, stesso ramo) e i tasti.
+  Sotto ogni consiglio dei tester con commento c'è "📨 Manda a Claude" (`sendTip` in src/devapp.ts): stessa strada di
+  `request_changes`, con il commento del tester (`votesBlock(..., extra)` in src/board.ts).
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
   codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo il tasto 📝 Proponi sullo schermo
   (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Da approvare" della stessa finestra (nelle Opzioni le proposte non ci sono più);

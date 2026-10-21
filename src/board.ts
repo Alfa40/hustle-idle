@@ -271,8 +271,8 @@ export function detailHtml(x: PrevItem, explain: string | null | undefined) {
 }
 
 /** i voti con i commenti, oppure "nessun voto" (nella scheda dell'anteprima) */
-export function votesBlock(p: Prop | undefined, skipMine = false) {
-  return votesHtml(p, skipMine) || '<div class="card"><p class="small muted center" style="margin:0">Nessun tester ha ancora dato un consiglio.</p></div>';
+export function votesBlock(p: Prop | undefined, skipMine = false, extra?: (v: Vote, i: number) => string) {
+  return votesHtml(p, skipMine, extra) || '<div class="card"><p class="small muted center" style="margin:0">Nessun tester ha ancora dato un consiglio.</p></div>';
 }
 
 /** la scheda di una proposta per cui Claude chiede un chiarimento; sotto, il riquadro per rispondere (`box`) */
@@ -303,13 +303,16 @@ export function noteBoxHtml(p: Prop | undefined, draft: string | undefined, busy
       <div class="dv-acts"><button class="btn sm good" data-a="note:${p.id}" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : 'Invia risposta'}</button></div>${err}</div>`;
 }
 
-/** i voti dei tester su un'anteprima: quanti approvano e quanti bocciano, e i commenti */
-export function votesHtml(p: Prop | undefined, skipMine = false) {
+/**
+ * i voti dei tester su un'anteprima: quanti approvano e quanti bocciano, e i commenti; `extra` aggiunge qualcosa
+ * sotto ogni voto (app developer: il tasto per mandare il consiglio a Claude), `i` è il posto del voto in `p.votes`
+ */
+export function votesHtml(p: Prop | undefined, skipMine = false, extra?: (v: Vote, i: number) => string) {
   const vs = (p?.votes ?? []).filter((v) => !(skipMine && v.mine));
   const all = p?.votes ?? [];
   if (!all.length) return '';
   const yes = all.filter((v) => v.vote === 'si').length;
-  const list = vs.map((v) => `<div class="dv-vote ${v.vote === 'si' ? 'yes' : 'no'}"><b>${v.vote === 'si' ? '👍' : '👎'} ${esc(v.name)}</b> <span class="muted">${ago(v.at)}</span>${v.comment ? `<div class="dv-text">${esc(v.comment)}</div>` : ''}</div>`).join('');
+  const list = vs.map((v) => `<div class="dv-vote ${v.vote === 'si' ? 'yes' : 'no'}"><b>${v.vote === 'si' ? '👍' : '👎'} ${esc(v.name)}</b> <span class="muted">${ago(v.at)}</span>${v.comment ? `<div class="dv-text">${esc(v.comment)}</div>` : ''}${extra ? extra(v, all.indexOf(v)) : ''}</div>`).join('');
   return `<div class="dv-votes"><div class="dv-vsum"><span class="s-green">👍 ${yes} sì</span><span class="s-red">👎 ${all.length - yes} no</span></div>${list}</div>`;
 }
 
