@@ -107,6 +107,9 @@ const RIDES: Record<DriveKind, { model: () => THREE.Object3D; speed: number; rad
   limousine: { model: () => carModel('cars/sedan.glb', 4.4, 1.7, 0x1c1c22), speed: 12, radius: 1.4, accel: 6, name: 'limousine', on: 'sulla limousine' },
 };
 
+/** peso di ogni mezzo coi pedali (1 = auto): più pesa, più accelera, frena e sterza piano */
+const MASS: Record<DriveKind, number> = { privato: 1, limousine: 1.3, navetta: 1.4, autobus: 2, turistico: 2 };
+
 export class DriveRun extends BaseRun {
   private kind: DriveKind;
   private stops: Stop[] = [];
@@ -480,7 +483,7 @@ export class DriveRun extends BaseRun {
     const r = RIDES[this.kind];
     const big = this.kind === 'autobus' || this.kind === 'turistico';
     // si guida come in un gioco di auto: pedali a sinistra, frecce a destra (i bus girano più piano)
-    const jr: JobRide = { obj: this.parked, speed: r.speed, radius: r.radius, inertia: true, pedals: true, turn: big ? 1.15 : 1.55, accel: r.accel, camZoom: big ? 1.45 : 1.25 };
+    const jr: JobRide = { obj: this.parked, speed: r.speed, radius: r.radius, inertia: true, pedals: true, turn: big ? 1.15 : 1.55, accel: r.accel, mass: MASS[this.kind], camZoom: big ? 1.45 : 1.25 };
     p.copy(this.carAt);
     this.game.setJobRide(jr);
     this.game.player.root.rotation.y = facing;

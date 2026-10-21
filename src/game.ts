@@ -164,6 +164,8 @@ export interface JobRide {
   pedals?: boolean;
   /** quanto gira (radianti al secondo, a velocità piena di sterzo) */
   turn?: number;
+  /** peso del mezzo coi pedali (1 = auto, 2 = autobus): più pesa, più pedali e sterzo rispondono piano */
+  mass?: number;
 }
 
 export interface FriendBiz {
@@ -210,6 +212,10 @@ export class Game {
   /** velocità lungo il muso del mezzo coi pedali (m/s, negativa in retromarcia) */
   private rideSpeed = 0;
   private brakeHold = 0;
+  /** pedali e volante non scattano: gas e freno si premono piano piano, il volante gira e torna dritto con calma */
+  private throttle = 0;
+  private brakeF = 0;
+  private wheel = 0;
   /** velocità attuale col mezzo da lavoro (con l'inerzia) */
   rideVel = new THREE.Vector3();
   /** Rimbalzo del veicolo contro ostacoli ed edifici della città (come se fossero di gomma). */
@@ -1463,6 +1469,7 @@ export class Game {
     this.jobRide = r;
     this.rideVel.set(0, 0, 0);
     this.rideSpeed = 0;
+    this.throttle = this.brakeF = this.wheel = 0;
     // pedali e frecce solo coi mezzi da guidare come in un gioco di auto
     if (r?.pedals && !this.pedalPad) this.pedalPad = createPedals(this.pedal);
     if (!r?.pedals && this.pedalPad) {
@@ -2023,18 +2030,36 @@ export class Game {
     const { gas, brake, steer } = this.pedalInput();
     const max = jr.speed;
     const acc = jr.accel ?? 6;
+    // peso: un autobus prende velocità, frena e sterza molto più piano di un'auto
+    const m = jr.mass ?? 1;
+    const ease = (x: number, to: number, up: number, down: number) => (to > x ? Math.min(to, x + up * dt) : Math.max(to, x - down * dt));
+    // i pedali arrivano a fondo in circa mezzo secondo (un autobus il doppio) e si rilasciano più in fretta
+    this.throttle = ease(this.throttle, gas && !brake ? 1 : 0, 2 / m, 4);
+    this.brakeF = ease(this.brakeF, brake ? 1 : 0, 2.5 / m, 5);
+    // il volante gira piano verso la freccia e torna dritto da solo quando la lasci
+    this.wheel = ease(this.wheel, steer, 2.2 / m, 2.2 / m);
+    const thr = this.throttle;
+    const brk = this.brakeF;
     let v = this.rideSpeed;
     // freno tenuto da fermo (o già in retromarcia): dopo un attimo si va indietro
     this.brakeHold = brake && v < 0.3 ? this.brakeHold + dt : 0;
-    if (gas && !brake) v = v < 0 ? Math.min(0, v + acc * 2.2 * dt) : Math.min(max, v + acc * dt);
-    else if (brake) {
-      if (v > 0.05) v = Math.max(0, v - acc * 2.2 * dt);
-      else if (this.brakeHold > 0.4) v = Math.max(-max * 0.3, v - acc * 0.6 * dt);
-      else v = Math.min(0, v + acc * 2.2 * dt);
-    } else v -= Math.sign(v) * Math.min(Math.abs(v), acc * 0.35 * dt);
+    // più va veloce, meno spinge il motore (con un mezzo pesante l'ultima parte di velocità arriva piano)
+    const heavy = m ** 0.7;
+    const push = (acc / heavy) * thr * (1 - 0.6 * Math.max(0, v / max) ** 2);
+    if (thr > 0.01 && v < 0) v = Math.min(0, v + acc * 1.6 * thr * dt);
+    else if (thr > 0.01) v = Math.min(max, v + push * dt);
+    if (brk > 0.01) {
+      if (v > 0.05) v = Math.max(0, v - ((acc * 1.8) / heavy) * brk * dt);
+      else if (this.brakeHold > 0.5) v = Math.max(-max * 0.3, v - acc * 0.5 * dt);
+      else v = Math.min(0, v + acc * 1.8 * dt);
+    }
+    // senza pedali rallenta da solo, piano (il peso lo fa scorrere)
+    if (thr <= 0.01 && brk <= 0.01) v -= Math.sign(v) * Math.min(Math.abs(v), (acc * 0.3 * dt) / Math.sqrt(m));
     const turn = jr.turn ?? 1.5;
     let h = this.player.root.rotation.y;
-    h -= steer * turn * Math.min(1, Math.abs(v) / 2.5) * Math.sign(v) * dt;
+    // sterza solo muovendosi; ad alta velocità gira meno (non si curva a tutta come in formula 1)
+    const sp = Math.abs(v);
+    h -= this.wheel * turn * Math.min(1, sp / 3) * (1 - 0.4 * Math.min(1, sp / max)) * Math.sign(v) * dt;
     this.player.root.rotation.y = h;
     const dx = Math.sin(h);
     const dz = Math.cos(h);
