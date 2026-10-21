@@ -50,6 +50,8 @@
   regole, consigli, note "come si calcola") ha la classe `explain` (o si scrive con `explain(...)` in src/ui/ui.ts)
   e resta nascosto finché non si tocca il tasto **?** nell'intestazione. Restano visibili solo dati, stati,
   avvisi e i pulsanti. Vale per ogni finestra nuova.
+- **Domanda dei prodotti**: la scheda Mercato di un prodotto (fattori e previsione a 7 giorni) è in `src/sim/market.ts` e rifà
+  le regole di `marketDemand` (economy.ts) e di `newDay` (calendar.ts): se cambia come si calcola la domanda, aggiornare anche lì.
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
 - Si pubblica (push su GitHub → GitHub Pages) solo quando l'utente scrive "Pusha"; ogni push
   va chiesto di nuovo. Dopo il push si aspetta che la GitHub Action finisca e si conferma il link.

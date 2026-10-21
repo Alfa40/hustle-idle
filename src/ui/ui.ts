@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BUSINESS, LEVEL, TIME } from '../config/balance';
-import { BIZ_GROUPS, BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizGroup, bizType, evolvesOf, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
+import { BIZ_GROUPS, BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizGroup, bizType, evolvesOf, hourFactor, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
 import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes';
@@ -20,7 +20,8 @@ import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../wo
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
 import { bizReport, ensurePartials } from '../sim/report';
-import { inShift, shiftText } from '../sim/shifts';
+import { inShift, shiftText, shortRanges } from '../sim/shifts';
+import { demandFactors, demandForecast, perDay } from '../sim/market';
 import { chainGroups, groupUpgradeTargets, chainOf, chainTypes, deleteGroup, groupFill, groupProduct, groupUpgrade, groupUpgradeCost, hasMenu, saveGroup } from '../sim/chains';
 import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim/specials';
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
@@ -28,7 +29,7 @@ import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } 
 import {
   bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
-  refreshCandidates, stockCap, totalDemand, typesForLot, upg, vehiclesMonthly,
+  refreshCandidates, stockCap, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
@@ -1091,13 +1092,15 @@ export class UI {
   private bizGroupsOpen = new Set<string>();
   /** resoconto: reparto scelto nei turni di oggi, per attività (niente = tutta l'attività) */
   private shiftView = new Map<string, string>();
+  /** resoconto: dipendente toccato nei turni, per attività (si vede cosa succederebbe senza di lui) */
+  private shiftOff = new Map<string, number>();
 
   /** Agenzia affari: quelle in vendita, le tue attività, i resoconti e il mercato. Senza tab: chi non ha
    *  ancora attività vede quelle in vendita, gli altri le proprie. */
   openAgency(tab?: string, atAgency = false) {
     let cur = tab ?? (this.s.businesses.length ? 'mie' : 'compra');
     let sel: string | null = null;
-    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconti'], ['mercato', '📈 Mercato']];
+    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
     this.open({
       money: true,
       title: atAgency ? '🏢 Agenzia affari' : '🏢 Attività',
@@ -1136,10 +1139,8 @@ export class UI {
           this.close();
           this.openBusiness(id, tab);
         },
-        report: (id) => {
-          this.close();
-          this.openReport(id);
-        },
+        // in avanti: con "‹ Indietro" si torna alla lista
+        report: (id) => this.openReport(id),
         ...this.buyActions(),
       },
     });
@@ -1163,10 +1164,14 @@ export class UI {
         const def = bizType(b.type);
         const lot = lotDef(b.lotId);
         const extra = def.kind === 'service' && b.orders.length ? ` · <b>${b.orders.length} ordini in attesa</b>` : '';
-        return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble" style="background:${def.color}">${def.icon}</div>
+        // avvisi dal resoconto del manager (personale o magazzino): si vedono già qui, i dettagli nel resoconto
+        const rep = (b.report ?? b.partial)?.data;
+        const warn = (rep?.advice ?? []).some((a) => a.kind === 'short' || a.kind === 'stock' || a.kind === 'excess');
+        return `<div class="card report-card ${warn ? 'has-alert' : ''}" data-a="report:${b.id}"><div class="row between"><div class="row"><div class="icon-bubble" style="background:${def.color}">${def.icon}</div>
             <div><h3 style="margin:0">${def.name}</h3><div class="muted small">${lot.name}</div></div></div>${this.autoTag(b)}</div>
           <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti'}${extra}</span>
-          <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div></div>`;
+          <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div>
+          ${warn ? '<div class="small bad" style="margin-top:4px">⚠️ Qualcosa da sistemare: guarda il resoconto</div>' : ''}<div class="report-more">Tocca per il resoconto: conti, turni e dipendenti ›</div></div>`;
       };
       // un menu a tendina per gruppo (ristorazione, consegne, traslochi…), nell'ordine di BIZ_GROUPS
       const groups = new Map<string, { g: ReturnType<typeof bizGroup>; list: Business[] }>();
@@ -1210,49 +1215,52 @@ export class UI {
         ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}`;
     }
     if (tab === 'resoconti') {
-      ensurePartials(s);
-      if (!s.businesses.length) return '<div class="card center muted">Qui vedrai i conti e i confronti tra le tue attività.</div>';
-      const rows = s.businesses.map((b) => {
+      // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
+      if (!s.businesses.length) return '<div class="card center muted">Qui vedrai quanto guadagnano e quanto spendono tutte le tue attività insieme.</div>';
+      const D = TIME.DAYS_PER_MONTH;
+      const dom = dayOfMonth(day(s));
+      let tRev = 0, mRev = 0, tGoods = 0, mGoods = 0, tServed = 0, mServed = 0, tLost = 0, mLost = 0, sal = 0, rent = 0, bills = 0, nStaff = 0;
+      for (const b of s.businesses) {
         const c = monthlyCosts(s, b);
-        const fixed = c.rent + c.utilities + b.staff.reduce((a, e) => a + e.salary, 0);
-        // avvisi e clienti dal resoconto di fine giornata (si aggiorna una volta al giorno)
-        const rep = (b.report ?? b.partial)?.data;
-        const warn = (rep?.advice ?? []).filter((a) => a.kind === 'short' || a.kind === 'stock' || a.kind === 'excess' || a.kind === 'info');
-        return { b, def: bizType(b.type), month: b.month.revenue, est: estimateMonthlyProfit(s, b), fixed, rep, warn };
-      }).sort((a, b) => b.month - a.month);
-      const max = Math.max(1, ...rows.map((r) => r.month));
-      const bars = rows.map((r) => `<div style="margin-bottom:8px"><div class="row between small"><span>${r.def.icon} <b>${lotDef(r.b.lotId).name}</b></span><b class="money-t">${euro(r.month)}</b></div>
-        <div class="bar green" style="height:14px"><i style="width:${(r.month / max) * 100}%;background:${r.def.color}"></i></div></div>`).join('');
-      // avvisi sul personale: clienti persi perché manca personale, costi alti per dipendenti di troppo
-      const alerts = (r: (typeof rows)[number]) => r.warn.map((w) => `<div class="report-alert ${w.kind}"><span>${w.icon} ${w.text}</span>${w.tab ? `<button class="btn sm" data-a="bizTab:${r.b.id}|${w.tab}">${w.label}</button>` : ''}</div>`).join('');
-      const cards = rows.map((r) => `<div class="card report-card ${r.warn.some((w) => w.kind !== 'info') ? 'has-alert' : ''}" data-a="report:${r.b.id}"><div class="row between"><h3 style="margin:0">${r.def.icon} ${lotDef(r.b.lotId).name}</h3>${this.autoTag(r.b)}</div>${alerts(r)}
-        <div class="grid3" style="margin-top:8px">
-          <div class="stat s-green"><b class="money-t">${euro(r.b.today.revenue)}</b><span>oggi</span></div>
-          <div class="stat s-yellow"><b>${euro(r.b.yesterday.revenue)}</b><span>ieri</span></div>
-          <div class="stat s-orange"><b>${euro(r.month)}</b><span>mese</span></div>
-          <div class="stat"><b>${r.rep ? fmtRate(r.rep.avg.served) : '—'}</b><span>serviti al giorno</span></div>
-          <div class="stat s-red"><b>${r.rep ? fmtRate(r.rep.avg.lost) : '—'}</b><span>persi al giorno</span></div>
-          <div class="stat s-purple"><b>${euro(r.fixed)}</b><span>costi fissi/mese</span></div>
-        </div>
-        <div class="row between" style="margin-top:8px"><span class="small">Utile stimato al mese</span><b class="${r.est >= 0 ? 'good' : 'bad'}">${isAutonomous(r.b) ? euro(r.est) : 'serve lo staff'}</b></div>
-        ${r.b.report ? '' : `<div class="report-wait">🧑‍💼 Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.${r.rep ? ` Intanto c'è un <b>resoconto provvisorio</b> di ${fmtRate(Math.floor(r.b.partial!.days * 10) / 10)} giornate.` : ` ${this.partialWhen(r.b)}`}${this.reportProgress(r.b, false)}</div>`}
-        <div class="report-more">${r.b.report ? 'Tocca per il resoconto della settimana: orario di punta, personale, cosa vendere e consigli ›' : r.rep ? 'Tocca per il resoconto provvisorio ›' : 'Tocca per i dettagli ›'}</div></div>`).join('');
-      const totMonth = rows.reduce((a, r) => a + r.month, 0);
-      const totFixed = rows.reduce((a, r) => a + r.fixed, 0) + vehiclesMonthly(s);
-      const nWarn = rows.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
-      // catene (2 o più attività dello stesso tipo): il loro resoconto, con quanti negozi hanno da sistemare
-      const chainCards = chainTypes(s).map((t) => {
-        const d = bizType(t);
-        const shops = rows.filter((r) => r.b.type === t);
-        const bad = shops.filter((r) => r.warn.some((w) => w.kind !== 'info')).length;
-        const day = shops.reduce((a, r) => a + (r.rep?.avg.revenue ?? 0), 0);
-        return `<button class="card chain-card" data-a="chain:${t}" style="--sc:${d.color}"><div class="icon-bubble" style="background:${d.color};color:#fff">🔗</div>
-          <div style="flex:1;text-align:left"><b>Catena ${d.icon} ${d.name}</b><div class="muted small">${shops.length} negozi · ${euro(day)} al giorno in media${bad ? ` · <b class="bad">⚠️ ${bad} da sistemare</b>` : ' · ✅ tutto in ordine'}</div><div class="report-more">Tocca per il resoconto della catena ›</div></div><span class="shop-go">›</span></button>`;
-      }).join('');
-      const top = nWarn ? `<div class="report-alert short big">⚠️ <b>${nWarn} ${nWarn === 1 ? 'attività ha' : 'attività hanno'} qualcosa da sistemare</b>: clienti persi (personale o magazzino) o dipendenti di troppo. Sotto trovi cosa fare per ognuna.</div>` : '';
-      return top + `<p class="muted small explain" style="margin:0 0 8px">📊 Consigli e clienti vengono dal resoconto della settimana del manager (7 giornate di dati; dal ${PARTIAL_DAYS}° giorno uno provvisorio); incassi e costi sono quelli di adesso.</p><div class="grid2"><div class="stat s-green"><b class="money-t">${euro(totMonth)}</b><span>💰 incassi del mese (tutte)</span></div>
-          <div class="stat s-red"><b>${euro(totFixed)}</b><span>🧾 costi fissi al mese (con veicoli)</span></div></div>
-        <div class="card" style="margin-top:10px"><h3>🏆 Classifica incassi del mese</h3>${bars}</div>${chainCards ? `<h3 class="sec-title">🔗 Resoconti delle catene</h3>${chainCards}<h3 class="sec-title">🏪 Attività una per una</h3>` : ''}${cards}`;
+        tRev += b.today.revenue;
+        mRev += b.month.revenue;
+        tGoods += b.today.costs;
+        mGoods += b.month.costs;
+        tServed += b.today.served;
+        mServed += b.month.served;
+        tLost += b.today.lost;
+        mLost += b.month.lost;
+        sal += b.staff.reduce((a, e) => a + e.salary, 0);
+        nStaff += b.staff.length;
+        rent += c.rent;
+        bills += c.utilities;
+      }
+      const veh = vehiclesMonthly(s);
+      const fixed = sal + rent + bills + veh;
+      const pToday = tRev - tGoods - fixed / D;
+      const pMonth = mRev - mGoods - (fixed * dom) / D;
+      const neg = (x: number) => (x ? `−${euro(x)}` : euro(0));
+      const row = (name: string, a: string, b: string, cls = '') => `<div class="lv-row ${cls}"><span>${name}</span><b>${a}</b><b>${b}</b></div>`;
+      const pct = (l: number, sv: number) => (l + sv ? ` <small>(${Math.round((l / (l + sv)) * 100)}%)</small>` : '');
+      const money = `<div class="card"><h3>💶 I conti di tutte le attività <span class="muted small">(${s.businesses.length})</span></h3>
+        <div class="lv-row lv-head"><span></span><b>Oggi</b><b>Mese (${dom}/${D})</b></div>
+        ${row('👥 Clienti serviti', String(tServed), String(mServed))}
+        ${row('❌ Persi', `${tLost}${tLost ? pct(tLost, tServed) : ''}`, `${mLost}${mLost ? pct(mLost, mServed) : ''}`, tLost || mLost ? 'lv-bad' : '')}
+        ${row('💰 Incassi', `<span class="money-t">${euro(tRev)}</span>`, `<span class="money-t">${euro(mRev)}</span>`)}
+        ${row('📦 Merce comprata', neg(tGoods), neg(mGoods))}
+        ${row(`👔 Stipendi (${nStaff})`, neg(sal / D), neg((sal * dom) / D))}
+        ${row('🏠 Affitto e bollette', neg((rent + bills) / D), neg(((rent + bills) * dom) / D))}
+        ${veh ? row('🚗 Veicoli', neg(veh / D), neg((veh * dom) / D)) : ''}
+        ${row('📊 Utile', `<span class="${pToday >= 0 ? 'good' : 'bad'}">${euro(pToday)}</span>`, `<span class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</span>`, 'lv-tot')}
+        <p class="muted small explain" style="margin:6px 0 0">Stipendi, affitto, bollette e veicoli si pagano a fine mese: qui sono divisi per giorno, così vedi se le attività guadagnano davvero. La merce è quella comprata per i magazzini. Per il resoconto di un'attività (turni, dipendenti, clienti, consigli) toccala nella scheda 🏢 Le mie.</p></div>`;
+      // dove vanno i soldi nel mese: le spese una per una rispetto agli incassi
+      const spend: [string, number][] = [['📦 Merce', mGoods], ['👔 Stipendi', (sal * dom) / D], ['🏠 Affitto', (rent * dom) / D], ['💡 Bollette', (bills * dom) / D], ...(veh ? [['🚗 Veicoli', (veh * dom) / D] as [string, number]] : [])];
+      const top = Math.max(1, mRev, ...spend.map((x) => x[1]));
+      const bar = (name: string, v: number, color: string) => `<div style="margin-bottom:6px"><div class="row between small"><span>${name}</span><b>${euro(v)}</b></div><div class="bar" style="height:12px"><i style="width:${(v / top) * 100}%;background:${color}"></i></div></div>`;
+      const where = `<div class="card"><h3>📊 Entrate e spese del mese</h3>${bar('💰 Incassi', mRev, 'var(--green)')}${spend.map(([n, v]) => bar(n, v, '#eb5757')).join('')}
+        <div class="row between" style="margin-top:6px"><b>Spese fisse al mese</b><b>${euro(fixed)}</b></div>
+        <div class="small muted">stipendi ${euro(sal)} + affitto ${euro(rent)} + bollette ${euro(bills)}${veh ? ` + veicoli ${euro(veh)}` : ''}</div></div>`;
+      return money + where;
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
@@ -1312,6 +1320,8 @@ export class UI {
         return head + chain + this.bizTab(b(), cur) + (cur === 'panoramica' ? this.sellHtml(b(), confirmSell) : '');
       },
       actions: {
+        // in avanti: con "‹ Indietro" si torna ai prodotti
+        prodInfo: (p) => this.openProduct(p as ProductId, [bizId]),
         sell: () => {
           const biz = b();
           const why = this.sellBlock(biz);
@@ -1565,11 +1575,91 @@ export class UI {
             : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Il manager sta ancora raccogliendo informazioni: con pochi giorni i numeri possono cambiare. Si aggiorna ogni sera alla chiusura; il resoconto completo arriva a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + liveCards + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
-        go: (tab) => {
-          this.close();
-          this.openBusiness(bizId, tab);
-        },
+        // in avanti: con "‹ Indietro" si torna al resoconto
+        go: (tab) => this.openBusiness(bizId, tab),
         shv: (v) => this.shiftView.set(bizId, v),
+        shx: (id) => {
+          if (this.shiftOff.get(bizId) === +id) this.shiftOff.delete(bizId);
+          else this.shiftOff.set(bizId, +id);
+        },
+      },
+    });
+  }
+
+  /**
+   * Mercato di un prodotto (toccandolo nella scheda Prodotti di un'attività o di una catena): la domanda di adesso
+   * e perché (un fattore per riga), zona per zona, e la previsione dei prossimi 7 giorni, meno sicura più è lontana.
+   * `bizIds`: le attività da cui si arriva (fama e migliorie valgono per quelle).
+   */
+  openProduct(pid: ProductId, bizIds: string[]) {
+    const s = this.s;
+    const pr = PRODUCTS[pid];
+    const bizs = () => bizIds.map((id) => s.businesses.find((b) => b.id === id)).filter((b): b is Business => !!b);
+    const first = bizs()[0];
+    const type = first.type;
+    const unit = bizType(type).kind === 'service' ? 'ordini' : 'clienti';
+    const mine = new Set(bizs().map((b) => lotZone[b.lotId]));
+    let zone: ZoneId = lotZone[first.lotId];
+    this.open({
+      title: `${pr.icon} ${pr.name} · mercato`,
+      live: true,
+      color: bizType(type).color,
+      render: () => {
+        // fama e migliorie: dell'attività in quella zona (o della prima), così i numeri sono quelli dei tuoi clienti
+        const b = bizs().find((x) => lotZone[x.lotId] === zone) ?? bizs()[0];
+        const fame = fameMultiplier(s, type);
+        const up = upgradeMultiplier(b);
+        const mult = fame * up;
+        const today = marketDemand(s, pid, zone) * mult;
+        const h = hourOf(s);
+        const open = isOpenHour(s);
+        const nowH = today * hourFactor(type, h);
+        const n1 = fmtRate;
+        const f2 = (x: number) => '×' + x.toFixed(2).replace('.', ',');
+        const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
+        const chips = `<div class="chips">${zones.map((z) => `<button class="chip ${z === zone ? 'on' : ''}" data-a="zone:${z}">📍 ${ZONES[z].name}${mine.has(z) ? ' 🏪' : ''}</button>`).join('')}</div><!--tabs-->`;
+        const selling = bizs().filter((x) => x.products.includes(pid)).length;
+        const now = `<div class="card"><h3>📊 Adesso <span class="muted small">${ZONES[zone].name}</span></h3>
+          <div class="grid3"><div class="stat s-blue"><b>${n1(today)}/h</b><span>${unit} all'ora oggi (media)</span></div>
+          <div class="stat s-green"><b>${open ? `${n1(nowH)}/h` : 'chiuso'}</b><span>${open ? `adesso (ore ${Math.floor(h)})` : `apre alle ${BUSINESS.OPEN_HOUR}`}</span></div>
+          <div class="stat s-yellow"><b>~${n1(perDay(type, today))}</b><span>${unit} in tutta la giornata</span></div></div>
+          <div class="row between small" style="margin-top:8px"><span>Prezzo ${euro(pr.price)} · costo ${euro(pr.cost)}</span><span>margine <b class="good">${euro(pr.price - pr.cost)}</b> a ${unit === 'ordini' ? 'ordine' : 'cliente'}</span></div>
+          <div class="row between small"><span>Se li servi tutti, oggi</span><b class="good">~${euro(perDay(type, today) * (pr.price - pr.cost))} di guadagno</b></div>
+          <div class="small muted" style="margin-top:4px">${bizIds.length > 1 ? `In vendita in ${selling} su ${bizIds.length} negozi` : selling ? '✅ In vendita in questa attività' : 'Non è nel menù di questa attività'}</div></div>`;
+        // perché: un fattore per riga
+        const extra = [{ icon: '⭐', name: 'Fama', mult: fame }, ...(up !== 1 ? [{ icon: '⬆️', name: 'Migliorie (look, marketing)', mult: up }] : [])];
+        const facs = demandFactors(s, pid, zone, extra);
+        const why = `<div class="card"><h3>🔎 Perché la domanda è questa</h3>
+          <div class="lv-row"><span>🧺 Domanda base del prodotto</span><b></b><b>${n1(pr.baseDemand)}/h</b></div>
+          ${facs.map((f) => `<div class="lv-row"><span>${f.icon} ${esc(f.name)}</span><b></b><b class="${f.mult > 1.02 ? 'good' : f.mult < 0.98 ? 'bad' : ''}">${f2(f.mult)}</b></div>`).join('')}
+          <div class="lv-row lv-tot"><span>= ${unit} all'ora oggi</span><b></b><b>${n1(today)}/h</b></div>
+          <p class="muted small explain" style="margin:6px 0 0">La domanda base si moltiplica per ogni riga: sopra ×1 aiuta (verde), sotto ×1 frena (rosso). L'andamento del mercato cambia un po' ogni giorno a caso e poi torna piano piano verso ×1. Durante il giorno i ${unit} arrivano di più nelle ore di punta.</p></div>`;
+        // zona per zona oggi
+        const zmax = Math.max(0.1, ...zones.map((z) => marketDemand(s, pid, z) * mult));
+        const byZone = `<div class="card"><h3>📍 Oggi zona per zona</h3>${zones.map((z) => {
+          const v = marketDemand(s, pid, z) * mult;
+          return `<div style="margin-bottom:6px"><div class="row between small"><span>${ZONES[z].name}${mine.has(z) ? ' 🏪' : ''}</span><b>${n1(v)}/h</b></div><div class="bar green"><i style="width:${(v / zmax) * 100}%"></i></div></div>`;
+        }).join('')}</div>`;
+        // prossimi giorni: forchetta (minimo–massimo), il più probabile e quanto è sicura
+        const fc = demandForecast(s, pid, zone, mult);
+        const fmax = Math.max(0.1, ...fc.map((x) => x.hi));
+        const label = (k: number, d: number) => (k === 0 ? 'Oggi' : k === 1 ? 'Domani' : `${WEEKDAYS[d % 7]} ${dayOfMonth(d)}`);
+        const rows = fc.map((x, k) => `<div class="fc-row" style="--sure:${0.45 + 0.55 * x.sure}">
+            <span class="fc-day">${label(k, x.day)}</span>
+            <span class="fc-w">${WEATHER[x.weather.w].icon}${k ? `<small>${Math.round(x.weather.p * 100)}%</small>` : ''}${x.events.filter((e) => e.kind !== 'weekly').map((e) => e.h.icon).join('')}</span>
+            <span class="fc-bar"><i style="left:${(x.lo / fmax) * 100}%;width:${Math.max(1.5, ((x.hi - x.lo) / fmax) * 100)}%"></i><b style="left:${(x.mid / fmax) * 100}%"></b></span>
+            <span class="fc-val"><b>${n1(x.mid)}</b>${k ? `<small>${n1(x.lo)}–${n1(x.hi)}</small>` : ''}</span>
+            <span class="fc-sure">${Math.round(x.sure * 100)}%</span></div>`).join('');
+        const mi = monthIndex(day(s));
+        const seas = [0, 1, 2].map((k) => `${MONTH_NAMES[(mi + k) % 12]} ${f2(pr.season[(mi + k) % 12])}`).join(' → ');
+        const next = `<div class="card"><h3>⛅ Prossimi 7 giorni</h3>
+          <div class="fc-row fc-head"><span class="fc-day"></span><span class="fc-w">meteo</span><span class="fc-bar">${unit} all'ora</span><span class="fc-val">probabile</span><span class="fc-sure">sicura</span></div>${rows}
+          <div class="small muted" style="margin-top:6px">📅 Stagione: ${seas}</div>
+          <p class="muted small explain" style="margin:6px 0 0">La barra va dal minimo al massimo che ci si può aspettare, la tacca è il valore più probabile. Più il giorno è lontano, meno la previsione è sicura (la percentuale a destra): il meteo può cambiare e il mercato si muove un po' a caso ogni giorno. Stagione ed eventi già annunciati invece sono sicuri. La percentuale sotto l'icona del meteo è la probabilità di quel tempo.</p></div>`;
+        return chips + now + why + byZone + next;
+      },
+      actions: {
+        zone: (z) => (zone = z as ZoneId),
       },
     });
   }
@@ -1709,7 +1799,7 @@ export class UI {
       return `<div class="card report-card" data-a="rep:${b.id}"><div class="row between"><b>${name(b)}</b>${this.autoTag(b)}</div>
         <div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}${d ? ` · ${full ? 'settimana' : '📋 provvisorio'} · ${n1(d.avg.served)} serviti al giorno · ${n1(d.avg.lost)} persi (${lp}%) · ${euro(d.avg.revenue)} al giorno` : ' · 🧑‍💼 il manager sta raccogliendo i dati'}</div>
         ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
-        <div class="report-more">Tocca per il resoconto del negozio ›</div></div>`;
+        <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
     }).join('');
     return status + advice + day + peakCard + `<h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows;
   }
@@ -1744,7 +1834,7 @@ export class UI {
           body = `<p class="muted small explain">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
             def.products.map((p) => {
               const n = g.bizs.filter((b) => b.products.includes(p)).length;
-              return `<div class="card row between"><div><b>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</b><div class="muted small">In vendita in ${n} su ${g.bizs.length}</div></div>
+              return `<div class="card row between report-card" data-a="prodInfo:${p}"><div><b>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</b><div class="muted small">In vendita in ${n} su ${g.bizs.length}</div><div class="report-more" style="margin:2px 0 0">Mercato e previsioni ›</div></div>
                 <div class="row" style="gap:6px"><button class="btn sm sec" data-a="prod:${p}|0" ${n ? '' : 'disabled'}>Togli</button><button class="btn sm good" data-a="prod:${p}|1" ${n === g.bizs.length ? 'disabled' : ''}>Metti</button></div></div>`;
             }).join('');
         } else if (tab === 'migliorie') {
@@ -1790,6 +1880,7 @@ export class UI {
         },
         // dal resoconto della catena: resoconto di un negozio ("‹ Indietro" torna qui) o una sua scheda
         rep: (id) => this.openReport(id),
+        prodInfo: (p) => this.openProduct(p as ProductId, sel().bizs.map((b) => b.id)),
         // in avanti: con "‹ Indietro" si torna al resoconto della catena (allo stesso punto)
         bizTab: (arg) => {
           const [id, t] = arg.split('|');
@@ -1892,31 +1983,41 @@ export class UI {
     // quanti ne regge un reparto in un'ora (senza reparto: tutta l'attività, cioè il reparto più lento)
     const capOf = (r: Role | null) => (h: number) => (r ? plan.byRole.get(r)?.cap[h] ?? 0 : plan.capAt(h));
     const shortWith = (cap: (h: number) => number) => (h: number) => team.length > 0 && curve[h] > 0.05 && cap(h) < curve[h] * tol;
+    // dipendente toccato: i turni di oggi senza di lui (gli altri restano dove sono; senza manager tutti un po'
+    // più lenti), così si vede cosa succederebbe licenziandolo
+    const off = team.find((e) => e.id === this.shiftOff.get(biz.id)) ?? null;
+    const b2: Business = off ? { ...biz, staff: biz.staff.filter((e) => e.id !== off.id) } : biz;
+    const capRole2 = (r: Role, h: number) => (plan.byRole.get(r)?.shifts ?? []).reduce((a, sh) => a + (sh.emp.id !== off?.id && inShift(sh, h) ? employeeRate(sh.emp, b2) : 0), 0);
+    const capOf2 = (r: Role | null) => (h: number) => (r ? capRole2(r, h) : need.length ? Math.min(...need.map((x) => capRole2(x, h))) : 0);
     // griglia: ore in verticale (8 in alto), poi clienti previsti e quanti ne reggono quelli di turno,
     // poi una colonna per dipendente piena nelle ore in cui lavora (un buco se il turno è in due pezzi)
-    const gridOf = (members: Employee[], cap: (h: number) => number) => {
-      const short = shortWith(cap);
+    const gridOf = (members: Employee[], cap: (h: number) => number, cap2?: (h: number) => number) => {
+      const short = shortWith(cap2 ?? cap);
       const R0 = 2;
       const cells: string[] = [`<b class="shg-h" style="grid-column:1">ora</b><b class="shg-h" style="grid-column:2">previsti</b><b class="shg-h" style="grid-column:3">reggono</b>`];
-      members.forEach((e, k) => cells.push(`<b class="shg-h shg-who" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
+      // col manager tolto anche gli altri lavorano meno (oscurati un po')
+      const dim = (e: Employee) => (!off ? '' : e.id === off.id ? 'off' : off.role === 'manager' ? 'dim' : '');
+      members.forEach((e, k) => cells.push(`<b class="shg-h shg-who ${dim(e)}" data-a="shx:${e.id}" style="grid-column:${4 + k};background-color:${color.get(e.id)}">${esc(initials(e.name))}</b>`));
       hours.forEach((h, i) => {
         const r = R0 + i;
         const cls = `${short(h) ? 'short' : ''} ${h === now ? 'now' : ''}`;
         cells.push(`<i class="shg-row ${cls}" style="grid-row:${r}"></i>`,
           `<span class="shg-hour ${cls}" style="grid-row:${r};grid-column:1">${h}</span>`,
           `<span class="shg-n" style="grid-row:${r};grid-column:2">${fmtRate(curve[h])}</span>`,
-          `<span class="shg-n shg-cap ${cls}" style="grid-row:${r};grid-column:3">${fmtRate(cap(h))}</span>`);
+          cap2 && cap2(h) < cap(h) - 0.05
+            ? `<span class="shg-n shg-cap drop ${cls}" style="grid-row:${r};grid-column:3">▼${fmtRate(cap2(h))}</span>`
+            : `<span class="shg-n shg-cap ${cls}" style="grid-row:${r};grid-column:3">${fmtRate((cap2 ?? cap)(h))}</span>`);
       });
       members.forEach((e, k) => {
         const sh = shiftFor(e);
-        for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar ${pat(e.role)}" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background-color:${color.get(e.id)}"></i>`);
+        for (const bl of sh?.blocks ?? []) cells.push(`<i class="shg-bar ${pat(e.role)} ${dim(e)}" data-a="shx:${e.id}" style="grid-column:${4 + k};grid-row:${R0 + bl.start - O} / ${R0 + bl.end - O};background-color:${color.get(e.id)}"></i>`);
       });
       return `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, members.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
     };
     const legendOf = (members: Employee[]) => members.map((e) => {
       const sh = shiftFor(e);
       const serves = need.includes(e.role);
-      return `<div class="sh-leg"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
+      return `<div class="sh-leg ${off?.id === e.id ? 'off' : ''}" data-a="shx:${e.id}"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
     }).join('');
     const bands: [string, number, number][] = [['🌅 Mattina', O, 12], ['🍝 Pranzo', 12, 15], ['☀️ Pomeriggio', 15, 18], ['🌙 Sera', 18, C]];
     // fasce orarie: previsti, quanti ne reggono (il reparto o tutta l'attività), quanti di turno, quanti persi
@@ -1942,9 +2043,10 @@ export class UI {
     const training = inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : '';
     const note = (key: string, cap = capOf(null)) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona${key}${hours.some(shortWith(cap)) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
     const explainTxt = `<p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire${need.length > 1 ? `: ogni reparto ha i suoi numeri e per tutta l'attività conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere)` : ''}. Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p>`;
+    const staffBtn = '<button class="btn sm" data-a="go:personale">👥 Personale</button>';
     let shifts: string;
     if (!team.length) {
-      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>
+      shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>
         <div class="small muted">Nessun dipendente: ${def.auto ? 'senza personale resta ferma' : def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
         <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
     } else {
@@ -1963,10 +2065,28 @@ export class UI {
         : '';
       const label = view ? rolePlural(roleName(biz.type, view)) : multi ? "tutta l'attività" : '';
       const empty = view && !members.length ? `<div class="small bad">Nessun ${esc(roleName(biz.type, view).toLowerCase())}: l'attività non serve nessuno. Assumi dalla scheda 👥 Personale.</div>` : '';
-      shifts = `<div class="card"><h3>🗓️ Turni di oggi</h3>${segs}${gridOf(members, cap)}${empty}
+      const cap2 = off ? capOf2(view) : undefined;
+      // riquadro "se lo licenzi": clienti persi in più (tutta l'attività), incassi e stipendio risparmiato
+      let what = '';
+      if (off) {
+        const all1 = capOf(null);
+        const all2 = capOf2(null);
+        let extra = 0;
+        for (const h of hours) extra += Math.max(0, curve[h] - all2(h)) - Math.max(0, curve[h] - all1(h));
+        const sold = biz.products.map((p) => [productDemand(s, biz, p), PRODUCTS[p]] as const);
+        const dem = sold.reduce((a, [d]) => a + d, 0);
+        const margin = dem ? sold.reduce((a, [d, pr]) => a + d * (pr.price - pr.cost), 0) / dem : 0;
+        const net = off.salary - extra * margin * D;
+        const holes = shortRanges(Array.from({ length: 24 }, (_, h) => all2(h)), curve).ranges.filter((r) => !shortRanges(Array.from({ length: 24 }, (_, h) => all1(h)), curve).ranges.includes(r));
+        what = `<div class="sh-what"><b>👁️ Senza ${esc(off.name)}</b> <span class="muted">(${esc(roleName(biz.type, off.role).toLowerCase())}, turno ${shiftFor(off) ? shiftText(shiftFor(off)!) : 'riposo'})</span><br>
+          ${extra > 0.05 ? `Oggi si perderebbero circa <b class="bad">${fmtRate(extra)} ${unit} in più</b>${holes.length ? ` (ore scoperte: ${holes.join(', ')})` : ''}, cioè circa ${euro(extra * margin)} di guadagno al giorno.` : `Oggi non si perderebbe nessun ${unit === 'ordini' ? 'ordine' : 'cliente'} in più: gli altri bastano.`}
+          Lo stipendio risparmiato è ${euro(off.salary)} al mese.<br><b class="${net >= 0 ? 'good' : 'bad'}">In un mese: ${net >= 0 ? '+' : '−'}${euro(Math.abs(net))}</b> <span class="muted small">${off.role === 'manager' ? 'ma senza manager l\'attività non lavora da sola' : net >= 0 ? 'licenziare conviene' : 'licenziare non conviene'}</span>
+          <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm sec" data-a="shx:${off.id}">↩️ Rimetti</button>${staffBtn}</div></div>`;
+      }
+      shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>${segs}<div class="small muted sh-tap explain">👆 Tocca il turno di un dipendente per vedere cosa succederebbe senza quella persona (tocca di nuovo per rimetterla).</div>${what}${gridOf(members, cap, cap2)}${empty}
         ${view ? '' : `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>`}${note(view ? '' : ' e la trama il lavoro', cap)}
         <div class="sh-legend">${legendOf(members)}</div>${training}
-        <h3 style="margin:12px 0 4px">⏰ Fasce orarie${label ? ` <span class="muted small">${esc(label)}</span>` : ''}</h3>${bandsOf(members.filter((e) => need.includes(e.role)), cap)}${explainTxt}</div>`;
+        <h3 style="margin:12px 0 4px">⏰ Fasce orarie${label ? ` <span class="muted small">${esc(label)}</span>` : ''}${off ? ` <span class="small bad">senza ${esc(off.name.split(' ')[0])}</span>` : ''}</h3>${bandsOf(members.filter((e) => need.includes(e.role) && e.id !== off?.id), cap2 ?? cap)}${explainTxt}</div>`;
     }
     return shifts + money;
   }
@@ -2131,11 +2251,13 @@ export class UI {
             const locked = need > upg(b, 'ampliamento');
             const steps = hasInterior(b.type) ? (LAYOUTS[b.type].recipes[p]?.steps ?? []) : [];
             const path = steps.map((id) => LAYOUTS[b.type as keyof typeof LAYOUTS].stations.find((x) => x.id === id)?.icon).join(' → ');
-            return `<div class="card" ${locked ? 'style="opacity:.6"' : ''}><div class="row between"><h3>${pr.icon} ${pr.name}</h3>
-              ${locked ? `<span class="tag">🔒 Ampliamento ${need}</span>` : `<label class="toggle"><input type="checkbox" ${on ? 'checked' : ''} data-c="toggleProduct:${p}"> in vendita</label>`}</div>
+            // tutta la scheda apre il mercato del prodotto, tranne la spunta "in vendita" (lì il tocco deve arrivare alla casella)
+            return `<div class="card report-card" ${locked ? 'style="opacity:.6"' : ''}><div class="row between"><h3 data-a="prodInfo:${p}" style="flex:1">${pr.icon} ${pr.name}</h3>
+              ${locked ? `<span class="tag">🔒 Ampliamento ${need}</span>` : `<label class="toggle"><input type="checkbox" ${on ? 'checked' : ''} data-c="toggleProduct:${p}"> in vendita</label>`}</div><div data-a="prodInfo:${p}">
               ${path ? `<div class="small muted">Lavorazione: ${path} → ${LAYOUTS[b.type as keyof typeof LAYOUTS].stations.find((x) => x.kind === 'counter')?.icon}</div>` : ''}
               <div class="row between small"><span>Domanda oggi ${demandBars(d, service ? 1 : 4)} ${f2(d)}/h</span><span class="muted">stagione ${trend}</span></div>
-              <div class="row between small muted"><span>Prezzo ${euro(pr.price)} · costo ${f2(pr.cost)}€</span><span>margine <b class="good">${f2(pr.price - pr.cost)}€</b></span></div></div>`;
+              <div class="row between small muted"><span>Prezzo ${euro(pr.price)} · costo ${f2(pr.cost)}€</span><span>margine <b class="good">${f2(pr.price - pr.cost)}€</b></span></div>
+              <div class="report-more">Tocca per domanda, mercato e previsioni ›</div></div></div>`;
           })
           .join('');
     }

@@ -1584,3 +1584,28 @@ body.in-poker .toasts { z-index: 31; }
 /* coi pedali niente joystick né pulsante azione, e niente Sali/Scendi del veicolo tuo */
 body.pedal-drive .joy, body.pedal-drive .act-zone, body.pedal-drive .action, body.pedal-drive .ride-btn { display: none !important; }
 body.overlay-job .pedals { display: none; }
+
+/* resoconto: dipendente toccato nei turni (cosa succederebbe senza di lui) */
+.shg-who, .shg-bar, .sh-leg { cursor: pointer; }
+.shg-bar.off, .shg-who.off { opacity: .16; filter: grayscale(1); }
+.shg-bar.dim, .shg-who.dim { opacity: .55; }
+.shg-cap.drop { color: #e67e22; font-weight: 800; }
+.shg-cap.drop.short { color: #c0392b; }
+.sh-leg.off { opacity: .45; text-decoration: line-through; }
+.sh-tap { margin: 4px 0 6px; }
+.sh-what { background: #fff4e5; border: 2px solid #f5c27a; border-radius: 12px; padding: 8px 10px; margin: 6px 0 8px; font-size: 13px; line-height: 1.35; }
+h3.row.between { gap: 8px; }
+
+/* mercato di un prodotto: previsione dei prossimi giorni */
+.fc-row { display: grid; grid-template-columns: 54px 52px 1fr 56px 34px; align-items: center; gap: 6px; font-size: 12.5px; padding: 4px 0; border-bottom: 1px solid #f1ead9; opacity: var(--sure, 1); }
+.fc-head { font-size: 10.5px; font-weight: 700; color: var(--muted, #8a8a99); opacity: 1; }
+.fc-day { font-weight: 800; white-space: nowrap; }
+.fc-w { white-space: nowrap; }
+.fc-w small { font-size: 10px; margin-left: 1px; color: var(--muted, #8a8a99); }
+.fc-bar { position: relative; height: 14px; background: #f1ead9; border-radius: 7px; }
+.fc-head .fc-bar { background: none; height: auto; }
+.fc-bar i { position: absolute; top: 0; bottom: 0; background: #9be3a6; border-radius: 7px; }
+.fc-bar b { position: absolute; top: -3px; bottom: -3px; width: 4px; margin-left: -2px; background: var(--green-d, #1e8e3e); border-radius: 2px; }
+.fc-val { text-align: right; line-height: 1.1; }
+.fc-val small { display: block; font-size: 10px; color: var(--muted, #8a8a99); }
+.fc-sure { text-align: right; font-weight: 700; font-size: 11.5px; }
