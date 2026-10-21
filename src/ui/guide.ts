@@ -95,6 +95,8 @@ export class Guide {
     this.el.append(...this.blocks, this.ring, this.hand, this.bubble);
     // tocco sul punto acceso (passi `tap`): il gioco lo riceve normalmente, la guida va avanti
     window.addEventListener('click', (e) => this.tapped(e), true);
+    // nei lavoretti il tocco sull'oggetto parte col dito giù (anche "tieni premuto"): si va avanti subito
+    window.addEventListener('pointerdown', (e) => this.pressed(e), true);
   }
 
   get active() {
@@ -159,6 +161,18 @@ export class Guide {
     return !!this.game.state.guidesOff;
   }
 
+  private oneOff = 0;
+  /**
+   * Guida fatta al momento (es. il passo di un lavoretto). Con `id` si vede una volta per partita; senza, ogni volta
+   * che la si chiede. Se un'altra guida è aperta aspetta il suo turno.
+   */
+  show(def: GuideDef, id?: string) {
+    const key = id ?? `~${++this.oneOff}`;
+    if (id && this.isSeen(id)) return;
+    this.defs[key] = def;
+    this.trigger(key);
+  }
+
   /** Rivede tutte le guide (Opzioni → developer). */
   reset() {
     this.game.state.guides = [];
@@ -201,7 +215,11 @@ export class Guide {
     const id = this.id!;
     const def = this.defs[id];
     // nessun passo si è visto (la finestra non era quella giusta): si riproverà la volta dopo
-    if (this.shown) {
+    if (id.startsWith('~')) {
+      // guida del momento: non si ricorda
+      delete this.defs[id];
+      def.done?.();
+    } else if (this.shown) {
       this.game.state.guides = [...new Set([...this.seen, id, ...(def.covers ?? [])])];
       def.done?.();
       this.game.save();
@@ -248,6 +266,16 @@ export class Guide {
       // il tocco va al gioco; si passa al passo dopo appena il gioco ha ridisegnato
       setTimeout(() => this.id && this.steps[this.i] === st && this.next(true), 0);
     }
+  }
+
+  /** Dito giù dentro il punto acceso di un passo `tap` con un riquadro (oggetto del lavoretto). */
+  private pressed(e: PointerEvent) {
+    if (!this.id) return;
+    const st = this.steps[this.i];
+    if (!st?.tap || !st.rect) return;
+    const r = st.rect();
+    if (!r || e.clientX < r.left - PAD || e.clientX > r.right + PAD || e.clientY < r.top - PAD || e.clientY > r.bottom + PAD) return;
+    setTimeout(() => this.id && this.steps[this.i] === st && this.next(true), 0);
   }
 
   /** Tocco nel punto sbagliato: la manina e il fumetto saltellano per farsi notare. */

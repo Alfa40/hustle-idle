@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Game } from '../game';
-import type { JobRun } from '../minigames/jobs';
+import type { JobRun, RunGuide } from '../minigames/jobs';
+import type { Guide } from './guide';
 import { toast } from '../sim/bus';
 
 /**
@@ -76,6 +77,13 @@ export class JobTutorial {
   /** secondi da fermo lontano dall'obiettivo (dopo un po' la manina mostra come camminare) */
   private still = 0;
   private last = 0;
+  /** passi già mostrati con la guida a schermo scuro (una volta per fase) */
+  private coachGo = false;
+  private coachPhase = -1;
+  private coachNear = -1;
+  private coachAim = -1;
+  /** quando è partito (i comandi si spiegano appena la scena è pronta, prima dei passi) */
+  private coachAt = 0;
 
   constructor(private game: Game) {
     this.bubble = document.createElement('div');
@@ -115,6 +123,9 @@ export class JobTutorial {
     run.frozen = true;
     this.key = '';
     this.open = false;
+    this.coachGo = false;
+    this.coachAt = performance.now();
+    this.coachPhase = this.coachNear = this.coachAim = -1;
     toast('🎓 Tutorial: il tempo è fermo', 'info');
   }
 
@@ -144,6 +155,12 @@ export class JobTutorial {
     const run = this.run;
     const g = run?.guide?.();
     if (!run || !g || !this.type || this.game.ui?.isOpen) {
+      this.hide();
+      return;
+    }
+    // guida a schermo scuro: comandi, poi ogni fase e il primo gesto di ogni fase (il fumetto aspetta)
+    const gd = this.game.ui?.guide;
+    if (gd && (gd.active || this.coach(g, gd))) {
       this.hide();
       return;
     }
@@ -201,6 +218,112 @@ export class JobTutorial {
     if (aimAt) this.placeHandAt(aimAt);
     else if (g.task?.aim) this.hand.style.display = 'none';
     else this.placeHand(gesture);
+  }
+
+  /**
+   * Passi obbligatori a schermo scuro (src/ui/guide.ts), una frase alla volta: la prima volta i comandi, poi a ogni
+   * fase cosa fare (con l'oggetto acceso se si vede) e, arrivati davanti all'oggetto, dove toccare o tenere premuto.
+   * Ritorna true se ha fatto partire un passo.
+   */
+  private coach(g: RunGuide, gd: Guide) {
+    if (performance.now() - this.coachAt < 700) return false;
+    const body = document.body.classList;
+    const inp = this.game.input;
+    const zone = (k: 'move' | 'look') => () => {
+      const z = inp.fpZones()[k];
+      return new DOMRect(z.x, z.y, z.w, z.h);
+    };
+    if (body.contains('fp-controls') && !gd.isSeen('job:controls')) {
+      gd.show({ steps: [
+        { rect: zone('move'), say: '🕹️ Trascina qui per camminare' },
+        { rect: zone('look'), say: '👀 Trascina qui per guardarti attorno' },
+        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo' },
+        { at: '#j-pause', say: '⏸️ Pausa, o per rinunciare' },
+      ] }, 'job:controls');
+      return true;
+    }
+    if (body.contains('pedal-drive') && !gd.isSeen('job:pedals')) {
+      gd.show({ steps: [
+        { at: '.pd-gas', say: '⚡ Tieni premuto per accelerare' },
+        { at: '.pd-brake', say: '🛑 Freno: tienilo per fermarti' },
+        { at: '.pd-right', say: '↔️ Le frecce per girare' },
+        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo' },
+      ] }, 'job:pedals');
+      return true;
+    }
+    if (!g.arrived) {
+      if (this.coachGo) return false;
+      this.coachGo = true;
+      gd.show({ steps: [{ say: '🚶 Prima vai alla zona di lavoro: segui la freccia' }] });
+      return true;
+    }
+    if (g.phase !== this.coachPhase) {
+      this.coachPhase = g.phase;
+      // il nome della fase dice tutto il compito ("Taglia i cespugli"), il punto è solo il primo da fare
+      const line = g.phaseName ? `${g.phaseIcon ? `${g.phaseIcon} ` : ''}${g.phaseName}` : `${g.task?.icon ? `${g.task.icon} ` : ''}${g.task?.label ?? ''}`;
+      const obj = g.task?.obj ?? g.task?.hitObj;
+      const rect = g.task ? this.screenRect(g.task.pos, obj) : null;
+      const where = rect ? { rect: () => this.screenRect(g.task!.pos, obj) } : {};
+      gd.show({ steps: [{ ...where, say: `🎓 Passo ${g.phase + 1} di ${g.phases}: ${line}` }] });
+      return true;
+    }
+    if (g.task?.aim && g.near && this.coachAim !== g.phase) {
+      const p = this.visibleAim(g.aims ?? []);
+      if (!p) return false;
+      this.coachAim = g.phase;
+      const box = () => {
+        const v = p.clone().project(this.game.activeCamera);
+        const x = ((v.x + 1) / 2) * innerWidth;
+        const y = ((1 - v.y) / 2) * innerHeight;
+        return new DOMRect(x - 40, y - 40, 80, 80);
+      };
+      gd.show({ steps: [{ rect: box, say: `👆 Tieni il dito ${AIM_WHAT[this.type!]?.[g.phase] ?? 'sul punto acceso'}`, tap: true }] });
+      return true;
+    }
+    if (g.task && !g.task.aim && g.near && this.coachNear !== g.phase && body.contains('act-ready')) {
+      const fp = body.contains('fp-controls');
+      const el = document.querySelector<HTMLElement>(fp ? '.action:not(.act-stand)' : '.act-zone');
+      if (!el) return false;
+      this.coachNear = g.phase;
+      const hold = g.task.kind === 'hold';
+      gd.show({ steps: [{ rect: () => el.getBoundingClientRect(), say: hold ? '✊ Tieni premuto qui' : '👆 Tocca qui', tap: true }] });
+      return true;
+    }
+    return false;
+  }
+
+  /** Riquadro sullo schermo dell'oggetto (o di un punto); null se non si vede. */
+  private screenRect(pos: THREE.Vector3, obj?: THREE.Object3D): DOMRect | null {
+    const cam = this.game.activeCamera;
+    cam.updateMatrixWorld();
+    const pts: THREE.Vector3[] = [];
+    if (obj && obj.visible !== false) {
+      const b = new THREE.Box3().setFromObject(obj);
+      if (Number.isFinite(b.min.x)) for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) pts.push(new THREE.Vector3(x, y, z));
+    }
+    if (!pts.length) pts.push(pos.clone().setY(pos.y + 0.4));
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of pts) {
+      const v = p.project(cam);
+      if (v.z > 1) return null;
+      const x = ((v.x + 1) / 2) * innerWidth;
+      const y = ((1 - v.y) / 2) * innerHeight;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    // oggetto troppo grande sullo schermo (gruppo con tutta la postazione): si accende solo il punto da usare
+    if (x1 - x0 > innerWidth * 0.45 || y1 - y0 > innerHeight * 0.35) {
+      const v = pos.clone().setY(pos.y + 0.6).project(cam);
+      if (v.z > 1) return null;
+      x0 = x1 = ((v.x + 1) / 2) * innerWidth;
+      y0 = y1 = ((1 - v.y) / 2) * innerHeight;
+    }
+    // almeno grande come un dito, e dentro lo schermo
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2;
+    const w = Math.max(110, x1 - x0);
+    const h = Math.max(110, y1 - y0);
+    if (cx < 0 || cx > innerWidth || cy < 0 || cy > innerHeight) return null;
+    return new DOMRect(cx - w / 2, cy - h / 2, w, h);
   }
 
   /** Freccia che rimbalza sopra l'oggetto da raggiungere; se non si vede, freccia sul bordo dello schermo. */
