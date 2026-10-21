@@ -1691,7 +1691,18 @@ export class UI {
     const nWait = reps.length - got.length;
     const name = (b: Business) => esc(lotDef(b.lotId).name);
     const status = `<div class="report-date">📅 ${nFull} ${nFull === 1 ? 'resoconto completo' : 'resoconti completi'}${nPart ? ` · ${nPart} ${nPart === 1 ? 'provvisorio' : 'provvisori'}` : ''}${nWait ? ` · ${nWait} ${nWait === 1 ? 'negozio' : 'negozi'} ancora senza dati` : ''}<br><span class="small">Somma dei resoconti dei negozi (quelli provvisori hanno ancora pochi giorni di dati).</span></div>`;
-    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div>`;
+    // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
+    const rows = () => reps.map(({ b, snap, full }) => {
+      const d = snap?.data;
+      const lp = d && d.avg.arrived ? Math.round((d.avg.lost / d.avg.arrived) * 100) : 0;
+      const staff = d ? d.staff.map((x) => `<span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅' : x.status === 'short' ? '⚠️' : '💸'} ${esc(x.name)}</span>`).join(' ') : '';
+      return `<div class="card report-card" data-a="rep:${b.id}"><div class="row between"><b>${name(b)}</b>${this.autoTag(b)}</div>
+        <div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}${d ? ` · ${full ? 'settimana' : '📋 provvisorio'} · ${fmtRate(d.avg.served)} serviti al giorno · ${fmtRate(d.avg.lost)} persi (${lp}%) · ${euro(d.avg.revenue)} al giorno` : ' · 🧑‍💼 il manager sta raccogliendo i dati'}</div>
+        ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
+        <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
+    }).join('');
+    // anche senza dati dei manager i negozi si vedono (resoconto con conti e turni, tasto Personale)
+    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div><h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows();
     const sum = (f: (r: (typeof got)[number]) => number) => got.reduce((a, r) => a + f(r), 0);
     const arrived = sum((r) => r.snap!.data.avg.arrived);
     const served = sum((r) => r.snap!.data.avg.served);
@@ -1791,17 +1802,7 @@ export class UI {
       return `${upgOf(type, id).icon} ${upgOf(type, id).name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
     }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
     const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3><div class="small muted" style="margin-bottom:4px">I problemi di tutti i negozi raggruppati: dove si può, un tasto lo sistema in tutto il gruppo.</div>${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta, magazzini pieni e migliorie pari</span></div>'}</div>`;
-    // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
-    const rows = reps.map(({ b, snap, full }) => {
-      const d = snap?.data;
-      const lp = d && d.avg.arrived ? Math.round((d.avg.lost / d.avg.arrived) * 100) : 0;
-      const staff = d ? d.staff.map((x) => `<span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅' : x.status === 'short' ? '⚠️' : '💸'} ${esc(x.name)}</span>`).join(' ') : '';
-      return `<div class="card report-card" data-a="rep:${b.id}"><div class="row between"><b>${name(b)}</b>${this.autoTag(b)}</div>
-        <div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}${d ? ` · ${full ? 'settimana' : '📋 provvisorio'} · ${n1(d.avg.served)} serviti al giorno · ${n1(d.avg.lost)} persi (${lp}%) · ${euro(d.avg.revenue)} al giorno` : ' · 🧑‍💼 il manager sta raccogliendo i dati'}</div>
-        ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
-        <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
-    }).join('');
-    return status + advice + day + peakCard + `<h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows;
+    return status + advice + day + peakCard + `<h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows();
   }
 
   openChain(type: BusinessType, startGroup = 'all') {
