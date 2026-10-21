@@ -348,6 +348,15 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btn('skills'), say: '⭐ Esperienza e livelli' },
         { at: btn('boards'), say: '🏆 Classifiche' },
         { at: btn('logo'), say: '🎨 Il tuo logo' },
+        { at: btn('account'), say: '🔑 Account: salva le partite sul server' },
+      ],
+    },
+    'panel:account': {
+      steps: [
+        tabStep('salva', '💾 Salva: crea l\'account con una password'),
+        { at: g('name'), say: 'Per entrare usi il tuo nome: è unico' },
+        tabStep('entra', '🔑 Entra: hai già un account? Ritrovi le partite'),
+        { at: g('saved'), say: '💾 Ultimo salvataggio: si salva da solo' },
       ],
     },
     'panel:multi': {

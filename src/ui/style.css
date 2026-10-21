@@ -873,7 +873,7 @@ body.is-landscape.is-short .biz-tut .tut-body { font-size: 13px; }
 .prof-hero .prof-name { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
 .prof-hero .prof-name b { font-size: 18px; }
 .prof-hero .prof-name .btn { min-height: 32px; padding: 3px 9px; }
-.prof-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0 0 10px; }
+.prof-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 10px; }
 .prof-btn {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 7px;
   border: none; border-radius: 14px; background: #fff; box-shadow: 0 3px 0 #e2d8c4; font: inherit; color: var(--ink); min-width: 0;
@@ -1618,3 +1618,7 @@ h3.row.between { gap: 8px; }
 .gd-dots i.on { background: #8e5bd6; }
 .gd-nudge { animation: gd-nudge .35s ease-in-out; }
 @keyframes gd-nudge { 25% { translate: -6px 0; } 75% { translate: 6px 0; } }
+
+/* schermata iniziale: account collegato */
+.t-acc { text-align: center; font-size: 13px; font-weight: 700; color: var(--ink-2); background: rgba(255,255,255,.75); border-radius: 12px; padding: 8px 10px; }
+body.is-landscape .prof-bar { grid-template-columns: repeat(6, 1fr); }

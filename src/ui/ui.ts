@@ -13,6 +13,7 @@ import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
 import { Guide } from './guide';
+import { changePassword, chooseName, cloudSave, lastCloudSave, loggedIn, login as accountLogin, logout as accountLogout, MIN_PASSWORD, nameTaken, register as accountRegister } from '../sim/account';
 import { makeGuides } from './guides';
 import { actSide, moveSide, onSettings, settings, type HudKey } from '../settings';
 import { layout } from './layout';
@@ -37,7 +38,7 @@ import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, to
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
 import { devApp, devGame } from '../dev';
 import { canPropose, canReview, Proposals } from './proposals';
-import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, setNickname as setLbNickname, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
+import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, playStats, wipeSave, yearOf,
@@ -452,7 +453,12 @@ export class UI {
     if (this.unlockT > 0.8) {
       this.unlockT = 0;
       const g = this.game;
-      if (!this.panel && !this.queue.length && !g.run && !g.interior && !g.house && !this.mapScreen.isOpen && !document.body.classList.contains('pedal-drive')) this.guide.checkUnlocks();
+      const free = !this.panel && !this.queue.length && !g.run && !g.interior && !g.house && !this.mapScreen.isOpen && !document.body.classList.contains('pedal-drive');
+      // il nome è già di un altro giocatore: se ne sceglie un altro (una volta per avvio, poi al prossimo)
+      if (free && nameTaken() && !this.takenAsked && !this.guide.active) {
+        this.takenAsked = true;
+        this.openNameEditor(true);
+      } else if (free) this.guide.checkUnlocks();
     }
     const s = this.s;
     const m = euro(s.money);
@@ -3216,7 +3222,7 @@ export class UI {
         return `<div class="card hero tint prof-hero"><div class="emoji">${logoImg(s.logo, 72)}</div>
             <div class="prof-name"><b>${esc(lbNickname() || 'Senza nome')}</b><button class="btn sm sec" data-a="name" aria-label="Cambia nome">✏️</button></div>
             <div class="big">${rank(s)}</div><div class="muted small">⭐ Fama ${totalFame(s).toFixed(1)} · Livello totale ${totalLevel(s)}</div></div>
-          <div class="prof-bar">${btn('stats', '📊', 'Statistiche')}${btn('friends', '👥', 'Amici', req)}${btn('skills', '⭐', 'Esperienza')}${btn('boards', '🏆', 'Classifiche')}${btn('logo', '🎨', 'Logo')}</div>
+          <div class="prof-bar">${btn('stats', '📊', 'Statistiche')}${btn('friends', '👥', 'Amici', req)}${btn('skills', '⭐', 'Esperienza')}${btn('boards', '🏆', 'Classifiche')}${btn('logo', '🎨', 'Logo')}${btn('account', '🔑', loggedIn() ? 'Account ✅' : 'Account')}</div>
           <div class="grid2"><div class="stat s-green"><b class="money-t">${euro(s.totalEarned)}</b><span>💰 guadagnato in totale</span></div>
           <div class="stat s-yellow"><b class="money-t">${perSec(moneyPerSecond(s))}</b><span>⏱️ dalle attività autonome</span></div>
           <div class="stat s-orange"><b>${s.businesses.length}</b><span>🏢 attività</span></div>
@@ -3229,33 +3235,192 @@ export class UI {
         boards: () => this.openLeaderboard(),
         logo: () => this.openLogoEditor(),
         name: () => this.openNameEditor(),
+        account: () => this.openAccount(),
       },
     });
   }
 
   /** Nome con cui compari in classifica e sulla mappa degli amici. */
-  openNameEditor() {
-    this.open({
+  /** `required`: il nome di prima è di un altro giocatore, se ne deve scegliere un altro (non si chiude). */
+  openNameEditor(required = false) {
+    let draft = lbNickname();
+    let msg = required ? `Il nome <b>${esc(lbNickname())}</b> è già di un altro giocatore: scegline un altro` : '';
+    let busy = false;
+    const panel: Panel = {
       title: '✏️ Il tuo nome',
       small: true,
+      locked: required,
       color: 'var(--blue)',
-      render: () => `<p class="muted small explain">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici.</p>
-        <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}">
-        <button class="btn good full" data-a="save" style="margin-top:10px">✅ Salva il nome</button>`,
+      render: () => `<p class="muted small explain">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici. È unico: due giocatori non possono avere lo stesso nome. Con l'account è anche il nome per entrare.</p>
+        <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(draft)}">
+        ${msg ? `<p class="small bad" style="margin:6px 0 0">${msg}</p>` : ''}
+        <button class="btn good full" data-a="save" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy ? '⏳ Controllo il nome…' : '✅ Salva il nome'}</button>`,
       actions: {
         save: () => {
-          const v = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
-          if (!setLbNickname(v)) {
-            this.toast('✏️ Scrivi un nome');
+          draft = (this.modal?.querySelector('.lb-input') as HTMLInputElement | null)?.value ?? '';
+          if (!draft.trim()) {
+            msg = '✏️ Scrivi un nome';
             return;
           }
-          void submitScore(this.s, true);
-          this.toast('✅ Nome salvato', 'good');
-          if (this.panel?.back) this.goBack();
-          else this.close();
+          busy = true;
+          msg = '';
+          void chooseName(draft).then((r) => {
+            busy = false;
+            if (r === 'taken') msg = `<b>${esc(draft.trim())}</b> è già di un altro giocatore: scegline un altro`;
+            else if (r === 'bad') msg = 'Questo nome non va bene: provane un altro';
+            if (r === 'taken' || r === 'bad') {
+              if (this.panel === panel) this.renderPanel();
+              return;
+            }
+            void submitScore(this.s, true);
+            this.toast(r === 'offline' ? '✅ Nome salvato (lo controllo appena c\'è internet)' : '✅ Nome salvato', 'good');
+            if (this.panel !== panel) return;
+            if (this.panel.back) this.goBack();
+            else this.close();
+          });
         },
       },
-    });
+    };
+    this.open(panel);
+  }
+
+  /**
+   * Account: il nome (unico) + una password. Le partite si salvano sul server da sole; su un altro telefono
+   * si entra con nome e password e tornano partite, amici e classifica.
+   */
+  openAccount() {
+    let tab: 'salva' | 'entra' = 'salva';
+    let msg = '';
+    let busy = false;
+    let sure = false;
+    let pwOpen = false;
+    // nome e password scritti per entrare (restano scritti tra un tocco e l'altro)
+    let inName = '';
+    let inPw = '';
+    const read = (sel: string) => (this.modal?.querySelector(sel) as HTMLInputElement | null)?.value ?? '';
+    const when = (t: number) => (t ? new Date(t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai');
+    const panel: Panel = {
+      guide: 'account',
+      title: '🔑 Account',
+      small: true,
+      color: 'var(--blue)',
+      render: () => {
+        const note = msg ? `<p class="small ${msg.startsWith('✅') ? 'good' : 'bad'}" style="margin:8px 0 0">${msg}</p>` : '';
+        const wait = busy ? 'disabled' : '';
+        if (loggedIn()) {
+          return `<div class="card hero tint"><div class="emoji">✅</div><div class="big">${esc(lbNickname())}</div><div class="muted small">Le tue partite sono salvate sul server</div></div>
+            <div class="row between small" style="margin:8px 2px"><span>💾 Ultimo salvataggio</span><b data-g="saved">${when(lastCloudSave())}</b></div>
+            <p class="muted small explain">Si salva da solo mentre giochi e quando chiudi l'app. Su un altro telefono: schermata iniziale → 🔑 Entra con il tuo account, con questo nome e la tua password.</p>
+            <button class="btn good full" data-a="now" ${wait}>${busy ? '⏳ Salvo…' : '💾 Salva adesso'}</button>
+            ${pwOpen ? `<div class="card" style="margin-top:10px"><h3>🔑 Cambia password</h3>
+              <input class="lb-input acc-old" type="password" autocomplete="current-password" placeholder="Password di adesso">
+              <input class="lb-input acc-new" type="password" autocomplete="new-password" placeholder="Password nuova (almeno ${MIN_PASSWORD} caratteri)" style="margin-top:6px">
+              <button class="btn full" data-a="pwSave" style="margin-top:8px" ${wait}>✅ Salva la password</button></div>` : '<button class="btn sec full" data-a="pw" style="margin-top:8px">🔑 Cambia password</button>'}
+            <button class="btn ${sure ? 'danger' : 'sec'} full" data-a="out" style="margin-top:8px" ${wait}>${sure ? 'Sicuro? Tocca ancora' : '🚪 Esci dall\'account'}</button>
+            ${note}`;
+        }
+        const tabs = `<div class="tabs">${([['salva', '💾 Salva'], ['entra', '🔑 Entra']] as const).map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
+        if (tab === 'salva') {
+          return `${tabs}<p class="muted small explain">Crea l'account per non perdere mai le tue partite: si salvano sul server e le ritrovi su un altro telefono entrando con il tuo nome e la password.</p>
+            <div class="card" data-g="name"><div class="row between"><div><div class="muted small">Il tuo nome (per entrare)</div><b>${esc(lbNickname() || '—')}</b></div><button class="btn sm sec" data-a="name">✏️ Cambia</button></div></div>
+            <input class="lb-input acc-pw" type="password" autocomplete="new-password" placeholder="Password (almeno ${MIN_PASSWORD} caratteri)">
+            <input class="lb-input acc-pw2" type="password" autocomplete="new-password" placeholder="Ripeti la password" style="margin-top:6px">
+            <button class="btn good full" data-a="reg" style="margin-top:10px" ${wait}>${busy ? '⏳ Salvo…' : '💾 Crea l\'account e salva'}</button>${note}`;
+        }
+        return `${tabs}<p class="muted small explain">Hai già un account (per esempio su un altro telefono)? Entra con il tuo nome e la password: le partite dell'account prendono il posto di quelle di questo telefono.</p>
+          <input class="lb-input acc-name" autocomplete="username" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(inName)}">
+          <input class="lb-input acc-pw" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:6px" value="${esc(inPw)}">
+          <div class="small bad" style="margin-top:6px">⚠️ Le partite di questo telefono verranno sostituite</div>
+          <button class="btn ${sure ? 'danger' : 'good'} full" data-a="in" style="margin-top:10px" ${wait}>${busy ? '⏳ Entro…' : sure ? 'Sicuro? Tocca ancora' : '🔑 Entra'}</button>${note}`;
+      },
+      actions: {
+        tab: (k) => {
+          tab = k as 'salva' | 'entra';
+          msg = '';
+          sure = false;
+        },
+        name: () => this.openNameEditor(),
+        reg: () => {
+          const a = read('.acc-pw');
+          if (a !== read('.acc-pw2')) {
+            msg = 'Le due password non sono uguali';
+            return;
+          }
+          busy = true;
+          msg = '';
+          void accountRegister(a).then((err) => {
+            busy = false;
+            msg = err ?? '✅ Account creato: le tue partite sono salvate';
+            if (!err) this.toast('🔑 Account creato', 'good');
+            if (this.panel === panel) this.renderPanel();
+          });
+        },
+        in: () => {
+          inName = read('.acc-name');
+          inPw = read('.acc-pw');
+          const name = inName;
+          const pw = inPw;
+          if (!name.trim() || !pw) {
+            msg = 'Scrivi nome e password';
+            return;
+          }
+          // le partite di questo telefono si perdono: secondo tocco per confermare
+          if (!sure) {
+            sure = true;
+            return;
+          }
+          busy = true;
+          msg = '';
+          void accountLogin(name, pw).then((err) => {
+            busy = false;
+            sure = false;
+            if (err) {
+              msg = err;
+              if (this.panel === panel) this.renderPanel();
+              return;
+            }
+            // il gioco riparte con le partite dell'account
+            this.game.resetting = true;
+            location.reload();
+          });
+        },
+        now: () => {
+          busy = true;
+          void cloudSave(true).then((ok) => {
+            busy = false;
+            msg = ok ? '✅ Salvato' : loggedIn() ? 'Non riesco a salvare: controlla internet' : 'Accesso scaduto: entra di nuovo con nome e password';
+            if (this.panel === panel) this.renderPanel();
+          });
+        },
+        pw: () => (pwOpen = true),
+        pwSave: () => {
+          const old = read('.acc-old');
+          const nw = read('.acc-new');
+          busy = true;
+          void changePassword(old, nw).then((err) => {
+            busy = false;
+            msg = err ?? '✅ Password cambiata';
+            if (!err) pwOpen = false;
+            if (this.panel === panel) this.renderPanel();
+          });
+        },
+        out: () => {
+          if (!sure) {
+            sure = true;
+            return;
+          }
+          sure = false;
+          busy = true;
+          void accountLogout().then(() => {
+            busy = false;
+            msg = '';
+            this.toast('🚪 Sei uscito dall\'account: le partite restano su questo telefono', 'info');
+            if (this.panel === panel) this.renderPanel();
+          });
+        },
+      },
+    };
+    this.open(panel);
   }
 
   /** Statistiche della partita: soldi, lavoretti, attività (una per una). */
@@ -3476,9 +3641,18 @@ export class UI {
     return !lbNickname() || !this.s.logoChosen;
   }
 
+  /** il server ha detto che il nome è di un altro: si chiede subito di sceglierne un altro (una volta per avvio) */
+  private takenAsked = false;
+  /** il nome di adesso è stato confermato dal server in questo avvio */
+  private nameOk = false;
+
   openLogoEditor(required = false) {
     const s = this.s;
     let draft: Logo = { ...s.logo };
+    // il nome scritto (si salva, controllando che sia libero, con "Salva il logo")
+    let nickDraft = lbNickname();
+    /** avviso sotto il nome (già usato, non va bene) */
+    let nickMsg = '';
     let mode: 'logo' | 'photo' = 'logo';
     let edit: PhotoEdit | null = null;
     // schermata scelta nella barra in alto: crea il logo da zero, oppure foto
@@ -3561,7 +3735,7 @@ export class UI {
           ${required ? '<div class="card tint small">Prima di iniziare scegli il <b>tuo nome</b> e il <b>logo</b> delle tue attività: comparirà sulle insegne, in classifica e nella città dei tuoi amici. Potrai cambiarli dal 👤 Profilo.</div>' : ''}
           <div class="lg-preview ${editing ? 'is-editing' : ''}">${editing ? '<canvas class="ph-mini" width="200" height="200"></canvas>' : `<img src="${logoUrl(draft, 200)}" width="120" height="120" alt="">`}<div><b>${esc(lbNickname() || 'Senza nome')}</b><small>${editing ? '✏️ Anteprima della foto' : draft.photo ? '📷 Logo con la tua foto' : '🎨 Logo disegnato'}</small></div></div>
           <h4 class="lg-h">Il tuo nome</h4>
-          <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(lbNickname())}" data-c="nick"></div>`;
+          <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(nickDraft)}" data-c="nick">${nickMsg ? `<p class="small bad" style="margin:4px 0 0">${nickMsg}</p>` : ''}</div>`;
         let main: string;
         let foot: string;
         if (tab === 'foto' && mode === 'photo' && edit) {
@@ -3604,9 +3778,8 @@ export class UI {
         fg: (c) => (draft.fg = c),
         sym: (e) => (draft.symbol = e),
         text: () => (draft.text = read('.lg-text').slice(0, 3)),
-        nick: () => {
-          if (!setLbNickname(read('.lg-nick'))) this.toast('✏️ Scrivi un nome');
-        },
+        // il nome si salva (e si controlla che sia libero) con "Salva il logo"
+        nick: () => (nickDraft = read('.lg-nick')),
         rnd: () => (draft = { ...randomLogo(), text: draft.text }),
         upload: () => picker.click(),
         retouch: () => {
@@ -3637,11 +3810,29 @@ export class UI {
         },
         save: () => {
           draft.text = read('.lg-text').slice(0, 3);
-          const nick = read('.lg-nick');
-          if (nick && nick !== lbNickname()) setLbNickname(nick);
-          if (!lbNickname()) {
+          if (this.modal?.querySelector('.lg-nick')) nickDraft = read('.lg-nick');
+          const nick = nickDraft;
+          if (!nick.trim()) {
             this.toast('✏️ Scrivi il tuo nome', 'bad');
             (this.modal?.querySelector('.lg-nick') as HTMLInputElement | null)?.focus();
+            return;
+          }
+          // il nome è unico: prima si chiede al server se è libero (senza rete si tiene e si controlla dopo)
+          if (nick !== lbNickname() || nameTaken() || !this.nameOk) {
+            void chooseName(nick).then((r) => {
+              if (r === 'taken' || r === 'bad') {
+                nickMsg = r === 'taken' ? `<b>${esc(nick.trim())}</b> è già di un altro giocatore: scegli un altro nome` : 'Questo nome non va bene: provane un altro';
+                if (this.panel !== panel) return;
+                this.renderPanel();
+                const inp = this.modal?.querySelector<HTMLInputElement>('.lg-nick');
+                inp?.scrollIntoView({ block: 'center' });
+                inp?.focus();
+                return;
+              }
+              nickMsg = '';
+              this.nameOk = true;
+              if (this.panel === panel) panel.actions.save('');
+            });
             return;
           }
           s.logo = { ...draft };

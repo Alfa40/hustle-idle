@@ -56,6 +56,10 @@
   corta per passo, che dice dove toccare e per fare cosa (mai un testo lungo nel fumetto). Se servono punti da indicare, dare
   agli elementi un `data-g="…"`. Ogni emoji delle frasi deve avere il disegno in iconart.ts. I tutorial dei lavoretti e della
   cucina sono obbligatori la prima volta.
+- **Nomi unici e account** (`src/sim/account.ts`, server `hustle-account.js`): il nome del giocatore si cambia solo con
+  `chooseName()` (controlla sul server che sia libero), mai scrivendo direttamente `hustle.nickname`. Il salvataggio
+  sul server (`cloudSave`) parte da `game.save()`; se si aggiungono dati del giocatore in localStorage da portare su un
+  altro telefono, vanno in `SAVE_KEYS`. Chiavi del server solo `hustle:name…`, `hustle:acct…`, `hustle:save…`, `hustle:sess…`.
 - **Domanda dei prodotti**: la scheda Mercato di un prodotto (fattori e previsione a 7 giorni) è in `src/sim/market.ts` e rifà
   le regole di `marketDemand` (economy.ts) e di `newDay` (calendar.ts): se cambia come si calcola la domanda, aggiornare anche lì.
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.

@@ -141,7 +141,12 @@ export async function submit(s: GameState, force = false) {
         stats: publicStats(s),
       }),
     });
-    if (r.ok) set(BEST_KEY, String(fame));
+    if (r.ok) {
+      set(BEST_KEY, String(fame));
+      set('hustle.nickTaken', '');
+    }
+    // il nome è già di un altro giocatore (un nome = un giocatore): il gioco chiede di sceglierne un altro
+    if (r.status === 409) set('hustle.nickTaken', '1');
   } catch {
     /* offline: si riprova più tardi */
   }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cloudSave } from './sim/account';
 import { fetchFriendRequests, fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry, type FriendRequest } from './sim/leaderboard';
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
@@ -15,9 +16,10 @@ import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from '.
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
 import { effectiveJobLevel, EVOLVE_EVERY, readyJobTypes } from './config/careers';
 import {
-  day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot,
+  currentSlot, day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot, SLOT_COUNT,
   type GameState, type JobOffer,
 } from './sim/state';
+import { previewPr } from './preview';
 import { Character, charPath } from './world/character';
 import { BUILDING_MODELS, City, CITY_ASSETS, DIR_ROT, DIR_VEC, TREE_MODELS, type Slot } from './world/city';
 import { StreetLights, WindowLights } from './world/night';
@@ -2302,6 +2304,8 @@ export class Game {
     // al poker la partita è "offline": riaprendo il gioco il tempo si conta da quando ci sei entrato
     saveState(this.state, undefined, this.awayAt || Date.now());
     void submitScore(this.state);
+    // con l'account le partite vanno anche sul server (non la partita developer né le anteprime)
+    if (currentSlot <= SLOT_COUNT && !this.state.dev && previewPr === null) void cloudSave(document.hidden);
   }
 
   /**

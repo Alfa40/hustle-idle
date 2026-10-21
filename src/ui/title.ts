@@ -6,8 +6,10 @@ import { DEV_SLOT, tryDevKey } from '../dev';
 import { tryTesterKey } from '../tester';
 import { previewPr } from '../preview';
 import { loadState } from '../sim/state';
+import { loggedIn, login } from '../sim/account';
+import { nickname } from '../sim/leaderboard';
 
-type View = 'main' | 'slots' | 'new' | 'settings' | 'credits';
+type View = 'main' | 'slots' | 'new' | 'settings' | 'credits' | 'login';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -33,6 +35,11 @@ export class TitleScreen {
   private newName = 'La mia partita';
   private verTaps = 0;
   private devMsg = '';
+  /** entra con l'account: nome e password scritti, messaggio, attesa */
+  private accName = '';
+  private accPw = '';
+  private accMsg = '';
+  private accBusy = false;
 
   constructor(private onStart: (slot: number, newName?: string, quick?: boolean) => void) {
     this.el = document.createElement('div');
@@ -42,6 +49,8 @@ export class TitleScreen {
     this.el.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
       if (t.name === 'savename') this.newName = t.value;
+      if (t.name === 'accname') this.accName = t.value;
+      if (t.name === 'accpw') this.accPw = t.value;
     });
     this.render();
   }
@@ -70,6 +79,7 @@ export class TitleScreen {
           <button class="t-btn ${ls || previewPr !== null ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
           ${previewPr !== null ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
+          ${previewPr !== null ? '' : loggedIn() ? `<div class="t-acc">💾 Account: <b>${esc(nickname())}</b> · partite salvate</div>` : '<button class="t-btn" data-t="view:login"><span class="t-ico">🔑</span><span><b>Entra con il tuo account</b><small>Ritrova le tue partite con nome e password</small></span></button>'}
           <div class="t-row">
             <button class="t-btn t-small" data-t="view:settings"><span class="t-ico">⚙️</span><b>Impostazioni</b></button>
             <button class="t-btn t-small" data-t="view:credits"><span class="t-ico">ℹ️</span><b>Crediti</b></button>
@@ -102,6 +112,18 @@ export class TitleScreen {
         <input class="t-input" name="savename" maxlength="24" value="${esc(this.newName)}" />
         <label class="t-label">Scegli lo slot</label>${cards}
         <button class="btn good full" data-t="start" style="margin-top:12px">${over ? (sure ? '⚠️ Tocca ancora per sovrascrivere' : '🚀 Inizia (sovrascrive lo slot)') : '🚀 Inizia!'}</button>`);
+    } else if (this.view === 'login') {
+      const has = slots.some(Boolean);
+      const sure = this.confirm === 'login';
+      html = this.panel('🔑 Entra con il tuo account', `
+        <label class="t-label">Il tuo nome</label>
+        <input class="t-input" name="accname" autocomplete="username" maxlength="20" value="${esc(this.accName)}" />
+        <label class="t-label">Password</label>
+        <input class="t-input" name="accpw" type="password" autocomplete="current-password" value="${esc(this.accPw)}" />
+        ${has ? '<p class="small bad" style="margin:8px 0 0">⚠️ Le partite di questo telefono verranno sostituite da quelle dell\'account</p>' : ''}
+        <button class="btn ${sure ? 'danger' : 'good'} full" data-t="login" style="margin-top:12px" ${this.accBusy ? 'disabled' : ''}>${this.accBusy ? '⏳ Entro…' : sure ? 'Sicuro? Tocca ancora' : '🔑 Entra'}</button>
+        ${this.accMsg ? `<p class="small bad center" style="margin:8px 0 0">${esc(this.accMsg)}</p>` : ''}
+        <p class="muted small center" style="margin:10px 0 0">L'account si crea in partita: 👤 Profilo → 🔑 Account</p>`);
     } else if (this.view === 'settings') {
       html = this.panel('⚙️ Impostazioni', settingsHtml());
     } else {
@@ -171,6 +193,30 @@ export class TitleScreen {
         else this.confirm = `del:${arg}`;
         if (!listSlots().some(Boolean)) this.view = 'main';
         break;
+      case 'login': {
+        if (!this.accName.trim() || !this.accPw) {
+          this.accMsg = 'Scrivi nome e password';
+          break;
+        }
+        // le partite di questo telefono si perdono: secondo tocco per confermare
+        if (listSlots().some(Boolean) && prevConfirm !== 'login') {
+          this.confirm = 'login';
+          break;
+        }
+        this.accBusy = true;
+        this.accMsg = '';
+        void login(this.accName, this.accPw).then((err) => {
+          this.accBusy = false;
+          if (err) {
+            this.accMsg = err;
+            this.render();
+            return;
+          }
+          // si riparte con le partite dell'account
+          location.reload();
+        });
+        break;
+      }
       case 'newin':
         this.view = 'new';
         this.newSlot = +arg;
