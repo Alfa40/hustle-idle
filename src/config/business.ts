@@ -118,6 +118,16 @@ export interface BusinessTypeDef {
   auto?: boolean;
 }
 
+/**
+ * Per ora tutte le attività lavorano da sole (decisione dell'utente, 21/10/2026): partono con un dipendente per reparto
+ * e il manager, e non si entra più dentro (niente bancone del food truck e del panificio, niente ordini fatti di
+ * persona). Il codice del lavoro dentro resta (src/world/interior.ts, biztutorial): rimettendo `false` torna tutto.
+ * Il laboratorio dell'artigiano (lavori su richiesta, senza personale) resta com'è.
+ */
+export const ALL_AUTO = true;
+/** l'attività lavora da sola (vedi `auto` e `ALL_AUTO`) */
+export const isAutoType = (t: BusinessType) => (ALL_AUTO ? bizType(t).kind !== 'craft' : !!bizType(t).auto);
+
 /** massimo delle migliorie per gradino: attrezzatura, look, pubblicità, magazzino */
 const AUTO_MAX = [[3, 3, 2, 2], [4, 4, 3, 3], [5, 5, 4, 3], [6, 6, 5, 4]];
 

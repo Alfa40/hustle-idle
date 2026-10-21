@@ -1,4 +1,5 @@
 import { BUSINESS, TIME } from '../config/balance';
+import { ALL_AUTO } from '../config/business';
 import { EVENTS, WEATHER } from '../config/events';
 import { ensureWeather, sureEvents, weatherOf } from './effects';
 import { JOBS } from '../config/jobs';
@@ -93,7 +94,8 @@ export function genMissions(s: GameState) {
   const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
   // stesso giorno (es. partita salvata con meno missioni): si tengono quelle che ci sono e si aggiungono le altre
   const list: Mission[] = s.missionsDay === day(s) ? [...s.missions] : [];
-  const owns = s.businesses.length > 0;
+  // "servi clienti di persona": solo se si può entrare in un'attività (con ALL_AUTO non si entra mai)
+  const owns = !ALL_AUTO && s.businesses.length > 0;
   const kinds: Mission['kind'][] = ['jobs', 'jobType', 'stars3', owns ? 'served' : 'jobType', 'earn'];
   const chosen = new Set<string>(list.map((m) => (m.kind === 'jobType' ? m.kind + m.jobType : m.kind)));
   while (list.length < DAILY_MISSIONS) {
@@ -154,7 +156,8 @@ export function ensureWeekly(s: GameState) {
   s.weeklyVer = WEEKLY_VER;
   s.weekEarned = 0;
   const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
-  const owns = s.businesses.length > 0;
+  // "servi clienti di persona": solo se si può entrare in un'attività (con ALL_AUTO non si entra mai)
+  const owns = !ALL_AUTO && s.businesses.length > 0;
   const pool: Mission['kind'][] = ['jobs', 'stars3', 'variety', 'earn', ...(owns ? ['served' as const] : [])];
   const kinds: Mission['kind'][] = [];
   while (kinds.length < 2) {

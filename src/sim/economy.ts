@@ -1,6 +1,6 @@
 import { BUSINESS, FAME } from '../config/balance';
 import {
-  bizType, evolvesOf, FIRST_NAMES, LAST_NAMES, roleName, upgOf, upgradeIdsFor,
+  bizType, evolvesOf, FIRST_NAMES, isAutoType, LAST_NAMES, roleName, upgOf, upgradeIdsFor,
   type BusinessType, type Role, type UpgradeId,
 } from '../config/business';
 import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
@@ -276,8 +276,8 @@ export function makeCandidate(s: GameState, role: Role): Employee {
   return e;
 }
 
-/** Attività automatica (Ristorazione e ospitalità evolute e B&B): niente di persona, lavora sempre col personale. */
-export const isAutoBiz = (t: BusinessType) => !!bizType(t).auto;
+/** Attività automatica (per ora tutte, `ALL_AUTO` in config/business.ts): niente di persona, lavora sempre col personale. */
+export const isAutoBiz = (t: BusinessType) => isAutoType(t);
 
 /**
  * Attività automatica: un dipendente per reparto più il manager, assunti da soli se mancano (apertura ed
@@ -285,6 +285,8 @@ export const isAutoBiz = (t: BusinessType) => !!bizType(t).auto;
  */
 export function ensureAutoStaff(s: GameState, b: Business) {
   if (!isAutoBiz(b.type)) return;
+  // niente ordini da fare di persona (partite vecchie)
+  b.orders = [];
   for (const r of [...bizType(b.type).roles, 'manager'] as Role[]) {
     if (b.staff.some((e) => e.role === r)) continue;
     const e = makeCandidate(s, r);
@@ -722,7 +724,8 @@ const acc = new Map<string, number>();
 export function autoSim(s: GameState, b: Business, minutes: number, efficiency = 1) {
   // laboratorio: si guadagna solo coi lavori fatti a mano
   if (isCraft(b)) return;
-  if (bizType(b.type).kind === 'service' && !isAutonomous(b)) {
+  // senza personale completo le attività automatiche restano ferme; le altre di servizio danno ordini al titolare
+  if (bizType(b.type).kind === 'service' && !isAutonomous(b) && !isAutoBiz(b.type)) {
     serviceOrders(s, b, minutes);
     return;
   }

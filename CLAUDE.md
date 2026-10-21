@@ -139,3 +139,4 @@
 - Asset: modelli Kenney CC0 in `public/models` (zip completi in `assets-src/`, non pubblicati). Licenze di terze parti
   (three.js MIT, Fredoka OFL, Kenney CC0) in `public/LICENSES.txt`, linkato dai Crediti: ogni libreria, font o asset
   nuovo va aggiunto lì e nei Crediti. Niente marchi, nomi o grafiche di aziende o giochi reali.
+- Attività: per ora **tutte automatiche** (`ALL_AUTO` / `isAutoType` in src/config/business.ts, `isAutoBiz` in sim/economy.ts): niente interni, niente ordini di persona, personale (un dipendente per reparto + manager) assunto all'apertura. Non cancellare il codice degli interni (food truck, panificio): è solo nascosto.

@@ -12,7 +12,7 @@ import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settin
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
-import { bizAtLot, CHAR_MODELS, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
+import { bizAtLot, CHAR_MODELS, ensureAutoStaff, isAutoBiz, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
 import { effectiveJobLevel, EVOLVE_EVERY, readyJobTypes } from './config/careers';
 import {
@@ -46,7 +46,7 @@ import { PotteryStudio } from './world/pottery';
 import { VASES } from './world/ceramics';
 import { completeSpecial } from './sim/specials';
 import { ClientHouse, HOUSE_ASSETS } from './world/clienthouse';
-import { BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
+import { ALL_AUTO, BUSINESS_TYPES, bizType, type BusinessType } from './config/business';
 import { VEHICLES, WALK_SPEED, type VehicleId } from './config/vehicles';
 import { riderPose, vehicleModel, VEHICLE_ASSETS } from './world/vehicle';
 import { applyAccessories } from './world/style';
@@ -341,6 +341,18 @@ export class Game {
     } else {
       this.offlineReport = applyOffline(this.state, Date.now() - this.state.lastSeen);
     }
+    // attività automatiche (per ora tutte): una volta sola, anche quelle delle partite vecchie ricevono un dipendente per
+    // reparto e il manager (poi, se il giocatore ne licenzia uno, resta licenziato)
+    if (!this.state.allAuto) {
+      for (const b of this.state.businesses) ensureAutoStaff(this.state, b);
+      this.state.allAuto = true;
+    }
+    // niente più "servi clienti di persona" (non si entra nelle attività): quelle non finite si tolgono e si rifanno
+    if (ALL_AUTO && this.state.missions.some((m) => m.kind === 'served' && !m.claimed)) {
+      this.state.missions = this.state.missions.filter((m) => m.kind !== 'served' || m.claimed);
+      genMissions(this.state);
+    }
+    if (ALL_AUTO && this.state.weekly) this.state.weekly = this.state.weekly.filter((m) => m.kind !== 'served' || m.claimed);
     ensureWeather(this.state);
     if (this.state.missionsDay !== day(this.state) || this.state.missions.length < 5) genMissions(this.state);
     ensureWeekly(this.state);
@@ -801,10 +813,11 @@ export class Game {
       const hw = dx !== 0 ? 1.3 : 2.3;
       const hd = dz !== 0 ? 1.3 : 2.3;
       this.city.colliders.push(Object.assign({ minX: slot.center.x - hw, maxX: slot.center.x + hw, minZ: slot.center.z - hd, maxZ: slot.center.z + hd }, { lot: lotId }));
+      const auto = isAutoBiz(biz.type);
       inter = this.addInteractable({
         pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2,
-        label: `${def.name}: ordini`, icon: '📋',
-        action: () => this.ui.openBusiness(biz.id, 'ordini'),
+        label: auto ? `${def.name}: gestisci` : `${def.name}: ordini`, icon: auto ? '📊' : '📋',
+        action: () => this.ui.openBusiness(biz.id, auto ? undefined : 'ordini'),
       });
     } else if (slot.kind === 'truck') {
       // il tuo furgone: lato di servizio verso la strada, aperto solo in orario
@@ -815,16 +828,19 @@ export class Game {
       const hd = dz !== 0 ? 1.3 : 2.3;
       this.city.colliders.push(Object.assign({ minX: slot.center.x - hw, maxX: slot.center.x + hw, minZ: slot.center.z - hd, maxZ: slot.center.z + hd }, { lot: lotId }));
       const game = this;
+      // attività automatica (per ora tutte, ALL_AUTO): non si entra nel furgone, si gestisce dalla finestra
+      const auto = isAutoBiz(biz.type);
       inter = this.addInteractable({
         pos: slot.center.clone().add(new THREE.Vector3(dx * 2.3, 0, dz * 2.3)), radius: 2,
         // da chiuso la porta resta chiusa: si torna dopo aver dormito
         get label() {
+          if (auto) return `${bizType(biz.type).name}: gestisci`;
           return isOpenHour(game.state) ? 'Entra nel food truck' : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
         },
         get icon() {
-          return isOpenHour(game.state) ? '🚪' : '🔒';
+          return auto ? '📊' : isOpenHour(game.state) ? '🚪' : '🔒';
         },
-        action: () => this.enterBusiness(lotId),
+        action: () => (auto ? this.ui.openBusiness(biz.id) : this.enterBusiness(lotId)),
       });
     } else {
       // negozio in un edificio: insegna colorata sopra l'ingresso
@@ -852,22 +868,22 @@ export class Game {
       g.add(mat);
       const service = def.kind === 'service';
       const craft = def.kind === 'craft';
-      // attività automatiche (ristorazione e ospitalità evolute, B&B): non si entra, si gestiscono dalla finestra
-      const auto = !craft && !service && !hasInterior(biz.type);
+      // attività automatiche (per ora tutte, ALL_AUTO): non si entra, si gestiscono dalla finestra
+      const auto = isAutoBiz(biz.type) || (!craft && !service && !hasInterior(biz.type));
       const game = this;
       inter = this.addInteractable({
         pos: slot.pos, radius: 2.2,
         // l'ufficio delle imprese di servizi e il laboratorio sono sempre raggiungibili; i locali solo da aperti
         get label() {
           if (craft) return `${def.name}: lavori su richiesta`;
-          if (service) return `Ufficio ${def.name.toLowerCase()}`;
           if (auto) return `${def.name}: gestisci`;
+          if (service) return `Ufficio ${def.name.toLowerCase()}`;
           return isOpenHour(game.state) ? `Entra: ${def.name}` : `Chiuso · apre alle ${BUSINESS.OPEN_HOUR}:00`;
         },
         get icon() {
-          return craft ? '🛠️' : service ? '📋' : auto ? '📊' : isOpenHour(game.state) ? '🚪' : '🔒';
+          return craft ? '🛠️' : auto ? '📊' : service ? '📋' : isOpenHour(game.state) ? '🚪' : '🔒';
         },
-        action: () => (craft ? this.ui.openBusiness(biz.id, 'lavori') : service ? this.ui.openBusiness(biz.id, 'ordini') : auto ? this.ui.openBusiness(biz.id) : this.enterBusiness(lotId)),
+        action: () => (craft ? this.ui.openBusiness(biz.id, 'lavori') : auto ? this.ui.openBusiness(biz.id) : service ? this.ui.openBusiness(biz.id, 'ordini') : this.enterBusiness(lotId)),
       });
     }
     this.trucks.set(lotId, { lotId, slot, group: g, inter, extra, built: !!biz, open: isOpenHour(this.state) });
@@ -921,8 +937,8 @@ export class Game {
       this.ui.openBusiness(biz.id, 'lavori');
       return;
     }
-    // attività automatiche (senza cucina da giocare): si gestiscono dalla finestra
-    if (biz && !hasInterior(biz.type)) {
+    // attività automatiche (senza cucina da giocare, o tutte con ALL_AUTO): si gestiscono dalla finestra
+    if (biz && (!hasInterior(biz.type) || isAutoBiz(biz.type))) {
       this.ui.openBusiness(biz.id);
       return;
     }

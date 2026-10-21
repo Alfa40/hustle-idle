@@ -33,6 +33,7 @@ import {
   bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly,
+  isAutoBiz,
 } from '../sim/economy';
 import { addFame, addMoney, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
@@ -1094,7 +1095,7 @@ export class UI {
   private estStats(lotId: string, t: BusinessType) {
     const est = estimateLot(this.s, lotId, t);
     const unit = bizType(t).kind === 'service' ? 'ordini' : 'clienti';
-    const auto = bizType(t).auto ? `<div class="small" style="margin-top:6px">🤖 <b>Automatica</b>: apre con ${bizType(t).roles.map((r) => roleName(t, r).toLowerCase()).join(', ')} e manager già assunti</div>` : '';
+    const auto = isAutoBiz(t) ? `<div class="small" style="margin-top:6px">🤖 <b>Automatica</b>: apre con ${bizType(t).roles.map((r) => roleName(t, r).toLowerCase()).join(', ')} e manager già assunti</div>` : '';
     return `${auto}<div class="grid3" style="margin-top:8px">
         <div class="stat s-purple"><b>${est.demand.toFixed(1)}/h</b><span>${unit} (${PRODUCTS[est.best].icon})</span></div>
         <div class="stat s-green"><b class="money-t">${euro(est.revenue)}</b><span>incasso/mese*</span></div>
@@ -1348,18 +1349,22 @@ export class UI {
   private autoTag(b: Business) {
     if (bizType(b.type).kind === 'craft') return '<span class="tag y">Lavori su richiesta</span>';
     if (isAutonomous(b)) return '<span class="tag g">Autonoma</span>';
-    return bizType(b.type).auto ? '<span class="tag y">Manca personale</span>' : '<span class="tag y">Serve il titolare</span>';
+    return isAutoBiz(b.type) ? '<span class="tag y">Manca personale</span>' : '<span class="tag y">Serve il titolare</span>';
   }
 
   openBusiness(bizId: string, tab?: string) {
     const s = this.s;
     const b = () => s.businesses.find((x) => x.id === bizId)!;
-    const service = bizType(b().type).kind === 'service';
     const craft = bizType(b().type).kind === 'craft';
-    let cur = tab ?? (service ? 'ordini' : craft ? 'lavori' : 'panoramica');
+    // attività automatiche (per ora tutte): niente ordini da fare di persona
+    const auto = isAutoBiz(b().type);
+    const service = bizType(b().type).kind === 'service';
+    const orders = service && !auto;
+    if (auto && tab === 'ordini') tab = undefined;
+    let cur = tab ?? (orders ? 'ordini' : craft ? 'lavori' : 'panoramica');
     // laboratorio dell'artigiano: solo lavori su richiesta (niente prodotti, magazzino né personale)
     const tabs = craft ? [['lavori', '🛠️ Lavori su richiesta'], ['panoramica', '📊 Panoramica'], ['migliorie', '⬆️ Migliorie']] : [
-      ...(service ? [['ordini', '📋 Ordini']] : []),
+      ...(orders ? [['ordini', '📋 Ordini']] : []),
       ['panoramica', '📊 Panoramica'],
       ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
       // il personale si apre dal resoconto (tasto 👥 Personale accanto ai turni) o dalla catena: la scheda c'è solo arrivando da lì
@@ -2131,7 +2136,7 @@ export class UI {
     let shifts: string;
     if (!team.length) {
       shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>
-        <div class="small muted">Nessun dipendente: ${def.auto ? 'senza personale resta ferma' : def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
+        <div class="small muted">Nessun dipendente: ${isAutoBiz(biz.type) ? 'senza personale resta ferma' : def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
         <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
     } else {
       // più reparti (es. cuochi e cassieri): stessa griglia e stesse fasce, con i dati del reparto scelto sopra
@@ -2295,7 +2300,7 @@ export class UI {
       const fullSal = b.staff.reduce((a, e) => a + e.salary, 0);
       const dem = totalDemand(s, b);
       const cap = capacityAt(s, b, hourOf(s));
-      const alone = type.auto ? 'Fino ad allora resta ferma.' : service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
+      const alone = isAutoBiz(b.type) ? 'Fino ad allora resta ferma.' : service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
       return `
         <div class="card ${isAutonomous(b) ? '' : 'hl'}" data-g="state"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
           ${missing.length ? `<p class="muted small" style="margin:0">Per farla lavorare da sola serve: <b>${missing.join(', ')}</b>. ${alone}</p>`
@@ -2394,7 +2399,7 @@ export class UI {
       );
       const cands = group(
         s.candidates.filter((e) => order.includes(e.role)),
-        (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
+        (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && !isAutoBiz(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
       return `<p class="muted small explain">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
@@ -2413,7 +2418,7 @@ export class UI {
       const maxed = lvl >= u.max;
       const buyBtn = `<button class="btn sm full ${maxed ? 'sec' : 'blue'}" data-a="upgrade:${id}" ${maxed || (!noRoom && s.money < cost) ? 'disabled' : ''}>${maxed ? 'Massimo' : noRoom ? `📏 Niente spazio sul muro: amplia prima ${b.type === 'foodtruck' ? 'il furgone' : 'il locale'}` : 'Migliora · ' + euro(cost)}</button>`;
       // prova gratis prima di comprare (solo le migliorie che cambiano la cucina)
-      const canTry = hasInterior(b.type) && PREVIEW_UPGRADES.includes(id) && !maxed && !noRoom;
+      const canTry = hasInterior(b.type) && !isAutoBiz(b.type) && PREVIEW_UPGRADES.includes(id) && !maxed && !noRoom;
       return `<div class="card"><div class="row between"><div class="row"><div class="icon-bubble">${u.icon}</div><h3 style="margin:0">${u.name}</h3></div><span class="tag">Liv. ${lvl}/${u.max}</span></div>
         <p class="muted small explain" style="margin:0 0 8px">${u.desc}</p>${id === 'ampliamento' && !maxed ? `<p class="small" style="margin:0 0 8px"><b>Sblocca: ${this.expansionUnlocks(b, lvl + 1)}</b></p>` : ''}
         ${canTry ? `<div class="btnrow upg-btns"><button class="btn sm purple" data-a="previewUpg:${id}">👁️ Prova</button>${buyBtn}</div>` : buyBtn}</div>`;

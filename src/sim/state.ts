@@ -232,6 +232,8 @@ export interface GameState {
   guides?: string[];
   /** guide spente (anteprima di una proposta con "Gioca subito") */
   guidesOff?: boolean;
+  /** le attività di prima sono già diventate automatiche (personale assunto una volta, src/game.ts) */
+  allAuto?: boolean;
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
   lastRide?: VehicleId;
   orderSeq: number;
