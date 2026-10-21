@@ -15,10 +15,11 @@ import { toast } from '../sim/bus';
 /** Chiave: il tipo (versione di base) o `tipo:versione` (es. `giardino:1`, la potatura). */
 const TIPS: Record<string, string[] | null> = {
   giardino: [
-    'Ti serve il <b>tosasiepi</b>: è nella <b>cassetta rossa</b>',
-    'Taglia tutti i <b>cespugli</b> che si illuminano',
-    'Le foglie tagliate sono cadute a terra: <b>raccogli ogni mucchio</b>',
-    'Svuota il sacco di foglie nel <b>bidone verde</b>',
+    'Il <b>tosaerba</b> rosso è vicino al cancello: prendilo',
+    "Taglia ogni <b>ciuffo d'erba alta</b>: gira attorno alle <b>aiuole fiorite</b>",
+    'Lascia il tosaerba e prendi il <b>rastrello</b>',
+    'Raccogli ogni <b>mucchio di foglie</b>',
+    'Svuota il sacco nel <b>bidone verde</b>',
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',

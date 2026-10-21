@@ -45,9 +45,13 @@ export const CAREER_LINES: CareerLine[] = [
   { id: 'ceramica', sector: 'artigianato', name: 'Ceramica', icon: '🏺', ready: false, ladder: ['Vasi in ceramica', 'Servizi da tavola', 'Opere in ceramica'] },
   { id: 'falegnameria', sector: 'artigianato', name: 'Falegnameria', icon: '🪚', ready: false, ladder: ['Piccola falegnameria', 'Mobili su misura', 'Restauro di mobili antichi'] },
   // 🔨 Costruzione e manualità
-  { id: 'giardino', sector: 'manualita', name: 'Giardinaggio', icon: '🌿', ready: true, ladder: ['Sistemare il giardino', 'Potatura di siepi e alberi', 'Progettare giardini'] },
-  { id: 'lavaggio', sector: 'manualita', name: 'Auto', icon: '🚗', ready: true, ladder: ['Lavaggio auto', 'Carrozzeria e lucidatura', 'Officina di auto di lusso'] },
-  { id: 'montaggio', sector: 'manualita', name: 'Lavori in casa', icon: '🔧', ready: false, ladder: ['Montaggio mobili', 'Riparazioni in casa', 'Ristrutturazioni'] },
+  // (scala completa in CARRIERE.md: qui solo i gradini già giocabili, si aggiungono man mano)
+  { id: 'giardino', sector: 'manualita', name: 'Giardinaggio', icon: '🌿', ready: true, ladder: ['Sistemare il giardino', 'Potatura di siepi e alberi'] },
+  { id: 'montaggio', sector: 'manualita', name: 'Lavori in casa', icon: '🔧', ready: true, ladder: ['Montaggio mobili'] },
+  { id: 'pulizie', sector: 'manualita', name: 'Pulizie', icon: '🧽', ready: true, ladder: ['Pulizie di casa'] },
+  { id: 'idraulico', sector: 'manualita', name: 'Impianti', icon: '⚡', ready: true, ladder: ['Aiuto idraulico'] },
+  // 🚗 Auto: categoria a parte in futuro (decisione dell'utente, 21/10/2026)
+  { id: 'lavaggio', sector: 'manualita', name: 'Auto', icon: '🚗', ready: false, ladder: ['Lavaggio auto', 'Carrozzeria e lucidatura', 'Officina di auto di lusso'] },
 ];
 
 /**
@@ -55,7 +59,7 @@ export const CAREER_LINES: CareerLine[] = [
  * (niente offerte di lavoretti né attività da comprare di quei settori). `null` = tutti accesi.
  * Le attività che una partita ha già restano sue e continuano a lavorare.
  */
-export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina'];
+export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita'];
 export const sectorOn = (k: SkillId) => !FOCUS_SECTORS || FOCUS_SECTORS.includes(k);
 /** Settori di cui si possono comprare le attività (le basi dei loro alberi). */
 export const BIZ_SECTORS: SkillId[] | null = ['logistica', 'cucina'];

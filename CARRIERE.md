@@ -282,7 +282,7 @@ Qui vanno anche le **ristrutturazioni** (piastrelle, pareti, arredare le stanze)
 
 ---
 
-## 🔨 Costruzione e manualità (PROPOSTA del 21/10, da approvare)
+## 🔨 Costruzione e manualità (decisa il 21/10; lavoretti di Liv. 1 ✅ nel gioco dal 21/10)
 
 **4 linee × 5 gradini = 20 lavoretti**, sempre con le mani e sotto i 5 minuti. **Niente lavori con le auto** (deciso
 dall'utente il 21/10): lavaggio, carrozzeria, officina e corse potranno avere una categoria tutta loro (🚗 Auto, sotto
@@ -294,7 +294,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 ### 🌿 Giardinaggio
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Sistemare il giardino | giardino di una casa del quartiere: col tosaerba passi sull'erba alta (quella tagliata cambia colore), poi rastrello e foglie nel sacco | giardino più grande, aiuole e giochi dei bambini da non investire | 1½–2½ min |
+| 1 | Sistemare il giardino ✅ | giardino di una casa del quartiere: col tosaerba passi sull'erba alta (quella tagliata cambia colore), poi rastrello e foglie nel sacco | giardino più grande, aiuole e giochi dei bambini da non investire | 1½–2½ min |
 | 10 | Potatura di siepi e alberi | col dito segui la sagoma della siepe col tagliasiepi (senza tagliare dentro), poi i rami secchi degli alberi | forme più difficili (palla, cubo, animale), più alberi | 2 min |
 | 20 | Progettare giardini | pianta fiori, cespugli e alberi come nel disegno del cliente, poi annaffia | più piante; piante che vogliono sole o ombra | 2–3 min |
 | 30 | Parchi pubblici | un parco con una squadra: dici a ogni aiutante cosa fare (prato, siepi, panchine, fontanella) e fai tu il resto | da 2 a 3 aiutanti, parco più grande | 3 min |
@@ -303,7 +303,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 ### 🔧 Lavori in casa
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Montaggio mobili | foglio delle istruzioni: pezzo giusto al posto giusto, viti girate col dito | da 1 a 2 mobili, più pezzi simili tra loro | 1½–2½ min |
+| 1 | Montaggio mobili ✅ | foglio delle istruzioni: pezzo giusto al posto giusto, viti girate col dito | da 1 a 2 mobili, più pezzi simili tra loro | 1½–2½ min |
 | 10 | Riparazioni in casa | rubinetto che perde, porta che cigola, presa rotta: scegli l'attrezzo giusto dalla cassetta e ripara | da 2 a 4 guasti, attrezzi simili | 2 min |
 | 20 | Carpentiere | soppalco o scala in legno: misura, taglia le travi col dito sulla linea, montale nell'ordine giusto | più travi, misure più precise | 2½–3½ min |
 | 30 | Costruire una casa | muri di mattoni a ritmo (malta, mattone, livella), poi il tetto | muri più alti, finestre da lasciare libere | 3 min |
@@ -312,7 +312,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 ### 🧽 Pulizie
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Pulizie di casa | appartamento: polvere col panno, aspirapolvere, letti, oggetti al loro posto | più stanze, più disordine | 1½–2½ min |
+| 1 | Pulizie di casa ✅ | appartamento: polvere col panno, aspirapolvere, letti, oggetti al loro posto | più stanze, più disordine | 1½–2½ min |
 | 10 | Pulizie di uffici | carrello delle pulizie, tante scrivanie e cestini: conta il giro più corto | più uffici, bagni | 2–3 min |
 | 20 | Vetri dei palazzi | piattaforma che sale e scende sulla facciata: tergivetro col dito senza lasciare aloni | più piani, vento che fa dondolare | 2–3 min |
 | 30 | Pulizie dopo un concerto | piazza dopo l'evento: ogni rifiuto nel bidone giusto della differenziata | più rifiuti, rifiuti difficili da capire | 2 min |
@@ -321,7 +321,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 ### ⚡ Impianti
 | Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli | Durata |
 |---|---|---|---|---|
-| 1 | Aiuto idraulico | ruota i pezzi di tubo finché l'acqua arriva al rubinetto, poi apri e controlla che non perda | griglia più grande, più rubinetti | 1½–2 min |
+| 1 | Aiuto idraulico ✅ | ruota i pezzi di tubo finché l'acqua arriva al rubinetto, poi apri e controlla che non perda | griglia più grande, più rubinetti | 1½–2 min |
 | 10 | Elettricista | prima stacca la corrente (se no prendi la scossa), poi ogni filo al morsetto del suo colore e prova la luce | più fili, colori simili | 2 min |
 | 20 | Caldaie e termosifoni | carica la caldaia fino alla tacca della pressione, sfiata i termosifoni al momento giusto | più termosifoni, tacca più stretta | 2–3 min |
 | 30 | Pannelli solari | sul tetto: monta i pannelli e girali verso il sole, poi collegali | più pannelli, il sole che si sposta | 3 min |

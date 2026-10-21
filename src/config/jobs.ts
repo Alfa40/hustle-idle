@@ -1,6 +1,6 @@
 import type { SkillId } from './skills';
 
-export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista' | 'festa' | 'hotel' | 'bar' | 'forno';
+export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista' | 'festa' | 'hotel' | 'bar' | 'forno' | 'montaggio' | 'pulizie' | 'idraulico';
 
 export interface JobDef {
   name: string;
@@ -25,8 +25,23 @@ export type HowStep = [icon: string, text: string, how: 'tap' | 'hold' | 'walk']
 export const JOBS: Record<JobType, JobDef> = {
   giardino: {
     name: 'Sistemare il giardino', icon: '🌿', skill: 'manualita', basePay: 30, xp: 14, fame: 1.2, where: 'house',
-    intro: 'Prendi il tosasiepi, taglia i cespugli, raccogli le foglie e svuota il sacco nel bidone. Resta nella zona di lavoro!',
-    steps: [['🧰', 'Prendi il tosasiepi dalla cassetta rossa', 'tap'], ['✂️', 'Taglia ogni cespuglio che brilla', 'hold'], ['🍂', 'Raccogli i mucchi di foglie', 'tap'], ['🗑️', 'Svuota il sacco nel bidone verde', 'tap']],
+    intro: "Nel giardino del cliente: prendi il tosaerba e taglia ogni ciuffo d'erba alta, senza calpestare le aiuole fiorite. Poi col rastrello raccogli le foglie e svuota il sacco nel bidone.",
+    steps: [['🧰', 'Prendi il tosaerba', 'tap'], ['🌿', "Taglia l'erba alta (gira attorno alle aiuole)", 'hold'], ['🍂', 'Col rastrello raccogli le foglie', 'tap'], ['🗑️', 'Svuota il sacco nel bidone', 'tap']],
+  },
+  montaggio: {
+    name: 'Montaggio mobili', icon: '🔧', skill: 'manualita', basePay: 30, xp: 14, fame: 1.1, where: 'house',
+    intro: 'A casa del cliente: apri la scatola del mobile e segui il foglio delle istruzioni, un passo alla volta. Prendi il pezzo con la lettera giusta, portalo al mobile e avvita le viti girando il dito come le lancette.',
+    steps: [['📦', 'Apri la scatola', 'tap'], ['🔧', 'Prendi il pezzo con la lettera del foglio', 'tap'], ['🔧', 'Avvita: gira il dito attorno alla vite', 'hold']],
+  },
+  pulizie: {
+    name: 'Pulizie di casa', icon: '🧽', skill: 'manualita', basePay: 28, xp: 13, fame: 1, where: 'house',
+    intro: "Pulisci l'appartamento del cliente: togli la polvere col panno, passa l'aspirapolvere sulle briciole, rimetti ogni cosa al suo posto e rifai il letto.",
+    steps: [['🧽', 'Strofina la polvere col panno', 'hold'], ['🧹', "Aspira le briciole", 'hold'], ['🧺', 'Ogni cosa al suo posto', 'tap'], ['🛏️', 'Rifai il letto', 'hold']],
+  },
+  idraulico: {
+    name: 'Aiuto idraulico', icon: '💧', skill: 'manualita', basePay: 31, xp: 14, fame: 1.1, where: 'house',
+    intro: "Chiudi il rubinetto generale dell'acqua, poi sotto il lavandino gira i pezzi di tubo finché l'acqua arriva al rubinetto. Riapri l'acqua e controlla: se un raccordo perde, stringilo.",
+    steps: [['🔴', "Chiudi l'acqua", 'hold'], ['💧', 'Gira i tubi finché sono collegati', 'tap'], ['🔴', "Riapri l'acqua", 'hold'], ['🔧', 'Stringi i raccordi che perdono', 'hold']],
   },
   consegna: {
     name: 'Consegna pacchi', icon: '📦', skill: 'logistica', basePay: 26, xp: 12, fame: 1, where: 'shop', vehicleOk: true,

@@ -22,7 +22,7 @@ export const ROOM_ASSETS = [
   'table', 'tableRound', 'tableCloth', 'chairCushion', 'chair', 'kitchenBar', 'kitchenBarEnd', 'stoolBar', 'kitchenCoffeeMachine',
   'kitchenMicrowave', 'kitchenCabinetUpper', 'kitchenCabinet', 'kitchenStove', 'kitchenFridge', 'kitchenFridgeLarge', 'kitchenSink',
   'bedSingle', 'bedDouble', 'bathroomSink', 'trashcan', 'coatRackStanding', 'sideTable', 'lampRoundTable', 'rugRound', 'rugRectangle',
-  'plantSmall1', 'pottedPlant', 'books', 'cabinetBedDrawerTable', 'toaster', 'kitchenBlender', 'bench', 'loungeSofa', 'desk',
+  'plantSmall1', 'pottedPlant', 'books', 'cabinetBedDrawerTable', 'toaster', 'kitchenBlender', 'bench', 'loungeSofa', 'desk', 'tableCoffee', 'cabinetTelevision', 'bookcaseOpen',
 ].map((n) => `furniture/${n}.glb`);
 
 /** Scala dei mobili Kenney (come nella casa del cliente): un bancone arriva a circa 1 m. */
