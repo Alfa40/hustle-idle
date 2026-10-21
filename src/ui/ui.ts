@@ -12,6 +12,8 @@ import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
+import { Guide } from './guide';
+import { makeGuides } from './guides';
 import { actSide, moveSide, onSettings, settings, type HudKey } from '../settings';
 import { layout } from './layout';
 import { PulseGlow } from '../world/pulse';
@@ -76,6 +78,8 @@ interface Panel {
   help?: boolean;
   /** sopra a tutto, anche ai tavoli delle sfide (finestra "Proponi") */
   top?: boolean;
+  /** nome per la guida obbligatoria (guides.ts): `panel:<nome>` all'apertura, `<nome>/tab:…` e `<nome>/<azione>` ai tocchi */
+  guide?: string;
 }
 
 /**
@@ -202,7 +206,13 @@ export class UI {
   private camEl!: HTMLDivElement;
   private pointers!: EdgePointers;
 
+  /** guida obbligatoria a passi (la prima volta di ogni tasto e di ogni sblocco) */
+  guide: Guide;
+  private unlockT = 0;
+
   constructor(private game: Game) {
+    this.guide = new Guide(game, makeGuides(game));
+    this.guide.skipReachedUnlocks();
     this.buildHud();
     bus.on('toast', ({ text, kind }) => this.toast(text, kind));
     bus.on('missions', () => this.updateDot());
@@ -255,7 +265,10 @@ export class UI {
         if (k === 'biz') this.openAgency();
         if (k === 'missions') this.openMissions();
         if (k === 'profile') this.openProfile();
-        if (k === 'home') this.game.goHome();
+        if (k === 'home') {
+          this.game.goHome();
+          this.guideLater('hud:home');
+        }
         if (k === 'shop') this.openShop();
         if (k === 'multi') this.openMulti();
         if (k === 'settings') this.openSettings();
@@ -263,7 +276,10 @@ export class UI {
       }),
     );
     this.hudMenuEl = right.querySelector('.hud-menu')!;
-    this.hudMenuEl.querySelector('.hud-menu-btn')!.addEventListener('click', () => this.hudMenuEl.classList.toggle('open'));
+    this.hudMenuEl.querySelector('.hud-menu-btn')!.addEventListener('click', () => {
+      this.hudMenuEl.classList.toggle('open');
+      if (this.hudMenuEl.classList.contains('open')) this.guideLater('hud:menu');
+    });
 
     // telefoni tester: tasto "Proponi" sempre sullo schermo (anche nei lavoretti, nei minigiochi e alle sfide)
     if (canPropose()) {
@@ -346,7 +362,10 @@ export class UI {
       b.addEventListener('pointerleave', stop);
       b.addEventListener('pointercancel', stop);
     });
-    cam.querySelector('.cam-toggle')!.addEventListener('click', () => cam.classList.toggle('open'));
+    cam.querySelector('.cam-toggle')!.addEventListener('click', () => {
+      cam.classList.toggle('open');
+      if (cam.classList.contains('open')) this.guideLater('hud:camera');
+    });
     this.root.querySelector('.hud-right .hud-btns')!.appendChild(cam);
     this.camEl = cam;
     this.layoutHud();
@@ -428,6 +447,13 @@ export class UI {
 
   update(dt: number) {
     this.placeTopStack();
+    // sblocchi: la guida parte quando il gioco è libero (niente finestre, lavori, cucina o mappa)
+    this.unlockT += dt;
+    if (this.unlockT > 0.8) {
+      this.unlockT = 0;
+      const g = this.game;
+      if (!this.panel && !this.queue.length && !g.run && !g.interior && !g.house && !this.mapScreen.isOpen && !document.body.classList.contains('pedal-drive')) this.guide.checkUnlocks();
+    }
     const s = this.s;
     const m = euro(s.money);
     if (this.moneyEl.textContent !== m) {
@@ -794,6 +820,7 @@ export class UI {
       if (!el || !this.panel) return;
       // solo il primo ':' separa l'azione dall'argomento (es. "group:zone:centro", "group:g:abc")
       const [name, arg = ''] = splitAction(el.dataset.a!);
+      const gname = this.panel.guide;
       this.navFrom = this.panel;
       try {
         this.panel.actions[name]?.(arg);
@@ -802,6 +829,11 @@ export class UI {
         this.backCandidate = null;
       }
       if (this.panel && this.modal === modal) this.renderPanel();
+      // guida obbligatoria: la prima volta di questa scheda o di questo pulsante
+      if (gname) {
+        if (name === 'tab' && this.panel?.guide === gname) this.guidePanel(false);
+        else this.guideLater(`${gname}/${name}`);
+      }
       // il pulsante ha chiuso la finestra senza aprirne un'altra: ora tocca a quelle in attesa
       if (!this.panel && this.queue.length) this.open(this.queue.shift()!);
       this.updateDot();
@@ -826,6 +858,7 @@ export class UI {
     document.body.appendChild(modal);
     this.modal = modal;
     this.renderPanel();
+    this.guidePanel(true);
     // tornando con "Indietro": la finestra è di nuovo dove l'avevi lasciata (i contenuti sono aggiornati)
     if (p.scroll) {
       putScroll(modal.querySelector('.sheet') as HTMLElement, p.scroll);
@@ -930,10 +963,12 @@ export class UI {
 
   openJobOffer(offer: JobOffer) {
     const def = jobInfo(offer.type, offer.level);
-    // il tutorial è acceso solo finché non hai completato quel lavoretto (vale per ogni livello, ma ogni
-    // versione nuova del lavoretto, ogni 10 livelli, ha il suo); dopo resta spento, ma lo puoi riaccendere
-    let tut = !this.game.tutorial.isDone(def.key);
+    // la prima volta il tutorial è obbligatorio (vale per ogni livello, ma ogni versione nuova del lavoretto,
+    // ogni 10 livelli, ha il suo); dopo resta spento, ma lo puoi riaccendere
+    const first = !this.game.tutorial.isDone(def.key);
+    let tut = first;
     this.open({
+      guide: 'job',
       title: `${def.icon} ${def.name}`,
       small: true,
       color: 'var(--orange)',
@@ -944,12 +979,12 @@ export class UI {
           <div class="stat s-purple"><b>Liv. ${offer.level}</b><span>📈 difficoltà</span></div>
           <div class="stat"><b>${SKILLS[def.skill].icon} ${SKILLS[def.skill].name}</b><span>esperienza che guadagni</span></div>
         </div>
-        <button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small explain">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
-          <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>
+        ${first ? '<div class="card tint small tut-note" style="margin-top:10px">🎓 <b>La prima volta c\'è il tutorial</b>: il tempo è fermo</div>' : `<button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small explain">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
+          <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>`}
         <p class="muted small center explain" style="margin:10px 0 0">${tut ? '🎓 Il tutorial è una prova: niente soldi né esperienza, ma il lavoretto resta disponibile per farlo sul serio' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
-        tut: () => (tut = !tut),
+        tut: () => (tut = first || !tut),
         yes: () => {
           this.close();
           this.game.startJob(offer, tut);
@@ -1080,6 +1115,7 @@ export class UI {
   openLot(lotId: string) {
     const lot = lotDef(lotId);
     this.open({
+      guide: 'lot',
       money: true,
       title: `🏷️ ${lot.name}`,
       color: 'var(--red)',
@@ -1102,6 +1138,7 @@ export class UI {
     let sel: string | null = null;
     const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
     this.open({
+      guide: 'agency',
       money: true,
       title: atAgency ? '🏢 Agenzia affari' : '🏢 Attività',
       live: true,
@@ -1307,6 +1344,7 @@ export class UI {
     // "Vendi l'attività" toccato una volta: si chiede conferma con un secondo tocco
     let confirmSell = false;
     this.open({
+      guide: 'biz',
       money: () => cur === 'migliorie' || cur === 'magazzino' || cur === 'personale',
       title: `${bizType(b().type).icon} ${bizType(b().type).name} · ${lotDef(b().lotId).name}`,
       live: true,
@@ -1510,6 +1548,7 @@ export class UI {
     const s = this.s;
     const b = () => s.businesses.find((x) => x.id === bizId)!;
     this.open({
+      guide: 'report',
       money: true,
       live: true,
       title: `📊 ${bizType(b().type).icon} ${lotDef(b().lotId).name}`,
@@ -1602,6 +1641,7 @@ export class UI {
     const mine = new Set(bizs().map((b) => lotZone[b.lotId]));
     let zone: ZoneId = lotZone[first.lotId];
     this.open({
+      guide: 'product',
       title: `${pr.icon} ${pr.name} · mercato`,
       live: true,
       color: bizType(type).color,
@@ -1620,7 +1660,7 @@ export class UI {
         const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
         const chips = `<div class="chips">${zones.map((z) => `<button class="chip ${z === zone ? 'on' : ''}" data-a="zone:${z}">📍 ${ZONES[z].name}${mine.has(z) ? ' 🏪' : ''}</button>`).join('')}</div><!--tabs-->`;
         const selling = bizs().filter((x) => x.products.includes(pid)).length;
-        const now = `<div class="card"><h3>📊 Adesso <span class="muted small">${ZONES[zone].name}</span></h3>
+        const now = `<div class="card" data-g="now"><h3>📊 Adesso <span class="muted small">${ZONES[zone].name}</span></h3>
           <div class="grid3"><div class="stat s-blue"><b>${n1(today)}/h</b><span>${unit} all'ora oggi (media)</span></div>
           <div class="stat s-green"><b>${open ? `${n1(nowH)}/h` : 'chiuso'}</b><span>${open ? `adesso (ore ${Math.floor(h)})` : `apre alle ${BUSINESS.OPEN_HOUR}`}</span></div>
           <div class="stat s-yellow"><b>~${n1(perDay(type, today))}</b><span>${unit} in tutta la giornata</span></div></div>
@@ -1630,14 +1670,14 @@ export class UI {
         // perché: un fattore per riga
         const extra = [{ icon: '⭐', name: 'Fama', mult: fame }, ...(up !== 1 ? [{ icon: '⬆️', name: 'Migliorie (look, marketing)', mult: up }] : [])];
         const facs = demandFactors(s, pid, zone, extra);
-        const why = `<div class="card"><h3>🔎 Perché la domanda è questa</h3>
+        const why = `<div class="card" data-g="why"><h3>🔎 Perché la domanda è questa</h3>
           <div class="lv-row"><span>🧺 Domanda base del prodotto</span><b></b><b>${n1(pr.baseDemand)}/h</b></div>
           ${facs.map((f) => `<div class="lv-row"><span>${f.icon} ${esc(f.name)}</span><b></b><b class="${f.mult > 1.02 ? 'good' : f.mult < 0.98 ? 'bad' : ''}">${f2(f.mult)}</b></div>`).join('')}
           <div class="lv-row lv-tot"><span>= ${unit} all'ora oggi</span><b></b><b>${n1(today)}/h</b></div>
           <p class="muted small explain" style="margin:6px 0 0">La domanda base si moltiplica per ogni riga: sopra ×1 aiuta (verde), sotto ×1 frena (rosso). L'andamento del mercato cambia un po' ogni giorno a caso e poi torna piano piano verso ×1. Durante il giorno i ${unit} arrivano di più nelle ore di punta.</p></div>`;
         // zona per zona oggi
         const zmax = Math.max(0.1, ...zones.map((z) => marketDemand(s, pid, z) * mult));
-        const byZone = `<div class="card"><h3>📍 Oggi zona per zona</h3>${zones.map((z) => {
+        const byZone = `<div class="card" data-g="zones"><h3>📍 Oggi zona per zona</h3>${zones.map((z) => {
           const v = marketDemand(s, pid, z) * mult;
           return `<div style="margin-bottom:6px"><div class="row between small"><span>${ZONES[z].name}${mine.has(z) ? ' 🏪' : ''}</span><b>${n1(v)}/h</b></div><div class="bar green"><i style="width:${(v / zmax) * 100}%"></i></div></div>`;
         }).join('')}</div>`;
@@ -1653,7 +1693,7 @@ export class UI {
             <span class="fc-sure">${Math.round(x.sure * 100)}%</span></div>`).join('');
         const mi = monthIndex(day(s));
         const seas = [0, 1, 2].map((k) => `${MONTH_NAMES[(mi + k) % 12]} ${f2(pr.season[(mi + k) % 12])}`).join(' → ');
-        const next = `<div class="card"><h3>⛅ Prossimi 7 giorni</h3>
+        const next = `<div class="card" data-g="fc"><h3>⛅ Prossimi 7 giorni</h3>
           <div class="fc-row fc-head"><span class="fc-day"></span><span class="fc-w">meteo</span><span class="fc-bar">${unit} all'ora</span><span class="fc-val">probabile</span><span class="fc-sure">sicura</span></div>${rows}
           <div class="small muted" style="margin-top:6px">📅 Stagione: ${seas}</div>
           <p class="muted small explain" style="margin:6px 0 0">La barra va dal minimo al massimo che ci si può aspettare, la tacca è il valore più probabile. Più il giorno è lontano, meno la previsione è sicura (la percentuale a destra): il meteo può cambiare e il mercato si muove un po' a caso ogni giorno. Stagione ed eventi già annunciati invece sono sicuri. La percentuale sotto l'icona del meteo è la probabilità di quel tempo.</p></div>`;
@@ -1703,7 +1743,7 @@ export class UI {
         <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
     }).join('');
     // anche senza dati dei manager i negozi si vedono (resoconto con conti e turni, tasto Personale)
-    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div><h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows();
+    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
     const sum = (f: (r: (typeof got)[number]) => number) => got.reduce((a, r) => a + f(r), 0);
     const arrived = sum((r) => r.snap!.data.avg.arrived);
     const served = sum((r) => r.snap!.data.avg.served);
@@ -1803,7 +1843,7 @@ export class UI {
       return `${upgOf(type, id).icon} ${upgOf(type, id).name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
     }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
     const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3><div class="small muted" style="margin-bottom:4px">I problemi di tutti i negozi raggruppati: dove si può, un tasto lo sistema in tutto il gruppo.</div>${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta, magazzini pieni e migliorie pari</span></div>'}</div>`;
-    return status + advice + day + peakCard + `<h3 class="sec-title">🏪 Negozio per negozio</h3>` + rows();
+    return status + advice + day + peakCard + `<h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
   }
 
   openChain(type: BusinessType, startGroup = 'all') {
@@ -1814,6 +1854,7 @@ export class UI {
     const report = (msg: string, ok: boolean) => toast(msg, ok ? 'good' : 'bad');
     const sel = () => chainGroups(s, type).find((g) => g.id === gid) ?? chainGroups(s, type)[0];
     this.open({
+      guide: 'chain',
       money: true,
       live: true,
       title: `🔗 Catena ${def.icon} ${def.name}`,
@@ -1951,7 +1992,7 @@ export class UI {
     const row = (name: string, a: string, b: string, cls = '') => `<div class="lv-row ${cls}"><span>${name}</span><b>${a}</b><b>${b}</b></div>`;
     const neg = (x: number) => (x ? `−${euro(x)}` : euro(0));
     const why = t.lost ? `<div class="small muted" style="margin-top:6px">Persi oggi: ${t.lostStaff ?? 0} per personale che non basta · ${t.lostStock ?? 0} per prodotti finiti · ${t.lostQueue ?? 0} in fila mentre lavoravi tu</div>` : '';
-    const money = `<div class="card"><h3>💶 I conti</h3>
+    const money = `<div class="card" data-g="money"><h3>💶 I conti</h3>
       <div class="lv-row lv-head"><span></span><b>Oggi</b><b>Mese (${dom}/${D})</b></div>
       ${row(`👥 ${unit[0].toUpperCase() + unit.slice(1)} serviti`, String(t.served), String(m.served))}
       ${row('❌ Persi', `${t.lost}${t.lost ? ` <small>(${pct(t)}%)</small>` : ''}`, `${m.lost}${m.lost ? ` <small>(${pct(m)}%)</small>` : ''}`, t.lost || m.lost ? 'lv-bad' : '')}
@@ -2215,7 +2256,7 @@ export class UI {
       const cap = capacityAt(s, b, hourOf(s));
       const alone = type.auto ? 'Fino ad allora resta ferma.' : service ? 'Fino ad allora gli ordini li esegui tu.' : 'Fino ad allora vende solo quando ci sei tu dentro.';
       return `
-        <div class="card ${isAutonomous(b) ? '' : 'hl'}"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
+        <div class="card ${isAutonomous(b) ? '' : 'hl'}" data-g="state"><div class="row between"><h3>${isAutonomous(b) ? '✅' : '⚠️'} Stato</h3>${this.autoTag(b)}</div>
           ${missing.length ? `<p class="muted small" style="margin:0">Per farla lavorare da sola serve: <b>${missing.join(', ')}</b>. ${alone}</p>`
             : '<p class="muted small explain" style="margin:0">Lavora da sola anche quando sei altrove o offline.</p>'}
         </div>
@@ -2227,7 +2268,7 @@ export class UI {
           <div class="stat s-yellow"><b>${euro(b.yesterday.revenue)}</b><span>📅 incasso ieri</span></div>
           <div class="stat s-orange"><b>${euro(b.month.revenue)}</b><span>🗓️ incasso del mese</span></div>
         </div>
-        <div class="card" style="margin-top:10px"><h3>🧾 Costi mensili</h3>
+        <div class="card" data-g="costs" style="margin-top:10px"><h3>🧾 Costi mensili</h3>
           <div class="row between small"><span>${lot.kind === 'truck' ? 'Posteggio' : 'Affitto'}</span><span>${euro(c.rent)}</span></div>
           <div class="row between small"><span>Bollette</span><span>${euro(c.utilities)}</span></div>
           <div class="row between small"><span>Stipendi (${b.staff.length})</span><span>${euro(fullSal)}</span></div>
@@ -2316,8 +2357,8 @@ export class UI {
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
       return `<p class="muted small explain">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
-        <h3 class="sec-title">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
-        <h3 class="sec-title">📝 Candidati di oggi</h3><p class="muted small explain" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
+        <h3 class="sec-title" data-g="staff">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
+        <h3 class="sec-title" data-g="cands">📝 Candidati di oggi</h3><p class="muted small explain" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40${s.money < 40 ? ' (non hai abbastanza soldi)' : ''}</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
@@ -2465,6 +2506,7 @@ export class UI {
     const card = (a: string, icon: string, title: string, sub: string, color: string) =>
       `<button class="shop-card" data-a="${a}" style="--sc:${color}"><span class="shop-ico">${icon}</span><span><b>${title}</b><small>${sub}</small></span><span class="shop-go">›</span></button>`;
     this.open({
+      guide: 'multi',
       money: true,
       title: '🎮 Multigiocatore',
       small: true,
@@ -2560,6 +2602,7 @@ export class UI {
       }).catch(() => {});
     }
     panel = {
+      guide: 'casino',
       money: true,
       title: isBj ? '🂡 Blackjack' : '🃏 Poker',
       // cifra delle fiches: si aggiorna mentre scrivi, senza ridisegnare la finestra
@@ -2695,6 +2738,7 @@ export class UI {
     const card = (a: string, icon: string, title: string, sub: string, color: string) =>
       `<button class="shop-card" data-a="${a}" style="--sc:${color}"><span class="shop-ico">${icon}</span><span><b>${title}</b><small>${sub}</small></span><span class="shop-go">›</span></button>`;
     this.open({
+      guide: 'shop',
       money: true,
       title: '🛍️ Negozio',
       small: true,
@@ -2726,6 +2770,7 @@ export class UI {
     const s = this.s;
     const g = this.game;
     this.open({
+      guide: 'houses',
       money: true,
       title: '🏡 Agenzia immobiliare',
       color: 'var(--green)',
@@ -2813,6 +2858,7 @@ export class UI {
       this.game.save();
     };
     this.open({
+      guide: 'style',
       money: true,
       title: '👕 Stile e accessori',
       color: 'var(--purple)',
@@ -2874,6 +2920,7 @@ export class UI {
   openDealer(canBuy = true) {
     const s = this.s;
     this.open({
+      guide: 'dealer',
       money: true,
       title: '🛵 Concessionaria',
       color: 'var(--blue)',
@@ -2936,6 +2983,7 @@ export class UI {
   openMissions() {
     const s = this.s;
     this.open({
+      guide: 'missions',
       title: '📋 Bacheca missioni',
       live: true,
       color: 'var(--purple)',
@@ -3027,6 +3075,7 @@ export class UI {
     let monthOff = 0;
     let sel = day(s);
     this.open({
+      guide: 'calendar',
       title: '📅 Calendario',
       color: 'var(--purple)',
       live: true,
@@ -3081,6 +3130,24 @@ export class UI {
 
   openMap(focusId?: string) {
     this.mapScreen.open(focusId);
+    this.guideLater('hud:map');
+  }
+
+  /** Guida di una cosa appena toccata: parte appena il gioco ha disegnato la finestra o la scheda nuova. */
+  private guideLater(key: string) {
+    setTimeout(() => this.guide.triggerAll(key), 60);
+  }
+
+  /** Finestra aperta o scheda cambiata: guida della finestra e della scheda accesa. */
+  private guidePanel(open: boolean) {
+    const name = this.panel?.guide;
+    if (!name) return;
+    setTimeout(() => {
+      if (this.panel?.guide !== name) return;
+      if (open) this.guide.triggerAll(`panel:${name}`);
+      const on = this.modal?.querySelector<HTMLElement>('.tab.on')?.dataset.a;
+      if (on) this.guide.triggerAll(`${name}/${on}`);
+    }, 60);
   }
 
   /** "Dettagli" dalla mappa: apre la scheda giusta senza poter comprare a distanza. */
@@ -3110,6 +3177,7 @@ export class UI {
     const s = this.s;
     void this.game.refreshFriendRequests();
     this.open({
+      guide: 'profile',
       title: '👤 Profilo',
       live: true,
       color: 'var(--blue)',
@@ -3673,6 +3741,7 @@ export class UI {
   openHome() {
     const s = this.s;
     this.open({
+      guide: 'home',
       title: '🏠 Casa tua',
       small: true,
       color: 'var(--green)',
@@ -3736,6 +3805,7 @@ export class UI {
     // telefoni tester: foto dello schermo e posto nel gioco presi adesso, prima che la finestra copra tutto
     this.proposals.capture();
     this.open({
+      guide: 'settings',
       title: '⚙️ Opzioni',
       color: 'var(--gray)',
       after: (body) => {
@@ -3836,7 +3906,9 @@ export class UI {
       devMorning: () => this.game.sleep(),
       devTut: () => {
         s.jobTutorials = [];
-        toast('🎓 I tutorial dei lavoretti ripartono', 'info');
+        s.bizTutorials = [];
+        this.guide.reset();
+        toast('🎓 I tutorial ripartono', 'info');
       },
       devLvl: (arg) => {
         const [line, v] = arg.split('|');
@@ -3900,51 +3972,6 @@ export class UI {
     });
   }
 
-  /**
-   * Prima volta in gioco: le due zone dei comandi si illuminano per qualche secondo
-   * (dove trascinare per muoversi, dove toccare per le azioni). Sparisce al primo tocco.
-   */
-  showControlsHint() {
-    const el = document.createElement('div');
-    el.className = 'ctl-hint';
-    el.innerHTML = `<div class="ctl-move"><b>🕹️ Trascina qui</b><span>per muoverti</span></div>
-      <div class="ctl-act"><b>👆 Tocca qui</b><span>per parlare, entrare e lavorare</span></div>`;
-    document.body.appendChild(el);
-    const done = () => {
-      el.classList.add('out');
-      setTimeout(() => el.remove(), 400);
-      window.removeEventListener('pointerdown', done);
-    };
-    setTimeout(() => window.addEventListener('pointerdown', done), 400);
-    setTimeout(done, 7000);
-  }
-
-  openWelcome() {
-    this.open({
-      title: '👋 Benvenuto!',
-      small: true,
-      color: 'var(--orange)',
-      render: () => `
-        <div class="hero"><div class="emoji">💼</div><p style="margin:4px 0 12px">Hai <b class="money-t">${euro(this.s.money)}</b> in tasca e tanta voglia di fare!</p></div>
-        <ul class="steps">
-          <li><div class="icon-bubble">🕹️</div><span>Per <b>muoverti</b> trascina il dito nella metà <b>${moveSide()}</b> dello schermo. Per <b>parlare, entrare o lavorare</b> mettiti sul cerchio a terra e tocca la metà <b>${actSide()}</b> (o tieni il dito lì se c'è scritto "Tieni premuto"). In ⚙️ Opzioni puoi invertire i lati.</span></li>
-          <li><div class="icon-bubble">❗</div><span>Cerca le persone con il <b>!</b> giallo: offrono <b>lavoretti</b>. Le freccette ai bordi ti portano da loro.</span></li>
-          <li><div class="icon-bubble">🎮</div><span>I <b>lavoretti</b> si giocano in prima persona: riquadro in basso a <b>${moveSide()}</b> per camminare, trascina il dito sul resto dello schermo per guardarti attorno e <b>tocca l'oggetto che pulsa</b> per lavorare (tieni il dito sopra se c'è scritto "Tieni premuto").</span></li>
-          <li><div class="icon-bubble">📋</div><span>Nella <b>bacheca</b> in piazza trovi le <b>missioni</b> del giorno.</span></li>
-          <li><div class="icon-bubble">🚚</div><span>Con i risparmi compra un lotto <b>IN VENDITA</b> e apri il tuo <b>food truck</b>.</span></li>
-          <li><div class="icon-bubble">👥</div><span>Assumi <b>dipendenti</b> e un <b>manager</b> per farlo lavorare da solo.</span></li>
-          <li><div class="icon-bubble">🗺️</div><span>Tocca la <b>mappa</b> in alto per vedere tutta la città.</span></li>
-        </ul>
-        <button class="btn full" data-a="ok">Iniziamo! 🚀</button>`,
-      actions: {
-        ok: () => {
-          this.s.tutorialDone = true;
-          this.close();
-          this.showControlsHint();
-        },
-      },
-    });
-  }
 }
 
 

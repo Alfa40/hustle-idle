@@ -907,24 +907,6 @@ body.swap-controls .act-zone { left: 0; right: 50%; }
 .ride-btn { right: calc(var(--sar) + 14px); bottom: calc(var(--sab) + 22px); }
 body.swap-controls .ride-btn { right: auto; left: calc(var(--sal) + 14px); }
 
-/* ---------- prima volta: dove muoversi e dove toccare ---------- */
-.ctl-hint { position: fixed; inset: 0; z-index: 25; pointer-events: none; animation: ht-pop .3s ease-out; transition: opacity .35s; }
-.ctl-hint.out { opacity: 0; }
-.ctl-hint .ctl-move {
-  position: absolute; left: 0; top: 30%; bottom: 0; width: 50%; border: 3px dashed rgba(255,255,255,.85); border-radius: 0 28px 0 0;
-  background: rgba(45,156,219,.18); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
-  text-shadow: 0 2px 4px rgba(0,0,0,.5);
-}
-.ctl-hint .ctl-act {
-  position: absolute; right: 0; top: 30%; bottom: 0; width: 50%; border: 3px dashed rgba(255,214,10,.95); border-radius: 28px 0 0 0;
-  background: rgba(255,214,10,.16); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
-  text-shadow: 0 2px 4px rgba(0,0,0,.5);
-}
-.ctl-hint b { font-size: 18px; }
-.ctl-hint span { font-size: 13px; font-weight: 700; }
-body.swap-controls .ctl-hint .ctl-move { left: auto; right: 0; border-radius: 28px 0 0 0; }
-body.swap-controls .ctl-hint .ctl-act { right: auto; left: 0; border-radius: 0 28px 0 0; }
-
 /* ---------- minigioco (scena separata in prima persona) ---------- */
 /* la città non c'è: niente minimappa né freccette verso i lavoretti */
 body.in-arena .hud-right .minimap, body.in-arena .edge-ptr { display: none !important; }
@@ -1609,3 +1591,30 @@ h3.row.between { gap: 8px; }
 .fc-val { text-align: right; line-height: 1.1; }
 .fc-val small { display: block; font-size: 10px; color: var(--muted, #8a8a99); }
 .fc-sure { text-align: right; font-weight: 700; font-size: 11.5px; }
+
+/* ---------- guida obbligatoria (src/ui/guide.ts): schermo scuro, un punto acceso, manina e frase corta ---------- */
+.gd { position: fixed; inset: 0; z-index: 150; pointer-events: none; }
+.gd-block { position: fixed; background: rgba(18, 14, 38, .66); pointer-events: auto; touch-action: none; }
+.gd-ring {
+  position: fixed; border-radius: 14px; pointer-events: none; box-sizing: border-box;
+  border: 3px solid #ffd60a; box-shadow: 0 0 0 3px rgba(255,255,255,.7), 0 0 18px 4px rgba(255,214,10,.7);
+  animation: gd-pulse 1.2s ease-in-out infinite;
+}
+@keyframes gd-pulse { 50% { box-shadow: 0 0 0 5px rgba(255,255,255,.85), 0 0 26px 8px rgba(255,214,10,.85); } }
+.gd-hand { z-index: 151; font-size: 54px; }
+.gd-hand.gd-look { animation: gd-bob 1.4s ease-in-out infinite; }
+@keyframes gd-bob { 50% { transform: translateY(-6px); } }
+.gd-bubble {
+  position: fixed; z-index: 152; pointer-events: auto; box-sizing: border-box;
+  background: #fff; border: 3px solid #8e5bd6; border-radius: 18px; padding: 10px 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.35); color: var(--ink);
+}
+.gd-say { font-size: 17px; font-weight: 800; line-height: 1.25; }
+.gd-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; min-height: 30px; }
+.gd-foot .btn { margin-left: auto; }
+.gd-hint { margin-left: auto; font-size: 13px; font-weight: 800; color: #8e5bd6; }
+.gd-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.gd-dots i { width: 7px; height: 7px; border-radius: 50%; background: #ddd3ef; }
+.gd-dots i.on { background: #8e5bd6; }
+.gd-nudge { animation: gd-nudge .35s ease-in-out; }
+@keyframes gd-nudge { 25% { translate: -6px 0; } 75% { translate: 6px 0; } }

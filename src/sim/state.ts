@@ -228,6 +228,10 @@ export interface GameState {
   jobTutorials?: string[];
   /** tipi di attività (con interno) di cui si è già visto il tutorial della cucina */
   bizTutorials?: BusinessType[];
+  /** guide obbligatorie già viste (src/ui/guides.ts); manca nelle partite di prima delle guide */
+  guides?: string[];
+  /** guide spente (anteprima di una proposta con "Gioca subito") */
+  guidesOff?: boolean;
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */
   lastRide?: VehicleId;
   orderSeq: number;

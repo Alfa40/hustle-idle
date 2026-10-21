@@ -58,12 +58,15 @@ async function boot() {
     }
     // "Gioca subito" in un'anteprima: niente benvenuto, si va dritti alla parte cambiata (se c'è il suo file)
     const jump = previewStart && quick ? previewStart : null;
-    if (previewPr !== null && quick) game.state.tutorialDone = true;
+    if (previewPr !== null && quick) {
+      game.state.tutorialDone = true;
+      game.state.guidesOff = true;
+    }
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda
     if (!devApp && game.ui.needsIdentity()) game.ui.openLogoEditor(true);
-    if (!game.state.tutorialDone) game.ui.openWelcome();
-    else if (game.offlineReport) game.ui.openOffline(game.offlineReport);
+    // la prima volta parte da sola la guida di benvenuto (src/ui/guides.ts, `start`), appena il gioco è libero
+    if (game.state.tutorialDone && game.offlineReport) game.ui.openOffline(game.offlineReport);
     game.ui.refresh();
     if (jump) applyPreviewStart(game, jump);
     // fiches del poker rimaste sul server (app chiusa al tavolo, stanza chiusa mentre eri via): tornano sul conto

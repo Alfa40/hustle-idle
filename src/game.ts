@@ -1081,7 +1081,8 @@ export class Game {
     const slot = this.slotsFor(offer.type)[offer.slot];
     const def = jobInfo(offer.type, offer.level);
     this.run = this.buildRun(offer, slot);
-    if (tutorial && this.run) this.tutorial.start(def.key, this.run);
+    // la prima volta di ogni lavoretto il tutorial è obbligatorio
+    if ((tutorial || !this.tutorial.isDone(def.key)) && this.run) this.tutorial.start(def.key, this.run);
     this.ui.jobBar(true);
   }
 

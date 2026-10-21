@@ -9,7 +9,7 @@ import { moveSide } from '../settings';
  * Tutorial contestuale della cucina: la prima volta che entri in un tipo di attività
  * (food truck, panificio) un fumetto ti guida nel primo ordine, postazione
  * per postazione, poi spiega ripiano, calore e dipendenti. Il tempo è fermo ed è solo
- * una prova; visto una volta, non si ripropone per le altre attività dello stesso tipo.
+ * una prova; è obbligatorio (non si salta) e, visto una volta, non si ripropone per le altre attività dello stesso tipo.
  */
 
 export interface TutStep {
@@ -171,7 +171,8 @@ export class KitchenTutorial {
       this.stepKey = step;
       this.open = false;
     }
-    const skip = t.stage === 'go' ? '' : '<button class="tut-skip" data-t="skip">Salta</button>';
+    // obbligatorio: niente "Salta"
+    const skip = '';
     const more = long ? `<button class="tut-more" data-t="more" aria-label="Spiegazione">${this.open ? '✕' : '?'}</button>` : '';
     const html = `<div class="tut-row"><span class="tut-line">${line}</span>${more}</div>` +
       (this.open ? `<div class="tut-long">${long}</div>` : '') +

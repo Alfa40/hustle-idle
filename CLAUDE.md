@@ -50,6 +50,12 @@
   regole, consigli, note "come si calcola") ha la classe `explain` (o si scrive con `explain(...)` in src/ui/ui.ts)
   e resta nascosto finché non si tocca il tasto **?** nell'intestazione. Restano visibili solo dati, stati,
   avvisi e i pulsanti. Vale per ogni finestra nuova.
+- **Guida obbligatoria per ogni tasto o funzione nuova** (`src/ui/guide.ts`, passi in `src/ui/guides.ts`): ogni finestra
+  nuova ha un nome `guide` nel pannello e i suoi passi in `guides.ts` (`panel:<nome>`, `<nome>/tab:<scheda>`, `<nome>/<azione>`);
+  ogni tasto nuovo fuori dalle finestre o funzione che si sblocca ha la sua guida (`hud:…`, `unlock:…` con `auto`). Una frase
+  corta per passo, che dice dove toccare e per fare cosa (mai un testo lungo nel fumetto). Se servono punti da indicare, dare
+  agli elementi un `data-g="…"`. Ogni emoji delle frasi deve avere il disegno in iconart.ts. I tutorial dei lavoretti e della
+  cucina sono obbligatori la prima volta.
 - **Domanda dei prodotti**: la scheda Mercato di un prodotto (fattori e previsione a 7 giorni) è in `src/sim/market.ts` e rifà
   le regole di `marketDemand` (economy.ts) e di `newDay` (calendar.ts): se cambia come si calcola la domanda, aggiornare anche lì.
 - Testi del gioco in italiano. Numeri da bilanciare in `src/config/`.
