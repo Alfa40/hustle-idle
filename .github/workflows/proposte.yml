@@ -129,8 +129,10 @@ jobs:
                 fi
               else
                 git merge --abort || true
-                err="si scontra con altre modifiche del gioco fatte nel frattempo: va aggiornata prima di pubblicarla"
-                gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha accettato l'anteprima, ma la modifica non si unisce al gioco perché si scontra con altre modifiche fatte nel frattempo. Per sistemarla scrivi nell'app developer, nel riquadro «Modifiche da fare»: \"aggiorna il ramo con il gioco e risolvi i conflitti\". Poi riprova l'anteprima e accettala di nuovo."
+                err="si scontra con altre modifiche del gioco fatte nel frattempo: Claude la sta aggiornando da solo. Tra qualche minuto riprova l'anteprima e accettala di nuovo"
+                gh issue comment "$issue" -R "$REPO" --body "Lo sviluppatore ha accettato l'anteprima, ma la modifica si scontra con altre modifiche del gioco fatte nel frattempo. Claude aggiorna il ramo da solo; poi basta riprovare l'anteprima e accettarla di nuovo dall'app developer."
+                # niente da chiedere allo sviluppatore: si manda subito Claude ad aggiornare il ramo (claude.yml unisce main)
+                gh workflow run claude.yml -R "$REPO" -f issue="$issue" -f richiesta="Aggiorna il ramo con il gioco e risolvi i conflitti (lo sviluppatore l'aveva già accettata: tieni sia la proposta sia le modifiche arrivate dal gioco)" || true
               fi
             fi
             curl -sSf --retry 3 --max-time 60 -X POST "$API/hustle/proposals/merged" -H 'Content-Type: application/json' \

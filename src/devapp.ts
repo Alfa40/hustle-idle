@@ -62,7 +62,7 @@ function detailView(x: PrevItem) {
   const head = detailHtml(x, explainOf(x.issue.number, render));
   const note = accepted
     ? '<div class="dv-note ok">⏳ Accettata: tra pochi minuti il robot la mette nel gioco e la pubblica.</div>'
-    : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}. Chiedi a Claude di aggiornarla qui sotto ("aggiorna il ramo con il gioco e risolvi i conflitti").</div>` : '';
+    : prop?.mergeError ? `<div class="dv-note bad">⚠️ Non pubblicata: ${esc(prop.mergeError)}${/scontra/.test(prop.mergeError) ? '' : '. Se non si sistema, chiedi a Claude qui sotto di aggiornarla'}.</div>` : '';
   const votes = `<h3 class="dv-sec">👥 Consigli dei tester</h3>${votesBlock(prop)}`;
   if (!prop || accepted) return head + note + votes;
   const msg = changeMsg?.id === prop.id ? `<p class="small center ${changeMsg.ok ? 'good' : 'bad'}" style="margin:4px 0 0">${esc(changeMsg.text)}</p>` : '';
