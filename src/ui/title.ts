@@ -178,7 +178,7 @@ export class TitleScreen {
         // stesso campo per il codice developer e per quello dei tester
         void tryDevKey(v).then(async (ok) => {
           const tester = !ok && (await tryTesterKey(v));
-          this.devMsg = ok ? '✅ Telefono dello sviluppatore: in partita trovi 📮 Proposte nelle ⚙️ Opzioni' : tester ? '✅ Modalità tester attiva: in partita trovi 📝 Proponi nelle ⚙️ Opzioni' : '❌ Codice sbagliato';
+          this.devMsg = ok ? '✅ Telefono dello sviluppatore: in partita tocca il tasto 📝 sul bordo dello schermo: lì trovi anche 📮 Da approvare' : tester ? '✅ Modalità tester attiva: in partita tocca il tasto 📝 sul bordo dello schermo' : '❌ Codice sbagliato';
           this.render();
         });
         return;

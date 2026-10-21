@@ -2,7 +2,7 @@
  * Modalità tester: un portale per proporre modifiche al gioco, senza account. Si accende su un telefono col
  * link segreto `?tester=<chiave>` (o scrivendo la chiave in Crediti dopo 7 tocchi su "Versione", per l'app sulla
  * Home). Non cambia niente della partita: vale per tutte le partite già iniziate, i salvataggi e le classifiche
- * restano uguali; aggiunge solo la scheda "Proponi" nelle Opzioni. Nel codice c'è solo l'impronta SHA-256; la
+ * restano uguali; aggiunge solo il tasto 📝 Proponi sul bordo dello schermo. Nel codice c'è solo l'impronta SHA-256; la
  * chiave resta sul telefono perché il server delle proposte la controlla a ogni invio. `?tester=off` la spegne.
  */
 const TESTER_HASHES = ['29fd6a5f47282398df31aa65c6a6b6fb3ebe6c5182ef93ddea156a7c9af9556a'];

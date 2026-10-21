@@ -5,7 +5,7 @@
  *   commento, cambiabile finché è da provare) e legge quelli degli altri. Decide sempre lo sviluppatore.
  * - Tester: per ogni tester le sue proposte finite, cioè rifiutate o entrate nel gioco (src/board.ts).
  * Serve la chiave tester (una volta per telefono, o il link `tester.html?tester=<chiave>`) e un nome. Le proposte
- * si scrivono sempre nel gioco (Opzioni → "Proponi"), dove c'è la foto dello schermo.
+ * si scrivono sempre nel gioco (tasto 📝 sul bordo dello schermo), dove c'è la foto dello schermo.
  */
 import '@fontsource/fredoka/500.css';
 import '@fontsource/fredoka/600.css';

@@ -3995,7 +3995,7 @@ export class UI {
 
   // ---------------- impostazioni ----------------
 
-  /** proposte dei tester (src/ui/proposals.ts): la bozza resta anche chiudendo le Opzioni */
+  /** proposte dei tester (src/ui/proposals.ts): la bozza resta anche chiudendo la finestra */
   private proposalsView?: Proposals;
   private get proposals() {
     return (this.proposalsView ??= new Proposals(this.game, () => this.renderPanel()));
@@ -4014,14 +4014,24 @@ export class UI {
       this.modal = null;
       this.panel = null;
     }
-    const actions = this.proposals.actions();
+    // telefono dello sviluppatore: anche la scheda per leggere e approvare le proposte
+    let tab = 'proponi';
     this.open({
-      title: '📝 Proponi una modifica',
+      guide: 'propose',
+      title: '📝 Proposte',
       color: 'var(--gray)',
       top: true,
-      render: () => this.proposals.formHtml(),
-      after: (body) => this.proposals.after(body),
-      actions,
+      render: () => {
+        const tabs = canReview()
+          ? `<div class="tabs">${[['proponi', '📝 Proponi'], ['proposte', '📮 Da approvare']]
+              .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`
+          : '';
+        return tabs + (tab === 'proposte' ? this.proposals.reviewHtml() : this.proposals.formHtml());
+      },
+      after: (body) => {
+        if (tab === 'proponi') this.proposals.after(body);
+      },
+      actions: { ...this.proposals.actions(), tab: (k) => (tab = k) },
       onClose: () => {
         if (prev) queueMicrotask(() => this.open(prev));
       },
@@ -4032,24 +4042,15 @@ export class UI {
     let confirm = false;
     // nella partita developer si apre subito sui comandi rapidi
     let tab = devGame ? 'dev' : 'impostazioni';
-    // telefoni tester: foto dello schermo e posto nel gioco presi adesso, prima che la finestra copra tutto
-    this.proposals.capture();
     this.open({
       guide: 'settings',
       title: '⚙️ Opzioni',
       color: 'var(--gray)',
-      after: (body) => {
-        if (tab === 'proponi') this.proposals.after(body);
-      },
       render: () => {
         const tabs = `<div class="tabs">${[
-          ...(canPropose() ? [['proponi', '📝 Proponi']] : []),
-          ...(canReview() ? [['proposte', '📮 Proposte']] : []),
           ...(devGame ? [['dev', '🛠️ Developer']] : []),
           ['impostazioni', '⚙️ Impostazioni'], ['partita', '💾 Partita'], ['aiuto', '❓ Come si gioca']]
           .map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
-        if (tab === 'proponi') return tabs + this.proposals.formHtml();
-        if (tab === 'proposte') return tabs + this.proposals.reviewHtml();
         if (tab === 'dev') return tabs + this.devHtml();
         if (tab === 'impostazioni') return tabs + settingsHtml();
         if (tab === 'partita') {
@@ -4071,7 +4072,6 @@ export class UI {
       },
       actions: {
         ...this.devActions(),
-        ...this.proposals.actions(),
         tab: (k) => (tab = k),
         set: (v) => settingsAction('set:' + v),
         tog: (v) => settingsAction('tog:' + v),

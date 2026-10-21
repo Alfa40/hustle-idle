@@ -88,7 +88,7 @@
 
 - **Telefono dello sviluppatore** (src/dev.ts): acceso col link segreto `?dev=<chiave>` o scrivendo la chiave in
   Crediti dopo 7 tocchi su "Versione" (l'app sulla Home su iPhone ha la memoria separata da Safari); nel codice c'è solo
-  l'impronta SHA-256, `?dev=off` la spegne. Nell'app per giocare aggiunge solo le schede "📝 Proponi" e "📮 Proposte".
+  l'impronta SHA-256, `?dev=off` la spegne. Nell'app per giocare aggiunge solo il tasto 📝 sullo schermo con le schede "📝 Proponi" e "📮 Da approvare".
 - **App developer** (`developer.html`, src/devapp.ts), separata dal gioco: Partita developer (`./?app=dev`, slot 9, un
   miliardo, scheda "🛠️ Developer" nelle Opzioni con comandi rapidi; mai in classifica né in "sto giocando"), anteprime
   e tester; ogni anteprima si accetta ("Accetta e pubblica": il robot `proposte.yml` la unisce in main e pubblica) o si
@@ -102,9 +102,11 @@
   `/tochange`, claude.yml input `risposta`, conferma `/answered`). claude.yml unisce main al ramo prima di Claude (conflitti: li risolve Claude). Se all'accettazione proposte.yml trova conflitti, lancia da solo claude.yml con la richiesta di aggiornare il ramo.
   Toccando un'anteprima si apre la sua scheda (src/board.ts `detailHtml`): voti e commenti, "Cosa cambia" da GitHub;
   nell'app developer "Modifiche da fare" (`request_changes` → robot → `claude.yml` con `richiesta`, stesso ramo) e i tasti.
+  Sotto ogni consiglio dei tester con commento c'è "📨 Manda a Claude" (`sendTip` in src/devapp.ts): stessa strada di
+  `request_changes`, con il commento del tester (`votesBlock(..., extra)` in src/board.ts).
 - **Modalità tester** (src/tester.ts): link segreto `?tester=<chiave>` (o chiave in Crediti), solo l'impronta nel
-  codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo la scheda "📝 Proponi" nelle Opzioni
-  (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Proposte";
+  codice, `?tester=off` la spegne. Non cambia niente della partita: aggiunge solo il tasto 📝 Proponi sullo schermo
+  (src/ui/proposals.ts). Le proposte vanno al server (private) e lo sviluppatore le approva nella scheda "📮 Da approvare" della stessa finestra (nelle Opzioni le proposte non ci sono più);
   solo le approvate diventano issue su GitHub con Claude al lavoro (`.github/workflows/proposte.yml`, GDD §12b).
   Claude ne prepara **una alla volta** (etichetta `in-coda`, il robot riparte alla fine di ogni `claude.yml`); il server
   sveglia subito il robot alle decisioni dello sviluppatore (`GH_DISPATCH_TOKEN` su Render: token stretto, solo Actions del repo del gioco).
