@@ -371,7 +371,7 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
       steps: [
         { at: `${M} .stat.s-green`, say: '💰 La paga' },
         { at: `${M} .stat.s-yellow`, say: '⭐⭐⭐ Veloce = paga più alta' },
-        { at: `${M} .tut-note`, say: '🎓 La prima volta c\'è il tutorial' },
+        { at: `${M} .tut-note`, say: '🎓 Ti guida passo passo, senza fretta' },
         { at: btn('yes'), say: '✅ Accetta per iniziare' },
       ],
     },
