@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { Game } from '../game';
 import type { JobRun, RunGuide } from '../minigames/jobs';
 import type { Guide } from './guide';
+import type { Station } from '../minigames/station';
 import { toast } from '../sim/bus';
 
 /**
@@ -80,8 +81,14 @@ export class JobTutorial {
   /** passi già mostrati con la guida a schermo scuro (una volta per fase) */
   private coachGo = false;
   private coachPhase = -1;
-  private coachNear = -1;
   private coachAim = -1;
+  /** tipi di compito (icona) e minigiochi col dito già spiegati in questo lavoretto */
+  private coachTasks = new Set<string>();
+  private coachNearKeys = new Set<string>();
+  private coachStations = new Set<string>();
+  private nearTry = 0;
+  private stationSeen: Station | null = null;
+  private stationAt = 0;
   /** quando è partito (i comandi si spiegano appena la scena è pronta, prima dei passi) */
   private coachAt = 0;
 
@@ -125,7 +132,10 @@ export class JobTutorial {
     this.open = false;
     this.coachGo = false;
     this.coachAt = performance.now();
-    this.coachPhase = this.coachNear = this.coachAim = -1;
+    this.coachPhase = this.coachAim = -1;
+    this.coachTasks.clear();
+    this.coachNearKeys.clear();
+    this.coachStations.clear();
     toast('🎓 Tutorial: il tempo è fermo', 'info');
   }
 
@@ -251,20 +261,48 @@ export class JobTutorial {
       ] }, 'job:pedals');
       return true;
     }
+    // minigioco col dito aperto (impastatrice, forma…): i suoi passi, una volta per tipo
+    const st = (this.run as { station?: Station | null } | null)?.station;
+    if (st && !st.closed) {
+      const name = st.constructor.name;
+      if (this.coachStations.has(name)) return false;
+      // un attimo per far arrivare la camera sulla postazione (la vasca dell'impastatrice), poi i passi
+      if (this.stationSeen !== st) {
+        this.stationSeen = st;
+        this.stationAt = performance.now();
+      }
+      if (performance.now() - this.stationAt < 700) return false;
+      const steps = st.guideSteps();
+      if (!steps.length) return false;
+      this.coachStations.add(name);
+      gd.show({ steps });
+      return true;
+    }
     if (!g.arrived) {
       if (this.coachGo) return false;
       this.coachGo = true;
       gd.show({ steps: [{ say: '🚶 Prima vai alla zona di lavoro: segui la freccia' }] });
       return true;
     }
+    const taskKey = g.task ? g.task.icon || g.task.label : '';
     if (g.phase !== this.coachPhase) {
       this.coachPhase = g.phase;
+      if (taskKey) this.coachTasks.add(taskKey);
       // il nome della fase dice tutto il compito ("Taglia i cespugli"), il punto è solo il primo da fare
       const line = g.phaseName ? `${g.phaseIcon ? `${g.phaseIcon} ` : ''}${g.phaseName}` : `${g.task?.icon ? `${g.task.icon} ` : ''}${g.task?.label ?? ''}`;
       const obj = g.task?.obj ?? g.task?.hitObj;
       const rect = g.task ? this.screenRect(g.task.pos, obj) : null;
       const where = rect ? { rect: () => this.screenRect(g.task!.pos, obj) } : {};
       gd.show({ steps: [{ ...where, say: `🎓 Passo ${g.phase + 1} di ${g.phases}: ${line}` }] });
+      return true;
+    }
+    // compito di un tipo nuovo dentro la stessa fase (farina → impastatrice → banco…): cosa fare ora
+    if (g.task && taskKey && !this.coachTasks.has(taskKey)) {
+      this.coachTasks.add(taskKey);
+      const t = g.task;
+      const obj = t.obj ?? t.hitObj;
+      const where = this.screenRect(t.pos, obj) ? { rect: () => this.screenRect(t.pos, obj) } : {};
+      gd.show({ steps: [{ ...where, say: `👉 Ora: ${t.icon ? `${t.icon} ` : ''}${t.label}` }] });
       return true;
     }
     if (g.task?.aim && g.near && this.coachAim !== g.phase) {
@@ -280,16 +318,53 @@ export class JobTutorial {
       gd.show({ steps: [{ rect: box, say: `👆 Tieni il dito ${AIM_WHAT[this.type!]?.[g.phase] ?? 'sul punto acceso'}`, tap: true }] });
       return true;
     }
-    if (g.task && !g.task.aim && g.near && this.coachNear !== g.phase && body.contains('act-ready')) {
+    if (g.task && !g.task.aim && g.near && !this.coachNearKeys.has(taskKey) && body.contains('act-ready')) {
       const fp = body.contains('fp-controls');
       const el = document.querySelector<HTMLElement>(fp ? '.action:not(.act-stand)' : '.act-zone');
       if (!el) return false;
-      this.coachNear = g.phase;
       const hold = g.task.kind === 'hold';
-      gd.show({ steps: [{ rect: () => el.getBoundingClientRect(), say: hold ? '✊ Tieni premuto qui' : '👆 Tocca qui', tap: true }] });
+      // la zona da toccare è un po' più grande dell'oggetto: si accende un punto che tocca davvero l'oggetto
+      // si cerca il punto al massimo 3 volte al secondo (sono molti raggi)
+      const now = performance.now();
+      if (now - this.nearTry < 330) return false;
+      this.nearTry = now;
+      const er = el.getBoundingClientRect();
+      const spot = fp ? this.hitSpot(er) : null;
+      // in prima persona senza un punto buono (oggetto non ancora davanti): si riprova tra poco
+      if (fp && !spot) return false;
+      if (!fp && er.width < 3) return false;
+      const rect = spot ? () => spot : () => el.getBoundingClientRect();
+      this.coachNearKeys.add(taskKey);
+      gd.show({ steps: [{ rect, say: hold ? '✊ Tieni premuto qui' : '👆 Tocca qui', tap: true }] });
       return true;
     }
     return false;
+  }
+
+  /** Dentro la zona da toccare, il punto più al centro che colpisce l'oggetto vero: un riquadro da dito attorno. */
+  private hitSpot(r: DOMRect): DOMRect | null {
+    const ui = this.game.ui;
+    if (!ui || !r.width) return null;
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let best: [number, number] | null = null;
+    let bd = Infinity;
+    const N = 9;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x = r.left + ((i + 0.5) / N) * r.width;
+      const y = r.top + ((j + 0.5) / N) * r.height;
+      const d = Math.hypot(x - cx, y - cy);
+      // niente punti sotto i pulsanti o i riquadri del gioco (il tocco andrebbe a loro)
+      const top = document.elementFromPoint(x, y);
+      const free = !!top && (top.tagName === 'CANVAS' || top.classList.contains('action') || top.classList.contains('act-ring'));
+      if (d < bd && free && ui.actionHit(x, y)) {
+        bd = d;
+        best = [x, y];
+      }
+    }
+    if (!best) return null;
+    const s = Math.min(90, r.width, r.height);
+    return new DOMRect(best[0] - s / 2, best[1] - s / 2, s, s);
   }
 
   /** Riquadro sullo schermo dell'oggetto (o di un punto); null se non si vede. */

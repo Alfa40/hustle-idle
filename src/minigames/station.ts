@@ -78,6 +78,19 @@ export abstract class Station {
     this.cv.style.width = `${w}px`;
     this.cv.style.height = `${h}px`;
     this.g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // ridimensionare cancella il disegno: si ridisegna subito (anche a gioco fermo, es. durante la guida)
+    if (!this.closed) this.step(0);
+  }
+
+  /** Un riquadro del disegno (coordinate del riquadro) sullo schermo: per la guida del tutorial. */
+  protected screen(x: number, y: number, w: number, h: number) {
+    const r = this.cv.getBoundingClientRect();
+    return new DOMRect(r.left + x, r.top + y, w, h);
+  }
+
+  /** Passi della guida obbligatoria per questo minigioco (la prima volta, nel tutorial); [] = nessuno o non ancora pronto. */
+  guideSteps(): { rect: () => DOMRect | null; say: string }[] {
+    return [];
   }
 
   protected down(_x: number, _y: number) {}
@@ -273,6 +286,17 @@ export class ShapeStation extends Station {
   constructor(private name: string, private icon: string, private shape: { hint: string; paths: Pt[][] }, private tol: number, onEnd: (q: number) => void) {
     super(onEnd);
     this.samples = shape.paths.map((p) => resample(p).map((q) => ({ p: q, hit: false })));
+  }
+
+  guideSteps() {
+    const area = () => {
+      const sq = this.square(70, 34);
+      return this.screen(sq.x, sq.y, sq.s, sq.s);
+    };
+    return [
+      { rect: area, say: '👐 Passa il dito sopra la sagoma' },
+      { rect: area, say: 'Tutta la linea, senza uscire' },
+    ];
   }
 
   private cover() {
@@ -876,6 +900,32 @@ export class MixerStation extends Station {
     const cx = this.w / 2;
     const cy = (top + bottom) / 2;
     return { top, bottom, cx, cy, r: Math.min(this.w, bottom - top) * 0.3 };
+  }
+
+  guideSteps() {
+    // il ripiano si misura al primo disegno: prima nessun passo (si riprova al fotogramma dopo)
+    if (!this.slots.acqua) return [];
+    const slot = (k: MixIng) => () => {
+      const b = this.slots[k];
+      return this.screen(b.x, b.y, b.w, b.h);
+    };
+    const bowl = () => {
+      const v = this.bowlArea();
+      return v ? this.screen(v.cx - v.r * 1.3, v.cy - v.r * 1.3, v.r * 2.6, v.r * 2.6) : null;
+    };
+    const both = () => {
+      const a = this.slots.lievito;
+      const b = this.slots.sale;
+      return this.screen(a.x, a.y, b.x + b.w - a.x, a.h);
+    };
+    return [
+      { rect: () => this.screen(6, 6, this.w - 12, 62), say: '📋 La ricetta: quanto mettere di ognuno' },
+      { rect: () => this.screen(12, 64, this.w - 24, 28), say: '⏱️ La barra dice quando tocca a ognuno' },
+      { rect: slot('acqua'), say: '💧 Quando si illumina, prendi la brocca col dito' },
+      { rect: bowl, say: '🌀 Portala sopra la vasca e tienila lì' },
+      { rect: slot('acqua'), say: '📏 Lasciala quando arrivi alla tacca' },
+      { rect: both, say: 'Poi lievito e sale, allo stesso modo' },
+    ];
   }
 
   private hit(x: number, y: number): MixIng | null {

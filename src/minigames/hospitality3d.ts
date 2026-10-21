@@ -642,13 +642,16 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const qs: number[] = [];
   // ai livelli alti impastatrice più veloce, finestre più strette, quantità più precise e sagoma più precisa
   const tol = 0.075 - 0.025 * t;
-  const mixDur = 15 - 4 * t;
   const mixTol = 0.1 - 0.04 * t;
   // secondi per versare la quantità giusta tenendo premuto (sempre meno della finestra)
   const pourSec = 1.8 - 0.6 * t;
-  const winW = 1 - 0.4 * t;
-  const win = (c: number, wd: number): [number, number] => [c - (wd * winW) / 2, c + (wd * winW) / 2];
-  const mixWin: Record<MixIng, [number, number]> = { acqua: win(0.2, 0.3), lievito: win(0.48, 0.24), sale: win(0.76, 0.24) };
+  // acqua, lievito e sale uno dopo l'altro, quasi senza attese: ogni momento dura poco più del versare
+  const lead = 0.6;
+  const winSec = pourSec + 1.1 - 0.3 * t;
+  const gapSec = 0.3;
+  const mixDur = lead + 3 * winSec + 2 * gapSec + 0.6;
+  const win = (i: number): [number, number] => [(lead + i * (winSec + gapSec)) / mixDur, (lead + i * (winSec + gapSec) + winSec) / mixDur];
+  const mixWin: Record<MixIng, [number, number]> = { acqua: win(0), lievito: win(1), sale: win(2) };
   // ogni ordine del foglio ha la sua ricetta (un po' diversa da quella di base): va letta
   const vary = (v: number, unit: number) => Math.max(unit, Math.round((v * (0.85 + Math.random() * 0.3)) / unit) * unit);
   const recipes = orders.map((b) => {

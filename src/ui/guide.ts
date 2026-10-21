@@ -275,7 +275,8 @@ export class Guide {
     if (!st?.tap || !st.rect) return;
     const r = st.rect();
     if (!r || e.clientX < r.left - PAD || e.clientX > r.right + PAD || e.clientY < r.top - PAD || e.clientY > r.bottom + PAD) return;
-    setTimeout(() => this.id && this.steps[this.i] === st && this.next(true), 0);
+    // subito, prima che il tocco arrivi al gioco: così il gioco è già ripartito e fa l'azione
+    this.next(true);
   }
 
   /** Tocco nel punto sbagliato: la manina e il fumetto saltellano per farsi notare. */
