@@ -91,7 +91,9 @@ export async function casino<T>(game: CasinoGame, path: string, body: object, ti
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...(previewPr !== null ? { practice: true } : {}), ...body }), signal: ctl.signal });
+    // blackjack: `ins` dice al server che questo gioco sa mostrare l'assicurazione; anteprime: tavoli di prova
+    const extra = { ...(game === 'bj' ? { ins: 1 } : {}), ...(previewPr !== null ? { practice: true } : {}) };
+    const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...extra, ...body }), signal: ctl.signal });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(j.error || `errore ${r.status}`), { data: j });
     return j as T;

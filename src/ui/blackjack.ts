@@ -2,7 +2,8 @@
  * Blackjack contro il banco (1–7 giocatori allo stesso tavolo) con i soldi del gioco.
  *
  * Il banco è il server (`hustle-blackjack.js` accanto a server.js): sabot, carte, turni e pagamenti. Qui c'è solo quello
- * che vede il giocatore: lo stato del tavolo chiesto ogni secondo e i tasti (punta, carta, stai, raddoppia, dividi).
+ * che vede il giocatore: lo stato del tavolo chiesto ogni secondo e i tasti (punta, carta, stai, raddoppia, dividi,
+ * assicurazione quando il banco mostra un asso: costa metà della puntata e paga 2 a 1 se il banco ha blackjack).
  * Soldi come nel poker (src/ui/poker.ts): le fiches si comprano entrando e tornano sul conto uscendo (`claimPoker`,
  * stessa lista sul server); al tavolo la partita è offline (`Game.enterAway`).
  */
@@ -31,6 +32,11 @@ export interface BjSeat {
   sitOut: boolean;
   me: boolean;
   hands: BjHand[];
+  /** assicurazione pagata in questa mano (0 = niente) e quanto è tornato */
+  ins?: number;
+  insWin?: number;
+  /** con l'asso del banco: null = deve ancora decidere, true/false = deciso; assente = non gli è offerta */
+  insure?: boolean | null;
 }
 export interface BjState {
   code: string;
@@ -42,7 +48,7 @@ export interface BjState {
   minBuy: number;
   maxBuy: number;
   fame: number;
-  phase: 'bet' | 'play' | 'done';
+  phase: 'bet' | 'insure' | 'play' | 'done';
   betLeft: number;
   betMs: number;
   dealer: { cards: (string | null)[]; total: number; soft: boolean };
@@ -264,10 +270,11 @@ export class BlackjackTable {
     const players = s.seats.filter(Boolean).length;
     if (busy && s.phase !== 'bet') line = s.phase === 'done' ? 'Gioca il banco…' : 'Il mazziere dà le carte…';
     else if (s.result) line = s.result.dealerBJ ? 'Il banco ha <b>blackjack</b>' : s.result.dealer > 21 ? `Il banco <b>sballa</b> (${s.result.dealer})` : `Il banco fa <b>${s.result.dealer}</b>`;
+    else if (s.phase === 'insure') line = 'Il banco ha un <b>asso</b>: assicurazione?';
     else if (s.phase === 'bet') line = s.betLeft > 0 ? `Puntate aperte: carte tra <b class="bj-secs">${Math.ceil(s.betLeft / 1000)}</b> s` : players > 1 ? 'Fate le vostre puntate' : 'Fai la tua puntata';
     else if (s.toAct >= 0 && s.seats[s.toAct] && s.toAct !== s.mySeat) line = `Tocca a <b>${esc(s.seats[s.toAct]!.name)}</b>`;
     return `<div class="bj-dealer"><div class="bj-dlabel">Banco ${total}</div><div class="bj-cards">${cards}</div>
-        <div class="bj-rules">Blackjack paga 3 a 2<br>Il banco sta su 17</div></div>
+        <div class="bj-rules">Blackjack paga 3 a 2<br>Il banco sta su 17<br>Assicurazione paga 2 a 1</div></div>
       ${line ? `<div class="pk-line bj-line">${line}</div>` : ''}`;
   }
 
@@ -279,6 +286,17 @@ export class BlackjackTable {
     const money = this.game.state.money;
     const inRound = me.hands.length > 0 && s.phase === 'play';
     if (this.deal.busy && s.phase !== 'bet') return `<div class="pk-note">${s.phase === 'done' ? 'Gioca il banco…' : 'Il mazziere dà le carte…'}</div>`;
+    // asso scoperto del banco: assicurazione (metà della puntata, paga 2 a 1 se il banco ha blackjack)
+    if (s.phase === 'insure') {
+      const secs = `<b class="bj-secs">${Math.ceil(s.turnLeft / 1000)}</b> s`;
+      if (!me.hands.length || me.insure === undefined) return `<div class="pk-note">Il banco offre l'assicurazione: aspettiamo… ${secs}</div>`;
+      if (me.insure === true) return `<div class="pk-note">🛡️ Assicurato con <b>${euro(me.ins ?? 0)}</b>. Il banco guarda la carta coperta tra ${secs}</div>`;
+      if (me.insure === false) return `<div class="pk-note">Niente assicurazione. Il banco guarda la carta coperta tra ${secs}</div>`;
+      const cost = Math.floor(me.hands[0].bet / 2);
+      const can = cost <= me.chips;
+      return `<div class="pk-note">Il banco ha un asso. Assicurazione? ${secs}<br><span class="bj-ins-why">Costa metà della puntata: se il banco ha blackjack te la paga 2 a 1 (e la puntata la perdi), altrimenti la perdi.</span></div><div class="pk-acts">
+        <button class="pk-btn" data-p="insure:no" ${busy}>No grazie</button><button class="pk-btn good" data-p="insure:yes" ${busy} ${can ? '' : 'disabled'}>🛡️ Assicurati <b>${euro(cost)}</b></button></div>`;
+    }
     if (s.phase === 'play' && s.toAct === s.mySeat && s.my) {
       return `<div class="pk-note">Tocca a te: <b class="bj-secs">${Math.ceil(s.turnLeft / 1000)}</b> s</div><div class="pk-acts">
         <button class="pk-btn blue" data-p="hit" ${busy}>Carta</button><button class="pk-btn good" data-p="stand" ${busy}>Stai</button>
@@ -311,7 +329,10 @@ export class BlackjackTable {
     }
     if (s.phase === 'done') {
       const line = this.deal.busy ? undefined : s.result?.lines.find((l) => l.seat === s.mySeat);
-      const txt = line ? (line.net > 0 ? `Hai vinto <b>${euro(line.net)}</b>!` : line.net < 0 ? `Hai perso ${euro(-line.net)}` : 'Pari: riprendi la puntata') : 'Prossima mano tra poco';
+      // con l'assicurazione il conto della mano la comprende: si dice anche com'è andata lei
+      const ins = !this.deal.busy && me.ins ? (me.insWin ? ` 🛡️ L'assicurazione ti ha pagato ${euro(me.insWin)}.` : ' 🛡️ Assicurazione persa.') : '';
+      const even = ins ? 'Sei pari.' : 'Pari: riprendi la puntata';
+      const txt = (line ? (line.net > 0 ? `Hai vinto <b>${euro(line.net)}</b>!` : line.net < 0 ? `Hai perso ${euro(-line.net)}.` : even) : 'Prossima mano tra poco') + ins;
       return `<div class="pk-note">${txt}</div>`;
     }
     return '';
@@ -344,7 +365,7 @@ export class BlackjackTable {
       <div class="pk-felt"><div class="pk-oval bj-oval"></div>${this.centerHtml()}${seats}</div>
       <div class="pk-me">
         <div class="bj-mine ${many ? 'many' : ''}">${myHands}</div>
-        <div class="bj-mybar"><span>Fiches <b>${euro(me?.chips ?? 0)}</b></span><span class="muted">Conto ${euro(this.game.state.money)}</span></div>
+        <div class="bj-mybar"><span>Fiches <b>${euro(me?.chips ?? 0)}</b>${me?.ins ? ` · 🛡️ ${euro(me.ins)}` : ''}</span><span class="muted">Conto ${euro(this.game.state.money)}</span></div>
         ${this.fails >= 3 ? '<div class="pk-note bad">Connessione persa: riprovo…</div>' : ''}${this.msg ? `<div class="pk-note bad">${esc(this.msg)}</div>` : ''}
         ${this.actionsHtml()}
       </div>`;
@@ -446,6 +467,7 @@ export class BlackjackTable {
     } else if (a === 'done') void this.exit();
     else if (a === 'share') this.share();
     else if (a === 'hit' || a === 'stand' || a === 'double' || a === 'split') void this.send({ action: a });
+    else if (a === 'insure:yes' || a === 'insure:no') void this.send({ action: 'insure', take: a === 'insure:yes' });
     else if (a.startsWith('chip:')) {
       // la stessa fiche toccata più volte si punta più volte
       const s = this.s;

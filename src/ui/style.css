@@ -1521,6 +1521,7 @@ body.in-poker .toasts { z-index: 31; }
 .prop-prog i { display: block; height: 100%; width: 0; background: #2fa866; transition: width .2s; }
 /* impastatrice del panettiere: riquadro trasparente, sotto si vede la ciotola vera dall'alto */
 .ovl.ovl-clear { background: transparent; box-shadow: none; }
+.bj-ins-why { display: block; font-size: 11.5px; font-weight: 600; opacity: .8; margin-top: 2px; }
 
 /* tasto "Proponi" dei telefoni tester: linguetta sul bordo sinistro, sempre sopra a tutto (anche alle sfide) */
 .prop-fab {
