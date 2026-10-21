@@ -231,7 +231,9 @@ dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso g
 
 ---
 
-## 🎨 Design e arte
+## 🎨 Arte, design e ristrutturazione (categoria a parte, decisa il 21/10)
+
+Qui vanno anche le **ristrutturazioni** (piastrelle, pareti, arredare le stanze), tolte da Costruzione e manualità.
 
 ### 🖌️ Pittura ✅
 | Liv. | Lavoro | Idea di minigioco |
@@ -284,7 +286,8 @@ dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso g
 
 **4 linee × 5 gradini = 20 lavoretti**, sempre con le mani e sotto i 5 minuti. **Niente lavori con le auto** (deciso
 dall'utente il 21/10): lavaggio, carrozzeria, officina e corse potranno avere una categoria tutta loro (🚗 Auto, sotto
-"Da decidere"); la linea Auto del registro resta spenta. Giardinaggio (che c'era già con i minigiochi vecchi) si rifà come gli altri lavoretti nuovi: terza persona, fasi,
+"Da decidere"); la linea Auto del registro resta spenta. **Niente ristrutturazioni** (deciso
+dall'utente il 21/10): vanno nella categoria 🎨 Arte, design e ristrutturazione, separata da questa. Giardinaggio (che c'era già con i minigiochi vecchi) si rifà come gli altri lavoretti nuovi: terza persona, fasi,
 postazioni col dito e tutorial passo passo. Scene: giardini e case vere del quartiere (come le Consegne), locale senza
 tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 
@@ -302,7 +305,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 |---|---|---|---|---|
 | 1 | Montaggio mobili | foglio delle istruzioni: pezzo giusto al posto giusto, viti girate col dito | da 1 a 2 mobili, più pezzi simili tra loro | 1½–2½ min |
 | 10 | Riparazioni in casa | rubinetto che perde, porta che cigola, presa rotta: scegli l'attrezzo giusto dalla cassetta e ripara | da 2 a 4 guasti, attrezzi simili | 2 min |
-| 20 | Ristrutturazioni | piastrelle allineate sulla griglia, poi pareti col rullo senza lasciare buchi né sbavature | stanze più grandi, angoli e finestre | 2½–3½ min |
+| 20 | Carpentiere | soppalco o scala in legno: misura, taglia le travi col dito sulla linea, montale nell'ordine giusto | più travi, misure più precise | 2½–3½ min |
 | 30 | Costruire una casa | muri di mattoni a ritmo (malta, mattone, livella), poi il tetto | muri più alti, finestre da lasciare libere | 3 min |
 | 40 | Capocantiere | cantiere con la gru: porta i carichi col gancio al piano giusto senza farli dondolare (vento) | più piani, vento più forte | 3–4 min |
 
@@ -352,9 +355,9 @@ niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le bas
 | Attività | Grado | Prodotti | Personale | Di persona |
 |---|---|---|---|---|
 | 🔧 Tuttofare | base, posteggio (nuova, furgoncino) | montaggi, riparazioni in casa | tuttofare | Montaggio mobili, Riparazioni in casa |
-| 🏠 Ristrutturazioni | 1ª, bivio A | bagni e cucine, appartamenti interi | muratori, piastrellista | Ristrutturazioni |
-| 🧱 Costruzioni | 2ª | case nuove | muratori, carpentiere | Costruire una casa |
-| 🏗️ Impresa edile | 3ª | palazzi, grandi cantieri | muratori, gruista | Capocantiere |
+| 🧱 Costruzioni | 1ª, bivio A | soppalchi, muri, case piccole | muratori, carpentiere | Carpentiere, Costruire una casa |
+| 🏗️ Impresa edile | 2ª | case nuove, palazzine | muratori, gruista | Costruire una casa |
+| 🌉 Grandi opere | 3ª | palazzi alti, ponti, grandi cantieri | capisquadra, gruista | Capocantiere |
 | ⚡ Ditta di impianti | 1ª, bivio B | impianti idraulici ed elettrici | idraulico, elettricista | Aiuto idraulico, Elettricista |
 | 🔥 Caldaie e clima | 2ª | caldaie, termosifoni, condizionatori | tecnici | Caldaie e termosifoni |
 | ☀️ Energia e casa intelligente | 3ª | pannelli solari, domotica | tecnici, installatori | Pannelli solari, Casa intelligente |
@@ -363,8 +366,8 @@ niente di persona) oppure con il lavoretto di persona come nei Trasporti. Le bas
 ristrutturazioni 1ª €22–30 mila, 2ª €70–90 mila, 3ª €190–220 mila (+ il locale). Con due dipendenti per reparto: base
 ~€5 mila al mese, 1ª ~€11 mila, 2ª ~€25 mila, 3ª ~€50 mila.
 
-**Agganci con gli altri settori (proposta):** la Ditta traslochi chiama il Tuttofare per i montaggi; Ristrutturazioni
-e Impresa edile danno uno sconto quando evolvi una tua attività; Pulizie industriali puliscono hotel e ristoranti tuoi
+**Agganci con gli altri settori (proposta):** la Ditta traslochi chiama il Tuttofare per i montaggi; L'Impresa
+edile dà uno sconto quando evolvi una tua attività; Pulizie industriali puliscono hotel e ristoranti tuoi
 (meno costi); i Trasporti eccezionali portano le gru al cantiere.
 
 ---|---|---|
@@ -413,7 +416,7 @@ Gli alberi completi di ogni settore sono nella sezione del settore (Trasporti e 
 | 🌳 Ditta di giardinaggio | 🔨 | Giardinaggio | giardini → parchi → ville | 🆕 |
 | 🧼 Autolavaggio | 🔨 | Auto | lavaggio a mano → tunnel → lucidatura | 🆕 |
 | 🔩 Officina | 🔨 | Auto | riparazioni → carrozzeria → auto di lusso e d'epoca | 🆕 |
-| 🏗️ Impresa edile | 🔨 | Lavori in casa, Impianti | riparazioni → ristrutturazioni → case → palazzi | 🆕 |
+| 🏗️ Impresa edile | 🔨 | Lavori in casa, Impianti | riparazioni → case → palazzi (le ristrutturazioni vanno in 🎨) | 🆕 |
 
 ---
 
