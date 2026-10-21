@@ -378,6 +378,13 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         tabStep('aiuto', '❓ Come si gioca'),
       ],
     },
+    // solo sul telefono dello sviluppatore ci sono le schede (per i tester la finestra è solo il modulo)
+    'panel:propose': {
+      steps: [
+        tabStep('proponi', '📝 Scrivi una proposta'),
+        tabStep('proposte', '📮 Leggi e approva quelle dei tester'),
+      ],
+    },
     'panel:job': {
       steps: [
         { at: `${M} .stat.s-green`, say: '💰 La paga' },

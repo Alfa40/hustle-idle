@@ -1,11 +1,11 @@
 /**
- * Proposte dei tester, dentro le Opzioni (senza uscire dal gioco e senza account).
+ * Proposte dei tester, nella finestra del tasto 📝 sempre sullo schermo (senza uscire dal gioco e senza account).
  *
  * - Scheda "Proponi" (telefoni tester, src/tester.ts, e telefono dello sviluppatore): cosa cambiare, perché,
- *   foto dello schermo presa all'apertura delle Opzioni (o scelta dalla galleria) e il posto nel gioco, che si
+ *   foto dello schermo presa all'apertura della finestra (o scelta dalla galleria) e il posto nel gioco, che si
  *   compila da solo, più un video facoltativo dalla galleria (rifatto piccolo sul telefono, src/ui/propvideo.ts).
  *   L'invio va al server delle classifiche e resta privato.
- * - Scheda "Proposte" (solo telefono dello sviluppatore): le legge e le approva o le scarta. Solo le approvate
+ * - Scheda "📮 Da approvare" nella stessa finestra (solo telefono dello sviluppatore): le legge e le approva o le scarta. Solo le approvate
  *   diventano una proposta su GitHub (workflow `.github/workflows/proposte.yml`) e solo lì Claude ci lavora.
  *
  * Non tocca la partita: niente salvataggi, classifiche o progressi.
@@ -78,7 +78,7 @@ async function post(path: string, body: object) {
 }
 
 export class Proposals {
-  // bozza: resta finché non si invia (anche chiudendo le Opzioni)
+  // bozza: resta finché non si invia (anche chiudendo la finestra)
   private text = '';
   private why = '';
   private photo: string | null = null;
@@ -102,7 +102,7 @@ export class Proposals {
 
   constructor(private game: Game, private rerender: () => void) {}
 
-  /** All'apertura delle Opzioni: foto dello schermo e posto nel gioco di quel momento. */
+  /** All'apertura della finestra: foto dello schermo e posto nel gioco di quel momento. */
   capture() {
     if (!canPropose() || this.sending) return;
     this.where = this.whereNow();
