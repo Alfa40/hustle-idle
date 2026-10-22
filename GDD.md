@@ -350,6 +350,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 
 ### Versione 0.7 (tappa 2), fatto
 - Pulizie e traslochi in 3D dentro la casa del cliente (world/clienthouse.ts): si raggiunge l'indirizzo, si entra in casa (1–3 stanze arredate) e il lavoro si fa lì
+- Pulizie di casa, panno (`WipeStation`): le macchie di polvere e gli aloni non sbiadiscono fino a sparire alla vista ma si **rimpiccioliscono** mentre strofini e scompaiono solo quando sono davvero finite (si vede sempre cosa manca)
 - Pulizie: carrello con 3 attrezzi (spugna per le macchie a terra, piumino per polvere e ragnatele sui mobili, tergivetro per i vetri appannati); ogni sporco si pulisce solo con l'attrezzo giusto
 - Traslochi: scatoloni da caricare, oggetti sparsi da imballare al banco prima di caricarli, mobili pesanti da sollevare tenendo premuto (si cammina più piano); tutto va portato al furgone all'ingresso
 - Tempo, stelle e progressi nella barra in alto; la paga dipende dalle stelle
