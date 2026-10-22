@@ -21,7 +21,7 @@ function liveCook(game: Game, t: number, title: string) {
   const gap = 0.78 - 0.22 * t;
   const dishes = pickN([['Pasta saltata', '🍝'], ['Gamberi flambé', '🍤'], ['Wok di verdure', '🥘'], ['Crêpe Suzette', '🥞']], 3);
   return new RhythmRun(game, title, dishes.map(([n, i]) => ({ name: n, icon: i, notes: beats(9, gap, 1) })), {
-    speed: 220 + 80 * t, icon: '🍳', tip: '<b>Tocca</b> quando il segno arriva sul <b>cerchio</b> per saltare la padella; i segni gialli 🔥 sono il <b>flambé</b>: tieni premuto finché finiscono',
+    speed: 220 + 80 * t, icon: '🍳', tip: '<b>Tocca</b> quando il segno è sul <b>cerchio</b>. Segni gialli 🔥 = <b>flambé</b>: tieni premuto finché finiscono',
   });
 }
 
@@ -86,7 +86,7 @@ function maitre(game: Game, t: number, title: string) {
       },
     })),
     board: 'floor', time: 40 + n * 14, phase: 'Fai sedere i gruppi', icon: '🎩',
-    tip: 'Trascina ogni gruppo su un tavolo con <b>abbastanza posti</b> (senza sprecarne troppi) e, se lo chiede, vicino alla <b>finestra 🪟</b> o <b>tranquillo 🤫</b>',
+    tip: 'Trascina ogni gruppo su un tavolo con <b>abbastanza posti</b>. Non sprecarne troppi. Se lo chiede: <b>finestra 🪟</b> o <b>tranquillo 🤫</b>',
   });
 }
 
@@ -122,7 +122,7 @@ function reception(game: Game, t: number, title: string) {
       },
     })),
     board: 'rooms', time: 40 + n * 15, phase: 'Dai le camere agli ospiti', icon: '🗝️',
-    tip: 'Ogni ospite chiede qualcosa: <b>🛏️</b> letto matrimoniale o <b>🛏️🛏️</b> due letti, vista <b>🌊 mare</b> o <b>🏙️ città</b>, piano <b>⬆️ alto</b> o <b>⬇️ basso</b>. Trascinalo su una camera che ha tutto',
+    tip: 'Guarda cosa chiede: letti 🛏️, vista 🌊/🏙️, piano ⬆️/⬇️. Trascinalo su una camera che ha tutto',
   });
 }
 
@@ -186,7 +186,7 @@ function sommelier(game: Game, t: number, title: string) {
   });
   return new PourRun(game, title, steps, {
     time: 40 + steps.length * 20, icon: '🍷', phase: 'Abbina e versa il vino',
-    tip: 'Scegli il <b>vino adatto</b> al piatto (carne → rosso, pesce → bianco, festa → bollicine, dolce → vino dolce), poi <b>tieni premuto</b> e lascia alla <b>tacca</b>',
+    tip: 'Carne → rosso, pesce → bianco, festa → bollicine, dolce → vino dolce. Poi <b>tieni premuto</b> e lascia alla <b>tacca</b>',
   });
 }
 
@@ -226,7 +226,7 @@ function chocolate(game: Game, t: number, title: string) {
   }));
   return new PourRun(game, title, steps, {
     time: 45 + molds * 15, icon: '🍫', phase: 'Tempera e versa il cioccolato',
-    tip: 'Prima la <b>temperatura</b>: tieni premuto per scaldare e lascia per raffreddare, tienila nel <b>verde</b>. Poi versa negli stampi fino alla <b>tacca</b>',
+    tip: 'Tieni la <b>temperatura</b> nel verde: premi per scaldare, lascia per raffreddare. Poi versa negli stampi fino alla <b>tacca</b>',
   });
 }
 

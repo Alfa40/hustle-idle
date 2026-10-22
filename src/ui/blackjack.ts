@@ -295,7 +295,7 @@ export class BlackjackTable {
       if (me.insure === false) return `<div class="pk-note">Niente assicurazione. Il banco guarda la carta coperta tra ${secs}</div>`;
       const cost = Math.floor(me.hands[0].bet / 2);
       const can = cost <= me.chips;
-      return `<div class="pk-note">Il banco ha un asso. Assicurazione? ${secs}<br><span class="bj-ins-why">Costa metà della puntata: se il banco ha blackjack te la paga 2 a 1 (e la puntata la perdi), altrimenti la perdi.</span></div><div class="pk-acts">
+      return `<div class="pk-note">Il banco ha un asso. Assicurazione? ${secs}<br><span class="bj-ins-why">Costa metà puntata. Paga 2 a 1 se il banco fa blackjack.</span></div><div class="pk-acts">
         <button class="pk-btn" data-p="insure:no" ${busy}>No grazie</button><button class="pk-btn good" data-p="insure:yes" ${busy} ${can ? '' : 'disabled'}>🛡️ Assicurati <b>${euro(cost)}</b></button></div>`;
     }
     if (s.phase === 'play' && s.toAct === s.mySeat && s.my) {

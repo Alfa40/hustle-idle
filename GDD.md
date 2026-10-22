@@ -38,6 +38,7 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 - Finestre centrate con scorrimento interno; su schermi bassi intestazione compatta e pulsanti finali sempre visibili
 - Ruotare non chiude niente e non interrompe azioni, tutorial, veicolo, timer o guadagni
 - Pagina di prova `debug.html`: cornici 360×640, 390×844, 430×932, 768×1024, pulsante Ruota, notch simulato
+- Testi: brevi e a punti. Le spiegazioni sono elenchi di frasi corte dietro il "?", i consigli del manager una riga sola (numero + cosa fare), i suggerimenti dei lavoretti un elenco nel fumetto del tutorial
 
 ## 3. Controlli e telecamera
 

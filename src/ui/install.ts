@@ -69,10 +69,10 @@ export function showInstallTip() {
     <h2>📲 Metti Hustle Idle sulla schermata Home</h2>
     <p class="inst-why">Si gioca meglio come un'app vera:</p>
     <ul class="inst-list">
-      <li>🖥️ <b>A schermo intero</b>, senza le barre del browser</li>
-      <li>👆 Si apre <b>con un tocco</b> dall'icona, come le altre app</li>
-      <li>💾 <b>Salvataggi più al sicuro</b>: il browser può cancellare i dati dei siti poco usati, l'app no</li>
-      <li>⚡ Più fluido e senza tocchi che fanno scorrere la pagina</li>
+      <li>🖥️ <b>A schermo intero</b></li>
+      <li>👆 Si apre <b>con un tocco</b></li>
+      <li>💾 <b>Salvataggi più al sicuro</b></li>
+      <li>⚡ <b>Più fluido</b></li>
     </ul>
     <button class="btn good full inst-go" style="${deferred ? '' : 'display:none'}">📲 Installa adesso</button>
     <div class="inst-steps">${STEPS[p].map(([i, t], n) => `<div class="inst-step"><span class="inst-n">${n + 1}</span><span class="inst-i">${i}</span><span>${t}</span></div>`).join('')}</div>

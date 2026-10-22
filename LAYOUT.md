@@ -92,6 +92,7 @@ Misure da provare sempre, in verticale e in orizzontale: 360×640, 390×844, 430
 Le spiegazioni non occupano spazio: hanno la classe `explain` e compaiono solo toccando il tasto **?**
 nell'intestazione della finestra (accanto a ✕). Il tasto si vede solo se la finestra ha spiegazioni; aperte,
 hanno uno sfondo azzurro con la riga blu a sinistra e restano aperte finché la finestra resta aperta.
+Si scrivono **a punti brevi** (`points(...)` in ui.ts, elenco con classe `points`), mai come un paragrafo unico.
 
 ## Minigiochi col dito
 I minigiochi che si giocano su un "tavolo" disegnato (furgone a incastri, pianoforte, quadri, smistamento:

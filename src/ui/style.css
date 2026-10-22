@@ -1070,7 +1070,10 @@ body.pottery-on .hud-right .minimap { display: none !important; }
 .sheet-head .help-q[hidden] { display: none; }
 body.is-short .sheet-head .help-q { width: 34px; height: 34px; }
 .sheet:not(.show-help) .explain { display: none !important; }
+.points { margin: 6px 0; padding-left: 22px; }
+.points li { margin: 2px 0; }
 .sheet.show-help .explain { background: #eef6ff; border-left: 4px solid var(--blue); border-radius: 10px; padding: 7px 10px; color: var(--ink-2); }
+.sheet.show-help .explain.points { padding-left: 26px; }
 
 /* ---------- minigiochi col dito (minigames/overlay.ts): riquadro nella zona libera ---------- */
 body.overlay-job .joy, body.overlay-job .act-zone, body.overlay-job .action, body.overlay-job .act-label,
@@ -1191,6 +1194,7 @@ body.is-short .dg-photo span { font-size: 13px; }
 .tut-mini .tut-row { display: flex; align-items: center; gap: 8px; }
 .tut-mini .tut-line { font-size: 15px; font-weight: 700; line-height: 1.2; flex: 1; min-width: 0; }
 .tut-mini .tut-long { font-size: 13px; font-weight: 600; line-height: 1.3; margin-top: 5px; color: var(--ink-2); }
+.tut-mini .tut-long .points { margin: 0; padding-left: 18px; }
 .tut-mini.tiny { padding: 3px 4px 3px 8px; }
 .tut-more {
   pointer-events: auto; flex: none; width: 30px; height: 30px; border-radius: 50%; border: 0;

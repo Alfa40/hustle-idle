@@ -159,7 +159,7 @@ function cutLoad(W: number, H: number, n: number) {
 
 export class VanPuzzleRun extends OverlayRun {
   protected phaseList = [
-    { name: 'Carica il furgone', icon: '🚛', tip: '<b>Trascina</b> ogni pezzo nel cassone; <b>toccalo</b> per girarlo. I pesanti 🏋️ vanno <b>sul fondo</b>, sopra i fragili 🔔 <b>non va niente</b>' },
+    { name: 'Carica il furgone', icon: '🚛', tip: '<b>Trascina</b> ogni pezzo nel cassone. <b>Toccalo</b> per girarlo. Pesanti 🏋️ <b>sul fondo</b>. Sopra i fragili 🔔 <b>niente</b>' },
     { name: 'Chiudi il furgone', icon: '🔒', tip: 'Tutto dentro e niente in rosso: tocca <b>Chiudi il furgone</b>' },
   ];
   private W: number;
@@ -399,7 +399,7 @@ export class VanPuzzleRun extends OverlayRun {
 
 export class PianoLiftRun extends OverlayRun {
   protected phaseList = [
-    { name: 'Tieni dritto il pianoforte', icon: '🎹', tip: 'Il pianoforte sale col montacarichi e il vento lo fa dondolare: <b>tieni il dito sullo schermo</b> e spostalo <b>dalla parte opposta</b> a dove pende' },
+    { name: 'Tieni dritto il pianoforte', icon: '🎹', tip: 'Il vento lo fa dondolare. <b>Tieni il dito</b> sullo schermo. Spostalo <b>dalla parte opposta</b> a dove pende' },
     { name: 'Spingilo dentro dalla finestra', icon: '🏠', tip: 'Sei alla finestra: <b>tocca</b> per spingerlo dentro' },
   ];
   private cv!: HTMLCanvasElement;
@@ -555,7 +555,7 @@ export class PianoLiftRun extends OverlayRun {
 /** Quadri: avvolgi ognuno nel pluriball (tieni premuto) e trascinalo nella cassa della sua misura, piano. */
 export class PaintingsRun extends OverlayRun {
   protected phaseList = [
-    { name: 'Imballa i quadri', icon: '🖼️', tip: '<b>Tieni premuto</b> su un quadro per avvolgerlo nel pluriball, poi <b>trascinalo piano</b> nella cassa della sua misura. Se lo trascini veloce si graffia' },
+    { name: 'Imballa i quadri', icon: '🖼️', tip: '<b>Tieni premuto</b> sul quadro per avvolgerlo. <b>Trascinalo piano</b> nella cassa della sua misura. Veloce si graffia' },
   ];
   private items: { el: HTMLDivElement; size: number; wrap: number; done: boolean }[] = [];
   private crates: HTMLDivElement[] = [];
@@ -693,7 +693,7 @@ const BIN_COLORS = ['#e5484d', '#2d6cdb', '#2fb36b', '#ffc21a', '#8e5bd6'];
 
 export class SortingRun extends OverlayRun {
   protected phaseList = [
-    { name: 'Smista i pacchi', icon: '🔀', tip: '<b>Tocca i deviatori</b> (le frecce) per mandare ogni pacco al nastro del <b>suo colore</b>. Il turno dura 2 minuti e i nastri accelerano' },
+    { name: 'Smista i pacchi', icon: '🔀', tip: '<b>Tocca le frecce</b>: ogni pacco al nastro del <b>suo colore</b>. Dura 2 minuti e i nastri accelerano' },
   ];
   private cv!: HTMLCanvasElement;
   private ctx!: CanvasRenderingContext2D;

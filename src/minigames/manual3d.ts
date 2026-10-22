@@ -188,7 +188,7 @@ export function lawnJob(game: Game, lineLevel: number, slot: Slot, placed: Place
     },
     {
       name: "Taglia l'erba alta", icon: '🌿', count: () => [tufts.filter((x) => !x.visible).length, nGrass],
-      tip: "Taglia ogni <b>ciuffo d'erba alta</b>: tieni premuto lì sopra. Gira attorno alle <b>aiuole fiorite</b>: se le calpesti si rovinano",
+      tip: "Tieni premuto su ogni <b>ciuffo d'erba alta</b>. Gira attorno alle <b>aiuole fiorite</b>: non calpestarle",
       tasks: () => grass.map((pos, i): Task => ({
         pos, kind: 'hold', sec: 1.0 - 0.25 * t, label: "Taglia l'erba", icon: '🌿', fx: 'leaf', fxColor: 0x5cae45, own: true, obj: tufts[i],
         onProgress: (p) => tufts[i].scale.set(1, Math.max(0.15, 1 - p * 0.85), 1),
@@ -363,7 +363,7 @@ export function furnitureJob(game: Game, lineLevel: number, slot: Slot, placed: 
     m.pieces.forEach((p) => {
       phases.push({
         name: `Pezzo ${p.letter}: ${p.name}`, icon: '🔧',
-        tip: `Il foglio dice: <b>pezzo ${p.letter}</b> (${p.name}). Prendilo da terra, portalo al mobile e <b>avvita</b> le viti girando il dito`,
+        tip: `Serve il <b>pezzo ${p.letter}</b> (${p.name}). Portalo al mobile. <b>Avvita</b> girando il dito`,
         tasks: () => {
           const onFloor = [...floorObjs.entries()].filter(([q, o]) => o.visible && q !== p);
           const right = floorObjs.get(p)!;
@@ -553,7 +553,7 @@ export function cleaningJob(game: Game, lineLevel: number, slot: Slot, placed: P
     },
     {
       name: 'Metti in ordine', icon: '🧺', count: () => [put, things.length],
-      tip: 'Rimetti ogni cosa al suo posto: i <b>libri</b> nella libreria, i <b>giocattoli</b> nella cesta, i <b>vestiti</b> nel cesto della biancheria',
+      tip: '<b>Libri</b> nella libreria. <b>Giocattoli</b> nella cesta. <b>Vestiti</b> nel cesto della biancheria',
       tasks: () => [
         ...things.map((th): Task => ({
           pos: th.at, kind: 'tap', repeat: true, own: true, obj: th.obj, label: `Prendi ${THINGS[th.k].name}`, icon: THINGS[th.k].icon,
@@ -665,7 +665,7 @@ export function plumberJob(game: Game, lineLevel: number, slot: Slot, placed: Pl
   const phases: Phase[] = [
     {
       name: "Chiudi l'acqua", icon: '🔴',
-      tip: "Prima di toccare i tubi chiudi il <b>rubinetto generale</b> (il volantino rosso sul muro): tieni premuto",
+      tip: "Chiudi il <b>rubinetto generale</b> (volantino rosso sul muro): tieni premuto",
       tasks: () => [{ pos: valveAt.clone().add(new THREE.Vector3(0.7, 0, 0)), kind: 'hold', sec: 1.1, label: "Chiudi l'acqua", icon: '🔴', own: true, obj: valve.g, onProgress: (p) => (valve.wheel.rotation.z = -p * Math.PI * 2) }],
     },
     {

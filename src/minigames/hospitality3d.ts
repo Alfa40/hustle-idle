@@ -129,7 +129,7 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const pileObjs: THREE.Object3D[] = [];
   const phases: Phase[] = [{
     name: 'Lava le stoviglie', icon: '', count: () => [done, n],
-    tip: 'Prendi una stoviglia sporca dal <b>carrello</b>, al <b>lavello</b> bagna la <b>spugna nel sapone</b>, strofina via ogni macchia e <b>sciacqua</b> sotto l\'acqua finché non resta schiuma. Poi mettila ad asciugare al posto giusto: piatti, vaschette e vassoi nello <b>scolapiatti</b>, bicchieri nel <b>portabicchieri</b>, posate nel <b>cestello</b>. Posto sbagliato? Tocca la stoviglia per riprenderla, prima di mettere l\'ultima',
+    tip: 'Prendi una stoviglia dal <b>carrello</b>. Al <b>lavello</b>: spugna nel sapone e strofina. <b>Sciacqua</b> finché sparisce la schiuma. Piatti e vassoi nello <b>scolapiatti</b>. Bicchieri nel <b>portabicchieri</b>, posate nel <b>cestello</b>. Sbagliato? Toccala per riprenderla',
     tasks: () => [
       {
         pos: cartAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dalla pila: ${DISHWARE[pile[Math.min(next, n - 1)]].name}`; }, icon: '', obj: cart.obj,
@@ -318,7 +318,7 @@ export function prepCookJob(game: Game, lineLevel: number, slot: Slot, placed: P
   };
   const phases: Phase[] = [{
     name: 'Prepara le verdure', icon: '🔪', count: () => [done, n],
-    tip: 'Segui il <b>foglio delle preparazioni</b>: prendi l\'ingrediente dal <b>frigo</b>, al <b>tagliere</b> prendi il <b>coltello</b> col dito e muovilo <b>su e giù</b> sopra ogni linea finché la fetta si stacca, poi metti le fette nella <b>ciotola</b> con lo stesso ingrediente. Ciotola sbagliata? Tocca le fette per riprenderle, prima di mettere l\'ultimo',
+    tip: 'Segui il <b>foglio delle preparazioni</b>. Prendi l\'ingrediente dal <b>frigo</b>. Al <b>tagliere</b> muovi il <b>coltello su e giù</b> su ogni linea. Metti le fette nella <b>ciotola</b> uguale. Sbagliato? Tocca le fette per riprenderle',
     tasks: () => [
       {
         pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, get label() { return `Prendi dal frigo: ${VEGGIES[cur()].icon} ${VEGGIES[cur()].name}`; }, icon: '🧊', obj: fridge.obj,
@@ -451,7 +451,7 @@ export function cookLineJob(game: Game, lineLevel: number, slot: Slot, placed: P
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara le comande', icon: '🍔', count: () => [served, n],
-    tip: 'Prendi la <b>carne</b> dal frigo; alla <b>piastra</b> trascinala sulla piastra, <b>toccala per girarla</b> quando la barra è verde e trascinala sul <b>panino</b> quando è cotta. Al <b>bancone</b> componi il panino come sullo <b>scontrino</b> (la salsa a <b>zig-zag</b> con la bottiglia) e portalo al <b>passe 🛎️</b>',
+    tip: 'Prendi la <b>carne</b> dal frigo. Trascinala sulla <b>piastra</b>. Barra verde: <b>toccala per girarla</b>. Cotta: trascinala sul <b>panino</b>. Al <b>bancone</b> componi come sullo <b>scontrino</b> (salsa a zig-zag). Portalo al <b>passe 🛎️</b>',
     tasks: () => [
       {
         pos: fridgeAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la carne dal frigo', icon: '🥩', obj: fridge.obj,
@@ -699,7 +699,7 @@ export function ovenJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cur = () => orders[Math.min(next, n - 1)];
   const phases: Phase[] = [{
     name: 'Prepara gli impasti', icon: '🥖', count: () => [done, n],
-    tip: 'Segui il <b>foglio degli ordini</b>: prendi la <b>farina</b> e mettila nell\'<b>impastatrice</b>. Mentre gira, quando arriva il loro momento sulla barra, prendi col dito la <b>brocca dell\'acqua</b>, la <b>manciata di lievito</b> e la <b>saliera</b> e trascinale sopra la vasca: versano finché restano lì. Allontanale quando il misurino arriva sulla tacca della ricetta. Per i <b>cornetti</b> prendi il <b>burro</b> dal frigo, dai la <b>forma</b> al banco seguendo la sagoma e metti l\'impasto a <b>lievitare</b> sul ripiano del suo tipo. Ripiano sbagliato? Tocca l\'impasto per riprenderlo, prima di mettere l\'ultimo',
+    tip: 'Segui il <b>foglio degli ordini</b>. Metti la <b>farina</b> nell\'<b>impastatrice</b>. Al momento giusto trascina sopra <b>acqua</b>, <b>lievito</b> e <b>sale</b>. Toglili quando il misurino tocca la tacca. Cornetti: prendi anche il <b>burro</b> dal frigo. Dai la <b>forma</b> al banco seguendo la sagoma. Metti a <b>lievitare</b> sul ripiano giusto. Sbagliato? Tocca l\'impasto per riprenderlo',
     tasks: () => [
       { pos: flourAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi la farina', icon: '🌾', enabled: () => !holding && next < n, onDone: () => { holding = { stage: 'flour', b: cur(), q: 1, r: recipes[next] }; next++; hold(game, crate(0.3, 0xf3ead7)); } },
       {
@@ -905,7 +905,7 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   };
   const phases: Phase[] = [{
     name: 'Servi i clienti in ordine', icon: '☕', count: () => [served, n],
-    tip: 'Guarda cosa chiede il <b>primo della fila</b>: prendi una <b>tazza</b>, fai il caffè alla <b>macchina</b> (tieni premuto). Cappuccino: poi il <b>latte montato</b>. Tè: il <b>bollitore</b>. Poi servi al bancone',
+    tip: 'Guarda cosa chiede il <b>primo della fila</b>. Prendi una <b>tazza</b>. Caffè alla <b>macchina</b> (tieni premuto). Cappuccino: aggiungi il <b>latte montato</b>. Tè: usa il <b>bollitore</b>. Servi al bancone',
     tasks: () => [
       { pos: cupsAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi una tazza', icon: '☕', obj: cups.obj, enabled: () => !holding && served < n, onDone: () => fill('cup') },
       { pos: machineAt, kind: 'hold', sec: 1.4, repeat: true, quiet: true, label: 'Fai il caffè', icon: '⚙️', obj: machine.obj, fx: 'bubble', fxColor: 0x6b3e1e, enabled: () => holding === 'cup', onDone: () => fill('espresso') },
@@ -1079,7 +1079,7 @@ export function restaurantJob(game: Game, lineLevel: number, slot: Slot, placed:
   const tables: Tb[] = [];
   const phases: Phase[] = [{
     name: 'Servi i tavoli', icon: '🍽️', count: () => [tables.filter((x) => x.stage === 'done').length, n],
-    tip: 'Al tavolo che chiama prendi l\'<b>ordinazione</b>; al <b>passe</b> prendi il piatto col <b>numero del tavolo</b> e portalo lì. Quando chiede il <b>conto 🧾</b>, prendilo alla <b>cassa</b> e portalo',
+    tip: 'Al tavolo che chiama prendi l\'<b>ordinazione</b>. Al <b>passe</b> prendi il piatto col <b>numero del tavolo</b>. Portalo al tavolo. Chiede il <b>conto 🧾</b>? Prendilo alla <b>cassa</b>',
     tasks: () => [
       ...tables.map((tb): Task => ({
         pos: tb.pos.clone().add(new THREE.Vector3(0, 0, 1.0)), kind: 'tap', repeat: true, quiet: true, label: `Tavolo ${tb.num}`, icon: '🍽️',
@@ -1263,7 +1263,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
   const phases: Phase[] = [
     {
       name: 'Porta le valigie in camera', icon: '🧳', count: () => [delivered, n],
-      tip: 'Prendi una <b>valigia</b> alla reception e leggi il <b>numero sull\'etichetta</b> (lo vedi anche in alto, <b>in mano</b>): portala alla porta con quel numero. Davanti alla porta guarda la <b>targa</b>: deve avere lo stesso numero. Porta sbagliata? Tocca la valigia per riprenderla',
+      tip: 'Prendi una <b>valigia</b> alla reception. Leggi il <b>numero sull\'etichetta</b> (anche in alto, <b>in mano</b>). Portala alla porta con la stessa <b>targa</b>. Sbagliato? Tocca la valigia per riprenderla',
       tasks: () => bags.map((b): Task => ({
         pos: b.at, kind: 'tap', quiet: true, label: `Prendi la valigia (camera ${b.door.num})`, icon: '🧳', enabled: () => !holding,
         onDone: () => {
@@ -1349,7 +1349,7 @@ export function housekeepingJob(game: Game, lineLevel: number, slot: Slot, place
   const total = jobs.length;
   const phases: Phase[] = [{
     name: 'Rifai le camere', icon: '🛏️', count: () => [jobs.filter((x) => x.done).length, total],
-    tip: 'Al <b>carrello</b> prendi le <b>lenzuola</b> per rifare il letto (tieni premuto) e gli <b>asciugamani</b> per il bagno. <b>Svuota il cestino</b> nel carrello e togli la <b>polvere</b> dai comodini',
+    tip: 'Dal <b>carrello</b> prendi <b>lenzuola</b> e <b>asciugamani</b>. Rifai il letto (tieni premuto). Asciugamani nel bagno. <b>Svuota il cestino</b> nel carrello. Togli la <b>polvere</b> dai comodini',
     tasks: () => [
       ...jobs,
       // dal carrello: solo ciò che serve ancora (e si può rimettere a posto)
@@ -1412,7 +1412,7 @@ export function conciergeJob(game: Game, lineLevel: number, slot: Slot, placed: 
   const itemAt = (k: number) => room.near(-3.75 + k * 1.5, -3.6, 0, 0.4);
   const phases: Phase[] = [{
     name: 'Aiuta gli ospiti', icon: '🛎️', count: () => [doneN, n],
-    tip: 'Parla con un ospite (tocca): ti dice cosa gli serve. Prendi la <b>cosa giusta</b> dagli scaffali dietro il banco e <b>portagliela</b>',
+    tip: 'Tocca un ospite: ti dice cosa vuole. Prendila dagli scaffali dietro il banco. <b>Portagliela</b>',
     tasks: () => [
       ...guests.map((g, i): Task => ({
         pos: g.pos.clone().add(new THREE.Vector3(0, 0, -0.9)), kind: 'tap', repeat: true, quiet: true, label: busy === i ? `Dai a ${['lui', 'lei'][i % 2]}` : 'Parla con l\'ospite', icon: '🙋',

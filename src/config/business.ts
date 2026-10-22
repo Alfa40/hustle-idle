@@ -29,7 +29,7 @@ export interface UpgradeDef {
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   ampliamento: {
-    name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio sulle pareti (per fuochi e banchi extra), nuove postazioni e nuovi prodotti da vendere.', max: 2,
+    name: 'Ampliamento del locale', icon: '🏗️', desc: 'Più spazio, nuove postazioni e nuovi prodotti.', max: 2,
     cost: (l) => [3500, 12000][l] ?? Infinity,
   },
   fuochi: {
@@ -45,15 +45,15 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     cost: (l) => [400, 1000, 2400][l] ?? Infinity,
   },
   attrezzatura: {
-    name: 'Attrezzatura professionale', icon: '⚡', desc: 'Si prepara più in fretta (+15% per livello). Le postazioni di lavoro diventano lucide e dorate.', max: 8,
+    name: 'Attrezzatura professionale', icon: '⚡', desc: 'Si prepara più in fretta: +15% per livello.', max: 8,
     cost: (l) => Math.round(400 * 1.8 ** l),
   },
   cassa: {
-    name: 'Cassa veloce', icon: '💳', desc: 'Registratore e POS moderni: i cassieri servono e incassano più in fretta (+15% per livello), per stare al passo con la cucina.', max: 8,
+    name: 'Cassa veloce', icon: '💳', desc: 'I cassieri servono più in fretta: +15% per livello.', max: 8,
     cost: (l) => Math.round((350 * 1.8 ** l) / 10) * 10,
   },
   look: {
-    name: 'Look e insegna', icon: '✨', desc: 'Attira più clienti (+15% di domanda per livello). Piante, luci e un pavimento più bello.', max: 8,
+    name: 'Look e insegna', icon: '✨', desc: 'Più clienti: +15% di domanda per livello.', max: 8,
     cost: (l) => Math.round(500 * 1.9 ** l),
   },
   menu: {
@@ -172,7 +172,7 @@ export const BUSINESS_TYPES = {
     stations: { stock: '🌾 Dispensa', work: '🔥 Forno', counter: '🧁 Bancone' },
   },
   artigianato: {
-    name: "Laboratorio dell'artigiano", icon: '🎨', desc: 'Lavori manuali su richiesta, fatti da te a mano in prima persona: pagano più dei lavoretti. Si parte dai vasi in ceramica; con l\'esperienza arrivano lavori più difficili e pagati meglio.',
+    name: "Laboratorio dell'artigiano", icon: '🎨', desc: 'Lavori a mano su richiesta, pagati più dei lavoretti. Si parte dai vasi.',
     kind: 'craft', lot: 'shop', setupCost: 3500, products: [],
     roles: [], roleNames: {}, skills: ['artigianato'],
     rateMul: 0, color: '#c0603a', sector: 'artigianato',

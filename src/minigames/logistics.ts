@@ -347,9 +347,9 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   const phases: Phase[] = [
     {
       name: 'Sistema le scatole sugli scaffali', icon: '📦', count: () => [items.filter((x) => x.obj && !x.obj.visible && x !== carrying).length, n],
-      tip: 'Il <b>nastro</b> della scatola è del colore dello <b>scaffale</b> e fa una <b>punta</b>: <b>^ ripiano in alto</b>, <b>V ripiano in basso</b>, come il cartellino sul montante. Le scatole si possono <b>impilare</b>: tocca la pila dove appoggiarla.'
-        + (levels ? ' La <b>pesante</b> 🏋️ va sempre direttamente sul ripiano, mai sopra altre scatole (le schiaccia); sulla <b>fragile</b> 🍷 non va messo niente sopra.' : '')
-        + ' Se sbagli, tocca la scatola in cima alla pila per riprenderla: conta solo quello che è ancora sbagliato quando firmi la bolla',
+      tip: 'Colore del <b>nastro</b> = colore dello <b>scaffale</b>. Punta <b>^</b> = ripiano in alto, <b>V</b> = in basso. Puoi <b>impilare</b>: tocca la pila dove appoggiarla.'
+        + (levels ? ' <b>Pesante</b> 🏋️: solo sul ripiano, mai sopra altre. <b>Fragile</b> 🍷: niente sopra.' : '')
+        + ' Sbagliato? Tocca la scatola in cima per riprenderla.',
       tasks: () => items.map((it) => ({
         pos: it.pos, kind: it.kind === 'heavy' ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.kind === 'heavy' ? 'Solleva la scatola pesante' : it.kind === 'fragile' ? 'Prendi la scatola fragile' : 'Prendi la scatola', icon: it.kind === 'heavy' ? '🏋️' : it.kind === 'fragile' ? '🍷' : '📦',
         quiet: true, enabled: () => !carrying, obj: it.obj,
@@ -472,7 +472,7 @@ export function forkliftJob(game: Game, lineLevel: number, wh: Warehouse, title:
     },
     {
       name: 'Carica i bancali sul camion', icon: '🚛', count: () => [loaded, n],
-      tip: 'Porta il muletto davanti a un <b>bancale</b> e <b>tieni premuto</b> per alzare le forche. Poi vai al <b>camion</b> e tieni premuto per abbassarlo. <b>Non urtare</b> scaffali e muri!',
+      tip: 'Davanti a un <b>bancale</b> tieni premuto per alzarlo. Al <b>camion</b> tieni premuto per abbassarlo. <b>Non urtare</b> scaffali e muri!',
       tasks: () => pals.map((p) => ({
         pos: p.pos, kind: 'hold' as const, sec: 1 + p.level * 0.5, label: p.level ? 'Alza le forche fino al bancale' : 'Infila le forche sotto il bancale', icon: '⬆️', enabled: () => !carrying, obj: p.obj,
         onProgress: (k: number) => (forks.position.y = 0.12 + (p.shelf.boards[p.level] - 0.12) * k),
@@ -542,7 +542,7 @@ export function pickingJob(game: Game, lineLevel: number, wh: Warehouse, title: 
     },
     {
       name: `Prendi gli articoli della lista`, icon: '📋', count: () => [got.size, n],
-      tip: `Cerca sugli scaffali gli articoli della lista <b>${order.join(' ')}</b> e prendili. Attento a quelli <b>simili</b>: se sbagli perdi tempo. Niente frecce: guarda le icone sugli scaffali`,
+      tip: `Prendi dagli scaffali: <b>${order.join(' ')}</b>. Guarda le icone: niente frecce. Attento a quelli <b>simili</b>`,
       tasks: () => arts.map((a) => {
         const ok = order.includes(a.icon);
         return {
@@ -660,7 +660,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
   const phases: Phase[] = [
     {
       name: 'Imballa i pacchi', icon: '📦', count: () => [packedN, n],
-      tip: 'Prendi un oggetto, scegli la scatola della <b>misura giusta</b> (S, M o L), poi al banco <b>riempitivo e nastro</b> (tieni premuto) e attacca l\'<b>etichetta</b>',
+      tip: 'Prendi un oggetto. Scatola della <b>misura giusta</b> (S, M, L). Al banco: <b>riempitivo e nastro</b> (tieni premuto). Attacca l\'<b>etichetta</b>',
       tasks: () => parcels.map((p) => ({
         pos: p.pos, kind: 'tap' as const, label: `Prendi ${p.icon} (misura ${p.size.id})`, icon: p.icon, markerText: `${p.icon}${p.size.id}`, enabled: () => !busy,
         onDone: () => {
@@ -673,7 +673,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     },
     {
       name: "Carica dall'ultimo al primo", icon: '🚐', count: () => [loadedN, n],
-      tip: 'Il numero è l\'<b>ordine di consegna</b>: carica prima il numero <b>più alto</b> e per ultimo il <b>1</b> (così è vicino alle porte quando arriva il suo turno)',
+      tip: 'Il numero è l\'<b>ordine di consegna</b>. Carica prima il <b>più alto</b>, per ultimo l\'<b>1</b>',
       tasks: loadStep,
     },
   ];
@@ -821,7 +821,7 @@ export function furnitureJob(game: Game, lineLevel: number, arena: Arena, title:
     }
     phases.push({
       name: 'Gira il mobile per passare dalla porta', icon: '🔄',
-      tip: 'Spingi il carrello fino alla <b>porta</b> senza urtare niente, poi <b>tieni premuto</b> per girare il mobile e farlo passare',
+      tip: 'Spingi il carrello alla <b>porta</b> senza urtare. <b>Tieni premuto</b> per girare il mobile',
       tasks: () => [{ pos: door, kind: 'hold', sec: 1.8, label: 'Gira il mobile', icon: '🔄', enabled: () => ramp }],
     });
     phases.push({
@@ -930,7 +930,7 @@ export function officeMoveJob(game: Game, lineLevel: number, arena: Arena, title
     },
     {
       name: 'Svuota l\'ufficio', icon: '🏢', count: () => [loaded, things.length],
-      tip: 'Porta gli oggetti al <b>camion</b> insieme agli aiutanti. Il <b>server</b> va staccato prima (tieni premuto), l\'<b>acquario</b> si porta piano: senza correre!',
+      tip: 'Porta gli oggetti al <b>camion</b> con gli aiutanti. Il <b>server</b>: staccalo prima (tieni premuto). L\'<b>acquario</b>: cammina, non correre!',
       tasks: () => things.map((th) => {
         const tk: Task = {
           pos: th.pos, kind: th.kind === 'server' ? 'hold' : 'tap', sec: 2, label: th.kind === 'server' ? 'Stacca il server e prendilo' : `Prendi ${th.icon} ${th.name}`, icon: th.icon,

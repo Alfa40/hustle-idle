@@ -128,7 +128,7 @@ export class TitleScreen {
       html = this.panel('⚙️ Impostazioni', settingsHtml());
     } else {
       html = this.panel('ℹ️ Crediti', `
-        <div class="card"><h3>Hustle Idle</h3><p class="muted small" style="margin:0">Un gioco gestionale in cui parti dai lavoretti e costruisci il tuo impero di attività.</p></div>
+        <div class="card"><h3>Hustle Idle</h3><p class="muted small" style="margin:0">Parti dai lavoretti, costruisci un impero di attività.</p></div>
         <div class="card"><h3>Grafica</h3><p class="muted small" style="margin:0">Modelli 3D di <b>Kenney.nl</b> (licenza CC0): Mini Characters, City Kit, Car Kit, Food Kit, Furniture Kit.<br>Font: Fredoka (SIL Open Font License 1.1).<br>Grafica 3D: three.js (licenza MIT, © three.js authors).<br><a href="./LICENSES.txt" target="_blank" rel="noopener">Testo completo delle licenze</a></p></div>
         <div class="card" data-t="ver"><h3>Versione</h3><p class="muted small" style="margin:0">Prototipo 0.5</p></div>
         ${this.verTaps >= 7 ? `<div class="card"><h3>🔑 Codice</h3><input class="t-input" name="devkey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Codice" />
@@ -178,7 +178,7 @@ export class TitleScreen {
         // stesso campo per il codice developer e per quello dei tester
         void tryDevKey(v).then(async (ok) => {
           const tester = !ok && (await tryTesterKey(v));
-          this.devMsg = ok ? '✅ Telefono dello sviluppatore: in partita tocca il tasto 📝 sul bordo dello schermo: lì trovi anche 📮 Da approvare' : tester ? '✅ Modalità tester attiva: in partita tocca il tasto 📝 sul bordo dello schermo' : '❌ Codice sbagliato';
+          this.devMsg = ok ? '✅ Sviluppatore: in partita tocca 📝 (dentro c\'è 📮 Da approvare)' : tester ? '✅ Tester attivo: in partita tocca 📝' : '❌ Codice sbagliato';
           this.render();
         });
         return;

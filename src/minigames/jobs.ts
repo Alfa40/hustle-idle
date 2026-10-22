@@ -1557,7 +1557,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     },
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna i pacchi', icon: flyer ? '📬' : '🏠',
-      tip: civici ? `Consegna ai <b>numeri civici ${nums}</b>: cercali leggendo le <b>targhe sulle case</b> (dispari a sinistra, pari a destra). Davanti alla porta si accendono lo <b>zerbino</b> e il <b>citofono</b>: tocca per lasciare il pacco, tieni premuto il citofono per firma e contrassegno${specialNote}` : undefined,
+      tip: civici ? `Civici: <b>${nums}</b>${specialNote}. Leggi le <b>targhe sulle case</b> (dispari a sinistra, pari a destra). Tocca lo <b>zerbino</b> per lasciare il pacco. Firma o contrassegno? Tieni premuto il <b>citofono</b>` : undefined,
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
         ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬', onFoot: true }

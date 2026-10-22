@@ -19,11 +19,11 @@ function toggle(key: Toggle, label: string, hint: string) {
 /** Controlli delle impostazioni: uguali nella schermata iniziale e in partita. */
 export function settingsHtml() {
   return [
-    toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: ti muovi trascinando il dito nella metà sinistra dello schermo e fai le azioni toccando la metà destra (nei lavoretti: joystick in basso a sinistra, sguardo in basso a destra). Acceso: il contrario.'),
-    toggle('battery', '🔋 Risparmio batteria', 'Il gioco disegna 30 immagini al secondo (15 quando non tocchi lo schermo) e con un po\' meno dettaglio: consuma circa la metà.'),
+    toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: muovi a sinistra, azioni a destra. Acceso: il contrario.'),
+    toggle('battery', '🔋 Risparmio batteria', 'Meno immagini al secondo e meno dettaglio: consuma circa la metà.'),
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),
-    toggle('outlines', '✏️ Contorni', 'Bordi scuri attorno agli oggetti: tutto più distinguibile. Spenti con qualità Bassa.'),
+    toggle('outlines', '✏️ Contorni', 'Bordi scuri attorno agli oggetti. Spenti con qualità Bassa.'),
     segmented('camera', '🎥 Distanza della camera', 'Quanto vedi della città attorno al personaggio.'),
     toggle('pointers', '➡️ Freccette ai bordi', 'Indicano i lavoretti vicini e il segnaposto.'),
     toggle('minimap', '🗺️ Minimappa', 'La mappa piccola in alto a destra.'),
@@ -41,7 +41,7 @@ function hudHtml() {
       <button class="btn sm sec" data-a="hud:down|${k}" ${i === n - 1 ? 'disabled' : ''} aria-label="Giù">▼</button>
       <button class="btn sm ${inMenu ? 'purple' : 'sec'}" data-a="hud:menu|${k}">${inMenu ? '☰ Nel menu' : '👁️ Visibile'}</button></div>`;
   }).join('');
-  return `<div class="card"><b>🧭 Pulsanti a destra</b><div class="muted small explain" style="margin:2px 0 8px">Cambia l'ordine con ▲▼ (dall'alto in basso). Quelli messi "nel menu" spariscono dalla colonna e si trovano toccando ☰ Menu: puoi metterci tutti i pulsanti, alcuni o nessuno.</div>
+  return `<div class="card"><b>🧭 Pulsanti a destra</b><div class="muted small explain" style="margin:2px 0 8px">▲▼ cambia l'ordine. "Nel menu" li sposta dentro ☰ Menu.</div>
     ${rows}<button class="btn sm sec full" data-a="hud:reset|x" style="margin-top:8px">↺ Disposizione iniziale</button></div>`;
 }
 

@@ -12,6 +12,12 @@ import { toast } from '../sim/bus';
  */
 
 /** Cosa fare in ogni fase, con il perché (null = si usa il punto da fare, es. lavapiatti). */
+/** Spiegazione lunga a punti: una frase per riga (si divide a ogni punto, punto e virgola o !; dopo il ? no: "Sbagliato? Tocca…" resta insieme). */
+function asPoints(t: string) {
+  const parts = t.split(/(?<=[.;!])\s+/).map((x) => x.replace(/[.;]$/, '').trim()).filter(Boolean);
+  return parts.length < 2 ? t : `<ul class="points">${parts.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+}
+
 /** Chiave: il tipo (versione di base) o `tipo:versione` (es. `giardino:1`, la potatura). */
 const TIPS: Record<string, string[] | null> = {
   giardino: [
@@ -23,7 +29,7 @@ const TIPS: Record<string, string[] | null> = {
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
-    'Porta un pacco a ogni <b>civico</b> del riquadro in alto: leggi le <b>targhe blu</b> sulle case e tocca lo <b>zerbino</b> davanti alla porta. L\'ordine lo scegli tu',
+    'Un pacco a ogni <b>civico</b> del riquadro in alto. Leggi le <b>targhe blu</b> sulle case. Tocca lo <b>zerbino</b>. L\'ordine lo scegli tu',
     'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [
@@ -33,21 +39,21 @@ const TIPS: Record<string, string[] | null> = {
   ],
   lavaggio: [
     'Prendi lo <b>spruzzino del sapone</b> (la tanica rosa)',
-    'Sull\'auto ci sono <b>macchie di sporco</b> marroni: insaponale tutte (anche sul muso, sulla coda e sul tetto: girale attorno)',
+    'Insapona tutte le <b>macchie marroni</b>. Gira attorno all\'auto: ci sono anche su muso, coda e tetto',
     'Prendi la <b>canna dell\'acqua</b> dall\'avvolgitubo verde',
     '<b>Sciacqua</b> via la schiuma bianca da ogni punto',
     'Prendi lo <b>straccio</b> dal secchio blu',
     '<b>Asciuga</b> le gocce azzurre finché l\'auto brilla',
   ],
   imbianchino: [
-    'Prima proteggi il giardino: copri ogni cosa (cespugli, aiuole, giochi…) con un <b>telone</b>',
+    'Copri cespugli, aiuole e giochi con un <b>telone</b>',
     'Prendi la <b>vernice</b> (i barattoli vicino al cancello)',
     '<b>Dipingi</b> ogni tratto del muretto di recinzione',
     'Lavoro finito: <b>togli i teloni</b>',
   ],
   'giardino:1': [
     'Ti servono le <b>cesoie da potatura</b>: sono nella <b>cassetta rossa</b>',
-    'Le <b>siepi</b> lungo la recinzione hanno delle <b>punte cresciute troppo</b> (verde chiaro): tagliale tutte',
+    'Taglia le <b>punte verde chiaro</b> delle <b>siepi</b>',
     'Gli <b>alberi</b> hanno dei <b>rami in eccesso</b> che sporgono: tagliali (alza lo sguardo!)',
     'I rami tagliati sono caduti a terra: <b>raccoglili</b>',
     'Butta i rami nella <b>cippatrice</b> arancione vicino alla casa',
@@ -212,7 +218,7 @@ export class JobTutorial {
     const near = !!g.task && g.near && !g.task.aim;
     const more = long ? `<button class="tut-more" data-t="more" aria-label="Spiegazione">${this.open ? '✕' : '?'}</button>` : '';
     const html = this.open
-      ? `<div class="tut-row"><span class="tut-line">🎓 ${line}</span>${more}</div><div class="tut-long">${long}</div>`
+      ? `<div class="tut-row"><span class="tut-line">🎓 ${line}</span>${more}</div><div class="tut-long">${asPoints(long)}</div>`
       : `<div class="tut-row"><span class="tut-line">${near ? '🎓' : `🎓 ${line}`}</span>${more}</div>`;
     if (html !== this.key) {
       this.key = html;

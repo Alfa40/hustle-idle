@@ -499,11 +499,11 @@ export class DriveRun extends BaseRun {
 
   guide(): RunGuide | null {
     const tips: Record<DriveKind, string> = {
-      navetta: 'Si guida come in un gioco di auto: <b>acceleratore</b> e <b>freno</b> in basso a sinistra, <b>frecce</b> in basso a destra per girare. Guida fino al <b>cerchio della fermata</b> e <b>fermati dentro</b>: i passeggeri salgono da soli. Lascia l\'acceleratore e frena un po\' prima di arrivare. Tenendo premuto il freno da fermo vai in retromarcia',
-      autobus: 'Fermati a ogni fermata della linea <b>in orario</b>: se sei in anticipo aspetta, se arrivi tardi perdi stelle. 🔔 = prenotata',
-      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: niente frenate o curve brusche (il gradimento 😊 scende). Sul <b>tachimetro</b>, oltre la <b>tacca</b> (barra arancione) girare o frenare è brusco: lascia l\'acceleratore prima delle curve e delle fermate',
-      privato: 'Guida <b>dolce</b>: il bicchiere d\'acqua 🥛 non deve rovesciarsi. Il cliente può <b>cambiare destinazione</b>. Oltre la <b>tacca</b> del tachimetro girare o frenare è brusco',
-      limousine: 'Prendi la sposa, poi <b>segui l\'auto dello sposo</b> né troppo vicino né troppo lontano, e fermati sul <b>tappeto rosso</b>. Oltre la <b>tacca</b> del tachimetro girare o frenare è brusco',
+      navetta: '<b>Acceleratore</b> e <b>freno</b> in basso a sinistra. <b>Frecce</b> in basso a destra per girare. <b>Fermati dentro</b> il cerchio della fermata. Frena un po\' prima di arrivare. Freno tenuto da fermo = retromarcia',
+      autobus: 'Fermati a ogni fermata <b>in orario</b>. In anticipo? Aspetta. In ritardo perdi stelle. 🔔 = prenotata',
+      turistico: 'Fermati a ogni monumento per le <b>foto</b>. Guida <b>dolce</b>: le brusche fanno scendere 😊. Oltre la <b>tacca</b> del tachimetro, curve e frenate sono brusche. Rallenta prima di curve e fermate',
+      privato: 'Guida <b>dolce</b>: il bicchiere 🥛 non deve rovesciarsi. Il cliente può <b>cambiare meta</b>. Oltre la <b>tacca</b> del tachimetro, curve e frenate sono brusche',
+      limousine: 'Prendi la sposa. <b>Segui l\'auto dello sposo</b>, né troppo vicino né lontano. Fermati sul <b>tappeto rosso</b>. Oltre la <b>tacca</b> del tachimetro, curve e frenate sono brusche',
     };
     const p = this.game.player.root.position;
     if (!this.boarded) {

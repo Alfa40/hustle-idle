@@ -139,11 +139,11 @@ export class Proposals {
 
   formHtml() {
     if (this.sent && !this.text) {
-      return `<div class="card hl"><h3>✅ Proposta inviata</h3><p class="small" style="margin:0">Grazie! Lo sviluppatore la legge e, se va bene, prepara la modifica. Puoi continuare a giocare.</p></div>
+      return `<div class="card hl"><h3>✅ Proposta inviata</h3><p class="small" style="margin:0">Grazie! Lo sviluppatore la leggerà.</p></div>
         <button class="btn blue full" data-a="propNew">📝 Scrivi un'altra proposta</button>`;
     }
     const photo = this.photo ? this.photo.replace(/^auto:/, '') : '';
-    return `<p class="muted small explain">Scrivi cosa vorresti cambiare nel gioco, come lo diresti a voce. La foto dello schermo e il posto in cui eri vengono aggiunti da soli: puoi toglierli o scegliere un'altra foto. Puoi aggiungere anche un video dalla galleria, per esempio una registrazione dello schermo: si tengono i primi ${VIDEO_MAX_SEC} secondi, senza audio. Non cambia niente nella tua partita. Se il tasto 📝 ti copre qualcosa, tienilo premuto e trascinalo dove vuoi.</p>
+    return `<ul class="muted small explain points"><li>Scrivi come lo diresti a voce</li><li>Foto e posto si aggiungono da soli: puoi toglierli</li><li>Puoi aggiungere un video (primi ${VIDEO_MAX_SEC} s, senza audio)</li><li>La tua partita non cambia</li><li>Il tasto 📝 ti copre? Tienilo premuto e spostalo</li></ul>
       <div class="card"><h3>📝 Cosa vorresti cambiare?</h3>
         <textarea class="lb-input prop-in" data-p="text" maxlength="${MAX_TEXT}" rows="4" placeholder="Es. Nel lavoretto del barista i clienti arrivano troppo in fretta">${esc(this.text)}</textarea></div>
       <div class="card"><h3>💡 Perché? <span class="muted small">(facoltativo)</span></h3>
@@ -295,12 +295,12 @@ export class Proposals {
 
   reviewHtml() {
     if (!devKey()) {
-      return `<div class="card hl"><h3>🔑 Chiave developer</h3><p class="small" style="margin:0">Per leggere le proposte serve la chiave sul telefono: riapri il link developer una volta, oppure scrivila qui.</p>
+      return `<div class="card hl"><h3>🔑 Chiave developer</h3><p class="small" style="margin:0">Serve la chiave: riapri il link developer o scrivila qui.</p>
         <input class="lb-input prop-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Chiave developer" style="width:100%;box-sizing:border-box;margin-top:8px">
         <button class="btn good full" data-a="revKey" style="margin-top:8px">Salva</button>${this.listError ? `<p class="small center bad">${esc(this.listError)}</p>` : ''}</div>`;
     }
     if (!this.list && !this.loading && !this.listError) void this.load();
-    const head = `<p class="muted small explain">Le proposte restano private finché non le approvi. Quando ne approvi una, entro qualche minuto diventa una proposta su GitHub e Claude prepara la modifica, con l'anteprima da provare sul telefono. Le scartate restano qui e si possono rimettere in attesa.</p>
+    const head = `<ul class="muted small explain points"><li>Restano private finché non le approvi</li><li>Approvata: Claude prepara la modifica con l'anteprima</li><li>Le scartate restano qui e si possono riprendere</li></ul>
       <div class="row" style="gap:6px;margin-bottom:8px"><button class="btn sm sec" data-a="revLoad" ${this.loading ? 'disabled' : ''}>${this.loading ? 'Carico…' : '🔄 Aggiorna'}</button></div>`;
     if (this.listError) return head + `<p class="small center bad">${esc(this.listError)}</p>`;
     if (!this.list) return head + '<p class="muted small center">Carico le proposte…</p>';

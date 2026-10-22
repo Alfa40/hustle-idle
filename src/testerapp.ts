@@ -76,7 +76,7 @@ function adviceBox(p: Prop) {
   const busy = voting === p.id;
   const draft = drafts.get(p.id) ?? mine?.comment ?? '';
   return `<div class="card tp-vote"><b>💬 Il tuo consiglio</b>
-      <p class="small muted" style="margin:0">Dopo averla provata: la metteresti nel gioco? Scrivi cosa va bene e cosa cambieresti. Decide lo sviluppatore, leggendo i consigli di tutti.</p>
+      <p class="small muted" style="margin:0">La metteresti nel gioco? Scrivi cosa va e cosa cambieresti.</p>
       <textarea class="lb-input tp-com" data-c="${p.id}" maxlength="${MAX_COMMENT}" rows="3" placeholder="Es. Mi piace, ma la linguetta è troppo grande">${esc(draft)}</textarea>
       <div class="dv-acts dv-decide"><button class="btn danger dv-rej" data-a="vote:${p.id}|no" ${busy ? 'disabled' : ''}>👎 Scartala</button><button class="btn good dv-acc" data-a="vote:${p.id}|si" ${busy ? 'disabled' : ''}>${busy ? 'Invio…' : '👍 Pubblicala'}</button></div>${msg}</div>`;
 }

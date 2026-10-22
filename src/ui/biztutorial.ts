@@ -30,9 +30,9 @@ const DOT: Partial<Record<StationKind, string>> = { source: '🔵', timed: '🟠
 
 /** I consigli dopo il primo cliente e prima di aprire: uno per volta. */
 const TIPS: { stage: 'tips' | 'go'; head: string; line: string; long: string }[] = [
-  { stage: 'tips', head: '🎉 Cliente servito!', line: '🍽️ Senza clienti prepara in anticipo: metti sul ripiano dei pronti', long: 'Quando non ci sono clienti puoi <b>preparare in anticipo</b> e appoggiare i prodotti sul <b>ripiano dei pronti</b>: dal bancone li servi subito.' },
-  { stage: 'tips', head: '🌡️ Caldo e freddo', line: '🌡️ Un prodotto resta caldo 45 s, poi va nel 🗑️ cestino', long: 'Un prodotto pronto resta caldo <b>45 secondi</b>, poi è ❄️ freddo e va buttato nel 🗑️ <b>cestino</b>.' },
-  { stage: 'go', head: '👥 Fatti aiutare', line: '👥 Assumi personale: Attività → resoconto → Personale', long: 'Assumi <b>dipendenti</b> (Attività → Le mie → tocca l\'attività → 👥 Personale accanto ai turni): i cuochi preparano, i cassieri servono. Con un <b>manager</b> l\'attività lavora anche senza di te. In ⬆️ <b>Migliorie</b> puoi provare fuochi e banchi con <b>👁️ Prova</b> prima di comprarli.' },
+  { stage: 'tips', head: '🎉 Cliente servito!', line: '🍽️ Senza clienti prepara in anticipo: metti sul ripiano dei pronti', long: 'Senza clienti <b>prepara in anticipo</b>. Metti i prodotti sul <b>ripiano dei pronti</b>. Dal bancone li servi subito.' },
+  { stage: 'tips', head: '🌡️ Caldo e freddo', line: '🌡️ Un prodotto resta caldo 45 s, poi va nel 🗑️ cestino', long: 'Resta caldo <b>45 secondi</b>. Poi è ❄️ freddo: buttalo nel 🗑️ <b>cestino</b>.' },
+  { stage: 'go', head: '👥 Fatti aiutare', line: '👥 Assumi personale: Attività → resoconto → Personale', long: 'Assumi da Attività → Le mie → 👥 Personale. I cuochi preparano, i cassieri servono. Col <b>manager</b> lavora anche senza di te.' },
 ];
 
 export class KitchenTutorial {
@@ -121,7 +121,7 @@ export class KitchenTutorial {
     let gesture: 'tap' | 'hold' | null = null;
     if (t.stage === 'intro') {
       line = `🎓 ${def.name}: prepariamo il primo ordine, ${prod}`;
-      long = 'Ogni prodotto passa da più <b>postazioni</b>: il colore del tappetino dice cosa si fa lì (🔵 prendi, 🟠 cuoci, 🟣 prepara, 🟢 servi). Il tempo è fermo: è solo una prova.';
+      long = 'Colore del tappetino: 🔵 prendi, 🟠 cuoci, 🟣 prepara, 🟢 servi. Il tempo è fermo: è una prova.';
       btn = '<button class="btn sm good" data-t="next">Iniziamo ▶</button>';
     } else if (t.stage === 'play') {
       // un passo alla volta, col pallino del colore della postazione
@@ -136,7 +136,7 @@ export class KitchenTutorial {
           break;
         case 'wait':
           line = `⏳ Cuoce: aspetta che la barra diventi verde`;
-          long = 'Guarda la <b>barra</b> sopra la postazione: quando è <b>verde</b> è pronto; se lo lasci troppo diventa rossa e <b>brucia</b> (nella prova no).';
+          long = 'Barra <b>verde</b> = pronto. Rossa = <b>brucia</b> (nella prova no).';
           break;
         case 'take':
           line = `✅ Pronto! Toglilo: ${at}`;

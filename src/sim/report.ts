@@ -94,20 +94,20 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
     const free = menuSlots(b) - b.products.length;
     if (free > 0) {
       const best = def.products.filter((p) => !b.products.includes(p)).sort((x, y) => productDemand(ms, b, y) - productDemand(ms, b, x))[0];
-      if (best) advice.push({ kind: 'grow', icon: '🍔', text: `Hai ${free} ${free === 1 ? 'posto libero' : 'posti liberi'} nel menù: aggiungi ${PRODUCTS[best].icon} ${PRODUCTS[best].name} (il più richiesto che non vendi)`, tab: 'prodotti', label: '🍔 Prodotti' });
+      if (best) advice.push({ kind: 'grow', icon: '🍔', text: `${free} ${free === 1 ? 'posto libero' : 'posti liberi'} nel menù: aggiungi ${PRODUCTS[best].icon} ${PRODUCTS[best].name}`, tab: 'prodotti', label: '🍔 Prodotti' });
     }
   }
   // dipendenti a vuoto solo in parte del turno (non di troppo): servono più clienti per sfruttarli
   const idle = cov.flatMap((x) => x.idle.map((i) => ({ ...i, r: x.r }))).filter((i) => i.hours.length < SHIFT_HOURS);
   const growId = upg(b, 'marketing') < upgOf(b.type, 'marketing').max ? 'marketing' : upg(b, 'look') < upgOf(b.type, 'look').max ? 'look' : null;
   if (!losing && isAutonomous(b) && idle.length) {
-    const who = idle.slice(0, 3).map((i) => `${i.emp.name.split(' ')[0]} (${(def.roleNames[i.r] ?? ROLES[i.r].name).toLowerCase()}) ${i.hours.length} ${i.hours.length === 1 ? 'ora' : 'ore'} su ${SHIFT_HOURS}, ${shortRanges(hoursCap(i.hours), hoursDem()).ranges.join(', ')}`).join('; ');
-    advice.push({ kind: 'grow', icon: '📣', text: `${idle.length === 1 ? 'Un dipendente lavora' : `${idle.length} dipendenti lavorano`} a vuoto per una parte del turno: ${who}${idle.length > 3 ? ' e altri' : ''}. Nelle altre ore servono, quindi non sono di troppo: aumenta la clientela${growId ? ` con ${upgOf(b.type, growId).name}` : ''} per sfruttarli`, tab: growId ? 'migliorie' : undefined, label: growId ? '⬆️ Migliorie' : undefined });
+    const who = idle.slice(0, 3).map((i) => `${i.emp.name.split(' ')[0]} alle ${shortRanges(hoursCap(i.hours), hoursDem()).ranges.join(', ')}`).join('; ');
+    advice.push({ kind: 'grow', icon: '📣', text: `${idle.length === 1 ? 'Un dipendente è' : `${idle.length} dipendenti sono`} a volte senza clienti: ${who}${idle.length > 3 ? ' e altri' : ''}. Servono nelle altre ore: porta più clienti${growId ? ` con ${upgOf(b.type, growId).name}` : ''}`, tab: growId ? 'migliorie' : undefined, label: growId ? '⬆️ Migliorie' : undefined });
   } else if (!losing && isAutonomous(b)) {
     const slowest = Math.min(...staff.map((x) => x.cap));
     if (slowest > peakRate * 1.4) {
       const id = upg(b, 'marketing') < upgOf(b.type, 'marketing').max ? 'marketing' : upg(b, 'look') < upgOf(b.type, 'look').max ? 'look' : null;
-      if (id) advice.push({ kind: 'grow', icon: '📣', text: `Il personale regge più clienti di quelli che arrivano: con ${upgOf(b.type, id).name} ne arrivano di più e lo sfrutti meglio`, tab: 'migliorie', label: '⬆️ Migliorie' });
+      if (id) advice.push({ kind: 'grow', icon: '📣', text: `Il personale regge più clienti: prendi ${upgOf(b.type, id).name} per averne di più`, tab: 'migliorie', label: '⬆️ Migliorie' });
     }
   }
   // domanda di oggi: cosa si vende di più nella zona del negozio (con stagione ed eventi del giorno)
@@ -124,20 +124,20 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
     const worst = sold[sold.length - 1];
     const better = products.find((x) => !x.selling && !x.locked);
     if (worst && better && better.demand > worst.demand * 1.15 && menuSlots(b) <= b.products.length) {
-      advice.push({ kind: 'grow', icon: '📈', text: `Oggi ${PRODUCTS[better.pid].icon} ${PRODUCTS[better.pid].name} è più richiesto di ${PRODUCTS[worst.pid].icon} ${PRODUCTS[worst.pid].name} (${fmtRate(better.demand)} contro ${fmtRate(worst.demand)} clienti all'ora): valuta di cambiarlo nel menù`, tab: 'prodotti', label: '🍔 Prodotti' });
+      advice.push({ kind: 'grow', icon: '📈', text: `${PRODUCTS[better.pid].icon} ${PRODUCTS[better.pid].name} (${fmtRate(better.demand)}/h) batte ${PRODUCTS[worst.pid].icon} ${PRODUCTS[worst.pid].name} (${fmtRate(worst.demand)}/h): cambialo nel menù?`, tab: 'prodotti', label: '🍔 Prodotti' });
     }
     const lockedTop = products[0];
     const bestSold = sold[0];
     if (lockedTop?.locked && bestSold && lockedTop.demand > bestSold.demand * 1.2) {
-      advice.push({ kind: 'grow', icon: '🏗️', text: `Il prodotto più richiesto oggi in questa zona è ${PRODUCTS[lockedTop.pid].icon} ${PRODUCTS[lockedTop.pid].name} (${fmtRate(lockedTop.demand)} clienti all'ora), ma serve l'ampliamento del locale per venderlo`, tab: 'migliorie', label: '⬆️ Migliorie' });
+      advice.push({ kind: 'grow', icon: '🏗️', text: `Il più richiesto qui è ${PRODUCTS[lockedTop.pid].icon} ${PRODUCTS[lockedTop.pid].name} (${fmtRate(lockedTop.demand)}/h): serve l'ampliamento`, tab: 'migliorie', label: '⬆️ Migliorie' });
     }
     const hot = products.find((x) => x.event > 1.15 && !x.locked);
-    if (hot) advice.push({ kind: 'grow', icon: '🎉', text: `Oggi c'è un evento: ${PRODUCTS[hot.pid].icon} ${PRODUCTS[hot.pid].name} è richiesto ${Math.round((hot.event - 1) * 100)}% più del solito${hot.selling ? ' (ce l\'hai: tieni pieno il magazzino)' : ' (non lo vendi: mettilo nel menù)'}`, tab: hot.selling ? 'magazzino' : 'prodotti', label: hot.selling ? '🧊 Magazzino' : '🍔 Prodotti' });
+    if (hot) advice.push({ kind: 'grow', icon: '🎉', text: `Evento: ${PRODUCTS[hot.pid].icon} ${PRODUCTS[hot.pid].name} +${Math.round((hot.event - 1) * 100)}% oggi.${hot.selling ? ' Tieni pieno il magazzino' : ' Mettilo nel menù'}`, tab: hot.selling ? 'magazzino' : 'prodotti', label: hot.selling ? '🧊 Magazzino' : '🍔 Prodotti' });
   }
   if (b.staff.length && !hasManager(b) && !advice.some((a) => a.text.includes('manager'))) {
     advice.push({ kind: 'short', icon: '👔', text: 'Senza manager l\'attività lavora solo quando ci sei tu', tab: 'personale', label: '👥 Personale' });
   }
-  if (!advice.length) advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale giusto per le ore di punta e magazzino pieno' });
+  if (!advice.length) advice.push({ kind: 'ok', icon: '✅', text: 'Tutto in ordine: personale e magazzino ok' });
   return {
     days, avg, hours, hasData, peak, peakRate, staff,
     costs: { rent: c.rent, utilities: c.utilities, salaries },

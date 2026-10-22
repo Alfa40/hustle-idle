@@ -992,28 +992,28 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   const staffLost = m.lostStaff ?? 0;
   const shortRoles = cover.filter((x) => x.n > 0 && x.short.hours.length);
   if (b.staff.length && missing.length && (lost >= 3 || !hasManager(b))) {
-    out.push({ kind: 'short', text: `Persi ${lost} clienti questa settimana (${pct}): manca il reparto ${missing.map(name).join(' e ')}. Assumi almeno un ${missing.map(name).join(' e un ')}`, tab: 'personale' });
+    out.push({ kind: 'short', text: `Persi ${lost} clienti (${pct}): manca ${missing.map(name).join(' e ')}. Assumine almeno uno`, tab: 'personale' });
   } else if (b.staff.length && shortRoles.length) {
     const list = shortRoles.map((x) => `${x.hire} ${x.hire === 1 ? name(x.r) : plural(x.r)}`).join(' e ');
-    const where = shortRoles.map((x) => `i ${plural(x.r)} non bastano ${x.short.ranges.length > 1 ? 'nelle ore' : 'nell\'ora'} ${x.short.ranges.join(', ')}`).join('; ');
-    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti questa settimana perché il personale non basta. ` : ''}Con i turni (massimo ${SHIFT_HOURS} ore a testa, anche divise in due) ${where} (nell'ora di punta arrivano circa ${fmtRate(peak)} clienti). Assumi circa ${list} in più: il manager li mette nei turni dove servono`, tab: 'personale' });
+    const where = shortRoles.map((x) => `${plural(x.r)} pochi alle ${x.short.ranges.join(', ')}`).join('; ');
+    out.push({ kind: 'short', text: `${staffLost ? `Persi ${staffLost} clienti: personale insufficiente. ` : ''}${where[0].toUpperCase() + where.slice(1)} (punta ~${fmtRate(peak)}/h). Assumi ${list} in più`, tab: 'personale' });
   } else if (unknown >= 3 && b.staff.length) {
-    out.push({ kind: 'info', text: `Persi ${unknown} clienti prima che il gioco registrasse il motivo. Con il personale e i turni di adesso tutta la giornata è coperta: dai prossimi giorni il resoconto ti dirà se se ne perdono ancora e perché` });
+    out.push({ kind: 'info', text: `Persi ${unknown} clienti senza motivo registrato. Ora la giornata è coperta: nei prossimi giorni vedrai se succede ancora` });
   }
   if (b.staff.length && !hasManager(b) && !missing.length) {
-    out.push({ kind: 'short', text: 'Senza manager l\'attività non lavora da sola quando non ci sei: i clienti si perdono. Assumi un manager' });
+    out.push({ kind: 'short', text: 'Senza manager non lavora quando non ci sei. Assumi un manager' });
   }
   // prodotti finiti
   const stockLost = m.lostStock ?? 0;
   if (stockLost >= 3) {
     const tip = !b.autoRestock ? 'attiva il riordino automatico nel Magazzino'
-      : !hasManager(b) && !b.staff.some((e) => e.role === 'magazzino') ? 'assumi un manager (o un magazziniere) che riordini da solo'
+      : !hasManager(b) && !b.staff.some((e) => e.role === 'magazzino') ? 'assumi un manager o un magazziniere'
         : 'compra la miglioria del frigo per tenere più scorte';
-    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti perché i prodotti erano finiti: ${tip}`, tab: tip.includes('frigo') ? 'migliorie' : tip.includes('assumi') ? 'personale' : 'magazzino' });
+    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti: prodotti finiti. Soluzione: ${tip}`, tab: tip.includes('frigo') ? 'migliorie' : tip.includes('assumi') ? 'personale' : 'magazzino' });
   }
   // fila troppo lunga mentre lavoravi tu
   const queueLost = m.lostQueue ?? 0;
-  if (queueLost >= 5) out.push({ kind: 'short', text: `Persi ${queueLost} clienti in fila mentre lavoravi nel locale: con un dipendente in più in cucina o alla cassa la fila scorre` });
+  if (queueLost >= 5) out.push({ kind: 'short', text: `Persi ${queueLost} clienti in fila mentre lavoravi tu. Assumi un aiuto in cucina o in cassa` });
   // dipendenti di troppo: solo se non si perdono clienti e misurando sulle ore di punta (con margine)
   const knownShare = known / Math.max(1, m.served + lost);
   if (!out.some((w) => w.kind !== 'info') && !missing.length && knownShare < 0.03 && unknown < 3 && peak > 0) {
@@ -1021,7 +1021,7 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
     const salary = cover.reduce((a, x) => a + x.excessSalary, 0);
     // per mansione, con i nomi: "1 cuoco (Anna) e 2 cassieri (Bruno, Carla)"
     const who = cover.filter((x) => x.excess).map((x) => `${x.excess} ${x.excess === 1 ? name(x.r) : plural(x.r)} (${x.excessEmps.map((e) => e.name.split(' ')[0]).join(', ')})`).join(' e ');
-    if (extra > 0) out.push({ kind: 'excess', text: `Costi alti: ${extra === 1 ? 'c\'è' : 'ci sono'} ${who} di troppo: in nessuna ora del ${extra === 1 ? 'suo turno' : 'loro turno'} servono, nemmeno nelle ore di punta (${euro(salary)} di stipendi al mese che si potrebbero risparmiare)`, tab: 'personale' });
+    if (extra > 0) out.push({ kind: 'excess', text: `Di troppo: ${who}. Non servono nemmeno nelle ore di punta (risparmi ${euro(salary)}/mese)`, tab: 'personale' });
   }
   return out;
 }

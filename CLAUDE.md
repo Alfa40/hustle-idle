@@ -50,6 +50,10 @@
   regole, consigli, note "come si calcola") ha la classe `explain` (o si scrive con `explain(...)` in src/ui/ui.ts)
   e resta nascosto finché non si tocca il tasto **?** nell'intestazione. Restano visibili solo dati, stati,
   avvisi e i pulsanti. Vale per ogni finestra nuova.
+- **Testi brevi, a punti**: niente paragrafi lunghi. Una spiegazione è un elenco di frasi corte (≈ 60 caratteri
+  ciascuna): in src/ui/ui.ts `points(...)` (dietro il "?") e `bullets(...)` (sempre visibile), classe `points`.
+  Consigli dei resoconti e messaggi: una riga sola, con il numero e cosa fare. I `tip` dei lavoretti si scrivono a
+  frasi brevi separate da punto: nel fumetto del tutorial (`asPoints` in src/ui/jobtutorial.ts) diventano un elenco.
 - **Guida obbligatoria per ogni tasto o funzione nuova** (`src/ui/guide.ts`, passi in `src/ui/guides.ts`): ogni finestra
   nuova ha un nome `guide` nel pannello e i suoi passi in `guides.ts` (`panel:<nome>`, `<nome>/tab:<scheda>`, `<nome>/<azione>`);
   ogni tasto nuovo fuori dalle finestre o funzione che si sblocca ha la sua guida (`hud:…`, `unlock:…` con `auto`). Una frase

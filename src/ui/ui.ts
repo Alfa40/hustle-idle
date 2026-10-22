@@ -90,6 +90,11 @@ interface Panel {
  * `explain(testo)` è la forma breve per un paragrafo di spiegazione.
  */
 const explain = (html: string, cls = '') => `<p class="muted small explain ${cls}">${html}</p>`;
+/** Spiegazione a punti brevi (una frase corta per punto): da preferire ai paragrafi lunghi. */
+const points = (...items: (string | false | 0 | null | undefined)[]) => bullets(...items).replace('class="', 'class="explain ');
+/** Elenco a punti brevi sempre visibile (non dietro il "?"). */
+const bullets = (...items: (string | false | 0 | null | undefined)[]) =>
+  `<ul class="muted small points">${items.filter(Boolean).map((t) => `<li>${t}</li>`).join('')}</ul>`;
 
 /**
  * Salva lo scorrimento (orizzontale e verticale) di ogni elemento che scorre dentro `root` e restituisce
@@ -996,7 +1001,7 @@ export class UI {
         </div>
         ${first ? '<div class="card tint small tut-note" style="margin-top:10px">🎓 <b>La prima volta c\'è il tutorial</b>: il tempo è fermo</div>' : `<button class="card set-toggle tut-toggle" data-a="tut" style="margin-top:10px"><div style="flex:1;text-align:left"><b>🎓 Con il tutorial</b><div class="muted small explain">${tut ? 'Ti guida passo passo sul posto, e il tempo è fermo.' : 'Il tutorial di questo lavoretto l\'hai già fatto: puoi rifarlo.'}</div></div>
           <span class="switch ${tut ? 'on' : ''}"><i></i></span></button>`}
-        <p class="muted small center explain" style="margin:10px 0 0">${tut ? '🎓 Il tutorial è una prova: niente soldi né esperienza, ma il lavoretto resta disponibile per farlo sul serio' : 'Più sei veloce, più stelle prendi ⭐'}</p>
+        <p class="muted small center explain" style="margin:10px 0 0">${tut ? '🎓 È una prova: niente soldi né esperienza. Il lavoretto resta da fare' : 'Più sei veloce, più stelle prendi ⭐'}</p>
         <div class="btnrow"><button class="btn sec" data-a="no">No grazie</button><button class="btn good" data-a="yes">Accetta</button></div>`,
       actions: {
         tut: () => (tut = first || !tut),
@@ -1017,7 +1022,7 @@ export class UI {
       small: true,
       color: 'var(--purple)',
       render: () => `<div class="card hero tint"><div class="emoji">${def.icon}</div><div class="big">Ora sai come si fa</div></div>
-        <p class="muted center explain">Il tutorial era una prova: niente soldi né esperienza. Il lavoretto <b>${def.name}</b> è ancora disponibile: fallo sul serio per essere pagato, più sei veloce più stelle prendi ⭐</p>
+        ${points('Era una prova: niente soldi né esperienza', `<b>${def.name}</b> è ancora disponibile: fallo per essere pagato`, 'Più sei veloce, più stelle ⭐')}
         <div class="btnrow"><button class="btn sec" data-a="later">Più tardi</button><button class="btn good" data-a="go">▶ Fallo adesso</button></div>`,
       actions: {
         later: () => this.close(),
@@ -1085,7 +1090,7 @@ export class UI {
         <div class="stat s-purple"><b>📍 ${ZONES[zone].name}</b><span>zona · clienti ×${ZONES[zone].demand}</span></div>
         <div class="stat s-orange"><b>${euro(lot.rent)}</b><span>${lot.kind === 'truck' ? '🅿️ posteggio' : '🏠 affitto'} al mese</span></div>
       </div>
-      ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Per comprare vai all'<b>agenzia affari</b> oppure davanti al lotto col cartello rosso.</div>
+      ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Si compra all'<b>agenzia affari</b> o davanti al cartello rosso</div>
         <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
       <h3 class="sec-title">Cosa puoi aprire qui</h3>${opts}
       ${this.estNote()}`;
@@ -1104,7 +1109,7 @@ export class UI {
   }
 
   private estNote() {
-    return explain(`* Stima con la domanda di oggi, due dipendenti per reparto (turni da 8 ore: coprono tutta la giornata) e un manager. Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese.`);
+    return points('* Stima con la domanda di oggi', '2 dipendenti per reparto + manager', `Bollette ${euro(BUSINESS.UTILITIES_MONTH)}/mese`);
   }
 
   private buyActions() {
@@ -1205,7 +1210,7 @@ export class UI {
     if (tab === 'mie') {
       if (!s.businesses.length) {
         return `<div class="card center"><div class="hero"><div class="emoji">🏪</div></div><p>Non hai ancora nessuna attività.</p>
-          <p class="muted">Metti da parte i soldi con i lavoretti, poi guarda la scheda <b>🛒 In vendita</b>. Il posteggio più economico costa ${euro(Math.min(...LOTS.map((l) => l.price)))}.</p></div>`;
+          <p class="muted">Fai soldi con i lavoretti, poi guarda <b>🛒 In vendita</b>.<br>Il posteggio più economico: ${euro(Math.min(...LOTS.map((l) => l.price)))}</p></div>`;
       }
       // catene: 2 o più attività dello stesso tipo si gestiscono insieme
       const chains = chainTypes(s).map((t) => {
@@ -1306,7 +1311,7 @@ export class UI {
         ${row('🏠 Affitto e bollette', neg((rent + bills) / D), neg(((rent + bills) * dom) / D))}
         ${veh ? row('🚗 Veicoli', neg(veh / D), neg((veh * dom) / D)) : ''}
         ${row('📊 Utile', `<span class="${pToday >= 0 ? 'good' : 'bad'}">${euro(pToday)}</span>`, `<span class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</span>`, 'lv-tot')}
-        <p class="muted small explain" style="margin:6px 0 0">Stipendi, affitto, bollette e veicoli si pagano a fine mese: qui sono divisi per giorno, così vedi se le attività guadagnano davvero. La merce è quella comprata per i magazzini. Per il resoconto di un'attività (turni, dipendenti, clienti, consigli) toccala nella scheda 🏢 Le mie.</p></div>`;
+        ${points('Stipendi, affitto, bollette e veicoli si pagano a fine mese', 'Qui sono divisi per giorno: vedi se guadagni davvero', 'Merce = scorte comprate per i magazzini', "Resoconto di un'attività: toccala in 🏢 Le mie")}</div>`;
       // dove vanno i soldi nel mese: le spese una per una rispetto agli incassi
       const spend: [string, number][] = [['📦 Merce', mGoods], ['👔 Stipendi', (sal * dom) / D], ['🏠 Affitto', (rent * dom) / D], ['💡 Bollette', (bills * dom) / D], ...(veh ? [['🚗 Veicoli', (veh * dom) / D] as [string, number]] : [])];
       const top = Math.max(1, mRev, ...spend.map((x) => x[1]));
@@ -1328,8 +1333,7 @@ export class UI {
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
-    return `<div class="muted small explain" style="margin-bottom:8px"><p style="margin:0 0 6px">Ogni numero è quanti <b>clienti all'ora</b> (per le imprese di servizi: <b>ordini all'ora</b>) chiedono oggi quel prodotto in ogni zona. Cambia ogni giorno con stagioni, meteo, eventi e la tua fama.</p>
-        <p style="margin:0">Come usarlo: apri dove i numeri sono più alti; metti nel menù i prodotti più richiesti e togli quelli quasi a zero; se i clienti all'ora sono più di quanti il tuo personale ne serve, assumi o migliora l'attrezzatura (nei Resoconti vedi quanti ne perdi).</p></div>` +
+    return points("Numero = <b>clienti all'ora</b> (servizi: <b>ordini all'ora</b>) di oggi", 'Cambia con stagioni, meteo, eventi e fama', 'Apri dove i numeri sono più alti', 'Metti in vendita i più richiesti, togli quelli a zero', 'Se ne perdi troppi: assumi o migliora (vedi Resoconti)') +
       BUSINESS_TYPE_IDS.filter((t) => bizType(t).products.length).map((t) => {
         const def = bizType(t);
         const fm = fameMultiplier(s, t);
@@ -1495,7 +1499,7 @@ export class UI {
     const staff = b.staff.length;
     return `<div class="card sell-card"><h3>💰 Vendi l'attività</h3>
       <p class="small" style="margin:0 0 4px">Ricevi <b>${euro(v.total)}</b>: metà di quanto hai speso (${euro(v.spent)})${v.stock ? `, più la merce in magazzino (${euro(v.stock)})` : ''}.</p>
-      <p class="muted small explain" style="margin:0 0 8px">Il posto torna libero e puoi aprirci un'altra attività. ${staff ? `${staff === 1 ? 'Il dipendente torna' : `I ${staff} dipendenti tornano`} tra i candidati di oggi: ${staff === 1 ? 'puoi riassumerlo' : 'puoi riassumerli'} in un'altra attività.` : ''} Migliorie, prodotti e statistiche di questa attività si perdono.</p>
+      ${points('Il posto torna libero', staff && `${staff === 1 ? 'Il dipendente torna' : `I ${staff} dipendenti tornano`} tra i candidati: puoi riassumerli`, 'Migliorie, prodotti e statistiche si perdono')}
       <button class="btn ${confirm ? 'danger' : 'sec'} full" data-a="sell">${confirm ? `⚠️ Sicuro? Tocca ancora per vendere a ${euro(v.total)}` : "💰 Vendi l'attività"}</button></div>`;
   }
 
@@ -1524,12 +1528,12 @@ export class UI {
         <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
         ${bestLot ? `${this.estStats(bestLot, t)}<div class="muted small center" style="margin:4px 0 8px">nel locale libero migliore: ${esc(lotDef(bestLot).name)}</div>` : ''}
         <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button>
-        ${!ready ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi ancora evolvere: ${miss.length === 1 ? 'manca' : 'mancano'} ${miss.map((x) => `${x.def.icon} ${x.def.name} (${x.lvl}/${x.def.max})`).join(', ')}.</div>`
-          : !lots.length ? `<div class="small center" style="margin-top:6px;color:#e0a030">Non puoi evolvere: ${d.name} ha bisogno di un locale di tipo diverso dal tuo e non ce n'è nessuno libero, tutti sono già tuoi. Chiudi o vendi un'attività di quel tipo per liberarne uno.</div>`
+        ${!ready ? `<div class="small center" style="margin-top:6px;color:#e0a030">${miss.length === 1 ? 'Manca 1 miglioria' : `Mancano ${miss.length} migliorie`} (elenco qui sopra)</div>`
+          : !lots.length ? `<div class="small center" style="margin-top:6px;color:#e0a030">${d.name} vuole un altro tipo di locale e sono tutti tuoi.<br>Vendine uno per liberarlo.</div>`
           : s.money < from ? `<div class="small center" style="margin-top:6px;color:#e0a030">Ti mancano ${euro(from - s.money)} per il locale più economico.</div>` : ''}</div>`;
     }).join('');
     return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
-        <p class="muted small explain" style="margin:0 0 6px">Per evolvere servono <b>tutte le migliorie al massimo</b> e una <b>ristrutturazione completa</b>: scegli un locale libero (o resta dove sei, pagando solo la ristrutturazione) e paghi un solo prezzo (locale + ristrutturazione). L'attività di adesso si trasforma e, se cambi locale, il suo posto torna libero; i dipendenti vengono con te, migliorie e scorte ripartono da zero.</p>
+        ${points('Servono <b>tutte le migliorie al massimo</b>', 'Paghi locale + ristrutturazione in un solo prezzo', 'Restando dove sei paghi solo la ristrutturazione', 'Se cambi locale, il vecchio torna libero', 'I dipendenti restano, migliorie e scorte ripartono da zero')}
         ${reqs}</div>
       <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}${this.estNote()}`;
   }
@@ -1547,7 +1551,7 @@ export class UI {
         if (!b) return '<p>Attività non trovata.</p>';
         const own = b.lotId;
         const lots = evolveLots(s, target, own).sort((x, y) => evolvePrice(x, target, own) - evolvePrice(y, target, own));
-        return `<div class="card row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div><div style="flex:1"><b>${d.name}</b><div class="small">🏗️ ristrutturazione ${euro(d.evolveCost ?? 0)} + locale</div></div></div>` + explain(`Il prezzo comprende il locale e la ristrutturazione (${euro(d.evolveCost ?? 0)}). In centro ci sono più clienti ma costa di più.`) +
+        return `<div class="card row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div><div style="flex:1"><b>${d.name}</b><div class="small">🏗️ ristrutturazione ${euro(d.evolveCost ?? 0)} + locale</div></div></div>` + points(`Prezzo = locale + ristrutturazione (${euro(d.evolveCost ?? 0)})`, 'In centro più clienti, ma costa di più') +
           lots.map((l) => {
             const lot = lotDef(l);
             const price = evolvePrice(l, target, own);
@@ -1614,7 +1618,7 @@ export class UI {
           <div class="stat s-green"><b>${n1(r.avg.served)}</b><span>serviti al giorno</span></div>
           <div class="stat ${lostPct >= 10 ? 's-red' : ''}"><b>${n1(r.avg.lost)} <small>(${lostPct}%)</small></b><span>persi al giorno</span></div>
           <div class="stat s-yellow"><b class="money-t">${euro(r.avg.revenue)}</b><span>incasso al giorno</span></div></div>
-          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi questa settimana: ${r.lostWhy.staff} per personale insufficiente · ${r.lostWhy.stock} per prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu${r.lostWhy.unknown ? ` · ${r.lostWhy.unknown} prima che il gioco registrasse il motivo` : ''}</div>` : ''}</div>`;
+          ${r.avg.lost ? `<div class="small muted" style="margin-top:6px">Persi: ${r.lostWhy.staff} poco personale · ${r.lostWhy.stock} prodotti finiti · ${r.lostWhy.queue} in fila mentre lavoravi tu${r.lostWhy.unknown ? ` · ${r.lostWhy.unknown} senza motivo` : ''}</div>` : ''}</div>`;
         // orario di punta: barre ora per ora (verde serviti, rosso persi)
         const max = Math.max(0.1, ...r.hours.map((x) => x.arrived));
         const bars = r.hours.map((x) => {
@@ -1623,14 +1627,14 @@ export class UI {
           return `<div class="hb ${x.h === r.peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
         }).join('');
         const peakCard = `<div class="card"><h3>⏰ Orario di punta: ${r.peak.h}–${r.peak.h + 1}</h3>
-          <div class="small">In quell'ora arrivano circa <b>${n1(r.peakRate)} ${unit}</b>${r.hasData ? ' (media della settimana)' : ' (stima dalla domanda: ancora pochi dati registrati)'}. Il personale va calcolato su quest'ora, non sulla media.</div>
+          <div class="small">Circa <b>${n1(r.peakRate)} ${unit}</b> in quell'ora${r.hasData ? ' (media settimana)' : ' (stima: pochi dati)'}.</div>${explain("Il personale va calcolato su quest'ora, non sulla media")}
           <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
         // personale per reparto
         const staffRows = r.staff.map((x) => `<div class="staff-row"><div><b>${x.name}</b> · ${x.n} ${x.n === 1 ? 'persona' : 'persone'}
             <div class="shifts">${x.shifts.map((sh) => `<span class="shift">${esc(sh.name)} ${sh.text ?? `${sh.start}–${sh.end}`}</span>`).join('') || '<span class="muted small">nessuno</span>'}</div>
             <div class="small muted">${x.status === 'short' ? `scoperto nelle ore ${x.short.join(', ')} · ne servono ~${x.need}` : x.status === 'excess' ? `ne basterebbero ~${x.need}` : 'tutta la giornata coperta'}</div></div>
           <span class="tag ${x.status === 'ok' ? 'g' : x.status === 'short' ? 'r' : 'y'}">${x.status === 'ok' ? '✅ giusto' : x.status === 'short' ? '⚠️ pochi' : '💸 troppi'}</span></div>`).join('');
-        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale e turni</h3><div class="small muted">Aperti dalle ${BUSINESS.OPEN_HOUR} alle ${BUSINESS.CLOSE_HOUR} (14 ore), massimo 8 ore a testa, di fila o divise in due (es. 4 + 4, 6 + 2): il manager mette più persone nelle ore di punta (circa ${n1(r.peakRate)} ${unit} all'ora) e meno nelle ore morte.</div>${staffRows}</div>` : '';
+        const staffCard = r.staff.length ? `<div class="card"><h3>👥 Personale e turni</h3><div class="small muted">Aperti ${BUSINESS.OPEN_HOUR}–${BUSINESS.CLOSE_HOUR}</div>${points('Massimo 8 ore a testa, anche divise in due', `Il manager mette più persone nelle ore di punta (~${n1(r.peakRate)} ${unit}/h)`)}${staffRows}</div>` : '';
         // cosa si vende oggi
         const pmax = Math.max(0.1, ...r.products.map((x) => x.demand));
         const prod = r.products.length ? `<div class="card"><h3>📈 Cosa si vende oggi in questa zona</h3>${r.products.map((x) => `<div class="prod-row"><div class="pr-top"><span class="pr-name">${PRODUCTS[x.pid].icon} ${PRODUCTS[x.pid].name}</span>
@@ -1648,7 +1652,7 @@ export class UI {
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
         return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
           ${full ? `<div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>`
-            : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Il manager sta ancora raccogliendo informazioni: con pochi giorni i numeri possono cambiare. Si aggiorna ogni sera alla chiusura; il resoconto completo arriva a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + liveCards + advice + day + peakCard + staffCard + prod + costs;
+            : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Pochi giorni: i numeri possono cambiare. Si aggiorna ogni sera; completo a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + liveCards + advice + day + peakCard + staffCard + prod + costs;
       },
       actions: {
         // in avanti: con "‹ Indietro" si torna al resoconto
@@ -1725,7 +1729,7 @@ export class UI {
           <div class="lv-row"><span>🧺 Domanda base del prodotto</span><b></b><b>${n1(pr.baseDemand)}/h</b></div>
           ${facs.map((f) => `<div class="lv-row"><span>${f.icon} ${esc(f.name)}</span><b></b><b class="${f.mult > 1.02 ? 'good' : f.mult < 0.98 ? 'bad' : ''}">${f2(f.mult)}</b></div>`).join('')}
           <div class="lv-row lv-tot"><span>= ${unit} all'ora oggi</span><b></b><b>${n1(today)}/h</b></div>
-          <p class="muted small explain" style="margin:6px 0 0">La domanda base si moltiplica per ogni riga: sopra ×1 aiuta (verde), sotto ×1 frena (rosso). L'andamento del mercato cambia un po' ogni giorno a caso e poi torna piano piano verso ×1. Durante il giorno i ${unit} arrivano di più nelle ore di punta.</p></div>`;
+          ${points('La domanda base si moltiplica per ogni riga', 'Sopra ×1 aiuta (verde), sotto ×1 frena (rosso)', 'Il mercato cambia un po\' ogni giorno, poi torna a ×1', `Nelle ore di punta arrivano più ${unit}`)}</div>`;
         // zona per zona oggi
         const zmax = Math.max(0.1, ...zones.map((z) => marketDemand(s, pid, z) * mult));
         const byZone = `<div class="card" data-g="zones"><h3>📍 Oggi zona per zona</h3>${zones.map((z) => {
@@ -1747,7 +1751,7 @@ export class UI {
         const next = `<div class="card" data-g="fc"><h3>⛅ Prossimi 7 giorni</h3>
           <div class="fc-row fc-head"><span class="fc-day"></span><span class="fc-w">meteo</span><span class="fc-bar">${unit} all'ora</span><span class="fc-val">probabile</span><span class="fc-sure">sicura</span></div>${rows}
           <div class="small muted" style="margin-top:6px">📅 Stagione: ${seas}</div>
-          <p class="muted small explain" style="margin:6px 0 0">La barra va dal minimo al massimo che ci si può aspettare, la tacca è il valore più probabile. Più il giorno è lontano, meno la previsione è sicura (la percentuale a destra): il meteo può cambiare e il mercato si muove un po' a caso ogni giorno. Stagione ed eventi già annunciati invece sono sicuri. La percentuale sotto l'icona del meteo è la probabilità di quel tempo.</p></div>`;
+          ${points('Barra = da minimo a massimo, tacca = più probabile', 'Più il giorno è lontano, meno è sicuro (% a destra)', 'Stagione ed eventi annunciati sono sicuri', '% sotto il meteo = probabilità di quel tempo')}</div>`;
         return chips + now + why + byZone + next;
       },
       actions: {
@@ -1782,7 +1786,7 @@ export class UI {
     const nPart = got.length - nFull;
     const nWait = reps.length - got.length;
     const name = (b: Business) => esc(lotDef(b.lotId).name);
-    const status = `<div class="report-date">📅 ${nFull} ${nFull === 1 ? 'resoconto completo' : 'resoconti completi'}${nPart ? ` · ${nPart} ${nPart === 1 ? 'provvisorio' : 'provvisori'}` : ''}${nWait ? ` · ${nWait} ${nWait === 1 ? 'negozio' : 'negozi'} ancora senza dati` : ''}<br><span class="small">Somma dei resoconti dei negozi (quelli provvisori hanno ancora pochi giorni di dati).</span></div>`;
+    const status = `<div class="report-date">📅 ${nFull} ${nFull === 1 ? 'resoconto completo' : 'resoconti completi'}${nPart ? ` · ${nPart} ${nPart === 1 ? 'provvisorio' : 'provvisori'}` : ''}${nWait ? ` · ${nWait} ${nWait === 1 ? 'negozio' : 'negozi'} ancora senza dati` : ''}<br><span class="small">Somma dei resoconti dei negozi</span></div>`;
     // un riepilogo per negozio: serviti, persi, reparti, utile; tocca per il suo resoconto
     const rows = () => reps.map(({ b, snap, full }) => {
       const d = snap?.data;
@@ -1794,7 +1798,7 @@ export class UI {
         <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
     }).join('');
     // anche senza dati dei manager i negozi si vedono (resoconto con conti e turni, tasto Personale)
-    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager stanno raccogliendo i dati: il resoconto provvisorio di ogni negozio arriva dal 3° giorno.</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
+    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager raccolgono i dati: primo resoconto dal 3° giorno</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
     const sum = (f: (r: (typeof got)[number]) => number) => got.reduce((a, r) => a + f(r), 0);
     const arrived = sum((r) => r.snap!.data.avg.arrived);
     const served = sum((r) => r.snap!.data.avg.served);
@@ -1836,7 +1840,7 @@ export class UI {
       const lh = x.arrived ? (x.lost / x.arrived) * hh : 0;
       return `<div class="hb ${x.h === peak.h ? 'peak' : ''}"><div class="hb-col"><i class="hb-ok" style="height:${hh - lh}%"></i><i class="hb-lost" style="height:${lh}%"></i></div><span>${x.h}</span></div>`;
     }).join('');
-    const peakCard = `<div class="card"><h3>⏰ Orario di punta della catena: ${peak.h}–${peak.h + 1}</h3><div class="small">In quell'ora arrivano circa <b>${n1(peak.arrived)} clienti</b> in tutti i negozi insieme.</div>
+    const peakCard = `<div class="card"><h3>⏰ Orario di punta della catena: ${peak.h}–${peak.h + 1}</h3><div class="small">Circa <b>${n1(peak.arrived)} clienti</b> in tutti i negozi insieme</div>
       <div class="hours">${bars}</div><div class="small muted"><i class="lg ok"></i> serviti <i class="lg lost"></i> persi</div></div>`;
     // COSA FARE NELLA CATENA: i problemi raggruppati per tipo (non negozio per negozio), con il modo più veloce
     // per sistemarli: un tasto che lo fa in tutto il gruppo (migliorie, magazzini, riordino, menù) oppure,
@@ -1893,7 +1897,7 @@ export class UI {
       const lv = bizs.map((b) => upg(b, id));
       return `${upgOf(type, id).icon} ${upgOf(type, id).name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
     }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
-    const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3><div class="small muted" style="margin-bottom:4px">I problemi di tutti i negozi raggruppati: dove si può, un tasto lo sistema in tutto il gruppo.</div>${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine in tutti i negozi: personale giusto per le ore di punta, magazzini pieni e migliorie pari</span></div>'}</div>`;
+    const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3>${explain('Problemi di tutti i negozi insieme: un tasto li sistema in tutto il gruppo')}${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine: personale, magazzini e migliorie</span></div>'}</div>`;
     return status + advice + day + peakCard + `<h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
   }
 
@@ -1925,14 +1929,14 @@ export class UI {
         if (tab === 'resoconto') {
           body = this.chainReport(g.bizs);
         } else if (tab === 'prodotti') {
-          body = `<p class="muted small explain">Metti o togli un prodotto in tutti i negozi del gruppo insieme (dove c'è posto nel menù e il locale è abbastanza grande).</p>` +
+          body = `${explain('Metti o togli un prodotto in tutti i negozi insieme (dove c\'è posto)')}` +
             def.products.map((p) => {
               const n = g.bizs.filter((b) => b.products.includes(p)).length;
               return `<div class="card row between report-card" data-a="prodInfo:${p}"><div><b>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</b><div class="muted small">In vendita in ${n} su ${g.bizs.length}</div><div class="report-more" style="margin:2px 0 0">Mercato e previsioni ›</div></div>
                 <div class="row" style="gap:6px"><button class="btn sm sec" data-a="prod:${p}|0" ${n ? '' : 'disabled'}>Togli</button><button class="btn sm good" data-a="prod:${p}|1" ${n === g.bizs.length ? 'disabled' : ''}>Metti</button></div></div>`;
             }).join('');
         } else if (tab === 'migliorie') {
-          body = `<p class="muted small explain">Migliora di un livello tutti i negozi del gruppo in un tocco (quelli già al massimo o senza spazio si saltano).</p>` +
+          body = `${explain('+1 livello a tutti i negozi in un tocco (salta quelli al massimo)')}` +
             upgradeIdsFor(type, hasInterior(type), hasCashUpgrade(type)).map((id) => {
               const u = upgOf(type, id);
               const lv = g.bizs.map((b) => upg(b, id));
@@ -1950,9 +1954,9 @@ export class UI {
             }).join('');
         } else if (tab === 'magazzino') {
           const allAuto = g.bizs.every((b) => b.autoRestock);
-          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small explain">Ogni prodotto in vendita fino al massimo, in tutti i negozi del gruppo.</div>
+          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small explain">Ogni prodotto al massimo, in tutti i negozi</div>
               <button class="btn full" style="margin-top:8px" data-a="fill">Riempi tutto</button></div>
-            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small explain">Il manager (o il magazziniere) riordina da solo in tutti i negozi del gruppo.</div></div>
+            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small explain">Il manager riordina da solo in tutti i negozi</div></div>
               <span class="switch ${allAuto ? 'on' : ''}"><i></i></span></button>`;
         } else {
           body = shops;
@@ -2042,7 +2046,7 @@ export class UI {
     const pct = (l: { served: number; lost: number }) => (l.served + l.lost ? Math.round((l.lost / (l.served + l.lost)) * 100) : 0);
     const row = (name: string, a: string, b: string, cls = '') => `<div class="lv-row ${cls}"><span>${name}</span><b>${a}</b><b>${b}</b></div>`;
     const neg = (x: number) => (x ? `−${euro(x)}` : euro(0));
-    const why = t.lost ? `<div class="small muted" style="margin-top:6px">Persi oggi: ${t.lostStaff ?? 0} per personale che non basta · ${t.lostStock ?? 0} per prodotti finiti · ${t.lostQueue ?? 0} in fila mentre lavoravi tu</div>` : '';
+    const why = t.lost ? `<div class="small muted" style="margin-top:6px">Persi oggi: ${t.lostStaff ?? 0} poco personale · ${t.lostStock ?? 0} prodotti finiti · ${t.lostQueue ?? 0} in fila mentre lavoravi tu</div>` : '';
     const money = `<div class="card" data-g="money"><h3>💶 I conti</h3>
       <div class="lv-row lv-head"><span></span><b>Oggi</b><b>Mese (${dom}/${D})</b></div>
       ${row(`👥 ${unit[0].toUpperCase() + unit.slice(1)} serviti`, String(t.served), String(m.served))}
@@ -2054,7 +2058,7 @@ export class UI {
       ${row('📊 Utile', `<span class="${profitToday >= 0 ? 'good' : 'bad'}">${euro(profitToday)}</span>`, `<span class="${profitMonth >= 0 ? 'good' : 'bad'}">${euro(profitMonth)}</span>`, 'lv-tot')}
       ${why}
       <div class="row between small" style="margin-top:8px"><span>Spese fisse al mese: stipendi ${euro(salaries)} + affitto ${euro(c.rent)} + bollette ${euro(c.utilities)}</span><b>${euro(fixedMonth)}</b></div>
-      <p class="muted small explain" style="margin:6px 0 0">Stipendi, affitto e bollette si pagano a fine mese: qui sono divisi per giorno, così vedi se l'attività guadagna davvero. La merce è quella comprata per il magazzino.</p></div>`;
+      ${points('Stipendi, affitto e bollette si pagano a fine mese', 'Qui sono divisi per giorno: vedi se guadagni davvero', 'Merce = scorte comprate per il magazzino')}</div>`;
     if (def.kind === 'craft') return money;
     // turni di oggi
     const { plan, curve } = shiftsFor(s, biz);
@@ -2135,8 +2139,8 @@ export class UI {
     }).join('');
     const inTraining = biz.staff.length - team.length;
     const training = inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : '';
-    const note = (key: string, cap = capOf(null)) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} che arrivano in quell'ora · <b>reggono</b>: quanti ne servono quelli di turno · <b>colonne</b>: le ore di ogni dipendente, il colore è la persona${key}${hours.some(shortWith(cap)) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
-    const explainTxt = `<p class="muted small explain" style="margin:6px 0 0">I turni li organizza il manager (o il gioco, se non c'è): massimo 8 ore a testa, di fila o in due pezzi, più persone nelle ore di punta. "Reggono" sono i ${unit} che quelli di turno riescono a servire${need.length > 1 ? `: ogni reparto ha i suoi numeri e per tutta l'attività conta il reparto più lento (es. 2 cuochi ma 1 solo cassiere: decide il cassiere)` : ''}. Se in una fascia i previsti sono più di quelli che reggono, quei ${unit} si perdono: assumi nel reparto che manca, migliora l'attrezzatura o fai crescere i dipendenti (livelli e stelle li rendono più veloci). I ${unit} previsti cambiano ogni giorno con meteo, eventi e fama.</p>`;
+    const note = (key: string, cap = capOf(null)) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} in arrivo · <b>reggono</b>: quanti ne serve il turno · <b>colonne</b>: ore di ogni dipendente${key}${hours.some(shortWith(cap)) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
+    const explainTxt = points("I turni li fa il manager: max 8 ore a testa", `"Reggono" = ${unit} che il turno riesce a servire`, need.length > 1 && 'Conta il reparto più lento (2 cuochi e 1 cassiere: decide il cassiere)', `Previsti più di "reggono": quei ${unit} si perdono`, 'Rimedi: assumi, migliora l\'attrezzatura, fai crescere lo staff', 'I previsti cambiano con meteo, eventi e fama');
     const staffBtn = '<button class="btn sm" data-a="go:personale">👥 Personale</button>';
     let shifts: string;
     if (!team.length) {
@@ -2177,7 +2181,7 @@ export class UI {
           Lo stipendio risparmiato è ${euro(off.salary)} al mese.<br><b class="${net >= 0 ? 'good' : 'bad'}">In un mese: ${net >= 0 ? '+' : '−'}${euro(Math.abs(net))}</b> <span class="muted small">${off.role === 'manager' ? 'ma senza manager l\'attività non lavora da sola' : net >= 0 ? 'licenziare conviene' : 'licenziare non conviene'}</span>
           <div class="row" style="gap:6px;margin-top:6px"><button class="btn sm sec" data-a="shx:${off.id}">↩️ Rimetti</button><button class="btn sm danger" data-a="shf:${off.id}">${this.fireAsk === off.id ? 'Sicuro? Tocca ancora' : 'Licenzia'}</button>${staffBtn}</div></div>`;
       }
-      shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>${segs}<div class="small muted sh-tap explain">👆 Tocca il turno di un dipendente per vedere cosa succederebbe senza quella persona (tocca di nuovo per rimetterla).</div>${what}${gridOf(members, cap, cap2)}${empty}
+      shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>${segs}<div class="small muted sh-tap explain">👆 Tocca un turno: vedi cosa succede senza quella persona</div>${what}${gridOf(members, cap, cap2)}${empty}
         ${view ? '' : `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>`}${note(view ? '' : ' e la trama il lavoro', cap)}
         <div class="sh-legend">${legendOf(members)}</div>${training}
         <h3 style="margin:12px 0 4px">⏰ Fasce orarie${label ? ` <span class="muted small">${esc(label)}</span>` : ''}${off ? ` <span class="small bad">senza ${esc(off.name.split(' ')[0])}</span>` : ''}</h3>${bandsOf(members.filter((e) => need.includes(e.role) && e.id !== off?.id), cap2 ?? cap)}${explainTxt}</div>`;
@@ -2188,10 +2192,10 @@ export class UI {
   private reportWaiting(biz: Business) {
     const why = biz.statsWhy && (biz.week?.from ?? 0) === biz.statsFrom ? `<p class="muted small">🔄 La raccolta è ripartita dopo l'ultimo cambio (<b>${esc(biz.statsWhy)}</b>): i dati di prima non valgono più.</p>` : '';
     return `<div class="card center"><div class="hero"><div class="emoji">🧑‍💼</div></div>
-      <p><b>Il manager deve raccogliere ulteriori informazioni prima di fornire un resoconto della settimana.</b></p>
+      <p><b>Il manager sta ancora raccogliendo i dati.</b></p>
       ${this.reportProgress(biz, false)}${why}
       <p><b>📋 ${this.partialWhen(biz)}</b></p>
-      <p class="muted small explain">Il resoconto provvisorio si vede dal ${PARTIAL_DAYS}° giorno di raccolta e si aggiorna ogni sera alla chiusura (${BUSINESS.CLOSE_HOUR}:00); quello completo arriva quando le giornate raccolte sono ${REPORT_DAYS}: con la media della settimana, l'orario di punta, il personale e i consigli.</p></div>`;
+      ${points(`Provvisorio dal ${PARTIAL_DAYS}° giorno`, `Si aggiorna ogni sera alle ${BUSINESS.CLOSE_HOUR}:00`, `Completo dopo ${REPORT_DAYS} giornate: media, ore di punta, personale e consigli`)}</div>`;
   }
 
   /** Quando arriva il resoconto provvisorio (stasera, domani sera, tra N giorni). */
@@ -2256,11 +2260,11 @@ export class UI {
           <div class="stat s-purple"><b class="money-t">${euro(b.month.revenue)}</b><span>📅 questo mese</span></div>
           <div class="stat s-orange"><b>${euro(c.rent + c.utilities)}</b><span>🏠 affitto e bollette al mese</span></div>
           <div class="stat s-yellow"><b>🎨 Liv. ${lv}</b><span>artigianato</span></div></div>
-        <div class="card tint small" style="margin-top:10px">🛠️ Qui si lavora solo a mano: ogni giorno arrivano <b>lavori su richiesta</b> che fai tu in prima persona, pagati più dei lavoretti. Niente clienti al bancone e niente dipendenti. Più sale l'esperienza in artigianato, più i lavori sono difficili e pagati meglio. Migliorando il laboratorio si sbloccheranno nuovi tipi di lavoro.</div>`;
+        ${bullets('🛠️ Qui lavori solo tu, a mano', 'Ogni giorno nuovi <b>lavori su richiesta</b>, pagati più dei lavoretti', 'Niente clienti al bancone, niente dipendenti', 'Più esperienza = lavori più difficili e pagati meglio')}`;
     }
     if (type.kind === 'craft' && tab === 'migliorie') {
       const jobs = CRAFT_JOBS.map((j) => `<div class="card row between"><span>${j.icon} <b>${j.name}</b><div class="muted small explain">${j.desc}</div></span>${j.ready ? '<span class="tag g">Sbloccato</span>' : '<span class="tag">🔜 In arrivo</span>'}</div>`).join('');
-      return `<p class="muted small explain">Migliorando il laboratorio sbloccherai nuovi tipi di lavoro su richiesta. I prossimi sono in preparazione.</p>${jobs}`;
+      return `${explain('Migliora il laboratorio per sbloccare nuovi lavori')}${jobs}`;
     }
     if (tab === 'lavori') {
       const list = specialOrders(s, b);
@@ -2274,7 +2278,7 @@ export class UI {
             <div class="sp-pay"><b class="money-t">${euro(o.reward)}</b> <span class="muted small">(⭐⭐⭐ ${euro(Math.round(o.reward * 1.35))})</span></div></div>
           ${o.done ? '<span class="tag g">✅ Consegnato</span>' : `<button class="btn sm good" data-a="special:${o.id}">🏺 Realizza</button>`}</div>`;
       }).join('');
-      return `<div class="card tint small">🛠️ <b>Lavori su richiesta</b>: li fai tu, a mano, in prima persona, e pagano più dei lavoretti. <b>🏺 Vasi in ceramica</b>: prendi l'argilla, mettila sul tornio e modellala finché somiglia alla foto (dito verso il centro stringe, verso i lati allarga), falla essiccare, dipingila, incartala e lasciala sul ripiano delle consegne. Nuovi lavori ogni giorno; con l'esperienza diventano più difficili e pagati meglio.</div>${cards}`;
+      return `<div class="card tint small">🛠️ <b>Lavori su richiesta</b>: li fai tu, pagano più dei lavoretti</div>${points('🏺 Modella il vaso sul tornio come nella foto', 'Dito al centro stringe, ai lati allarga', 'Poi essicca, dipingi, incarta e consegna', 'Nuovi lavori ogni giorno, sempre più pagati')}${cards}`;
     }
     if (tab === 'evoluzione') return this.evolveTab(b);
     if (tab === 'ordini') {
@@ -2294,7 +2298,7 @@ export class UI {
             <button class="btn sm good" data-a="exec:${o.id}" ${noStock || this.game.run ? 'disabled' : ''}>Esegui</button></div>`;
         })
         .join('');
-      return `<div class="card tint small explain">Gli ordini arrivano nelle ore di apertura (${BUSINESS.OPEN_HOUR}–${BUSINESS.CLOSE_HOUR}). Puoi eseguirli tu (più stelle = paga più alta) oppure assumere staff e un manager per farli fare a loro.</div>
+      return `${points(`Gli ordini arrivano dalle ${BUSINESS.OPEN_HOUR} alle ${BUSINESS.CLOSE_HOUR}`, 'Falli tu (più stelle = più paga) o assumi staff')}
         <h3 class="sec-title">📋 Ordini in attesa (${b.orders.length}/${MAX_ORDERS})</h3>
         ${list || '<p class="muted small">Nessun ordine al momento. Torna più tardi!</p>'}`;
     }
@@ -2324,12 +2328,12 @@ export class UI {
           <div class="row between small"><span>Bollette</span><span>${euro(c.utilities)}</span></div>
           <div class="row between small"><span>Stipendi (${b.staff.length})</span><span>${euro(fullSal)}</span></div>
           <hr><div class="row between"><b>Utile stimato al mese</b><b class="${estimateMonthlyProfit(s, b) >= 0 ? 'good' : 'bad'}">${isAutonomous(b) ? euro(estimateMonthlyProfit(s, b)) : '—'}</b></div>
-          <p class="muted small explain" style="margin-bottom:0">Aperto dalle ${BUSINESS.OPEN_HOUR}:00 alle ${BUSINESS.CLOSE_HOUR}:00. I costi si pagano il 1° del mese.</p>
+          <p class="muted small explain" style="margin-bottom:0">Aperto ${BUSINESS.OPEN_HOUR}:00–${BUSINESS.CLOSE_HOUR}:00 · i costi si pagano il 1° del mese</p>
         </div>`;
     }
     if (tab === 'prodotti') {
       const slots = menuSlots(b);
-      return `<p class="muted small explain">Scegli cosa offrire guardando la domanda di oggi (${b.products.length}/${slots} posti). La domanda cambia ogni giorno, con le stagioni, il meteo e gli eventi.</p>` +
+      return `<p class="muted small" style="margin:0 0 6px">${b.products.length}/${slots} posti in vendita</p>${points('Scegli guardando la domanda di oggi', 'Cambia con stagioni, meteo ed eventi')}` +
         type.products
           // i prodotti che servono un ampliamento non ancora comprato non si mostrano
           .filter((p) => productLevel(b.type, p) <= upg(b, 'ampliamento'))
@@ -2407,9 +2411,9 @@ export class UI {
         (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && !isAutoBiz(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
-      return `<p class="muted small explain">Serve almeno un dipendente per reparto (${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')}) più un manager perché l'attività lavori senza di te. Più dipendenti nello stesso reparto = più ${unit} serviti.</p>
-        <h3 class="sec-title" data-g="staff">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano da zero e si dividono il lavoro; chi è libero fa il jolly.<br>💰 <b>Cassa</b>: i cassieri portano i pronti ai clienti e incassano.<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
-        <h3 class="sec-title" data-g="cands">📝 Candidati di oggi</h3><p class="muted small explain" style="margin-top:-4px">Puoi assumere quanti dipendenti vuoi: più cuochi = più aiuto in cucina. Nuovi candidati ogni giorno.</p>${cands}
+      return `${points(`Per lavorare da sola: ${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')} + manager`, `Più persone nello stesso reparto = più ${unit} serviti`)}
+        <h3 class="sec-title" data-g="staff">👥 Il tuo staff</h3>${staff}${hasInterior(b.type) ? `<div class="card tint small"><b>Aree del locale</b><br>🍳 <b>Cucina</b>: i cuochi preparano<br>💰 <b>Cassa</b>: i cassieri servono e incassano<br>${extras.map((x) => `${ROLES[x.role].icon} <b>${ROLES[x.role].name}</b>: ${x.desc}`).join('<br>')}</div>` : ''}
+        <h3 class="sec-title" data-g="cands">📝 Candidati di oggi</h3>${points('Assumi quanti vuoi', 'Nuovi candidati ogni giorno')}${cands}
         <button class="btn sec full" data-a="reroll" ${s.money < 40 ? 'disabled' : ''}>🔄 Cerca altri candidati · €40${s.money < 40 ? ' (non hai abbastanza soldi)' : ''}</button>`;
     }
     // migliorie (l'ampliamento c'è solo per le attività con un interno)
@@ -2509,7 +2513,7 @@ export class UI {
       const left = Math.max(0, e.trainingEnd - this.s.minutes);
       train = `<div class="emp-train on">🎓 Al corso di formazione: torna tra ${Math.ceil(left / 1440)} ${Math.ceil(left / 1440) === 1 ? 'giorno' : 'giorni'} con ${'★'.repeat(stars + 1)} (intanto non lavora)</div>`;
     } else if (bizId && canTrain(e)) {
-      train = `<div class="emp-train">🎓 Livello 10: pronto per la ${stars + 1}ª stella. Torna a livello 0 ma lavora meglio e più in fretta
+      train = `<div class="emp-train">🎓 Pronto per la ${stars + 1}ª stella: torna a Liv. 0 ma è più bravo
         <button class="btn sm purple full" data-a="train:${e.id}" ${this.s.money < trainingCost(e) ? 'disabled' : ''}>Corso di formazione · ${euro(trainingCost(e))} · ${trainingDays(e)} giorni</button></div>`;
     } else if (complete) {
       train = '<div class="emp-train done">🏆 Dipendente completo: 5 stelle e livello 10, tutto al massimo</div>';
@@ -2562,7 +2566,7 @@ export class UI {
       title: '🎮 Multigiocatore',
       small: true,
       color: '#14a3a3',
-      render: () => `${explain('Sfida i tuoi amici con i soldi della tua partita. Mentre giochi la tua partita è offline, come ad app chiusa: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo.')}
+      render: () => `${points('Sfida gli amici con i soldi della partita', 'Mentre giochi qui la partita è ferma, come ad app chiusa', 'Uscendo ricevi i guadagni offline')}
         <h3 class="sec-title">🎰 Casinò</h3>
         ${card('poker', '🃏', 'Poker', "Texas Hold'em da 2 a 8 giocatori: crea una stanza o entra con il codice di un amico", '#1f7a4c')}
         ${card('bj', '🂡', 'Blackjack', 'Contro il banco, da solo o con gli amici (fino a 7): arriva a 21 senza sballare', '#7a1f3d')}
@@ -2678,15 +2682,15 @@ export class UI {
         const label = isBj ? 'Puntata minima del tavolo' : 'Puntate del tavolo (piccolo e grande buio)';
         const limits = isBj ? `<div class="small muted" style="margin-top:6px">A ogni mano punti da ${euro(bb)} a ${euro(bb * BJ_MAX_BET_X)}</div>` : '';
         const rules = isBj
-          ? `Al tavolo si portano da ${BJ_MIN_BUY_X} a ${BJ_MAX_BUY_X} puntate minime (mai più di quello che hai): quei soldi diventano fiches e il resto del conto resta al sicuro.`
-          : `Il piccolo buio (${euro(sb)}) e il grande buio (${euro(bb)}) sono le puntate obbligatorie di ogni mano. Al tavolo si portano da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui (mai più di quello che hai): quei soldi diventano fiches e il resto del conto resta al sicuro.`;
+          ? points(`Porti da ${BJ_MIN_BUY_X} a ${BJ_MAX_BUY_X} puntate minime`, 'Diventano fiches, il resto del conto è al sicuro')
+          : points(`Bui obbligatori: piccolo ${euro(sb)}, grande ${euro(bb)}`, `Porti da ${MIN_BUY_BB} a ${MAX_BUY_BB} grandi bui`, 'Diventano fiches, il resto del conto è al sicuro');
         const create = `<div class="card"><h3>➕ ${isBj ? 'Apri un tavolo' : 'Crea una stanza'}</h3>
             <div class="small muted">${label}</div><div class="segs pk-stakes">${stakes}</div>${limits}
             ${canCreate ? `<div class="small muted" style="margin-top:8px">Fiches da portare al tavolo</div>${buyBox('c', minBuy, maxFor(maxBuy), buyAmt, bb)}
               <button class="btn good full" data-a="create" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy === 'create' ? 'Apro il tavolo…' : `${isBj ? 'Apri il tavolo' : 'Crea la stanza'} (<span class="pk-go-c">${euro(buyAmt)}</span>)`}</button>`
             : `<p class="small bad" style="margin:8px 0 0">Per questo tavolo servono almeno ${euro(minBuy)}.</p>`}
-            <p class="muted small explain" style="margin:6px 0 0">I primi due tavoli sono per tutti; dal terzo in su serve fama totale (⭐ ${STAKE_FAME.slice(2).join(', ')}): la tua è ⭐ ${fame().toFixed(1)}. Vale anche per entrare con il codice.</p>
-            <p class="muted small explain" style="margin:6px 0 0">${rules}</p></div>`;
+            ${points('I primi 2 tavoli sono per tutti', `Dal 3° serve fama (⭐ ${STAKE_FAME.slice(2).join(', ')}): hai ⭐ ${fame().toFixed(1)}`)}
+            ${rules}</div>`;
         let joinBox = '';
         if (info) {
           const unit = isBj ? info.min! : info.bb!;
@@ -2707,11 +2711,11 @@ export class UI {
             <button class="btn sm blue" data-a="find" ${busy ? 'disabled' : ''}>${busy === 'find' ? 'Cerco…' : '🔍 Cerca'}</button></div>${joinBox}</div>`;
         const back = where ? `<div class="card hl"><h3>${where.game === 'bj' ? '🂡' : '🃏'} Sei ancora seduto al tavolo di ${gameName(where.game)} ${esc(where.code)}</h3><button class="btn good full" data-a="rejoin" ${busy ? 'disabled' : ''}>Torna al tavolo</button></div>` : '';
         const intro = isBj
-          ? 'Blackjack contro il banco, con i soldi della tua partita: arriva più vicino a 21 del banco senza superarlo. Puoi giocare da solo o mandare il codice agli amici (fino a 7 allo stesso tavolo): ognuno gioca contro il banco. Il blackjack (asso e figura) paga 3 a 2, il banco sta su 17; puoi raddoppiare sulle prime due carte e dividere due carte uguali. Uscendo, le fiches che hai tornano sul conto. Mentre giochi la tua partita è offline: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo. Il primo collegamento può metterci fino a un minuto.'
-          : "Texas Hold'em senza limite, da 2 a 8 giocatori, con i soldi della tua partita. Chi crea la stanza sceglie le puntate e manda il codice agli amici; si può entrare anche a partita iniziata e uscire quando si vuole. Uscendo, le fiches che hai tornano sul conto. Se al tavolo restano meno di 2 giocatori la stanza si chiude. Mentre giochi la tua partita è offline: niente soldi al secondo, e uscendo arrivano i guadagni offline di quel tempo. Il primo collegamento può metterci fino a un minuto.";
+          ? points('Arriva più vicino a 21 del banco, senza superarlo', 'Da solo o con amici (fino a 7): ognuno contro il banco', 'Blackjack (asso + figura) paga 3 a 2', 'Il banco sta su 17', 'Raddoppi sulle prime 2 carte, dividi le coppie', 'Uscendo le fiches tornano sul conto', 'Mentre giochi qui la partita è ferma', 'Il primo collegamento può durare un minuto')
+          : points("Texas Hold'em senza limite, da 2 a 8", 'Chi crea la stanza sceglie le puntate e manda il codice', 'Entri ed esci quando vuoi', 'Uscendo le fiches tornano sul conto', 'Con meno di 2 giocatori la stanza si chiude', 'Mentre giochi qui la partita è ferma', 'Il primo collegamento può durare un minuto');
         // anteprime: tavoli di prova del server (fiches finte, nel poker si gioca contro un bot)
         const practice = previewPr !== null ? `<div class="card hl"><p class="small" style="margin:0">🎯 Anteprima: tavolo di prova con fiches finte${isBj ? '' : ', contro un bot'}. I soldi che porti tornano uscendo.</p></div>` : '';
-        return `${explain(intro)}
+        return `${intro}
           ${practice}${back}${err ? `<p class="small center bad">${esc(err)}</p>` : ''}${create}${join}`;
       },
       actions: {
@@ -2845,7 +2849,7 @@ export class UI {
             <div class="row" style="justify-content:flex-end;gap:6px;margin-top:8px;flex-wrap:wrap">${btns}</div></div>`;
         }).join('');
         const tot = canRent(s) ? s.houses.filter((x) => x.rent).reduce((a, x) => a + g.houseRent(x.i), 0) : 0;
-        return `<div class="card tint small">Compra una casa per <b>viverci</b> (il pulsante 🏠 Casa ti porta lì e lì dormi). Con <b>almeno 2 case</b> (conta anche quella di partenza) puoi <b>affittare</b> quelle dove non vivi: l'affitto si guadagna <b>solo mentre il gioco è chiuso</b> (fino a ${RENT_MAX_HOURS} ore). Rivendendola recuperi l'85% del prezzo.</div>
+        return `${bullets('🏠 Compra una casa per <b>viverci</b>: lì dormi', 'Con <b>2+ case</b> affitti quelle dove non vivi', `🔑 L'affitto si guadagna <b>a gioco chiuso</b> (max ${RENT_MAX_HOURS} ore)`, 'Rivendendo recuperi l\'85%')}
           ${tot ? `<div class="stat s-green" style="margin-bottom:10px"><b class="money-t">+${euro(tot)}/ora</b><span>🔑 affitti mentre sei offline</span></div>` : ''}
 
           ${s.homeIdx >= 0 ? '<button class="btn sm sec" data-a="live:-1" style="margin-bottom:10px">🏠 Torna a vivere nella casa di partenza</button>' : ''}${rows}`;
@@ -2975,7 +2979,7 @@ export class UI {
       money: true,
       title: '🛵 Concessionaria',
       color: 'var(--blue)',
-      render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}<p class="muted small explain">Con un veicolo attraversi la città molto più in fretta. Le auto hanno assicurazione e bollo da pagare ogni mese. Il pulsante <b>🛵</b> sopra quello giallo ti fa salire e scendere.</p>` +
+      render: () => `${canBuy ? '' : '<div class="card tint small">🛵 Per comprare vai alla <b>concessionaria</b> in centro.</div>'}${points('Con un veicolo giri la città più in fretta', 'Le auto pagano assicurazione e bollo ogni mese', 'Il tasto <b>🛵</b> ti fa salire e scendere')}` +
         VEHICLE_IDS.map((id) => {
           const v = VEHICLES[id];
           const owned = s.vehicles.includes(id);
@@ -3059,7 +3063,7 @@ export class UI {
             return `<div class="row between small"><span>${PRODUCTS[p].icon} ${PRODUCTS[p].name}</span>${demandBars(d, 2.4)}</div>`;
           })
           .join('');
-        return `<h3 class="sec-title">🎯 Missioni di oggi</h3><p class="muted small explain" style="margin-top:-4px">Cambiano ogni giorno. Le ricompense crescono con la tua fama. I premi delle missioni non contano per "Guadagna".</p>${ms}
+        return `<h3 class="sec-title">🎯 Missioni di oggi</h3>${points('Cambiano ogni giorno', 'Più fama = premi più ricchi', 'I premi non contano per "Guadagna"')}${ms}
           <h3 class="sec-title">🗓️ Missioni della settimana</h3><p class="muted small explain" style="margin-top:-4px">Più lunghe, con premi più ricchi.</p><p class="small" style="margin:-4px 0 6px">⏳ ${left > 1 ? `Restano ${left} giorni` : 'Ultimo giorno'}</p>${wk}
           <h3 class="sec-title">📅 Prossimi giorni</h3>${evs}
           <button class="btn blue full" data-a="cal" style="margin-bottom:10px">📅 Apri il calendario completo</button>
@@ -3172,7 +3176,7 @@ export class UI {
           </div>
           <h3 class="sec-title">🔎 Giorno scelto</h3>${this.dayCard(sel)}
           <div class="card"><h3>🗓️ Prossimi eventi sicuri</h3>${upcoming.join('') || '<div class="muted small">Nessuno nei prossimi due mesi.</div>'}
-            <p class="muted small explain" style="margin-bottom:0">Ogni sabato c'è il 🛒 mercato e ogni domenica 🌳 la gente va al parco. Il meteo si può prevedere al massimo ${FORECAST_DAYS} giorni prima.</p></div>`;
+            ${points('Sabato: 🛒 mercato', 'Domenica: 🌳 tutti al parco', `Meteo previsto fino a ${FORECAST_DAYS} giorni prima`)}</div>`;
       },
     });
   }
@@ -3269,7 +3273,7 @@ export class UI {
       small: true,
       locked: required,
       color: 'var(--blue)',
-      render: () => `<p class="muted small explain">Il nome con cui compari nelle classifiche e sulla mappa dei tuoi amici. È unico: due giocatori non possono avere lo stesso nome. Con l'account è anche il nome per entrare.</p>
+      render: () => `${points('Compare in classifica e nella città degli amici', 'È unico: nessun altro può averlo', "Serve anche per entrare nell'account")}
         <input class="lb-input" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(draft)}">
         ${msg ? `<p class="small bad" style="margin:6px 0 0">${msg}</p>` : ''}
         <button class="btn good full" data-a="save" style="margin-top:10px" ${busy ? 'disabled' : ''}>${busy ? '⏳ Controllo il nome…' : '✅ Salva il nome'}</button>`,
@@ -3328,7 +3332,7 @@ export class UI {
         if (loggedIn()) {
           return `<div class="card hero tint"><div class="emoji">✅</div><div class="big">${esc(lbNickname())}</div><div class="muted small">Le tue partite sono salvate sul server</div></div>
             <div class="row between small" style="margin:8px 2px"><span>💾 Ultimo salvataggio</span><b data-g="saved">${when(lastCloudSave())}</b></div>
-            <p class="muted small explain">Si salva da solo mentre giochi e quando chiudi l'app. Su un altro telefono: schermata iniziale → 🔑 Entra con il tuo account, con questo nome e la tua password.</p>
+            ${points("Si salva da solo mentre giochi e quando chiudi", 'Su un altro telefono: 🔑 Entra con nome e password')}
             <button class="btn good full" data-a="now" ${wait}>${busy ? '⏳ Salvo…' : '💾 Salva adesso'}</button>
             ${pwOpen ? `<div class="card" style="margin-top:10px"><h3>🔑 Cambia password</h3>
               <input class="lb-input acc-old" type="password" autocomplete="current-password" placeholder="Password di adesso">
@@ -3339,13 +3343,13 @@ export class UI {
         }
         const tabs = `<div class="tabs">${([['salva', '💾 Salva'], ['entra', '🔑 Entra']] as const).map(([k, n]) => `<button class="tab ${tab === k ? 'on' : ''}" data-a="tab:${k}">${n}</button>`).join('')}</div><!--tabs-->`;
         if (tab === 'salva') {
-          return `${tabs}<p class="muted small explain">Crea l'account per non perdere mai le tue partite: si salvano sul server e le ritrovi su un altro telefono entrando con il tuo nome e la password.</p>
+          return `${tabs}${points('Le partite si salvano sul server', 'Le ritrovi su un altro telefono con nome e password')}
             <div class="card" data-g="name"><div class="row between"><div><div class="muted small">Il tuo nome (per entrare)</div><b>${esc(lbNickname() || '—')}</b></div><button class="btn sm sec" data-a="name">✏️ Cambia</button></div></div>
             <input class="lb-input acc-pw" type="password" autocomplete="new-password" placeholder="Password (almeno ${MIN_PASSWORD} caratteri)">
             <input class="lb-input acc-pw2" type="password" autocomplete="new-password" placeholder="Ripeti la password" style="margin-top:6px">
             <button class="btn good full" data-a="reg" style="margin-top:10px" ${wait}>${busy ? '⏳ Salvo…' : '💾 Crea l\'account e salva'}</button>${note}`;
         }
-        return `${tabs}<p class="muted small explain">Hai già un account (per esempio su un altro telefono)? Entra con il tuo nome e la password: le partite dell'account prendono il posto di quelle di questo telefono.</p>
+        return `${tabs}${points('Hai già un account? Entra con nome e password', "Le partite dell'account sostituiscono quelle di qui")}
           <input class="lb-input acc-name" autocomplete="username" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(inName)}">
           <input class="lb-input acc-pw" type="password" autocomplete="current-password" placeholder="Password" style="margin-top:6px" value="${esc(inPw)}">
           <div class="small bad" style="margin-top:6px">⚠️ Le partite di questo telefono verranno sostituite</div>
@@ -3509,7 +3513,7 @@ export class UI {
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(x - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div>
             ${lines || biz ? `<div class="career-lines">${lines}${biz}</div>` : ''}</div>`;
         }).join('');
-        return `<p class="muted small explain">Ogni settore raccoglie i suoi lavori: il livello del settore è la somma dell'esperienza di tutti i suoi lavori (e del lavoro nelle tue attività). Ogni lavoro ha il suo livello e ogni ${EVOLVE_EVERY} livelli si evolve in un lavoro più complesso. La fama sale anche quando lavorano i tuoi dipendenti, ma molto più piano: più fama = più clienti e offerte più ricche.</p>${skills}`;
+        return `${points('Livello del settore = somma dei suoi lavori e attività', `Ogni ${EVOLVE_EVERY} livelli un lavoro si evolve`, 'La fama sale anche coi dipendenti, ma più piano', 'Più fama = più clienti e offerte migliori')}${skills}`;
       },
       actions: {},
     });
@@ -3541,7 +3545,7 @@ export class UI {
           ${invite ? `<div class="card fr-drop"><div class="row between"><span><small class="muted">Il tuo codice amico</small><br><b class="fr-code">${code}</b></span>
               <span class="row"><button class="btn sm sec" data-a="copy">📋 Copia</button><button class="btn sm blue" data-a="share">📤 Invia</button></span></div>
             <div class="row" style="margin-top:8px;gap:6px"><input class="lb-input fr-input" maxlength="7" placeholder="Codice di un amico" style="flex:1;font-size:16px;padding:9px 12px"><button class="btn sm good" data-a="addf">➕ Aggiungi</button></div>
-            <small class="muted explain">Quando aggiungi qualcuno, gli arriva una richiesta: può ricambiare con un tocco, senza mandarti il suo codice.</small></div>` : ''}`;
+            <small class="muted explain">All'amico arriva una richiesta: ricambia con un tocco</small></div>` : ''}`;
         const reqs = this.game.friendRequests;
         const reqHtml = reqs.length ? `<h3 class="sec-title">📨 Richieste di amicizia (${reqs.length})</h3>` + reqs.map((r) =>
           `<div class="lb-row">${logoImg(r.logo, 34) || '<span class="logo-img empty"></span>'}<span class="lb-name"><b>${esc(r.nickname)}</b><small>${esc(r.title)} · ⭐ ${r.fame.toFixed(1)}</small></span>
@@ -3750,7 +3754,7 @@ export class UI {
         const editing = tab === 'foto' && mode === 'photo' && !!edit;
         // anteprima e nome: in verticale sopra, in orizzontale in una colonna a sinistra
         const side = `<div class="lg-side">
-          ${required ? '<div class="card tint small">Prima di iniziare scegli il <b>tuo nome</b> e il <b>logo</b> delle tue attività: comparirà sulle insegne, in classifica e nella città dei tuoi amici. Potrai cambiarli dal 👤 Profilo.</div>' : ''}
+          ${required ? '<div class="card tint small">Scegli il <b>tuo nome</b> e il <b>logo</b>: vanno su insegne e classifiche.<br>Si cambiano dal 👤 Profilo.</div>' : ''}
           <div class="lg-preview ${editing ? 'is-editing' : ''}">${editing ? '<canvas class="ph-mini" width="200" height="200"></canvas>' : `<img src="${logoUrl(draft, 200)}" width="120" height="120" alt="">`}<div><b>${esc(lbNickname() || 'Senza nome')}</b><small>${editing ? '✏️ Anteprima della foto' : draft.photo ? '📷 Logo con la tua foto' : '🎨 Logo disegnato'}</small></div></div>
           <h4 class="lg-h">Il tuo nome</h4>
           <input class="lb-input lg-nick" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(nickDraft)}" data-c="nick">${nickMsg ? `<p class="small bad" style="margin:4px 0 0">${nickMsg}</p>` : ''}</div>`;
@@ -3770,14 +3774,14 @@ export class UI {
         } else if (tab === 'foto') {
           // scegliere una foto (o gestire quella già scelta)
           main = draft.photo
-            ? `<div class="card center"><img class="lg-photo-big" src="${logoUrl(draft, 320)}" alt=""><p class="muted small explain">Il tuo logo ora usa questa foto. La vedono solo i tuoi amici: nella classifica mondiale compare il logo disegnato.</p>
+            ? `<div class="card center"><img class="lg-photo-big" src="${logoUrl(draft, 320)}" alt="">${points('La foto la vedono solo gli amici', 'In classifica mondiale va il logo disegnato')}
                 <div class="lg-row" style="justify-content:center"><button class="btn sm purple" data-a="retouch">✏️ Ritocca</button><button class="btn sm sec" data-a="upload">📷 Cambia foto</button><button class="btn sm danger" data-a="nophoto">🗑️ Togli la foto</button></div></div>`
-            : `<div class="card center lg-pick"><div class="emoji">📷</div><b>Usa una tua foto come logo</b><p class="muted small explain">Scegli una foto dal telefono: potrai spostarla, ingrandirla, ruotarla e ritoccare luce e colori dentro la forma che preferisci.</p>
-                <button class="btn purple full" data-a="upload">📷 Scegli una foto</button><p class="muted small explain" style="margin:8px 0 0">La foto la vedono solo i tuoi amici; nella classifica mondiale compare il logo disegnato (scheda 🎨 Crea logo).</p></div>`;
+            : `<div class="card center lg-pick"><div class="emoji">📷</div><b>Usa una tua foto come logo</b>${explain('Puoi spostarla, ingrandirla, ruotarla e ritoccarla')}
+                <button class="btn purple full" data-a="upload">📷 Scegli una foto</button>${points('La foto la vedono solo gli amici', 'In classifica mondiale va il logo disegnato')}</div>`;
           foot = `<button class="btn good" data-a="save">✅ Salva il logo</button>`;
         } else {
           // creare il logo da zero
-          main = `${draft.photo ? '<div class="card tint small row between"><span>📷 Il logo ora usa la tua foto: questo disegno si vede nella classifica mondiale.</span><button class="btn sm sec" data-a="nophoto">Usa il disegno</button></div>' : ''}
+          main = `${draft.photo ? '<div class="card tint small row between"><span>📷 Usi la foto: questo disegno va in classifica mondiale</span><button class="btn sm sec" data-a="nophoto">Usa il disegno</button></div>' : ''}
             <h4 class="lg-h">Forma</h4>${shapes}
             <h4 class="lg-h">Colore di sfondo</h4>${swatches('bg', draft.bg)}
             <h4 class="lg-h">Simbolo</h4>
@@ -3960,7 +3964,7 @@ export class UI {
       color: '#5b4bb7',
       render: () => `<div class="lg-preview">${logoImg(f.logo, 90) || ''}<div><b>${esc(f.nickname)}</b><small>${esc(f.title)} · ⭐ ${f.fame.toFixed(1)}</small></div></div>
         <div class="grid2"><div class="stat ${f.online ? 's-green' : ''}"><b>${f.online ? '🟢 Aperto' : '💤 Chiuso'}</b><span>${f.online ? 'sta giocando adesso' : 'non sta giocando'}</span></div><div class="stat s-purple"><b>${['Base', 'Ampliata', 'Grande'][fb.lvl] ?? 'Grande'}</b><span>📐 ${def.icon} ${def.name}</span></div></div>
-        <p class="muted small explain">Tra poco potrai entrare nelle attività dei tuoi amici e girare la città insieme. Per ora le vedi nella tua città: ${mine ? 'qui c\'è anche la tua attività.' : 'questo posto da te è libero e puoi comprarlo lo stesso: le attività degli amici restano accanto alla tua.'}</p>
+        ${points('Presto potrai entrare nelle attività degli amici', mine ? "Qui c'è anche la tua attività" : 'Questo posto da te è libero: puoi comprarlo lo stesso')}
         <div class="btnrow">${mine ? '' : '<button class="btn sec" data-a="lot">🏷️ Vedi il posto</button>'}<button class="btn" data-a="board">👥 I tuoi amici</button></div>`,
       actions: {
         lot: () => {
@@ -3986,9 +3990,9 @@ export class UI {
         const h = hourOf(s);
         const canSleep = h >= 19 || h < 6;
         return `<div class="hero"><div class="emoji">🏡</div></div>
-          <p class="muted center explain">La casa è il tuo punto di teletrasporto: con il pulsante verde <b>🏠 Casa</b> ci torni all'istante da qualsiasi punto della città.</p>
+          ${explain('Col tasto verde <b>🏠 Casa</b> torni qui all\'istante', 'center')}
           <button class="btn blue full" data-a="sleep" ${canSleep ? '' : 'disabled'}>😴 Dormi fino alle 7:00</button>
-          <p class="center muted small">${canSleep ? 'Le attività sono chiuse di notte: dormire fa passare il tempo.' : 'Puoi dormire dalle 19:00 in poi.'}</p>`;
+          <p class="center muted small">${canSleep ? 'Dormire fa passare la notte' : 'Puoi dormire dalle 19:00'}</p>`;
       },
       actions: {
         sleep: () => {
@@ -4061,20 +4065,17 @@ export class UI {
         if (tab === 'impostazioni') return tabs + settingsHtml();
         if (tab === 'partita') {
           return tabs + `
-            <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot}</p><p class="muted small explain" style="margin:6px 0 0">La partita si salva da sola ogni pochi secondi.</p></div>
+            <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot}</p>${explain('Si salva da sola ogni pochi secondi')}</div>
             <button class="btn blue full" data-a="menu">🏠 Salva e torna al menu principale</button>
-            <p class="muted small center explain">Dal menu puoi cambiare partita o iniziarne una nuova.</p>
+            ${explain('Dal menu cambi partita o ne inizi una nuova', 'center')}
             <hr>
             <button class="btn danger full" data-a="reset">${confirm ? '⚠️ Sicuro? Tocca di nuovo per cancellare questa partita' : '🗑️ Ricomincia questa partita da capo'}</button>`;
         }
         return tabs + `
-          <div class="card"><h3>🕹️ Comandi</h3><p class="muted small" style="margin:0">
-            Per muoverti trascina il dito nella metà ${moveSide()} dello schermo: compare un joystick.
-            Quando sei sul cerchio a terra davanti a una persona o a un oggetto (l'oggetto pulsa), tocca la <b>metà ${actSide()}</b> dello schermo; se c'è scritto "Tieni premuto" tieni il dito lì finché il cerchio si riempie.
-            In ⚙️ Opzioni puoi invertire i lati.
-            Nei lavoretti (in prima persona): riquadro 🕹️ in basso a ${moveSide()} per camminare, trascina il dito sul resto dello schermo per guardarti attorno, e tocca o tieni premuto l'oggetto che pulsa per le azioni.
-            Su PC: WASD o frecce, E o spazio per l'azione.</p></div>
-          <div class="card"><h3>⏰ Tempo</h3><p class="muted small" style="margin:0">1 mese di gioco = 2 ore reali (una giornata dura 4 minuti). Con il gioco chiuso il tempo scorre ${TIME.OFFLINE_SLOWDOWN} volte più piano e le attività autonome guadagnano l'80% nelle prime 24 ore, il 50% nelle 48 ore dopo e poi il 20%.</p></div>`;
+          <div class="card"><h3>🕹️ Comandi</h3>${bullets(`Muoviti: trascina nella metà ${moveSide()}`, `Azione: sul cerchio a terra tocca la <b>metà ${actSide()}</b>`, '"Tieni premuto": dito giù finché il cerchio è pieno', 'I lati si invertono in ⚙️ Opzioni')}
+            <h4 style="margin:8px 0 2px">Nei lavoretti</h4>${bullets(`🕹️ in basso a ${moveSide()} per camminare`, 'Trascina altrove per guardarti attorno', "Tocca l'oggetto che pulsa")}
+            <h4 style="margin:8px 0 2px">Su PC</h4>${bullets('WASD o frecce', 'E o spazio per l\'azione')}</div>
+          <div class="card"><h3>⏰ Tempo</h3>${bullets('1 mese di gioco = 2 ore reali', '1 giornata = 4 minuti', `A gioco chiuso il tempo va ${TIME.OFFLINE_SLOWDOWN} volte più piano`, 'Offline le attività guadagnano: 80% (primo giorno), 50% (2 giorni dopo), poi 20%')}</div>`;
       },
       actions: {
         ...this.devActions(),
@@ -4202,7 +4203,7 @@ export class UI {
           <div class="stat ${r.net >= 0 ? 's-green' : 's-red'}"><b class="${r.net >= 0 ? 'good' : 'bad'}">${euro(r.net)}</b><span>🧾 saldo dopo i costi</span></div>
         </div>
         ${r.rent ? `<div class="stat s-yellow" style="margin-top:8px"><b class="money-t">+${euro(r.rent)}</b><span>🔑 affitti delle tue case</span></div>` : ''}
-        ${r.revenue === 0 ? '<p class="muted small explain">Solo le attività con almeno un dipendente per reparto e un manager lavorano mentre sei via (con una persona per reparto, solo per un turno di 8 ore).</p>' : ''}
+        ${r.revenue === 0 ? points('Mentre sei via lavorano solo le attività con staff completo e manager', 'Con una persona per reparto: solo 8 ore al giorno') : ''}
         <button class="btn full" data-a="ok" style="margin-top:12px">Continua</button>`,
       actions: { ok: () => this.close() },
     });
