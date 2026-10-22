@@ -44,7 +44,7 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 ## 3. Controlli e telecamera
 
 - **Visuale isometrica dall'alto** che segue il personaggio.
-- **Sensibilità della visuale** (Impostazioni): Lenta, Normale, Veloce, Molto veloce (×0,6 / ×1 / ×1,5 / ×2,1, `LOOK_MULT` in src/settings.ts): quanto gira la visuale trascinando il dito nei lavoretti in prima persona e al tornio
+- **Sensibilità della visuale** (Impostazioni): un cursore da ×0,3 a ×2,5 (×1 = normale, `lookSens`, limiti `LOOK_MIN`/`LOOK_MAX` in src/settings.ts): quanto gira la visuale trascinando il dito nei lavoretti in prima persona e al tornio
 - **Movimento solo col joystick virtuale** (compare dove si appoggia il dito). Toccare un punto dello schermo non fa muovere il personaggio. Su PC: WASD o frecce.
 - Si interagisce avvicinandosi: NPC, porte degli edifici posseduti, postazioni dei mini-giochi.
 

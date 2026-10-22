@@ -1,6 +1,6 @@
-import { HUD_KEYS, HUD_NAMES, setSetting, settings, SETTING_OPTIONS, type HudKey, type Settings } from '../settings';
+import { HUD_KEYS, HUD_NAMES, LOOK_MAX, LOOK_MIN, setSetting, settings, SETTING_OPTIONS, type HudKey, type Settings } from '../settings';
 
-type Choice = 'quality' | 'camera' | 'lookSens';
+type Choice = 'quality' | 'camera';
 type Toggle = 'shadows' | 'outlines' | 'pointers' | 'minimap' | 'battery' | 'swapControls';
 
 function segmented(key: Choice, label: string, hint: string) {
@@ -16,11 +16,34 @@ function toggle(key: Toggle, label: string, hint: string) {
     <span class="switch ${on ? 'on' : ''}"><i></i></span></button>`;
 }
 
+const lookLabel = (v: number) => `×${v.toFixed(1).replace('.', ',')}`;
+
+/** Cursore della sensibilità della visuale: si salva mentre si trascina (senza ridisegnare la finestra). */
+function lookSlider() {
+  const v = settings.lookSens;
+  return `<div class="card"><div class="row between"><b>👀 Sensibilità della visuale</b><b class="look-val">${lookLabel(v)}</b></div>
+    <div class="look-sl"><span class="muted small">lenta</span><input type="range" class="look-range" min="${LOOK_MIN}" max="${LOOK_MAX}" step="0.1" value="${v}"><span class="muted small">veloce</span></div>
+    <div class="muted small explain" style="margin-top:6px">Quanto gira la visuale quando trascini il dito. ×1 = normale.</div></div>`;
+}
+
+// mentre si trascina vale subito (senza avvisare il resto del gioco, che rifarebbe grafica e ombre); si salva lasciando
+const onLook = (save: boolean) => (e: Event) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.classList?.contains('look-range')) return;
+  const v = Math.round(Number(el.value) * 10) / 10;
+  if (save) setSetting('lookSens', v);
+  else settings.lookSens = v;
+  const lab = el.closest('.card')?.querySelector('.look-val');
+  if (lab) lab.textContent = lookLabel(v);
+};
+document.addEventListener('input', onLook(false));
+document.addEventListener('change', onLook(true));
+
 /** Controlli delle impostazioni: uguali nella schermata iniziale e in partita. */
 export function settingsHtml() {
   return [
     toggle('swapControls', '🔁 Inverti joystick e azioni', 'Spento: muovi a sinistra, azioni a destra. Acceso: il contrario.'),
-    segmented('lookSens', '👀 Sensibilità della visuale', 'Quanto gira la visuale quando trascini il dito.'),
+    lookSlider(),
     toggle('battery', '🔋 Risparmio batteria', 'Meno immagini al secondo e meno dettaglio: consuma circa la metà.'),
     segmented('quality', '🎨 Qualità grafica', 'Se il telefono si scalda o va a scatti, prova Media o Bassa.'),
     toggle('shadows', '🌗 Ombre', 'Disattivale per più fluidità.'),

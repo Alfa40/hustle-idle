@@ -1,4 +1,4 @@
-import { LOOK_MULT, settings } from './settings';
+import { settings } from './settings';
 /**
  * Controlli: joystick virtuale che compare dove si appoggia il dito,
  * tocco breve = vai lì, tastiera (WASD/frecce + E/spazio) su PC.
@@ -376,7 +376,7 @@ export class Input {
 
   consumeLook() {
     // sensibilità scelta nelle impostazioni
-    const k = LOOK_MULT[settings.lookSens] ?? 1;
+    const k = settings.lookSens || 1;
     const l = { x: this.look.x * k, y: this.look.y * k };
     this.look = { x: 0, y: 0 };
     return l;

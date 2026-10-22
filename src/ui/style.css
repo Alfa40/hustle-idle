@@ -681,6 +681,8 @@ body.guide-on .hud-top { display: none; }
 .ph-sl { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
 .ph-sl span { width: 104px; flex: none; }
 .ph-sl input { flex: 1; accent-color: var(--purple); }
+.look-sl { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.look-sl input { flex: 1; min-height: 32px; accent-color: var(--blue); }
 
 /* ---------- negozio ---------- */
 .hbtn.c-pink { --b: #e84393; --bd: #b8306f; }
