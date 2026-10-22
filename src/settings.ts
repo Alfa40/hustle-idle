@@ -14,6 +14,8 @@ export interface Settings {
   hudMenu: HudKey[];
   /** joystick a destra e azioni toccando a sinistra (per i mancini) */
   swapControls: boolean;
+  /** sensibilità della visuale: quanto gira la camera trascinando il dito (lavoretti in prima persona, tornio) */
+  lookSens: 'lenta' | 'normale' | 'veloce' | 'molto';
 }
 
 /** Metà dello schermo delle azioni (per i testi dei tutorial): l'altra è del joystick. */
@@ -28,7 +30,7 @@ export const HUD_NAMES: Record<HudKey, string> = {
 
 const KEY = 'hustleidle.settings';
 
-const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false, hudOrder: [...HUD_KEYS], hudMenu: [], swapControls: false };
+const DEFAULTS: Settings = { quality: 'alta', shadows: true, camera: 'normale', pointers: true, minimap: true, outlines: true, battery: false, hudOrder: [...HUD_KEYS], hudMenu: [], swapControls: false, lookSens: 'normale' };
 
 export const settings: Settings = { ...DEFAULTS };
 
@@ -71,8 +73,11 @@ export function setSetting<K extends keyof Settings>(key: K, value: Settings[K])
 /** Rapporto pixel massimo per ogni qualità (meno pixel = telefono più fresco). */
 export const QUALITY_PIXEL_RATIO: Record<Settings['quality'], number> = { alta: 1.6, media: 1.25, bassa: 1 };
 export const CAMERA_MULT: Record<Settings['camera'], number> = { vicina: 0.78, normale: 1, lontana: 1.28 };
+/** Quanto gira la visuale per ogni pixel di dito, rispetto al normale. */
+export const LOOK_MULT: Record<Settings['lookSens'], number> = { lenta: 0.6, normale: 1, veloce: 1.5, molto: 2.1 };
 
 export const SETTING_OPTIONS = {
   quality: [['alta', 'Alta'], ['media', 'Media'], ['bassa', 'Bassa']],
   camera: [['vicina', 'Vicina'], ['normale', 'Normale'], ['lontana', 'Lontana']],
+  lookSens: [['lenta', 'Lenta'], ['normale', 'Normale'], ['veloce', 'Veloce'], ['molto', 'Molto veloce']],
 } as const;

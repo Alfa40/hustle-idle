@@ -39,11 +39,12 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 - Ruotare non chiude niente e non interrompe azioni, tutorial, veicolo, timer o guadagni
 - Pagina di prova `debug.html`: cornici 360×640, 390×844, 430×932, 768×1024, pulsante Ruota, notch simulato
 - Tutorial dei lavoretti un passo alla volta: il fumetto dice solo cosa fare adesso e la freccia indica il passo giusto; ogni minigioco (lavello, piastra, tagliere…) ha il suo mini tutorial che spiega ogni momento quando arriva
-- Testi: brevi e a punti. Le spiegazioni sono elenchi di frasi corte dietro il "?", i consigli del manager una riga sola (numero + cosa fare), i suggerimenti dei lavoretti un elenco nel fumetto del tutorial
+- Testi: brevi e a punti. Le spiegazioni sono elenchi di frasi corte dietro il "?", i consigli del manager una riga sola (numero + cosa fare), i suggerimenti dei lavoretti detti un passo alla volta
 
 ## 3. Controlli e telecamera
 
 - **Visuale isometrica dall'alto** che segue il personaggio.
+- **Sensibilità della visuale** (Impostazioni): Lenta, Normale, Veloce, Molto veloce (×0,6 / ×1 / ×1,5 / ×2,1, `LOOK_MULT` in src/settings.ts): quanto gira la visuale trascinando il dito nei lavoretti in prima persona e al tornio
 - **Movimento solo col joystick virtuale** (compare dove si appoggia il dito). Toccare un punto dello schermo non fa muovere il personaggio. Su PC: WASD o frecce.
 - Si interagisce avvicinandosi: NPC, porte degli edifici posseduti, postazioni dei mini-giochi.
 
