@@ -88,9 +88,25 @@ export abstract class Station {
     return new DOMRect(r.left + x, r.top + y, w, h);
   }
 
+  /** Un riquadro del quadrato di gioco (`square(top, bottom)`, coordinate 0–1) sullo schermo, ricalcolato a ogni uso. */
+  protected sqRect(u0: number, v0: number, u1: number, v1: number, top = 70, bottom = 34) {
+    return () => {
+      const q = this.square(top, bottom);
+      return this.screen(q.x + u0 * q.s, q.y + v0 * q.s, (u1 - u0) * q.s, (v1 - v0) * q.s);
+    };
+  }
+
   /** Passi della guida obbligatoria per questo minigioco (la prima volta, nel tutorial); [] = nessuno o non ancora pronto. */
   guideSteps(): { rect: () => DOMRect | null; say: string }[] {
     return [];
+  }
+
+  /**
+   * Il momento del minigioco (es. "lava" → "sciacqua"): il tutorial mostra `guideSteps()` una volta per ogni momento
+   * nuovo, così ogni cosa si spiega quando serve. '' = un solo momento.
+   */
+  guideKey() {
+    return '';
   }
 
   protected down(_x: number, _y: number) {}
@@ -166,6 +182,13 @@ export class KneadStation extends Station {
       const d = Math.sqrt(Math.random()) * 0.28;
       return { x: 0.5 + Math.cos(a) * d * 1.3, y: 0.55 + Math.sin(a) * d * 0.7, r: 0.025 + Math.random() * 0.02 };
     });
+  }
+
+  guideSteps() {
+    return [
+      { rect: this.sqRect(0.1, 0.25, 0.9, 0.85), say: "👉 Trascina il dito avanti e indietro sull'impasto" },
+      { rect: this.sqRect(0.1, 0.25, 0.9, 0.85), say: '💡 Passate lunghe, senza fermarti' },
+    ];
   }
 
   protected down(x: number) {
@@ -467,6 +490,15 @@ export class CutStation extends Station {
     super(onEnd);
     this.v = VEGGIES[veg];
     this.lines = Array.from({ length: nLines }, (_, i) => ({ u: (i + 1) / (nLines + 1), n: 0, shift: 0 }));
+  }
+
+  guideSteps() {
+    const s = this.shape();
+    return [
+      { rect: this.sqRect(0.4, 0.76, 1, 0.96), say: '🔪 Prendi il coltello col dito' },
+      { rect: this.sqRect(s.x0 - 0.04, s.y0 - 0.04, s.x1 + 0.04, s.y1 + 0.04), say: '↕️ Muovilo su e giù sopra ogni linea' },
+      { rect: this.sqRect(s.x0 - 0.04, s.y0 - 0.04, s.x1 + 0.04, s.y1 + 0.04), say: '💡 Dopo qualche passata la fetta si stacca' },
+    ];
   }
 
   /** Dove sta l'ingrediente nel riquadro (coordinate 0–1 del quadrato). */

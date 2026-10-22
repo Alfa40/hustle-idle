@@ -117,7 +117,7 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
   const cartAt = room.near(-2.6, 0.4, 0.9, 0);
   const sink = room.furn('kitchenSink', 0, -2.4, 0);
   const sinkAt = room.near(0, -2.4, 0, 0.6);
-  const rackNames: Record<Rack, string> = { piatti: 'scolapiatti', bicchieri: 'portabicchieri', posate: 'cestello delle posate' };
+  const rackNames: Record<Rack, string> = { piatti: 'nello scolapiatti', bicchieri: 'nel portabicchieri', posate: 'nel cestello delle posate' };
   const stations = racks.map((r, k) => {
     const z = -1.2 + k * 1.3;
     const f = room.furn('kitchenCabinet', 3.0, z, -Math.PI / 2);
@@ -143,7 +143,7 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         },
       },
       {
-        pos: sinkAt, kind: 'tap', repeat: true, quiet: true, get label() { return holding ? `Lava: ${DISHWARE[holding.kind].name}` : 'Lava'; }, icon: '', obj: sink.obj,
+        pos: sinkAt, kind: 'tap', repeat: true, quiet: true, get label() { return holding ? `Porta al lavello e lava: ${DISHWARE[holding.kind].name}` : 'Lava al lavello'; }, icon: '', obj: sink.obj,
         enabled: () => !!holding && !holding.clean,
         onDone: () => {
           const kind = holding!.kind;
@@ -156,7 +156,7 @@ export function dishJob(game: Game, lineLevel: number, slot: Slot, placed: Place
         },
       },
       ...stations.map((st): Task => ({
-        pos: st.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti nel ${rackNames[st.r]}`, icon: '', obj: st.obj,
+        pos: st.pos, kind: 'tap', repeat: true, quiet: true, label: `Metti ad asciugare ${rackNames[st.r]}`, icon: '', obj: st.obj,
         enabled: () => !!holding?.clean,
         get right() { return !!holding && DISHWARE[holding.kind].rack === st.r; },
         onDone: () => {
@@ -906,6 +906,7 @@ export function barJob(game: Game, lineLevel: number, slot: Slot, placed: Placed
   const phases: Phase[] = [{
     name: 'Servi i clienti in ordine', icon: '☕', count: () => [served, n],
     tip: 'Guarda cosa chiede il <b>primo della fila</b>. Prendi una <b>tazza</b>. Caffè alla <b>macchina</b> (tieni premuto). Cappuccino: aggiungi il <b>latte montato</b>. Tè: usa il <b>bollitore</b>. Servi al bancone',
+    rules: 'Servi in ordine: prima il primo della fila. Cappuccino: dopo il caffè, il latte montato. Tè: usa il bollitore.',
     tasks: () => [
       { pos: cupsAt, kind: 'tap', repeat: true, quiet: true, label: 'Prendi una tazza', icon: '☕', obj: cups.obj, enabled: () => !holding && served < n, onDone: () => fill('cup') },
       { pos: machineAt, kind: 'hold', sec: 1.4, repeat: true, quiet: true, label: 'Fai il caffè', icon: '⚙️', obj: machine.obj, fx: 'bubble', fxColor: 0x6b3e1e, enabled: () => holding === 'cup', onDone: () => fill('espresso') },
@@ -1080,6 +1081,7 @@ export function restaurantJob(game: Game, lineLevel: number, slot: Slot, placed:
   const phases: Phase[] = [{
     name: 'Servi i tavoli', icon: '🍽️', count: () => [tables.filter((x) => x.stage === 'done').length, n],
     tip: 'Al tavolo che chiama prendi l\'<b>ordinazione</b>. Al <b>passe</b> prendi il piatto col <b>numero del tavolo</b>. Portalo al tavolo. Chiede il <b>conto 🧾</b>? Prendilo alla <b>cassa</b>',
+    rules: 'Ogni piatto ha il numero del suo tavolo. Chiede il conto 🧾? Prendilo alla cassa.',
     tasks: () => [
       ...tables.map((tb): Task => ({
         pos: tb.pos.clone().add(new THREE.Vector3(0, 0, 1.0)), kind: 'tap', repeat: true, quiet: true, label: `Tavolo ${tb.num}`, icon: '🍽️',
@@ -1264,6 +1266,7 @@ export function facchinoJob(game: Game, lineLevel: number, slot: Slot, placed: P
     {
       name: 'Porta le valigie in camera', icon: '🧳', count: () => [delivered, n],
       tip: 'Prendi una <b>valigia</b> alla reception. Leggi il <b>numero sull\'etichetta</b> (anche in alto, <b>in mano</b>). Portala alla porta con la stessa <b>targa</b>. Sbagliato? Tocca la valigia per riprenderla',
+      rules: 'Il numero sull\'etichetta è la camera. Sbagliato? Tocca la valigia per riprenderla.',
       tasks: () => bags.map((b): Task => ({
         pos: b.at, kind: 'tap', quiet: true, label: `Prendi la valigia (camera ${b.door.num})`, icon: '🧳', enabled: () => !holding,
         onDone: () => {
@@ -1413,6 +1416,7 @@ export function conciergeJob(game: Game, lineLevel: number, slot: Slot, placed: 
   const phases: Phase[] = [{
     name: 'Aiuta gli ospiti', icon: '🛎️', count: () => [doneN, n],
     tip: 'Tocca un ospite: ti dice cosa vuole. Prendila dagli scaffali dietro il banco. <b>Portagliela</b>',
+    rules: 'Tocca un ospite: ti dice cosa vuole.',
     tasks: () => [
       ...guests.map((g, i): Task => ({
         pos: g.pos.clone().add(new THREE.Vector3(0, 0, -0.9)), kind: 'tap', repeat: true, quiet: true, label: busy === i ? `Dai a ${['lui', 'lei'][i % 2]}` : 'Parla con l\'ospite', icon: '🙋',

@@ -49,6 +49,28 @@ export class GrillStation extends Station {
     super(onEnd);
   }
 
+  /** i momenti spiegati dal tutorial: metti sulla piastra, gira quando è verde, sul panino quando è cotta */
+  guideKey() {
+    const kd = this.k[this.side];
+    if (this.where === 'grill' && kd >= 1 && kd <= 1.4) return this.k[1 - this.side] >= 1 ? 'serve' : 'flip';
+    return 'start';
+  }
+
+  guideSteps() {
+    const meat = () => this.sqRect(this.p.x - 0.13, this.p.y - 0.1, this.p.x + 0.13, this.p.y + 0.1)();
+    switch (this.guideKey()) {
+      case 'flip':
+        return [{ rect: meat, say: '👆 Barra verde: tocca la carne per girarla' }, { rect: meat, say: '💡 Se diventa rossa brucia' }];
+      case 'serve':
+        return [{ rect: this.sqRect(0.64, 0.28, 0.96, 0.56), say: '🍞 Cotta: trascinala sul panino' }];
+      default:
+        return [
+          { rect: meat, say: '🥩 Trascina la carne sulla piastra' },
+          { rect: this.sqRect(0.06, 0.15, 0.6, 0.75), say: '⏳ Aspetta che la barra diventi verde' },
+        ];
+    }
+  }
+
   private sq() {
     return this.square(70, 34);
   }
@@ -298,6 +320,24 @@ export class BurgerStation extends Station {
 
   private sq() {
     return this.square(70, 34);
+  }
+
+  /** i momenti spiegati dal tutorial: gli ingredienti dalle vaschette, poi (se c'è) la salsa */
+  guideKey() {
+    return this.steps[this.idx]?.t === 'sauce' ? 'sauce' : 'tray';
+  }
+
+  guideSteps() {
+    if (this.guideKey() === 'sauce') {
+      return [
+        { rect: this.sqRect(0.62, 0.48, 0.98, 0.76), say: '🧴 Prendi la bottiglia della salsa' },
+        { rect: this.sqRect(0.06, 0.3, 0.6, 0.8), say: '🧴 Passala a zig-zag sul panino, da un lato all\'altro' },
+      ];
+    }
+    return [
+      { rect: this.sqRect(0.62, 0.06, 0.98, 0.5), say: '🧾 Lo scontrino: cosa mettere e in che ordine' },
+      { rect: this.sqRect(0.02, 0.82, 0.98, 1), say: "👆 Tocca la vaschetta giusta: l'ingrediente cade sul panino" },
+    ];
   }
 
   /** vaschette in basso: gli ingredienti e il panino sopra */
@@ -655,6 +695,27 @@ export class WashStation extends Station {
       this.dirt.push({ x: u * this.d.hx, y: v * this.d.hy, r: 0.035 + Math.random() * 0.03, a: 1, c: cols[i % cols.length] });
     }
     this.foam = new Array(this.G * this.G).fill(0);
+  }
+
+  /** i momenti spiegati dal tutorial: spugna, sapone e macchie; poi il risciacquo */
+  guideKey() {
+    return this.stage === 'scrub' ? 'scrub' : 'rinse';
+  }
+
+  guideSteps() {
+    const dish = () => this.sqRect(this.at.x - this.d.hx - 0.03, this.at.y - this.d.hy - 0.03, this.at.x + this.d.hx + 0.03, this.at.y + this.d.hy + 0.03)();
+    if (this.guideKey() === 'rinse') {
+      return [
+        { rect: dish, say: "🚿 Pulito! Ora trascina il piatto sotto l'acqua" },
+        { rect: this.sqRect(0.3, 0.1, 0.7, 0.5), say: '💡 Muovilo finché sparisce tutta la schiuma' },
+      ];
+    }
+    return [
+      { rect: this.sqRect(this.sponge.x - 0.1, this.sponge.y - 0.08, this.sponge.x + 0.1, this.sponge.y + 0.08), say: '🧽 Prendi la spugna col dito' },
+      { rect: this.sqRect(this.soapAt.x - 0.1, this.soapAt.y - 0.08, this.soapAt.x + 0.1, this.soapAt.y + 0.08), say: '🧼 Tienila nel sapone: si inzuppa' },
+      { rect: dish, say: '🫧 Poi strofina le macchie finché spariscono' },
+      { rect: dish, say: '💡 Spugna asciutta? Rimettila nel sapone' },
+    ];
   }
 
   /** (u, v) in -1…1 dentro la sagoma della stoviglia? */

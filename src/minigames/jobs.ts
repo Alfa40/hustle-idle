@@ -70,6 +70,12 @@ export interface RunGuide {
   aims?: THREE.Vector3[];
   /** cosa fare in questa fase, per il fumetto del tutorial (se il lavoretto lo scrive da sé) */
   tip?: string;
+  /** regole della fase da dire all'inizio (vedi `Phase.rules`) */
+  rules?: string;
+  /** il passo consigliato dal tutorial: quello giusto tra le scelte (es. lo scaffale giusto), il più vicino tra gli altri */
+  next?: Task | null;
+  /** si è abbastanza vicini al passo consigliato per farlo */
+  nextNear?: boolean;
 }
 
 export function starsFor(timeLeft: number, total: number) {
@@ -240,6 +246,8 @@ export interface Task {
   hitObj?: THREE.Object3D;
   /** tra le scelte di un gruppo, quella giusta (le altre si possono fare lo stesso ma costano alla fine) */
   right?: boolean;
+  /** consiglio breve per il tutorial, detto quando questo passo arriva la prima volta (es. "dispari a sinistra") */
+  tip?: string;
   /** gruppo di scelte: quando si fa quella giusta, le altre del gruppo spariscono */
   group?: string;
   /** dopo averla fatta arrivano altri punti nella stessa fase (es. prendi la scatola → mettila sullo scaffale) */
@@ -287,6 +295,11 @@ export interface Phase {
   icon: string;
   /** cosa fare, per il fumetto del tutorial */
   tip?: string;
+  /**
+   * regole da sapere che i passi non dicono da soli (es. i colori degli scaffali): il tutorial le dice all'inizio
+   * della fase, una frase alla volta. Frasi brevi separate da punto.
+   */
+  rules?: string;
   /** quanto è fatto della fase (al posto del conto dei punti, quando i punti arrivano man mano) */
   count?: () => [number, number];
   /** crea le attività quando la fase inizia (così possono dipendere da quelle prima) */
@@ -613,17 +626,42 @@ export class PhasedRun extends BaseRun {
   private nearTask: Task | null = null;
   private nearOk = false;
 
+  /**
+   * Il passo che il tutorial consiglia adesso: tra le scelte si va su quella giusta (`right`), mai su una sbagliata o
+   * su un punto per riprendere un oggetto (se c'è altro da fare); tra gli altri il più vicino.
+   */
+  private recommend() {
+    const p = this.game.player.root.position;
+    const real = this.pending().filter((t) => !t.decoy);
+    const pool = real.some((t) => t.right === true) ? real.filter((t) => t.right === true) : real.filter((t) => t.right !== false);
+    const main = pool.filter((t) => !t.loose);
+    let best: Task | null = null;
+    let bd = Infinity;
+    for (const t of main.length ? main : pool) {
+      const d = Math.hypot(t.pos.x - p.x, t.pos.z - p.z);
+      if (d < bd) {
+        bd = d;
+        best = t;
+      }
+    }
+    return best;
+  }
+
   guide(): RunGuide | null {
     const ph = this.phases[this.idx];
     if (!ph) return null;
     const p = this.game.player.root.position;
+    const next = this.recommend();
     return {
+      next,
+      nextNear: !!next && (next.aim ? Math.hypot(next.pos.x - p.x, next.pos.z - p.z) < 4.5 : next === this.nearTask && this.nearOk),
       phase: this.idx,
       phases: this.phases.length,
       phaseName: ph.name,
       phaseIcon: ph.icon,
       left: ph.count ? ph.count()[1] - ph.count()[0] : this.left(),
       tip: ph.tip,
+      rules: ph.rules,
       task: this.nearTask,
       // i punti da toccare sull'oggetto si raggiungono anche da più lontano (basta vederli)
       near: this.nearTask?.aim ? Math.hypot(this.nearTask.pos.x - p.x, this.nearTask.pos.z - p.z) < 4.5 : this.nearOk,
@@ -1558,6 +1596,7 @@ export function routeStreetJob(game: Game, level: number, street: Street, title:
     {
       name: flyer ? 'Imbuca un giornale in ogni cassetta' : 'Consegna i pacchi', icon: flyer ? '📬' : '🏠',
       tip: civici ? `Civici: <b>${nums}</b>${specialNote}. Leggi le <b>targhe sulle case</b> (dispari a sinistra, pari a destra). Tocca lo <b>zerbino</b> per lasciare il pacco. Firma o contrassegno? Tieni premuto il <b>citofono</b>` : undefined,
+      rules: civici ? 'Leggi le targhe blu sulle case: dispari a sinistra, pari a destra. Firma o contrassegno? Tieni premuto il citofono.' : undefined,
       // giornali: nella cassetta della posta sul marciapiede; pacchi: fino alla porta di casa
       tasks: () => stops.map((h) => (flyer
         ? { pos: h.stand, markerAt: h.box, kind: 'tap' as const, label: 'Imbuca il giornale', icon: '📬', onFoot: true }

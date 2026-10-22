@@ -12,10 +12,9 @@ import { toast } from '../sim/bus';
  */
 
 /** Cosa fare in ogni fase, con il perché (null = si usa il punto da fare, es. lavapiatti). */
-/** Spiegazione lunga a punti: una frase per riga (si divide a ogni punto, punto e virgola o !; dopo il ? no: "Sbagliato? Tocca…" resta insieme). */
-function asPoints(t: string) {
-  const parts = t.split(/(?<=[.;!])\s+/).map((x) => x.replace(/[.;]$/, '').trim()).filter(Boolean);
-  return parts.length < 2 ? t : `<ul class="points">${parts.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+/** Le frasi di una spiegazione (una per passo della guida): si divide a ogni punto, punto e virgola o "!". */
+function sentences(t: string) {
+  return t.split(/(?<=[.;!])\s+/).map((x) => x.replace(/[.;]$/, '').trim()).filter(Boolean);
 }
 
 /** Chiave: il tipo (versione di base) o `tipo:versione` (es. `giardino:1`, la potatura). */
@@ -29,7 +28,7 @@ const TIPS: Record<string, string[] | null> = {
   ],
   consegna: [
     'Ritira i <b>pacchi</b> al <b>negozio dei pacchi</b> (insegna rossa)',
-    'Un pacco a ogni <b>civico</b> del riquadro in alto. Leggi le <b>targhe blu</b> sulle case. Tocca lo <b>zerbino</b>. L\'ordine lo scegli tu',
+    'Un pacco a ogni <b>civico</b> del riquadro in alto. Tocca lo <b>zerbino</b> davanti alla porta. L\'ordine lo scegli tu',
     'Hai consegnato tutto: torna al negozio a <b>firmare la ricevuta</b>',
   ],
   volantini: [
@@ -79,9 +78,6 @@ export class JobTutorial {
   /** freccia 3D che rimbalza sopra l'oggetto da raggiungere */
   private arrow: THREE.Sprite;
   private key = '';
-  /** spiegazione lunga aperta col "?" (si richiude quando cambia il passo) */
-  private open = false;
-  private stepKey = '';
   /** secondi da fermo lontano dall'obiettivo (dopo un po' la manina mostra come camminare) */
   private still = 0;
   private last = 0;
@@ -93,6 +89,7 @@ export class JobTutorial {
   private coachTasks = new Set<string>();
   private coachNearKeys = new Set<string>();
   private coachStations = new Set<string>();
+  private coachTips = new Set<string>();
   private nearTry = 0;
   private stationSeen: Station | null = null;
   private stationAt = 0;
@@ -102,11 +99,6 @@ export class JobTutorial {
   constructor(private game: Game) {
     this.bubble = document.createElement('div');
     this.bubble.className = 'tut-bubble tut-mini';
-    this.bubble.addEventListener('click', (e) => {
-      if (!(e.target as HTMLElement).closest('[data-t="more"]')) return;
-      this.open = !this.open;
-      this.key = '';
-    });
     this.hand = document.createElement('div');
     this.hand.className = 'tut-hand';
     this.walk = document.createElement('div');
@@ -136,13 +128,13 @@ export class JobTutorial {
     this.run = run;
     run.frozen = true;
     this.key = '';
-    this.open = false;
     this.coachGo = false;
     this.coachAt = performance.now();
     this.coachPhase = this.coachAim = -1;
     this.coachTasks.clear();
     this.coachNearKeys.clear();
     this.coachStations.clear();
+    this.coachTips.clear();
     toast('🎓 Tutorial: il tempo è fermo', 'info');
   }
 
@@ -184,9 +176,10 @@ export class JobTutorial {
     const now = performance.now();
     const dt = Math.min(0.1, (now - (this.last || now)) / 1000);
     this.last = now;
-    // una cosa alla volta: il passo di adesso in poche parole (il nome del punto da fare)
-    const tips = TIPS[this.type];
-    const long = g.tip ?? tips?.[g.phase] ?? '';
+    // una cosa alla volta: il passo di adesso in poche parole (il nome del punto da fare). Il passo è quello
+    // consigliato (lo scaffale giusto, non il più vicino); i minigiochi senza punti hanno il nome della fase
+    const task = g.next !== undefined ? g.next : g.task;
+    const tNear = g.next !== undefined ? !!g.nextNear : g.near;
     let line: string;
     let target: THREE.Vector3 | null = null;
     let obj: THREE.Object3D | undefined;
@@ -195,35 +188,27 @@ export class JobTutorial {
     let noArrow = false;
     if (!g.arrived) line = '🚶 Vai alla zona di lavoro';
     else if (!g.inZone) line = '⚠️ Torna nella zona di lavoro';
-    else if (g.task) {
-      line = `${g.task.icon ? `${g.task.icon} ` : ''}${g.task.label}`;
-      if (!g.near) {
-        target = g.task.pos;
+    else if (task) {
+      line = `${task.icon ? `${task.icon} ` : ''}${task.label}`;
+      if (!tNear) {
+        target = task.pos;
         // i punti col loro indicatore (il cerchio bianco con l'icona) non hanno bisogno della freccia sopra
-        noArrow = !g.task.quiet;
-        obj = g.task.obj ?? g.task.hitObj;
-      } else if (g.task.aim) {
+        noArrow = !task.quiet;
+        obj = task.obj ?? task.hitObj;
+      } else if (task.aim) {
         // punti da toccare direttamente (macchie sull'auto, punte della siepe): il gesto è insolito, si scrive
         aimAt = this.visibleAim(g.aims ?? []);
         line = `👆 Tieni il dito ${AIM_WHAT[this.type]?.[g.phase] ?? 'sul punto che si illumina'}`;
       }
-      else gesture = g.task.kind;
+      else gesture = task.kind;
     } else line = `${g.phaseIcon ? `${g.phaseIcon} ` : ''}${g.phaseName}`;
-    const step = `${g.phase}|${line}`;
-    if (step !== this.stepKey) {
-      this.stepKey = step;
-      this.open = false;
-    }
-    // davanti all'oggetto basta la manina (e la scritta dell'azione): il fumetto resta piccolo, col "?"
-    const near = !!g.task && g.near && !g.task.aim;
-    const more = long ? `<button class="tut-more" data-t="more" aria-label="Spiegazione">${this.open ? '✕' : '?'}</button>` : '';
-    const html = this.open
-      ? `<div class="tut-row"><span class="tut-line">🎓 ${line}</span>${more}</div><div class="tut-long">${asPoints(long)}</div>`
-      : `<div class="tut-row"><span class="tut-line">${near ? '🎓' : `🎓 ${line}`}</span>${more}</div>`;
+    // niente spiegazioni lunghe: il fumetto dice solo il passo di adesso; i dettagli arrivano al momento giusto
+    // (guida a schermo scuro quando arriva un passo nuovo o si apre un minigioco)
+    const html = `<div class="tut-row"><span class="tut-line">🎓 ${line}</span></div>`;
     if (html !== this.key) {
       this.key = html;
       this.bubble.innerHTML = html;
-      this.bubble.classList.toggle('tiny', near && !this.open);
+      this.bubble.classList.remove('tiny');
     }
     this.bubble.style.display = '';
     this.place();
@@ -233,7 +218,7 @@ export class JobTutorial {
     this.still = target && !moving ? this.still + dt : 0;
     this.placeWalk(!!target && this.still > 1.5);
     if (aimAt) this.placeHandAt(aimAt);
-    else if (g.task?.aim) this.hand.style.display = 'none';
+    else if (task?.aim) this.hand.style.display = 'none';
     else this.placeHand(gesture);
   }
 
@@ -271,7 +256,8 @@ export class JobTutorial {
     // minigioco col dito aperto (impastatrice, forma…): i suoi passi, una volta per tipo
     const st = (this.run as { station?: Station | null } | null)?.station;
     if (st && !st.closed) {
-      const name = st.constructor.name;
+      // un pezzo di spiegazione per ogni momento del minigioco (es. lavello: spugna e sapone, poi il risciacquo)
+      const name = `${st.constructor.name}:${st.guideKey()}`;
       if (this.coachStations.has(name)) return false;
       // un attimo per far arrivare la camera sulla postazione (la vasca dell'impastatrice), poi i passi
       if (this.stationSeen !== st) {
@@ -291,28 +277,45 @@ export class JobTutorial {
       gd.show({ steps: [{ say: '🚶 Prima vai alla zona di lavoro: segui la freccia' }] });
       return true;
     }
-    const taskKey = g.task ? g.task.icon || g.task.label : '';
+    // il passo consigliato (la scelta giusta, non la più vicina) e se ci si è davanti
+    const task = g.next !== undefined ? g.next : g.task;
+    const tNear = g.next !== undefined ? !!g.nextNear : g.near;
+    // stesso tipo di passo anche se cambia l'oggetto ("Prendi dalla pila: piatto" / "…: bicchiere"): si spiega una volta
+    const taskKey = task ? task.icon || task.label.split(':')[0] : '';
+    // ogni consiglio si dice una volta sola (la guida ha una fase per fermata: non si ripete a ogni fermata)
+    const tipSteps = (t?: string) => {
+      if (!t || this.coachTips.has(t)) return [];
+      this.coachTips.add(t);
+      return sentences(t).map((x) => ({ say: `💡 ${x}` }));
+    };
     if (g.phase !== this.coachPhase) {
       this.coachPhase = g.phase;
       if (taskKey) this.coachTasks.add(taskKey);
-      // il nome della fase dice tutto il compito ("Taglia i cespugli"), il punto è solo il primo da fare
-      const line = g.phaseName ? `${g.phaseIcon ? `${g.phaseIcon} ` : ''}${g.phaseName}` : `${g.task?.icon ? `${g.task.icon} ` : ''}${g.task?.label ?? ''}`;
-      const obj = g.task?.obj ?? g.task?.hitObj;
-      const rect = g.task ? this.screenRect(g.task.pos, obj) : null;
-      const where = rect ? { rect: () => this.screenRect(g.task!.pos, obj) } : {};
-      gd.show({ steps: [{ ...where, say: `🎓 Passo ${g.phase + 1} di ${g.phases}: ${line}` }] });
+      // la fase: il suo consiglio scritto per il tutorial (una frase per passo) o il suo nome, con l'oggetto acceso
+      // (il consiglio della fase si usa se è breve: quelli lunghi si dicono a pezzi, passo per passo)
+      const short = g.tip && sentences(g.tip).length <= 2 ? g.tip : undefined;
+      const head = task ? TIPS[this.type!]?.[g.phase] ?? short : undefined;
+      const name = g.phaseName ? `${g.phaseIcon ? `${g.phaseIcon} ` : ''}${g.phaseName}` : `${task?.icon ? `${task.icon} ` : ''}${task?.label ?? ''}`;
+      const obj = task?.obj ?? task?.hitObj;
+      const where = task && this.screenRect(task.pos, obj) ? { rect: () => this.screenRect(task.pos, obj) } : {};
+      const lines = head ? sentences(head) : [name];
+      const steps = lines.map((x, i) => ({ ...where, say: i ? x : `🎓 Passo ${g.phase + 1} di ${g.phases}: ${x}` }));
+      // minigiochi senza punti da raggiungere (furgone, pianoforte, guida…): come si gioca, una frase alla volta
+      if (!task && g.tip) steps.push(...tipSteps(g.tip));
+      else steps.push(...tipSteps(g.rules), ...tipSteps(task?.tip));
+      gd.show({ steps });
       return true;
     }
-    // compito di un tipo nuovo dentro la stessa fase (farina → impastatrice → banco…): cosa fare ora
-    if (g.task && taskKey && !this.coachTasks.has(taskKey)) {
+    // passo di un tipo nuovo dentro la stessa fase (prendi il piatto → lavalo → mettilo ad asciugare): cosa fare ora
+    if (task && taskKey && !this.coachTasks.has(taskKey)) {
       this.coachTasks.add(taskKey);
-      const t = g.task;
+      const t = task;
       const obj = t.obj ?? t.hitObj;
       const where = this.screenRect(t.pos, obj) ? { rect: () => this.screenRect(t.pos, obj) } : {};
-      gd.show({ steps: [{ ...where, say: `👉 Ora: ${t.icon ? `${t.icon} ` : ''}${t.label}` }] });
+      gd.show({ steps: [{ ...where, say: `👉 Ora: ${t.icon ? `${t.icon} ` : ''}${t.label}` }, ...tipSteps(t.tip)] });
       return true;
     }
-    if (g.task?.aim && g.near && this.coachAim !== g.phase) {
+    if (task?.aim && tNear && this.coachAim !== g.phase) {
       const p = this.visibleAim(g.aims ?? []);
       if (!p) return false;
       this.coachAim = g.phase;
@@ -325,11 +328,11 @@ export class JobTutorial {
       gd.show({ steps: [{ rect: box, say: `👆 Tieni il dito ${AIM_WHAT[this.type!]?.[g.phase] ?? 'sul punto acceso'}`, tap: true }] });
       return true;
     }
-    if (g.task && !g.task.aim && g.near && !this.coachNearKeys.has(taskKey) && body.contains('act-ready')) {
+    if (task && !task.aim && tNear && !this.coachNearKeys.has(taskKey) && body.contains('act-ready')) {
       const fp = body.contains('fp-controls');
       const el = document.querySelector<HTMLElement>(fp ? '.action:not(.act-stand)' : '.act-zone');
       if (!el) return false;
-      const hold = g.task.kind === 'hold';
+      const hold = task.kind === 'hold';
       // la zona da toccare è un po' più grande dell'oggetto: si accende un punto che tocca davvero l'oggetto
       // si cerca il punto al massimo 3 volte al secondo (sono molti raggi)
       const now = performance.now();

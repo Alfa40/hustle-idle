@@ -53,7 +53,14 @@
 - **Testi brevi, a punti**: niente paragrafi lunghi. Una spiegazione è un elenco di frasi corte (≈ 60 caratteri
   ciascuna): in src/ui/ui.ts `points(...)` (dietro il "?") e `bullets(...)` (sempre visibile), classe `points`.
   Consigli dei resoconti e messaggi: una riga sola, con il numero e cosa fare. I `tip` dei lavoretti si scrivono a
-  frasi brevi separate da punto: nel fumetto del tutorial (`asPoints` in src/ui/jobtutorial.ts) diventano un elenco.
+  frasi brevi separate da punto.
+- **Tutorial dei lavoretti: un passo alla volta** (src/ui/jobtutorial.ts). Il fumetto dice solo il passo di adesso
+  (niente "?" con la lista di tutto) e la freccia indica il passo **consigliato** (`RunGuide.next`: tra le scelte quella
+  giusta, `right`, mai il punto più vicino se è sbagliato). Quando arriva un tipo di passo nuovo, una frase a schermo
+  scuro ("👉 Ora: …"); all'inizio di una fase il suo nome (o `TIPS`, o il `tip` se è breve) e le sue `rules` (regole che i
+  passi non dicono da soli, una frase per passo); un `Task.tip` si dice quando quel passo arriva. Ogni minigioco col dito
+  (`Station`) ha il suo **mini tutorial**: `guideSteps()` per ogni momento (`guideKey()`, es. lavello: spugna → sapone →
+  macchie, poi il risciacquo), con il punto da toccare acceso. Ogni postazione nuova deve averli.
 - **Guida obbligatoria per ogni tasto o funzione nuova** (`src/ui/guide.ts`, passi in `src/ui/guides.ts`): ogni finestra
   nuova ha un nome `guide` nel pannello e i suoi passi in `guides.ts` (`panel:<nome>`, `<nome>/tab:<scheda>`, `<nome>/<azione>`);
   ogni tasto nuovo fuori dalle finestre o funzione che si sblocca ha la sua guida (`hud:…`, `unlock:…` con `auto`). Una frase

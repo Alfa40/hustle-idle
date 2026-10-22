@@ -350,6 +350,7 @@ export function shelvingJob(game: Game, lineLevel: number, wh: Warehouse, title:
       tip: 'Colore del <b>nastro</b> = colore dello <b>scaffale</b>. Punta <b>^</b> = ripiano in alto, <b>V</b> = in basso. Puoi <b>impilare</b>: tocca la pila dove appoggiarla.'
         + (levels ? ' <b>Pesante</b> 🏋️: solo sul ripiano, mai sopra altre. <b>Fragile</b> 🍷: niente sopra.' : '')
         + ' Sbagliato? Tocca la scatola in cima per riprenderla.',
+      rules: 'Colore del nastro = colore dello scaffale. Punta ^ = ripiano in alto, V = in basso. Puoi impilare le scatole.' + (levels ? ' Pesante 🏋️: solo sul ripiano, mai sopra altre. Fragile 🍷: niente sopra.' : ''),
       tasks: () => items.map((it) => ({
         pos: it.pos, kind: it.kind === 'heavy' ? 'hold' as const : 'tap' as const, sec: 1.2, label: it.kind === 'heavy' ? 'Solleva la scatola pesante' : it.kind === 'fragile' ? 'Prendi la scatola fragile' : 'Prendi la scatola', icon: it.kind === 'heavy' ? '🏋️' : it.kind === 'fragile' ? '🍷' : '📦',
         quiet: true, enabled: () => !carrying, obj: it.obj,
@@ -473,6 +474,7 @@ export function forkliftJob(game: Game, lineLevel: number, wh: Warehouse, title:
     {
       name: 'Carica i bancali sul camion', icon: '🚛', count: () => [loaded, n],
       tip: 'Davanti a un <b>bancale</b> tieni premuto per alzarlo. Al <b>camion</b> tieni premuto per abbassarlo. <b>Non urtare</b> scaffali e muri!',
+      rules: 'Non urtare scaffali e muri!',
       tasks: () => pals.map((p) => ({
         pos: p.pos, kind: 'hold' as const, sec: 1 + p.level * 0.5, label: p.level ? 'Alza le forche fino al bancale' : 'Infila le forche sotto il bancale', icon: '⬆️', enabled: () => !carrying, obj: p.obj,
         onProgress: (k: number) => (forks.position.y = 0.12 + (p.shelf.boards[p.level] - 0.12) * k),
@@ -543,6 +545,7 @@ export function pickingJob(game: Game, lineLevel: number, wh: Warehouse, title: 
     {
       name: `Prendi gli articoli della lista`, icon: '📋', count: () => [got.size, n],
       tip: `Prendi dagli scaffali: <b>${order.join(' ')}</b>. Guarda le icone: niente frecce. Attento a quelli <b>simili</b>`,
+      rules: 'Guarda le icone sugli scaffali: niente frecce. Attento a quelli simili!',
       tasks: () => arts.map((a) => {
         const ok = order.includes(a.icon);
         return {
@@ -661,6 +664,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     {
       name: 'Imballa i pacchi', icon: '📦', count: () => [packedN, n],
       tip: 'Prendi un oggetto. Scatola della <b>misura giusta</b> (S, M, L). Al banco: <b>riempitivo e nastro</b> (tieni premuto). Attacca l\'<b>etichetta</b>',
+      rules: 'Ogni oggetto vuole la scatola della sua misura: S, M o L.',
       tasks: () => parcels.map((p) => ({
         pos: p.pos, kind: 'tap' as const, label: `Prendi ${p.icon} (misura ${p.size.id})`, icon: p.icon, markerText: `${p.icon}${p.size.id}`, enabled: () => !busy,
         onDone: () => {
@@ -674,6 +678,7 @@ export function shippingJob(game: Game, lineLevel: number, wh: Warehouse, title:
     {
       name: "Carica dall'ultimo al primo", icon: '🚐', count: () => [loadedN, n],
       tip: 'Il numero è l\'<b>ordine di consegna</b>. Carica prima il <b>più alto</b>, per ultimo l\'<b>1</b>',
+      rules: 'Il numero è l\'ordine di consegna. Carica prima il più alto, per ultimo l\'1.',
       tasks: loadStep,
     },
   ];
@@ -931,6 +936,7 @@ export function officeMoveJob(game: Game, lineLevel: number, arena: Arena, title
     {
       name: 'Svuota l\'ufficio', icon: '🏢', count: () => [loaded, things.length],
       tip: 'Porta gli oggetti al <b>camion</b> con gli aiutanti. Il <b>server</b>: staccalo prima (tieni premuto). L\'<b>acquario</b>: cammina, non correre!',
+      rules: 'Il server va staccato prima (tieni premuto). L\'acquario si porta camminando, non correre!',
       tasks: () => things.map((th) => {
         const tk: Task = {
           pos: th.pos, kind: th.kind === 'server' ? 'hold' : 'tap', sec: 2, label: th.kind === 'server' ? 'Stacca il server e prendilo' : `Prendi ${th.icon} ${th.name}`, icon: th.icon,
