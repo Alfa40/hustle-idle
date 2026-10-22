@@ -120,18 +120,20 @@ export class WipeStation extends Station {
       }
     }
     g.restore();
-    // macchie: polvere grigia o aloni bianchi, sbiadiscono strofinando
+    // macchie: polvere grigia o aloni bianchi; strofinando si rimpiccioliscono (restano ben visibili finché non sono finite)
     for (const s of this.spots) {
       if (s.a <= 0) continue;
       const cx = sq.x + s.x * S;
       const cy = sq.y + s.y * S;
-      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, s.r * S);
+      const rad = s.r * S * (0.2 + 0.8 * s.a);
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
       const c = this.kind === 'specchio' ? '255,255,255' : '120,115,110';
-      gr.addColorStop(0, `rgba(${c},${0.85 * s.a})`);
+      gr.addColorStop(0, `rgba(${c},0.85)`);
+      gr.addColorStop(0.7, `rgba(${c},0.6)`);
       gr.addColorStop(1, `rgba(${c},0)`);
       g.fillStyle = gr;
       g.beginPath();
-      g.arc(cx, cy, s.r * S, 0, Math.PI * 2);
+      g.arc(cx, cy, rad, 0, Math.PI * 2);
       g.fill();
     }
     // il panno sotto il dito
