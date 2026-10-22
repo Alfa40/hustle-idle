@@ -40,10 +40,14 @@ export const CAREER_LINES: CareerLine[] = [
   { id: 'volantini', sector: 'clientela', name: 'Porta a porta', icon: '📰', ready: true, ladder: ['Consegna giornali', 'Sondaggi porta a porta', 'Vendita porta a porta'] },
   { id: 'promoter', sector: 'clientela', name: 'Pubbliche relazioni', icon: '📣', ready: false, ladder: ['Promoter in piazza', 'Hostess agli eventi', 'Relazioni pubbliche'] },
   { id: 'vendita', sector: 'clientela', name: 'Vendita', icon: '🏷️', ready: false, ladder: ['Commesso in negozio', 'Venditore di auto', 'Concessionario di lusso'] },
-  // 🎨 Design e arte
-  { id: 'imbianchino', sector: 'artigianato', name: 'Pittura', icon: '🖌️', ready: true, ladder: ['Dipingere la recinzione', 'Dipingere la facciata', 'Murales'] },
+  // 🎨 Arte, design e ristrutturazione (tabella in CARRIERE.md: qui solo i gradini già giocabili)
+  { id: 'imbianchino', sector: 'artigianato', name: 'Pittura', icon: '🖌️', ready: true, ladder: ['Dipingere la recinzione'] },
+  { id: 'falegnameria', sector: 'artigianato', name: 'Falegnameria', icon: '🪚', ready: true, ladder: ['Piccola falegnameria'] },
+  { id: 'ristrutturazione', sector: 'artigianato', name: 'Ristrutturazione', icon: '🧱', ready: true, ladder: ['Posare le piastrelle'] },
+  { id: 'foto', sector: 'artigianato', name: 'Foto e grafica', icon: '📷', ready: true, ladder: ['Foto alle feste'] },
+  { id: 'moda', sector: 'artigianato', name: 'Moda', icon: '🧵', ready: true, ladder: ['Riparazioni sartoriali'] },
+  // la ceramica si gioca come lavori su richiesta nel laboratorio dell'artigiano
   { id: 'ceramica', sector: 'artigianato', name: 'Ceramica', icon: '🏺', ready: false, ladder: ['Vasi in ceramica', 'Servizi da tavola', 'Opere in ceramica'] },
-  { id: 'falegnameria', sector: 'artigianato', name: 'Falegnameria', icon: '🪚', ready: false, ladder: ['Piccola falegnameria', 'Mobili su misura', 'Restauro di mobili antichi'] },
   // 🔨 Costruzione e manualità
   // (scala completa in CARRIERE.md: qui solo i gradini già giocabili, si aggiungono man mano)
   { id: 'giardino', sector: 'manualita', name: 'Giardinaggio', icon: '🌿', ready: true, ladder: ['Sistemare il giardino', 'Potatura di siepi e alberi'] },
@@ -59,10 +63,10 @@ export const CAREER_LINES: CareerLine[] = [
  * (niente offerte di lavoretti né attività da comprare di quei settori). `null` = tutti accesi.
  * Le attività che una partita ha già restano sue e continuano a lavorare.
  */
-export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita'];
+export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita', 'artigianato'];
 export const sectorOn = (k: SkillId) => !FOCUS_SECTORS || FOCUS_SECTORS.includes(k);
 /** Settori di cui si possono comprare le attività (le basi dei loro alberi). */
-export const BIZ_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita'];
+export const BIZ_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita', 'artigianato'];
 export const bizSectorOn = (k: SkillId) => !BIZ_SECTORS || BIZ_SECTORS.includes(k);
 
 export const careerLine = (id: string) => CAREER_LINES.find((l) => l.id === id);

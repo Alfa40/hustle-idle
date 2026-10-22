@@ -1,6 +1,6 @@
 import type { SkillId } from './skills';
 
-export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista' | 'festa' | 'hotel' | 'bar' | 'forno' | 'montaggio' | 'pulizie' | 'idraulico';
+export type JobType = 'giardino' | 'consegna' | 'piatti' | 'volantini' | 'lavaggio' | 'imbianchino' | 'magazzino' | 'autista' | 'festa' | 'hotel' | 'bar' | 'forno' | 'montaggio' | 'pulizie' | 'idraulico' | 'falegnameria' | 'ristrutturazione' | 'foto' | 'moda';
 
 export interface JobDef {
   name: string;
@@ -97,6 +97,27 @@ export const JOBS: Record<JobType, JobDef> = {
     name: 'Dipingere la recinzione', icon: '🖌️', skill: 'artigianato', basePay: 34, xp: 15, fame: 1.2, where: 'house',
     intro: 'Copri con i teloni tutto quello che c\'è in giardino (cespugli, aiuole, giochi…), prendi la vernice, dipingi ogni tratto del muretto di recinzione e alla fine togli i teloni.',
     steps: [['🛡️', 'Copri con i teloni le cose del giardino', 'tap'], ['🪣', 'Prendi la vernice', 'tap'], ['🖌️', 'Dipingi ogni tratto del muretto', 'hold'], ['🧹', 'Togli i teloni', 'tap']],
+  },
+  // 🎨 Arte, design e ristrutturazione: gradino di base delle linee nuove (src/minigames/art3d.ts)
+  falegnameria: {
+    name: 'Piccola falegnameria', icon: '🪚', skill: 'artigianato', basePay: 31, xp: 14, fame: 1.1, where: 'shop',
+    intro: 'In falegnameria fai una mensola: taglia l\'asse sulla linea, carteggia, verniciala e appendila al muro.',
+    steps: [['🪚', 'Taglia l\'asse seguendo la linea', 'hold'], ['🪵', 'Carteggia i punti ruvidi', 'hold'], ['🖌️', 'Vernicia tutta l\'asse', 'hold'], ['🔧', 'Appendi la mensola al muro', 'hold']],
+  },
+  ristrutturazione: {
+    name: 'Posare le piastrelle', icon: '🧱', skill: 'artigianato', basePay: 32, xp: 14, fame: 1.1, where: 'house',
+    intro: 'Nel bagno del cliente: stendi la colla sul pavimento e posa le piastrelle come nel disegno.',
+    steps: [['🪣', 'Stendi la colla sul riquadro', 'hold'], ['🧱', 'Posa le piastrelle come nel disegno', 'tap'], ['🧽', 'Pulisci le piastrelle', 'hold']],
+  },
+  foto: {
+    name: 'Foto alle feste', icon: '📷', skill: 'artigianato', basePay: 30, xp: 14, fame: 1.2, where: 'restaurant',
+    intro: 'A una festa: fotografa ogni gruppo di invitati, con tutti dentro la cornice e sorridenti.',
+    steps: [['📷', 'Prendi la macchina fotografica', 'tap'], ['😊', 'Inquadra il gruppo e scatta quando sorridono', 'tap'], ['🖼️', 'Mostra le foto al cliente', 'tap']],
+  },
+  moda: {
+    name: 'Riparazioni sartoriali', icon: '🧵', skill: 'artigianato', basePay: 30, xp: 14, fame: 1.1, where: 'shop',
+    intro: 'In sartoria ripari i vestiti: cuci l\'orlo lungo la linea, attacca il bottone e appendi il capo.',
+    steps: [['👕', 'Prendi il capo dalla cesta', 'tap'], ['🧵', 'Cuci l\'orlo lungo la linea', 'hold'], ['🧵', 'Attacca il bottone', 'tap'], ['👕', 'Appendi il capo', 'tap']],
   },
 };
 

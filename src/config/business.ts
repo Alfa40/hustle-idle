@@ -514,6 +514,102 @@ export const BUSINESS_TYPES = {
     staff: ['Tecnico', 'Installatore'], color: '#f2a900', rateMul: 0.0616, tier: 3, evolveCost: 220000,
     upg: [['Droni e sensori', '📡'], ['Showroom', '💡'], ['Incentivi', '📜'], ['Pannelli in magazzino', '☀️'], ['Casa intelligente', '💡']],
   }),
+  // ---------------- 🎨 Arte, design e ristrutturazione: alberi delle evoluzioni (CARRIERE.md), tutte automatiche ----------------
+  pittore: autoBiz({
+    name: 'Imbianchino', icon: '🖌️', desc: 'Pareti e recinzioni dipinte: col furgoncino dei colori, su un posteggio.', products: ['tinteggiature', 'recinzioni_dipinte'],
+    staff: ['Imbianchino', 'Aiutante'], color: '#e8590c', rateMul: 0.095, tier: 0, setupCost: 4000, sector: 'artigianato', lot: 'truck', evolvesTo: ['ristrutturazioni', 'decorazioni'],
+    upg: [['Pennelli e rulli nuovi', '🖌️'], ['Furgoncino con la scritta', '🚐'], ['Volantini nelle cassette', '📣'], ['Secchi di vernice', '🪣'], ['Recinzioni e cancelli', '🏡']],
+  }),
+  ristrutturazioni: autoBiz({
+    name: 'Ristrutturazioni', icon: '🧱', desc: 'Pavimenti, piastrelle e bagni rifatti.', products: ['pavimenti', 'bagni'], sector: 'artigianato',
+    staff: ['Piastrellista', 'Muratore'], color: '#b5532f', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['impresa_ristrutturazioni'],
+    upg: [['Tagliapiastrelle', '🧱'], ['Furgoni e divise', '👕'], ['Sito con le foto', '📱'], ['Piastrelle in magazzino', '📦'], ['Bagni', '🛁']],
+  }),
+  impresa_ristrutturazioni: autoBiz({
+    name: 'Impresa di ristrutturazioni', icon: '🏡', desc: 'Case e negozi rifatti da capo.', products: ['case_ristrutturate', 'negozi_rinnovati'], sector: 'artigianato',
+    staff: ['Muratore', 'Capocantiere'], color: '#c2410c', rateMul: 0.0651, tier: 2, evolveCost: 90000, evolvesTo: ['ristrutturazioni_lusso'],
+    upg: [['Ponteggi e attrezzi', '🏗️'], ['Squadre di cantiere', '👷'], ['Preventivi gratis', '📜'], ['Deposito materiali', '📦'], ['Negozi', '🏪']],
+  }),
+  ristrutturazioni_lusso: autoBiz({
+    name: 'Ristrutturazioni di lusso', icon: '🏰', desc: 'Ville e palazzi storici: il traguardo della ristrutturazione.', products: ['ville_ristrutturate', 'palazzi_storici'], sector: 'artigianato',
+    staff: ['Architetto', 'Capocantiere'], color: '#7c3aed', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Materiali pregiati', '💎'], ['Studio elegante', '🏛️'], ['Clienti famosi', '🤩'], ['Marmi e legni rari', '🪵'], ['Palazzi storici', '🏛️']],
+  }),
+  decorazioni: autoBiz({
+    name: 'Decorazioni', icon: '🎨', desc: 'Pareti decorate e murales.', products: ['pareti_decorate', 'murales'], sector: 'artigianato',
+    staff: ['Decoratore', 'Pittore'], color: '#d946ef', rateMul: 0.0789, tier: 1, evolveCost: 26000, evolvesTo: ['interior_design'],
+    upg: [['Stencil e spatole', '🎨'], ['Bozzetti a colori', '🖼️'], ['Profilo con le foto', '📱'], ['Colori speciali', '🪣'], ['Murales', '🖼️']],
+  }),
+  interior_design: autoBiz({
+    name: 'Studio di interior design', icon: '🛋️', desc: 'Case e locali arredati da capo: il traguardo della decorazione.', products: ['case_arredate', 'locali_arredati'], sector: 'artigianato',
+    staff: ['Designer', 'Arredatore'], color: '#0f766e', rateMul: 0.0959, tier: 2, evolveCost: 85000,
+    upg: [['Progetti in 3D', '📐'], ['Showroom', '🛋️'], ['Riviste di arredo', '📣'], ['Campionario', '📦'], ['Locali', '🪑']],
+  }),
+  falegnameria: autoBiz({
+    name: 'Falegnameria', icon: '🪚', desc: 'Mensole, piccoli mobili e riparazioni in legno.', products: ['mensole', 'riparazioni_legno'],
+    staff: ['Falegname', 'Commesso'], color: '#a16207', rateMul: 0.095, tier: 0, setupCost: 3500, sector: 'artigianato', evolvesTo: ['mobili_misura', 'restauro'],
+    upg: [['Seghe e pialle', '🪚'], ['Bottega in ordine', '🪵'], ['Insegna di legno', '📣'], ['Legname in magazzino', '📦'], ['Riparazioni in legno', '🔨']],
+  }),
+  mobili_misura: autoBiz({
+    name: 'Mobili su misura', icon: '🪑', desc: 'Mobili e cucine fatti sulle misure della casa.', products: ['mobili_misura', 'cucine_legno'], sector: 'artigianato',
+    staff: ['Falegname', 'Montatore'], color: '#92400e', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['mobilificio'],
+    upg: [['Macchine da taglio', '🪚'], ['Disegni dei mobili', '📐'], ['Sito e recensioni', '📱'], ['Legni scelti', '🪵'], ['Cucine', '🍽️']],
+  }),
+  mobilificio: autoBiz({
+    name: 'Mobilificio', icon: '🏭', desc: 'Arredi per negozi e uffici, tanti pezzi uguali.', products: ['arredi_negozi', 'arredi_uffici'], sector: 'artigianato',
+    staff: ['Operaio', 'Montatore'], color: '#78716c', rateMul: 0.0959, tier: 2, evolveCost: 85000, evolvesTo: ['ebanisteria'],
+    upg: [['Linea di produzione', '🏭'], ['Camion delle consegne', '🚚'], ['Contratti con le aziende', '🤝'], ['Magazzino', '📦'], ['Uffici', '💼']],
+  }),
+  ebanisteria: autoBiz({
+    name: 'Ebanisteria', icon: '💎', desc: 'Mobili di pregio e intarsi: il traguardo della falegnameria.', products: ['mobili_pregio', 'intarsi'], sector: 'artigianato',
+    staff: ['Ebanista', 'Intarsiatore'], color: '#3f2a1d', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Attrezzi a mano antichi', '🪚'], ['Bottega storica', '🏛️'], ['Mostre', '🤩'], ['Legni rari', '🪵'], ['Intarsi', '🎨']],
+  }),
+  restauro: autoBiz({
+    name: 'Restauro', icon: '🖌️', desc: 'Mobili vecchi restaurati, cornici e quadri.', products: ['restauri', 'cornici'], sector: 'artigianato',
+    staff: ['Restauratore', 'Commesso'], color: '#b45309', rateMul: 0.0789, tier: 1, evolveCost: 26000, evolvesTo: ['antiquario'],
+    upg: [['Pennelli fini e cere', '🖌️'], ['Vetrina', '🖼️'], ['Passaparola', '📣'], ['Vernici antiche', '🪣'], ['Cornici e quadri', '🖼️']],
+  }),
+  antiquario: autoBiz({
+    name: 'Antiquario', icon: '🏺', desc: 'Pezzi antichi da collezione e aste: il traguardo del restauro.', products: ['antiquariato', 'aste'], sector: 'artigianato',
+    staff: ['Antiquario', 'Battitore'], color: '#854d0e', rateMul: 0.0651, tier: 2, evolveCost: 90000,
+    upg: [['Perizie', '🔎'], ['Sala espositiva', '🏛️'], ['Cataloghi', '📣'], ['Pezzi da collezione', '🏺'], ['Aste', '🔨']],
+  }),
+  studio_foto: autoBiz({
+    name: 'Studio fotografico', icon: '📷', desc: 'Ritratti, foto tessera e foto alle feste.', products: ['ritratti', 'foto_feste'],
+    staff: ['Fotografo', 'Commesso'], color: '#2563eb', rateMul: 0.095, tier: 0, setupCost: 3500, sector: 'artigianato', evolvesTo: ['foto_matrimoni', 'sartoria'],
+    upg: [['Macchine fotografiche', '📷'], ['Set con le luci', '💡'], ['Foto in vetrina', '📣'], ['Carta e cornici', '🖼️'], ['Foto alle feste', '🎉']],
+  }),
+  foto_matrimoni: autoBiz({
+    name: 'Foto di matrimoni', icon: '💍', desc: 'Matrimoni, album e stampe.', products: ['foto_nozze', 'album'], sector: 'artigianato',
+    staff: ['Fotografo', 'Assistente'], color: '#db2777', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['agenzia_grafica'],
+    upg: [['Obiettivi nuovi', '📷'], ['Album di prova', '📸'], ['Fiere degli sposi', '💍'], ['Stampe in magazzino', '📦'], ['Album e stampe', '📸']],
+  }),
+  agenzia_grafica: autoBiz({
+    name: 'Agenzia di grafica', icon: '🖥️', desc: 'Loghi, insegne e pubblicità per i negozi.', products: ['loghi', 'pubblicita'], sector: 'artigianato',
+    staff: ['Grafico', 'Fotografo'], color: '#0891b2', rateMul: 0.0959, tier: 2, evolveCost: 85000, evolvesTo: ['studio_creativo'],
+    upg: [['Computer potenti', '🖥️'], ['Ufficio moderno', '💼'], ['Clienti in città', '🤝'], ['Stampanti grandi', '🖼️'], ['Pubblicità', '📣']],
+  }),
+  studio_creativo: autoBiz({
+    name: 'Studio creativo', icon: '✨', desc: 'Campagne con foto, grafica e video: il traguardo della fotografia.', products: ['campagne', 'video'], sector: 'artigianato',
+    staff: ['Direttore creativo', 'Regista'], color: '#4c1d95', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Telecamere', '🎥'], ['Studio di posa', '💡'], ['Premi', '🏆'], ['Archivio', '📦'], ['Video e spot', '🎥']],
+  }),
+  sartoria: autoBiz({
+    name: 'Sartoria', icon: '🧵', desc: 'Orli, riparazioni e abiti su misura.', products: ['orli', 'abiti_misura'], sector: 'artigianato',
+    staff: ['Sarta', 'Commesso'], color: '#be185d', rateMul: 0.0789, tier: 1, evolveCost: 26000, evolvesTo: ['atelier'],
+    upg: [['Macchine da cucire', '🧵'], ['Camerini di prova', '👔'], ['Vetrina', '📣'], ['Stoffe e bottoni', '📦'], ['Abiti su misura', '👔']],
+  }),
+  atelier: autoBiz({
+    name: 'Atelier di moda', icon: '👗', desc: 'Abiti da sposa e collezioni.', products: ['abiti_sposa', 'collezioni'], sector: 'artigianato',
+    staff: ['Stilista', 'Sarta'], color: '#9d174d', rateMul: 0.0651, tier: 2, evolveCost: 90000, evolvesTo: ['casa_moda'],
+    upg: [['Manichini e stoffe', '👗'], ['Salotto per le prove', '🛋️'], ['Riviste di moda', '📣'], ['Tessuti pregiati', '📦'], ['Collezioni', '👗']],
+  }),
+  casa_moda: autoBiz({
+    name: 'Casa di moda', icon: '🛍️', desc: 'Sfilate e boutique: il traguardo della moda.', products: ['sfilate', 'boutique'], sector: 'artigianato',
+    staff: ['Stilista', 'Modella'], color: '#111827', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Passerella', '✨'], ['Boutique in centro', '🛍️'], ['Testimonial famosi', '🤩'], ['Collezione in magazzino', '📦'], ['Boutique', '🛍️']],
+  }),
 } satisfies Record<string, BusinessTypeDef>;
 
 export type BusinessType = keyof typeof BUSINESS_TYPES;
@@ -572,6 +668,9 @@ export const BIZ_GROUPS: { id: string; name: string; icon?: string; roots: Busin
   { id: 'pulizie', name: 'Pulizie', roots: ['pulizie'] },
   { id: 'giardini', name: 'Giardinaggio', icon: '🌿', roots: ['giardiniere'] },
   { id: 'costruzioni', name: 'Costruzione e impianti', icon: '🔧', roots: ['tuttofare'] },
+  { id: 'pittura', name: 'Pittura e ristrutturazioni', icon: '🖌️', roots: ['pittore'] },
+  { id: 'falegnameria', name: 'Falegnameria', icon: '🪚', roots: ['falegnameria'] },
+  { id: 'foto', name: 'Foto, grafica e moda', icon: '📷', roots: ['studio_foto'] },
   { id: 'artigianato', name: 'Artigianato', roots: ['artigianato'] },
 ];
 

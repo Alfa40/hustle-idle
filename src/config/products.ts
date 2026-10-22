@@ -27,7 +27,9 @@ export type ProductId =
   | 'piante' | 'fiori' | 'attrezzi_giardino' | 'arredo_giardino'
   | 'uffici_grandi' | 'vetri_palazzi' | 'ospedali' | 'laboratori' | 'pulizia_concerti' | 'pulizia_fiere'
   | 'montaggi' | 'riparazioni' | 'soppalchi' | 'muri' | 'case_nuove' | 'palazzine' | 'palazzi_alti' | 'ponti'
-  | 'impianti_idraulici' | 'impianti_elettrici' | 'caldaie' | 'condizionatori' | 'pannelli_solari' | 'domotica';
+  | 'impianti_idraulici' | 'impianti_elettrici' | 'caldaie' | 'condizionatori' | 'pannelli_solari' | 'domotica'
+  // arte, design e ristrutturazione: le attività automatiche (vedi config/business.ts)
+  | 'tinteggiature' | 'recinzioni_dipinte' | 'pavimenti' | 'bagni' | 'case_ristrutturate' | 'negozi_rinnovati' | 'ville_ristrutturate' | 'palazzi_storici' | 'pareti_decorate' | 'murales' | 'case_arredate' | 'locali_arredati' | 'mensole' | 'riparazioni_legno' | 'mobili_misura' | 'cucine_legno' | 'arredi_negozi' | 'arredi_uffici' | 'mobili_pregio' | 'intarsi' | 'restauri' | 'cornici' | 'antiquariato' | 'aste' | 'ritratti' | 'foto_feste' | 'foto_nozze' | 'album' | 'loghi' | 'pubblicita' | 'campagne' | 'video' | 'orli' | 'abiti_misura' | 'abiti_sposa' | 'collezioni' | 'sfilate' | 'boutique';
 
 export interface Product {
   name: string;
@@ -228,6 +230,48 @@ Object.assign(PRODUCTS, {
   condizionatori: food('Condizionatori', '❄️', 50, 260, 0.0992, SUMMER),
   pannelli_solari: food('Pannelli solari', '☀️', 180, 900, 0.0599, SUMMER),
   domotica: food('Casa intelligente', '💡', 90, 480, 0.0998),
+} satisfies Partial<Record<ProductId, Product>>);
+
+// ---- arte, design e ristrutturazione: stessi numeri per gradino di Costruzione e manualità ----
+Object.assign(PRODUCTS, {
+  tinteggiature: food('Pareti tinteggiate', '🖌️', 15, 75, 0.15, BUILD),
+  recinzioni_dipinte: food('Recinzioni e cancelli', '🏡', 22, 110, 0.0706, SPRING),
+  pavimenti: food('Pavimenti e piastrelle', '🧱', 25, 130, 0.113, BUILD),
+  bagni: food('Bagni rifatti', '🛁', 40, 170, 0.0753, BUILD),
+  case_ristrutturate: food('Case ristrutturate', '🏡', 60, 320, 0.0898, BUILD),
+  negozi_rinnovati: food('Negozi rinnovati', '🏪', 80, 380, 0.0718, BUILD),
+  ville_ristrutturate: food('Ville ristrutturate', '🏰', 180, 900, 0.0599, BUILD),
+  palazzi_storici: food('Palazzi storici', '🏛️', 90, 480, 0.0998, BUILD),
+  pareti_decorate: food('Pareti decorate', '🎨', 25, 130, 0.113),
+  murales: food('Murales', '🖼️', 40, 170, 0.0753, SUMMER),
+  case_arredate: food('Case arredate', '🛋️', 40, 210, 0.139),
+  locali_arredati: food('Locali arredati', '🪑', 50, 260, 0.0992),
+  mensole: food('Mensole e piccoli mobili', '🪵', 15, 75, 0.15),
+  riparazioni_legno: food('Riparazioni in legno', '🔨', 22, 110, 0.0706),
+  mobili_misura: food('Mobili su misura', '🪑', 25, 130, 0.113),
+  cucine_legno: food('Cucine in legno', '🍽️', 40, 170, 0.0753),
+  arredi_negozi: food('Arredi per negozi', '🏪', 40, 210, 0.139),
+  arredi_uffici: food('Arredi per uffici', '💼', 50, 260, 0.0992),
+  mobili_pregio: food('Mobili di pregio', '💎', 180, 900, 0.0599),
+  intarsi: food('Intarsi', '🎨', 90, 480, 0.0998),
+  restauri: food('Mobili restaurati', '🪚', 25, 130, 0.113),
+  cornici: food('Cornici e quadri', '🖼️', 40, 170, 0.0753),
+  antiquariato: food('Antiquariato', '🏺', 60, 320, 0.0898, WINTER),
+  aste: food('Aste', '🔨', 80, 380, 0.0718),
+  ritratti: food('Ritratti e foto tessera', '📷', 15, 75, 0.15),
+  foto_feste: food('Foto alle feste', '🎉', 22, 110, 0.0706, SUMMER),
+  foto_nozze: food('Foto di matrimoni', '💍', 25, 130, 0.113, SUMMER),
+  album: food('Album e stampe', '📸', 40, 170, 0.0753),
+  loghi: food('Loghi e insegne', '🎨', 40, 210, 0.139),
+  pubblicita: food('Pubblicità', '📣', 50, 260, 0.0992),
+  campagne: food('Campagne pubblicitarie', '✨', 180, 900, 0.0599),
+  video: food('Video e spot', '🎥', 90, 480, 0.0998),
+  orli: food('Orli e riparazioni', '🧵', 25, 130, 0.113),
+  abiti_misura: food('Abiti su misura', '👔', 40, 170, 0.0753),
+  abiti_sposa: food('Abiti da sposa', '👰', 60, 320, 0.0898, SUMMER),
+  collezioni: food('Collezioni', '👗', 80, 380, 0.0718),
+  sfilate: food('Sfilate', '✨', 180, 900, 0.0599),
+  boutique: food('Boutique', '🛍️', 90, 480, 0.0998, WINTER),
 } satisfies Partial<Record<ProductId, Product>>);
 
 export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];

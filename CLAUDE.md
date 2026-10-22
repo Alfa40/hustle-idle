@@ -43,6 +43,9 @@
   carriera, `ready`); le versioni giocabili sono in `src/config/jobs.ts` (`JOBS` gradino base,
   `JOB_VARIANTS` ogni 10 livelli, `jobInfo()`). Livello del settore = somma dell'esperienza delle sue linee
   + lavoro nelle attività (`sectorXp` in src/sim/progress.ts). Nuovi lavori: si aggiungono lì, non altrove.
+  Le scene dei lavoretti per settore: src/minigames/logistics.ts, hospitality3d.ts, manual3d.ts (Costruzione),
+  art3d.ts (Arte, design e ristrutturazione), con i minigiochi col dito in station.ts, kitchen.ts, handstations.ts e
+  artstations.ts; si avviano da `buildRun` in src/game.ts (`start…Job`).
 - **Lavoretti sempre "con le mani"** a ogni gradino (guidare, caricare, consegnare…): la gestione di persone,
   mezzi e turni sta **solo nelle attività**. Le attività nuove **non si sbloccano col livello**: si compra
   un'attività base e, ampliandola e migliorandola, si evolve in un'altra (albero con bivi, vedi `CARRIERE.md`).

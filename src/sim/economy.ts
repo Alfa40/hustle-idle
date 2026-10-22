@@ -7,7 +7,7 @@ import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { bizSectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
-import { BUSINESS_TYPES } from '../config/business';
+import { ALL_AUTO, BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
@@ -404,7 +404,8 @@ export const lotPrice = (lotId: string, type: BusinessType) => lotDef(lotId).pri
 export const typesForLot = (lotId: string) =>
   (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => {
     const d = bizType(t);
-    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || bizSectorOn(d.sector));
+    // il laboratorio dell'artigiano (lavoro solo a mano, dentro) non si compra più: ora le attività lavorano da sole
+    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || bizSectorOn(d.sector)) && !(ALL_AUTO && d.kind === 'craft');
   });
 
 // ---------------- evoluzione delle attività ----------------

@@ -41,6 +41,7 @@ import { DEV_SLOT, setDevGame } from './dev';
 import { LOGISTICS_ASSETS } from './minigames/warehouse';
 import { startHospitalityJob } from './minigames/hospitality';
 import { startManualJob } from './minigames/manual3d';
+import { startArtJob } from './minigames/art3d';
 import { ROOM_ASSETS } from './minigames/room';
 import { routeStops, Street } from './minigames/street';
 import { PotteryStudio } from './world/pottery';
@@ -893,8 +894,8 @@ export class Game {
   /** Posteggio di un'attività di servizio: bici nella rastrelliera o il pulmino della navetta. */
   private buildServicePost(type: BusinessType) {
     const g = new THREE.Group();
-    // furgoncino: navetta, giardiniere e tuttofare
-    if (type === 'navetta' || type === 'giardiniere' || type === 'tuttofare') {
+    // furgoncino: navetta, giardiniere, tuttofare e imbianchino
+    if (type === 'navetta' || type === 'giardiniere' || type === 'tuttofare' || type === 'pittore') {
       const van = model('cars/van.glb', 1.6);
       van.rotation.y = Math.PI / 2;
       g.add(van);
@@ -1116,7 +1117,7 @@ export class Game {
     const lv = jobDifficulty(eff);
     const play = { ...offer, level: eff } as JobOffer;
     // Trasporti e logistica: magazzino, autista e i gradini alti delle consegne (minigames/logistics.ts)
-    const logi = startLogisticsJob(this, play, slot, title) ?? startHospitalityJob(this, play, slot, title) ?? startManualJob(this, play, slot, title);
+    const logi = startLogisticsJob(this, play, slot, title) ?? startHospitalityJob(this, play, slot, title) ?? startManualJob(this, play, slot, title) ?? startArtJob(this, play, slot, title);
     if (logi) return logi;
     switch (offer.type) {
       case 'giardino': {

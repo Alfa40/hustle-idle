@@ -231,54 +231,94 @@ dipendenti per reparto l'utile al mese è circa come nei Trasporti allo stesso g
 
 ---
 
-## 🎨 Arte, design e ristrutturazione (categoria a parte, decisa il 21/10)
+## 🎨 Arte, design e ristrutturazione (decisa il 21/10; lavoretti di Liv. 1 e attività ✅ nel gioco dal 23/10)
 
 Qui vanno anche le **ristrutturazioni** (piastrelle, pareti, arredare le stanze), tolte da Costruzione e manualità.
+**5 linee × 5 gradini**, sotto i 5 minuti, come Costruzione: terza persona, fasi, minigiochi col dito e tutorial
+passo passo. La Ceramica resta nel laboratorio dell'artigiano (non è una linea dei lavoretti).
 
-### 🖌️ Pittura ✅
+### 🖌️ Pittura
 | Liv. | Lavoro | Idea di minigioco |
 |---|---|---|
 | 1 | Dipingere la recinzione ✅ | passa il pennello su tutto il muretto |
-| 10 | Dipingere la facciata 🟡 | ponteggio, colori diversi per zona |
-| 20 | Murales 🟡 | ricalca il disegno della foto |
-| 30 | Decoratore d'interni 🆕 | pareti decorate, stucchi, finto marmo |
-| 40 | Artista 🆕 | quadri su commissione e mostre |
+| 10 | Dipingere la facciata | ponteggio, colori diversi per zona |
+| 20 | Murales | ricalca il disegno della foto |
+| 30 | Decoratore d'interni | pareti decorate, stucchi, finto marmo |
+| 40 | Artista | quadri su commissione e mostre |
 
-### 🏺 Ceramica 🟡 (i vasi si giocano già come lavori su richiesta nel laboratorio)
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Vasi in ceramica 🟡 | tornio, forno, pittura (esiste nel laboratorio) |
-| 10 | Servizi da tavola 🟡 | piatti e tazze tutti uguali tra loro |
-| 20 | Opere in ceramica 🟡 | forme complesse uguali alla foto |
-| 30 | Mosaici 🆕 | componi il disegno con le tessere |
-| 40 | Sculture 🆕 | modella una figura in più passaggi |
+### 🪚 Falegnameria
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli |
+|---|---|---|---|
+| 1 | Piccola falegnameria ✅ | asse → taglia sulla linea (sega) → carteggia → vernicia → appendi la mensola (viti) | 2 tagli, più punti ruvidi, pennello più piccolo, 3 viti |
+| 10 | Mobili su misura | misura e monta il mobile come nel disegno | |
+| 20 | Restauro di mobili antichi | togli la vernice vecchia, ripara, lucida | |
+| 30 | Intarsi | incastra legni di colori diversi nel disegno | |
+| 40 | Ebanista | mobili di pregio su commissione | |
 
-### 🪚 Falegnameria 🟡
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Piccola falegnameria 🟡 | taglia, carteggia, vernicia una mensola |
-| 10 | Mobili su misura 🟡 | misura e monta il mobile come nel disegno |
-| 20 | Restauro di mobili antichi 🟡 | togli la vernice vecchia, ripara, lucida |
-| 30 | Intarsi 🆕 | incastra legni di colori diversi nel disegno |
-| 40 | Ebanista 🆕 | mobili di pregio su commissione |
+### 🧱 Ristrutturazione
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli |
+|---|---|---|---|
+| 1 | Posare le piastrelle ✅ | bagno: colla su tutto il riquadro → piastrelle come nel disegno → pulisci | griglia da 3×3 a 4×4, tre colori |
+| 10 | Rifare il bagno | togli le vecchie, sanitari al posto giusto, piastrelle alle pareti | |
+| 20 | Pareti e cartongesso | lastre, stucco e carta da parati dritta | |
+| 30 | Ristrutturare la casa | più stanze, ogni lavoro nell'ordine giusto | |
+| 40 | Arredare le stanze | mobili, colori e luci come chiede il cliente | |
 
-### 📷 Foto e grafica 🆕
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Foto alle feste 🆕 | scatta al momento giusto, inquadra bene |
-| 10 | Fotografo di matrimoni 🆕 | metti in posa gli sposi e gli invitati |
-| 20 | Grafico di insegne e loghi 🆕 | componi il logo come lo chiede il cliente |
-| 30 | Servizi di moda 🆕 | luci, sfondo e posa in studio |
-| 40 | Studio creativo 🆕 | campagne con foto e grafica insieme |
+### 📷 Foto e grafica
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli |
+|---|---|---|---|
+| 1 | Foto alle feste ✅ | ogni gruppo nella cornice (trascina), scatta quando sorridono | da 2 a 3 gruppi, da 2 a 4 persone, più movimento, sorriso più corto, 2 foto |
+| 10 | Fotografo di matrimoni | metti in posa gli sposi e gli invitati | |
+| 20 | Grafico di insegne e loghi | componi il logo come lo chiede il cliente | |
+| 30 | Servizi di moda | luci, sfondo e posa in studio | |
+| 40 | Studio creativo | campagne con foto e grafica insieme | |
 
-### 🧵 Moda 🆕
-| Liv. | Lavoro | Idea di minigioco |
-|---|---|---|
-| 1 | Riparazioni sartoriali 🆕 | orli e bottoni: cuci lungo la linea |
-| 10 | Sarto su misura 🆕 | prendi le misure, taglia la stoffa |
-| 20 | Stilista 🆕 | crea il vestito come nel bozzetto |
-| 30 | Collezione 🆕 | più capi abbinati tra loro |
-| 40 | Sfilata 🆕 | modelli, ordine di uscita, musica |
+### 🧵 Moda
+| Liv. | Lavoro | Minigioco | Cosa sale nei 9 livelli |
+|---|---|---|---|
+| 1 | Riparazioni sartoriali ✅ | capo dalla cesta → cuci l'orlo sulla linea → bottone (buchi in ordine) → stampella | 2 capi, 2 righe, 2 giri e 2 bottoni |
+| 10 | Sarto su misura | prendi le misure, taglia la stoffa | |
+| 20 | Stilista | crea il vestito come nel bozzetto | |
+| 30 | Collezione | più capi abbinati tra loro | |
+| 40 | Sfilata | modelli, ordine di uscita, musica | |
+
+### 🏺 Ceramica (nel laboratorio dell'artigiano)
+Vasi in ceramica, servizi da tavola, opere: lavori su richiesta del laboratorio, che non si compra più (le attività
+lavorano da sole); chi l'ha già lo tiene.
+
+### Attività (3 alberi, ✅ nel gioco dal 23/10)
+Tutte automatiche, stessi numeri per gradino di Costruzione e manualità.
+
+#### 🖌️ Albero dell'Imbianchino
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🖌️ Imbianchino | base, posteggio (furgoncino) | pareti tinteggiate, recinzioni e cancelli | imbianchino, aiutante | Dipingere la recinzione |
+| 🧱 Ristrutturazioni | 1ª, bivio A | pavimenti e piastrelle, bagni | piastrellista, muratore | Posare le piastrelle |
+| 🏡 Impresa di ristrutturazioni | 2ª | case, negozi | muratore, capocantiere | Ristrutturare la casa |
+| 🏰 Ristrutturazioni di lusso | 3ª | ville, palazzi storici | architetto, capocantiere | Arredare le stanze |
+| 🎨 Decorazioni | 1ª, bivio B | pareti decorate, murales | decoratore, pittore | Murales |
+| 🛋️ Studio di interior design | 2ª | case e locali arredati | designer, arredatore | Decoratore d'interni |
+
+#### 🪚 Albero della Falegnameria
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 🪚 Falegnameria | base, locale | mensole, riparazioni in legno | falegname, commesso | Piccola falegnameria |
+| 🪑 Mobili su misura | 1ª, bivio A | mobili su misura, cucine in legno | falegname, montatore | Mobili su misura |
+| 🏭 Mobilificio | 2ª | arredi per negozi e uffici | operaio, montatore | Mobili su misura |
+| 💎 Ebanisteria | 3ª | mobili di pregio, intarsi | ebanista, intarsiatore | Intarsi, Ebanista |
+| 🖌️ Restauro | 1ª, bivio B | mobili restaurati, cornici | restauratore, commesso | Restauro di mobili antichi |
+| 🏺 Antiquario | 2ª | antiquariato, aste | antiquario, battitore | Restauro di mobili antichi |
+
+#### 📷 Albero dello Studio fotografico
+| Attività | Grado | Prodotti | Personale | Di persona |
+|---|---|---|---|---|
+| 📷 Studio fotografico | base, locale | ritratti, foto alle feste | fotografo, commesso | Foto alle feste |
+| 💍 Foto di matrimoni | 1ª, bivio A | foto di matrimoni, album | fotografo, assistente | Fotografo di matrimoni |
+| 🖥️ Agenzia di grafica | 2ª | loghi e insegne, pubblicità | grafico, fotografo | Grafico di insegne e loghi |
+| ✨ Studio creativo | 3ª | campagne, video | direttore creativo, regista | Studio creativo |
+| 🧵 Sartoria | 1ª, bivio B | orli, abiti su misura | sarta, commesso | Riparazioni sartoriali |
+| 👗 Atelier di moda | 2ª | abiti da sposa, collezioni | stilista, sarta | Stilista |
+| 🛍️ Casa di moda | 3ª | sfilate, boutique | stilista, modella | Sfilata |
 
 ---
 

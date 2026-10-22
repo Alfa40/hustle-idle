@@ -2,7 +2,7 @@ import { Station } from './station';
 
 /**
  * Minigiochi col dito dei lavoretti di Costruzione e manualità (src/minigames/manual3d.ts):
- * - WipeStation: strofina col panno la polvere o gli aloni su un mobile o uno specchio;
+ * - WipeStation: strofina col panno la polvere o gli aloni su un mobile o uno specchio (o carteggia il legno ruvido);
  * - ScrewStation: avvita le viti girando il dito in tondo, come le lancette;
  * - PipeStation: gira i pezzi di tubo finché l'acqua arriva al rubinetto.
  * Come gli altri (station.ts): si aprono toccando la postazione e alla fine dicono com'è andata (0–1).
@@ -22,10 +22,10 @@ export class WipeStation extends Station {
   private doneT = 0;
 
   /**
-   * `kind`: 'polvere' (piano di legno con la polvere grigia) o 'specchio' (vetro con gli aloni).
+   * `kind`: 'polvere' (piano di legno con la polvere grigia), 'specchio' (vetro con gli aloni) o 'ruvido' (asse da carteggiare).
    * `n` macchie; `tough`: quanto toglie ogni passata (più basso = più ostinate).
    */
-  constructor(private name: string, private kind: 'polvere' | 'specchio', n: number, private tough: number, onEnd: (q: number) => void) {
+  constructor(private name: string, private kind: 'polvere' | 'specchio' | 'ruvido' | 'piastrelle', n: number, private tough: number, onEnd: (q: number) => void) {
     super(onEnd);
     for (let i = 0; i < n * 30 && this.spots.length < n; i++) {
       const x = 0.14 + Math.random() * 0.72;
@@ -44,8 +44,8 @@ export class WipeStation extends Station {
     const first = this.spots.find((p) => p.a > 0);
     const spot = first ? () => this.screen(s.x + (first.x - first.r) * s.s, s.y + (first.y - first.r) * s.s, first.r * 2 * s.s, first.r * 2 * s.s) : () => this.screen(s.x, s.y, s.s, s.s);
     return [
-      { rect: () => this.screen(s.x, s.y, s.s, s.s), say: this.kind === 'specchio' ? '🧽 Lo specchio ha degli aloni' : '🧽 Sul mobile c\'è la polvere' },
-      { rect: spot, say: '👆 Strofina col dito sulle macchie finché spariscono' },
+      { rect: () => this.screen(s.x, s.y, s.s, s.s), say: this.kind === 'specchio' ? '🧽 Lo specchio ha degli aloni' : this.kind === 'ruvido' ? '🪵 L\'asse è ruvida nei punti scuri' : this.kind === 'piastrelle' ? '🧽 Sulle piastrelle è rimasta la colla' : '🧽 Sul mobile c\'è la polvere' },
+      { rect: spot, say: this.kind === 'ruvido' ? '👆 Strofina con la carta vetrata finché è liscia' : '👆 Strofina col dito sulle macchie finché spariscono' },
     ];
   }
 
@@ -84,8 +84,9 @@ export class WipeStation extends Station {
     }
     g.fillStyle = '#fff8ec';
     g.fillRect(0, 0, w, h);
-    this.text(`🧽 ${this.name}`, w / 2, 24, 20);
-    this.text(left ? 'strofina col dito sulle macchie' : 'pulito!', w / 2, 48, 13, '#7a6f8f', 500);
+    const rough = this.kind === 'ruvido';
+    this.text(`${rough ? '🪵' : '🧽'} ${this.name}`, w / 2, 24, 20);
+    this.text(left ? (rough ? 'strofina sui punti ruvidi' : 'strofina col dito sulle macchie') : rough ? 'liscia!' : 'pulito!', w / 2, 48, 13, '#7a6f8f', 500);
     // la superficie: legno del mobile o vetro dello specchio con la cornice
     g.save();
     g.beginPath();
@@ -107,8 +108,21 @@ export class WipeStation extends Station {
       g.moveTo(sq.x + S * 0.2, sq.y + S * 0.75);
       g.lineTo(sq.x + S * 0.45, sq.y + S * 0.25);
       g.stroke();
+    } else if (this.kind === 'piastrelle') {
+      g.fillStyle = '#f4f1ea';
+      g.fill();
+      g.strokeStyle = '#c9c2b4';
+      g.lineWidth = 3;
+      for (let k = 1; k < 4; k++) {
+        g.beginPath();
+        g.moveTo(sq.x + (S * k) / 4, sq.y);
+        g.lineTo(sq.x + (S * k) / 4, sq.y + S);
+        g.moveTo(sq.x, sq.y + (S * k) / 4);
+        g.lineTo(sq.x + S, sq.y + (S * k) / 4);
+        g.stroke();
+      }
     } else {
-      g.fillStyle = '#b8834f';
+      g.fillStyle = rough ? '#e3c08f' : '#b8834f';
       g.fill();
       g.strokeStyle = 'rgba(90,50,20,.18)';
       g.lineWidth = 2;
@@ -126,7 +140,7 @@ export class WipeStation extends Station {
       const cx = sq.x + s.x * S;
       const cy = sq.y + s.y * S;
       const gr = g.createRadialGradient(cx, cy, 0, cx, cy, s.r * S);
-      const c = this.kind === 'specchio' ? '255,255,255' : '120,115,110';
+      const c = this.kind === 'specchio' ? '255,255,255' : rough ? '140,90,40' : '120,115,110';
       gr.addColorStop(0, `rgba(${c},${0.85 * s.a})`);
       gr.addColorStop(1, `rgba(${c},0)`);
       g.fillStyle = gr;
@@ -138,7 +152,7 @@ export class WipeStation extends Station {
     if (this.cloth) {
       const cx = sq.x + this.cloth.x * S;
       const cy = sq.y + this.cloth.y * S;
-      g.fillStyle = '#ffd43b';
+      g.fillStyle = rough ? '#c9a56b' : '#ffd43b';
       g.beginPath();
       g.roundRect(cx - 26, cy - 18, 52, 36, 8);
       g.fill();
@@ -147,7 +161,7 @@ export class WipeStation extends Station {
       g.stroke();
     }
     const tot = this.spots.length || 1;
-    this.text(`${tot - left}/${tot} pulite`, w / 2, h - 34, 14, '#7a6f8f', 500);
+    this.text(`${tot - left}/${tot} ${rough ? 'lisce' : 'pulite'}`, w / 2, h - 34, 14, '#7a6f8f', 500);
     this.bar((tot - left) / tot);
   }
 }
