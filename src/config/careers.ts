@@ -62,7 +62,7 @@ export const CAREER_LINES: CareerLine[] = [
 export const FOCUS_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita'];
 export const sectorOn = (k: SkillId) => !FOCUS_SECTORS || FOCUS_SECTORS.includes(k);
 /** Settori di cui si possono comprare le attività (le basi dei loro alberi). */
-export const BIZ_SECTORS: SkillId[] | null = ['logistica', 'cucina'];
+export const BIZ_SECTORS: SkillId[] | null = ['logistica', 'cucina', 'manualita'];
 export const bizSectorOn = (k: SkillId) => !BIZ_SECTORS || BIZ_SECTORS.includes(k);
 
 export const careerLine = (id: string) => CAREER_LINES.find((l) => l.id === id);

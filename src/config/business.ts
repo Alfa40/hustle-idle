@@ -131,19 +131,21 @@ export const isAutoType = (t: BusinessType) => (ALL_AUTO ? bizType(t).kind !== '
 /** massimo delle migliorie per gradino: attrezzatura, look, pubblicità, magazzino */
 const AUTO_MAX = [[3, 3, 2, 2], [4, 4, 3, 3], [5, 5, 4, 3], [6, 6, 5, 4]];
 
-/** Un'attività automatica di Ristorazione e ospitalità (vedi `auto`). */
+/** Un'attività automatica (vedi `auto`): di Ristorazione e ospitalità, o di un altro settore con `sector`. */
 function autoBiz(o: {
   name: string; icon: string; desc: string; products: ProductId[]; staff: [string, string]; color: string; rateMul: number;
   tier: number; evolveCost?: number; evolvesTo?: string[]; setupCost?: number;
+  /** altro settore (Costruzione e manualità): servizi ("ordini" al posto di "clienti"), anche su un posteggio */
+  sector?: SkillId; lot?: 'shop' | 'truck';
   /** nomi propri delle migliorie: attrezzatura, look, pubblicità, magazzino, più prodotti */
   upg: [[string, string], [string, string], [string, string], [string, string], [string, string]];
 }): BusinessTypeDef {
   const m = AUTO_MAX[o.tier];
   const [att, look, mkt, frigo, menu] = o.upg;
   return {
-    name: o.name, icon: o.icon, desc: o.desc, kind: 'shop', lot: 'shop', setupCost: o.setupCost ?? 0, products: o.products,
-    roles: ['cucina', 'cassa'], roleNames: { cucina: o.staff[0], cassa: o.staff[1] }, skills: ['cucina', 'clientela'],
-    rateMul: o.rateMul, color: o.color, sector: 'cucina', tier: o.tier, evolveCost: o.evolveCost, evolvesTo: o.evolvesTo, auto: true,
+    name: o.name, icon: o.icon, desc: o.desc, kind: o.sector ? 'service' : 'shop', lot: o.lot ?? 'shop', setupCost: o.setupCost ?? 0, products: o.products,
+    roles: ['cucina', 'cassa'], roleNames: { cucina: o.staff[0], cassa: o.staff[1] }, skills: [o.sector ?? 'cucina', 'clientela'],
+    rateMul: o.rateMul, color: o.color, sector: o.sector ?? 'cucina', tier: o.tier, evolveCost: o.evolveCost, evolvesTo: o.evolvesTo, auto: true,
     upgrades: {
       attrezzatura: { name: att[0], icon: att[1], desc: 'Il personale lavora più in fretta (+15% per livello).', max: m[0] },
       look: { name: look[0], icon: look[1], desc: 'Più clienti (+15% di domanda per livello).', max: m[1] },
@@ -179,7 +181,8 @@ export const BUSINESS_TYPES = {
     name: 'Impresa di pulizie', icon: '🧽', desc: 'Servizi a domicilio: esegui gli ordini nelle case.',
     kind: 'service', lot: 'shop', setupCost: 2000, products: ['pulizia_casa', 'pulizia_uffici', 'vetri'],
     roles: ['cucina'], roleNames: { cucina: 'Addetto pulizie' }, skills: ['manualita', 'clientela'],
-    rateMul: 0.12, color: '#2d9cdb', sector: 'manualita',
+    rateMul: 0.12, color: '#2d9cdb', sector: 'manualita', tier: 0, evolvesTo: ['pulizie_industriali', 'pulizie_eventi'],
+    upgrades: { attrezzatura: { name: 'Lavapavimenti e aspiratori', icon: '🧹', max: 3 }, look: { name: 'Divise e furgoncino', icon: '👕', max: 3 }, marketing: { name: 'Volantini e passaparola', max: 2 }, frigo: { name: 'Detersivi di scorta', icon: '🧴', max: 2 }, menu: { name: 'Uffici e vetri', icon: '🏢' } },
   },
   traslochi: {
     name: 'Ditta traslochi', icon: '🚛', desc: 'Lavori grossi e ben pagati, serve un furgone.',
@@ -430,6 +433,87 @@ export const BUSINESS_TYPES = {
     staff: ['Addetto alle pulizie', 'Receptionist'], color: '#6b7080', rateMul: 0.0959, tier: 2, evolveCost: 80000,
     upg: [['Appartamenti nuovi', '🏢'], ['Portineria', '🛎️'], ['Siti di prenotazione', '📱'], ['Biancheria', '🧺'], ['Soggiorni di lavoro', '💼']],
   }),
+  // ---------------- 🔨 Costruzione e manualità: alberi delle evoluzioni (CARRIERE.md), tutte automatiche ----------------
+  giardiniere: autoBiz({
+    name: 'Giardiniere di quartiere', icon: '🌿', desc: 'Prati e siepi delle case del quartiere: col furgoncino degli attrezzi, su un posteggio.', products: ['prati', 'siepi'],
+    staff: ['Giardiniere', 'Aiutante'], color: '#3f9a3a', rateMul: 0.095, tier: 0, setupCost: 4000, sector: 'manualita', lot: 'truck', evolvesTo: ['ditta_giardini', 'vivaio'],
+    upg: [['Tosaerba nuovi', '🚜'], ['Furgoncino con la scritta', '🚐'], ['Volantini nelle cassette', '📣'], ['Sacchi e concime', '🧺'], ['Siepi e cespugli', '✂️']],
+  }),
+  ditta_giardini: autoBiz({
+    name: 'Ditta di giardinaggio', icon: '🌳', desc: 'Giardini nuovi e potature.', products: ['giardini_nuovi', 'potature'], sector: 'manualita',
+    staff: ['Giardiniere', 'Progettista'], color: '#2e7d32', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['manutenzione_parchi'],
+    upg: [['Attrezzi professionali', '✂️'], ['Progetti a colori', '🌱'], ['Sito e recensioni', '📱'], ['Vivaio di scorta', '🪴'], ['Potature', '🌳']],
+  }),
+  manutenzione_parchi: autoBiz({
+    name: 'Manutenzione parchi', icon: '🏞️', desc: 'Appalti del comune per i parchi e le aiuole della città.', products: ['parchi_comune', 'aiuole_citta'], sector: 'manualita',
+    staff: ['Giardiniere', 'Caposquadra'], color: '#4a8f3c', rateMul: 0.0651, tier: 2, evolveCost: 90000, evolvesTo: ['paesaggistica'],
+    upg: [['Trattorini e soffiatori', '🚜'], ['Squadre in divisa', '👕'], ['Contratti col comune', '📜'], ['Magazzino attrezzi', '📦'], ['Aiuole della città', '🌷']],
+  }),
+  paesaggistica: autoBiz({
+    name: 'Studio di paesaggistica', icon: '🏛️', desc: 'Giardini delle ville, degli hotel e dei resort: il traguardo del giardinaggio.', products: ['giardini_ville', 'giardini_resort'], sector: 'manualita',
+    staff: ['Paesaggista', 'Giardiniere'], color: '#1c6b5a', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Fontane e vialetti', '⛲'], ['Studio elegante', '💎'], ['Clienti famosi', '🤩'], ['Piante rare', '🌴'], ['Giardini dei resort', '🌴']],
+  }),
+  vivaio: autoBiz({
+    name: 'Vivaio', icon: '🪴', desc: 'Piante e fiori, coltivati e venduti.', products: ['piante', 'fiori'], sector: 'manualita',
+    staff: ['Vivaista', 'Commesso'], color: '#6ab04c', rateMul: 0.2612, tier: 1, evolveCost: 24000, evolvesTo: ['garden_center'],
+    upg: [['Serre', '🌱'], ['Esposizione', '🌷'], ['Insegna', '📣'], ['Vasi e terriccio', '🪴'], ['Fiori', '🌷']],
+  }),
+  garden_center: autoBiz({
+    name: 'Garden center', icon: '🌺', desc: 'Piante, attrezzi e arredo da giardino in un grande negozio.', products: ['attrezzi_giardino', 'arredo_giardino'], sector: 'manualita',
+    staff: ['Commesso', 'Vivaista'], color: '#d35d8a', rateMul: 0.0959, tier: 2, evolveCost: 80000,
+    upg: [['Scaffali e casse', '🧰'], ['Serra espositiva', '🌺'], ['Volantini e sito', '📱'], ['Magazzino', '📦'], ['Arredo da giardino', '🪑']],
+  }),
+  pulizie_industriali: autoBiz({
+    name: 'Pulizie industriali', icon: '🏢', desc: 'Grandi uffici e vetri dei palazzi.', products: ['uffici_grandi', 'vetri_palazzi'], sector: 'manualita',
+    staff: ['Addetto pulizie', 'Caposquadra'], color: '#2d6cdb', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['sanificazione'],
+    upg: [['Lavasciuga', '🧹'], ['Divise e furgoni', '👕'], ['Contratti con le aziende', '🤝'], ['Detersivi', '🧴'], ['Vetri dei palazzi', '🪟']],
+  }),
+  sanificazione: autoBiz({
+    name: 'Sanificazione', icon: '🧪', desc: 'Ospedali e laboratori: pulizia perfetta, zone da non saltare.', products: ['ospedali', 'laboratori'], sector: 'manualita',
+    staff: ['Tecnico', 'Caposquadra'], color: '#13a3a3', rateMul: 0.0651, tier: 2, evolveCost: 90000,
+    upg: [['Macchine a vapore', '🫧'], ['Tute e protezioni', '🧤'], ['Certificati', '📜'], ['Prodotti speciali', '🧴'], ['Laboratori', '🧪']],
+  }),
+  pulizie_eventi: autoBiz({
+    name: 'Pulizie per eventi', icon: '🎪', desc: 'Concerti, fiere e stadi: si pulisce tutto dopo la festa.', products: ['pulizia_concerti', 'pulizia_fiere'], sector: 'manualita',
+    staff: ['Addetto pulizie', 'Caposquadra'], color: '#e8590c', rateMul: 0.0789, tier: 1, evolveCost: 30000,
+    upg: [['Spazzatrici', '🧹'], ['Squadre grandi', '👕'], ['Contratti con gli organizzatori', '🤝'], ['Sacchi e bidoni', '🗑️'], ['Fiere e stadi', '🏟️']],
+  }),
+  tuttofare: autoBiz({
+    name: 'Tuttofare', icon: '🔧', desc: 'Montaggi e riparazioni a casa dei clienti: col furgoncino, su un posteggio.', products: ['montaggi', 'riparazioni'],
+    staff: ['Tuttofare', 'Aiutante'], color: '#e0a100', rateMul: 0.095, tier: 0, setupCost: 4000, sector: 'manualita', lot: 'truck', evolvesTo: ['costruzioni', 'ditta_impianti'],
+    upg: [['Cassetta degli attrezzi', '🧰'], ['Furgoncino con la scritta', '🚐'], ['Volantini nelle cassette', '📣'], ['Viti e ricambi', '🔧'], ['Riparazioni in casa', '🛠️']],
+  }),
+  costruzioni: autoBiz({
+    name: 'Costruzioni', icon: '🧱', desc: 'Soppalchi, scale, muri e case piccole.', products: ['soppalchi', 'muri'], sector: 'manualita',
+    staff: ['Muratore', 'Carpentiere'], color: '#b5532f', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['impresa_edile'],
+    upg: [['Betoniera e attrezzi', '🏗️'], ['Furgoni e divise', '👕'], ['Cartelli nei cantieri', '📣'], ['Mattoni e legname', '🧱'], ['Muri e tramezzi', '🧱']],
+  }),
+  impresa_edile: autoBiz({
+    name: 'Impresa edile', icon: '🏗️', desc: 'Case nuove e palazzine.', products: ['case_nuove', 'palazzine'], sector: 'manualita',
+    staff: ['Muratore', 'Gruista'], color: '#d4a017', rateMul: 0.0651, tier: 2, evolveCost: 90000, evolvesTo: ['grandi_opere'],
+    upg: [['Gru e ponteggi', '🏗️'], ['Squadre di cantiere', '👷'], ['Appalti', '📜'], ['Deposito materiali', '📦'], ['Palazzine', '🏘️']],
+  }),
+  grandi_opere: autoBiz({
+    name: 'Grandi opere', icon: '🌉', desc: 'Palazzi alti, ponti e grandi cantieri: il traguardo della costruzione.', products: ['palazzi_alti', 'ponti'], sector: 'manualita',
+    staff: ['Caposquadra', 'Gruista'], color: '#3a2f55', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Gru giganti', '🏗️'], ['Ingegneri', '📐'], ['Appalti del comune', '📜'], ['Acciaio e cemento', '🧱'], ['Ponti', '🌉']],
+  }),
+  ditta_impianti: autoBiz({
+    name: 'Ditta di impianti', icon: '⚡', desc: 'Impianti idraulici ed elettrici nelle case.', products: ['impianti_idraulici', 'impianti_elettrici'], sector: 'manualita',
+    staff: ['Idraulico', 'Elettricista'], color: '#2d9cdb', rateMul: 0.0789, tier: 1, evolveCost: 30000, evolvesTo: ['caldaie_clima'],
+    upg: [['Attrezzi professionali', '🔧'], ['Furgoni attrezzati', '🚐'], ['Pronto intervento', '📱'], ['Tubi e cavi', '🔌'], ['Impianti elettrici', '⚡']],
+  }),
+  caldaie_clima: autoBiz({
+    name: 'Caldaie e clima', icon: '🔥', desc: 'Caldaie e termosifoni d\'inverno, condizionatori d\'estate.', products: ['caldaie', 'condizionatori'], sector: 'manualita',
+    staff: ['Tecnico', 'Installatore'], color: '#e5484d', rateMul: 0.0959, tier: 2, evolveCost: 80000, evolvesTo: ['energia_domotica'],
+    upg: [['Strumenti di controllo', '🌡️'], ['Furgoni attrezzati', '🚐'], ['Contratti di manutenzione', '📜'], ['Ricambi', '🔧'], ['Condizionatori', '❄️']],
+  }),
+  energia_domotica: autoBiz({
+    name: 'Energia e casa intelligente', icon: '☀️', desc: 'Pannelli solari e case intelligenti: il traguardo degli impianti.', products: ['pannelli_solari', 'domotica'], sector: 'manualita',
+    staff: ['Tecnico', 'Installatore'], color: '#f2a900', rateMul: 0.0616, tier: 3, evolveCost: 220000,
+    upg: [['Droni e sensori', '📡'], ['Showroom', '💡'], ['Incentivi', '📜'], ['Pannelli in magazzino', '☀️'], ['Casa intelligente', '💡']],
+  }),
 } satisfies Record<string, BusinessTypeDef>;
 
 export type BusinessType = keyof typeof BUSINESS_TYPES;
@@ -486,6 +570,8 @@ export const BIZ_GROUPS: { id: string; name: string; icon?: string; roots: Busin
   { id: 'traslochi', name: 'Traslochi e trasporti', roots: ['traslochi'] },
   { id: 'persone', name: 'Trasporto persone', roots: ['navetta'] },
   { id: 'pulizie', name: 'Pulizie', roots: ['pulizie'] },
+  { id: 'giardini', name: 'Giardinaggio', icon: '🌿', roots: ['giardiniere'] },
+  { id: 'costruzioni', name: 'Costruzione e impianti', icon: '🔧', roots: ['tuttofare'] },
   { id: 'artigianato', name: 'Artigianato', roots: ['artigianato'] },
 ];
 

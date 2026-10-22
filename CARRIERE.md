@@ -327,7 +327,7 @@ tetto per gli appartamenti (come la cucina), facciata del palazzo per i vetri.
 | 30 | Pannelli solari | sul tetto: monta i pannelli e girali verso il sole, poi collegali | più pannelli, il sole che si sposta | 3 min |
 | 40 | Casa intelligente | luci, allarme e sensori: collega ognuno alla centralina come vuole il cliente, poi la prova finale | più richieste, collegamenti che si incrociano | 3–4 min |
 
-### Attività (3 alberi)
+### Attività (3 alberi, ✅ nel gioco dal 22/10)
 
 Stesse regole per evolvere (tutte le migliorie al massimo + ristrutturazione, un locale libero, un solo prezzo).
 **Deciso il 21/10:** tutte automatiche (anche le basi, e anche quelle vecchie degli altri settori): aprono con un

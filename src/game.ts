@@ -893,7 +893,8 @@ export class Game {
   /** Posteggio di un'attività di servizio: bici nella rastrelliera o il pulmino della navetta. */
   private buildServicePost(type: BusinessType) {
     const g = new THREE.Group();
-    if (type === 'navetta') {
+    // furgoncino: navetta, giardiniere e tuttofare
+    if (type === 'navetta' || type === 'giardiniere' || type === 'tuttofare') {
       const van = model('cars/van.glb', 1.6);
       van.rotation.y = Math.PI / 2;
       g.add(van);

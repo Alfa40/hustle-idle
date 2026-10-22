@@ -21,7 +21,13 @@ export type ProductId =
   | 'pasticcini' | 'semifreddi' | 'torte_compleanno' | 'torte_nuziali' | 'praline' | 'cioccolato_regalo'
   | 'colazione_forno' | 'pane_ingrosso' | 'forniture_locali'
   | 'camere_bnb' | 'camere_famiglia' | 'camere_hotel' | 'mezza_pensione' | 'suite' | 'congressi'
-  | 'soggiorno_resort' | 'spa' | 'posto_letto' | 'camere_private' | 'appartamenti' | 'soggiorni_lavoro';
+  | 'soggiorno_resort' | 'spa' | 'posto_letto' | 'camere_private' | 'appartamenti' | 'soggiorni_lavoro'
+  // costruzione e manualità: le attività automatiche (vedi config/business.ts)
+  | 'prati' | 'siepi' | 'giardini_nuovi' | 'potature' | 'parchi_comune' | 'aiuole_citta' | 'giardini_ville' | 'giardini_resort'
+  | 'piante' | 'fiori' | 'attrezzi_giardino' | 'arredo_giardino'
+  | 'uffici_grandi' | 'vetri_palazzi' | 'ospedali' | 'laboratori' | 'pulizia_concerti' | 'pulizia_fiere'
+  | 'montaggi' | 'riparazioni' | 'soppalchi' | 'muri' | 'case_nuove' | 'palazzine' | 'palazzi_alti' | 'ponti'
+  | 'impianti_idraulici' | 'impianti_elettrici' | 'caldaie' | 'condizionatori' | 'pannelli_solari' | 'domotica';
 
 export interface Product {
   name: string;
@@ -182,6 +188,46 @@ Object.assign(PRODUCTS, {
   camere_private: food('Camere private', '🛏️', 10, 55, 0.206, SUMMER),
   appartamenti: food('Appartamenti', '🏢', 40, 210, 0.139, SUMMER),
   soggiorni_lavoro: food('Soggiorni di lavoro', '💼', 50, 260, 0.0992, WINTER),
+} satisfies Partial<Record<ProductId, Product>>);
+
+// ---- costruzione e manualità: servizi delle attività automatiche. Stessi numeri delle attività di Ospitalità allo
+// stesso gradino (base come il B&B, 1ª come l'hotel o l'ostello, 2ª come l'hotel 4 stelle o il residence, 3ª come il
+// resort): così guadagnano come gli altri settori (base ~€5 mila al mese, 1ª ~€11 mila, 2ª ~€25 mila, 3ª ~€50 mila) ----
+const SPRING = [0.6, 0.7, 1.2, 1.5, 1.5, 1.3, 1.1, 0.9, 1.1, 1, 0.7, 0.6];
+const BUILD = [0.8, 0.85, 1, 1.1, 1.15, 1.15, 1.1, 0.9, 1.1, 1.05, 0.9, 0.8];
+Object.assign(PRODUCTS, {
+  prati: food('Prati tagliati', '🌿', 15, 75, 0.15, SPRING),
+  siepi: food('Siepi e cespugli', '✂️', 22, 110, 0.0706, SPRING),
+  giardini_nuovi: food('Giardini nuovi', '🌱', 25, 130, 0.113, SPRING),
+  potature: food('Potature', '🌳', 40, 170, 0.0753, SPRING),
+  parchi_comune: food('Parchi del comune', '🏞️', 60, 320, 0.0898, SPRING),
+  aiuole_citta: food('Aiuole della città', '🌷', 80, 380, 0.0718, SPRING),
+  giardini_ville: food('Giardini delle ville', '🏛️', 180, 900, 0.0599, SPRING),
+  giardini_resort: food('Giardini di hotel e resort', '🌴', 90, 480, 0.0998, SPRING),
+  piante: food('Piante', '🪴', 6, 32, 0.412, SPRING),
+  fiori: food('Fiori', '🌷', 10, 55, 0.206, SPRING),
+  attrezzi_giardino: food('Attrezzi da giardino', '🧰', 40, 210, 0.139, SPRING),
+  arredo_giardino: food('Arredo da giardino', '🪑', 50, 260, 0.0992, SUMMER),
+  uffici_grandi: food('Pulizia di grandi uffici', '🏢', 25, 130, 0.113),
+  vetri_palazzi: food('Vetri dei palazzi', '🪟', 40, 170, 0.0753),
+  ospedali: food('Sanificazione ospedali', '🏥', 60, 320, 0.0898, WINTER),
+  laboratori: food('Sanificazione laboratori', '🧪', 80, 380, 0.0718),
+  pulizia_concerti: food('Pulizia dopo i concerti', '🎪', 25, 130, 0.113, SUMMER),
+  pulizia_fiere: food('Pulizia di fiere e stadi', '🏟️', 40, 170, 0.0753),
+  montaggi: food('Montaggio mobili', '🔧', 15, 75, 0.15),
+  riparazioni: food('Riparazioni in casa', '🛠️', 22, 110, 0.0706),
+  soppalchi: food('Soppalchi e scale', '🪜', 25, 130, 0.113, BUILD),
+  muri: food('Muri e tramezzi', '🧱', 40, 170, 0.0753, BUILD),
+  case_nuove: food('Case nuove', '🏠', 60, 320, 0.0898, BUILD),
+  palazzine: food('Palazzine', '🏘️', 80, 380, 0.0718, BUILD),
+  palazzi_alti: food('Palazzi alti', '🏙️', 180, 900, 0.0599, BUILD),
+  ponti: food('Ponti e grandi opere', '🌉', 90, 480, 0.0998, BUILD),
+  impianti_idraulici: food('Impianti idraulici', '💧', 25, 130, 0.113),
+  impianti_elettrici: food('Impianti elettrici', '⚡', 40, 170, 0.0753),
+  caldaie: food('Caldaie e termosifoni', '🔥', 40, 210, 0.139, WINTER),
+  condizionatori: food('Condizionatori', '❄️', 50, 260, 0.0992, SUMMER),
+  pannelli_solari: food('Pannelli solari', '☀️', 180, 900, 0.0599, SUMMER),
+  domotica: food('Casa intelligente', '💡', 90, 480, 0.0998),
 } satisfies Partial<Record<ProductId, Product>>);
 
 export const PRODUCT_IDS = Object.keys(PRODUCTS) as ProductId[];
