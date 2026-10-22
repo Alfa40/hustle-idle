@@ -156,3 +156,4 @@
 - Attività: per ora **tutte automatiche** (`ALL_AUTO` / `isAutoType` in src/config/business.ts, `isAutoBiz` in sim/economy.ts): niente interni, niente ordini di persona, personale (un dipendente per reparto + manager) assunto all'apertura. Non cancellare il codice degli interni (food truck, panificio): è solo nascosto.
 
 - Punti "da passare col dito" nei lavoretti 3D: `Task.sweep(a, b)` con `aim` (jobs.ts). Riceve il tratto percorso dal dito sulla zona `aim` e restituisce quanto è fatto (0–1); col dito fermo non avanza. Esempio: i mucchietti di sporco dell'aspirapolvere (`dustPile` in manual3d.ts). Niente riquadro: si fa nella scena.
+- Locali con l'interno (food truck, panificio): col locale grande (ampliamento 2) ci devono stare TUTTI i fuochi e banchi extra (`extraRoom` in src/config/recipes.ts, controllo in fondo al file). L'evoluzione chiede tutte le migliorie al massimo: se manca parete, l'attività resta bloccata per sempre.

@@ -1,4 +1,4 @@
-import type { BusinessType } from './business';
+import { UPGRADES, type BusinessType } from './business';
 import type { ProductId } from './products';
 
 /**
@@ -54,9 +54,11 @@ const common = (level: number): StationDef[] => [
   { id: 'imballo', kind: 'hold', name: 'Imballaggio', icon: '🥡', verb: 'Imballa', model: 'furniture/kitchenCabinet.glb', x: 0, z: ISLAND_Z, level, sec: 1 },
 ];
 
+// Il locale grande (ampliamento al massimo) deve avere parete per TUTTI i fuochi e banchi extra (UPGRADES.max):
+// l'evoluzione chiede tutte le migliorie al massimo, altrimenti l'attività resta bloccata (controllo in fondo al file).
 export const LAYOUTS: Record<'foodtruck' | 'panificio', Layout> = {
   foodtruck: {
-    width: [7.5, 10, 12.5],
+    width: [7.5, 10, 14.5],
     wall: 0xe8590c,
     floor: 0xe8e2d4,
     stations: [
@@ -81,7 +83,7 @@ export const LAYOUTS: Record<'foodtruck' | 'panificio', Layout> = {
     extra: { fuochi: 'piastra', banco: 'banco' },
   },
   panificio: {
-    width: [7.5, 10, 12.5],
+    width: [7.5, 10, 14.5],
     wall: 0xd4a373,
     floor: 0xf3e6d0,
     stations: [
@@ -162,4 +164,9 @@ export function extraRoom(t: keyof typeof LAYOUTS, level: number, fuochi: number
   const lay = LAYOUTS[t];
   const base = lay.stations.filter((s) => s.level <= level && s.kind !== 'counter' && s.kind !== 'pass').length;
   return wallSpots(t, level).length - base - fuochi - banchi;
+}
+
+// controllo: col locale grande ci stanno tutti gli extra (se no l'evoluzione non si può mai sbloccare)
+for (const t of Object.keys(LAYOUTS) as (keyof typeof LAYOUTS)[]) {
+  if (extraRoom(t, 2, UPGRADES.fuochi.max, UPGRADES.banco.max) < 0) console.error(`[recipes] ${t}: nel locale grande non c'è parete per tutti gli extra`);
 }
