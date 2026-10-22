@@ -63,6 +63,7 @@ const TIPS: Record<string, string[] | null> = {
 const AIM_WHAT: Record<string, Record<number, string>> = {
   lavaggio: { 1: 'sulla macchia', 3: 'sulla schiuma', 5: 'sulle gocce' },
   'giardino:1': { 1: 'sulla punta della siepe', 2: 'sul ramo da tagliare' },
+  pulizie: { 1: 'sullo sporco e passalo su ogni granello' },
 };
 
 export class JobTutorial {

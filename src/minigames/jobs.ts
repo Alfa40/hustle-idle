@@ -267,6 +267,11 @@ export interface Task {
    * dito sopra (o passandoci sopra) avanza. `pos` è il punto vero, anche in alto.
    */
   aim?: THREE.Object3D;
+  /**
+   * Con `aim`: si fa passando il dito sopra, non tenendolo fermo (es. l'aspirapolvere sui granelli). Riceve il
+   * tratto percorso dal dito su `aim` (da `a` a `b`, punti veri nella scena) e dice quanto è fatto (0–1).
+   */
+  sweep?: (a: THREE.Vector3, b: THREE.Vector3) => number;
   /** si fa solo a piedi (es. imbucare il giornale, lasciare il pacco): sul veicolo bisogna scendere */
   onFoot?: boolean;
 }
@@ -898,8 +903,13 @@ export class PhasedRun extends BaseRun {
     this.ray.setFromCamera(new THREE.Vector2((x / w) * 2 - 1, -(y / h) * 2 + 1), cam);
     this.ray.far = 5;
     const hits = this.ray.intersectObjects(list.map((t) => t.aim!), false);
+    if (hits.length) this.aimPoint.copy(hits[0].point);
     return hits.length ? list.find((t) => t.aim === hits[0].object) ?? null : null;
   }
+
+  /** dove il dito tocca il punto (ultimo `aimHit` riuscito) e l'ultimo punto del dito che passa (`sweep`) */
+  private aimPoint = new THREE.Vector3();
+  private sweepLast: { t: Task; p: THREE.Vector3 } | null = null;
 
   /**
    * Punti da toccare sull'oggetto: il dito nella metà delle azioni, se è su un punto, lo lavora
@@ -911,10 +921,19 @@ export class PhasedRun extends BaseRun {
     inp.onActionClaim = (x, y) => !!this.aimHit(x, y, list);
     const close = near && Math.hypot(near.pos.x - p.x, near.pos.z - p.z) < 4.5;
     const hit = inp.actionHeld && inp.actionPos ? this.aimHit(inp.actionPos.x, inp.actionPos.y, list) : null;
+    // passare il dito (aspirapolvere): conta solo il tratto percorso, il dito fermo non fa niente
+    let moved = true;
+    if (hit?.sweep) {
+      const pt = this.aimPoint.clone();
+      const last = this.sweepLast?.t === hit ? this.sweepLast.p : pt;
+      moved = last.distanceTo(pt) > 0.005;
+      if (moved) hit.progress = hit.sweep(last, pt);
+      this.sweepLast = { t: hit, p: pt };
+    } else this.sweepLast = null;
     if (hit) {
-      hit.progress = (hit.progress ?? 0) + dt / (hit.sec ?? 0.6);
+      hit.progress = hit.sweep ? hit.progress ?? 0 : (hit.progress ?? 0) + dt / (hit.sec ?? 0.6);
       this.fxT -= dt;
-      if (hit.fx && this.fxT <= 0) {
+      if (hit.fx && moved && this.fxT <= 0) {
         this.fxT = 0.08;
         this.game.fx.emit(hit.fx, hit.pos.clone(), 2, hit.fxColor);
       }
@@ -923,7 +942,8 @@ export class PhasedRun extends BaseRun {
       if (hit.progress >= 1) this.complete(hit);
     } else if (this.game.player.currentName === 'interact-right' && !inp.actionHeld) this.game.player.play('idle');
     const t = hit ?? near;
-    this.game.prompt = close && t ? { label: t.label, icon: t.icon, progress: hit?.progress ?? 0, at: t.pos.clone(), obj: t.obj } : null;
+    // (lo sporco da aspirare non pulsa: i granelli diventerebbero bianchi come coriandoli)
+    this.game.prompt = close && t ? { label: t.label, icon: t.icon, progress: hit?.progress ?? 0, at: t.pos.clone(), obj: t.sweep ? undefined : t.obj, how: t.sweep ? '👆 Passa il dito' : undefined } : null;
   }
 
   /** Chiude la fase in corso subito (es. tutti i piatti consegnati: le postazioni restano lì ma non servono più). */

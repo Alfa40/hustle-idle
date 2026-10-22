@@ -116,6 +116,8 @@ export interface ActionPrompt {
   stand?: THREE.Vector3;
   /** prima persona: le parti da toccare per l'azione (di solito quelle che pulsano); senza, vale `obj` */
   hit?: THREE.Object3D[];
+  /** il gesto scritto prima dell'azione, se non è "tocca" o "tieni premuto" (es. "👆 Passa il dito") */
+  how?: string;
 }
 
 interface JobNpc {

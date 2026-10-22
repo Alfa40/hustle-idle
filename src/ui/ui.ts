@@ -580,7 +580,7 @@ export class UI {
       if (p) {
         const hold = p.progress !== undefined;
         // prima il gesto (tocca / tieni premuto), poi cosa fai
-        this.labelEl.innerHTML = `${p.at ? `<span class="act-how">${hold ? '✊ Tieni premuto' : '👆 Tocca'}</span> ` : ''}${esc(p.icon)} ${esc(p.label.replace(/^Tieni premuto:\s*/, ''))}`;
+        this.labelEl.innerHTML = `${p.at ? `<span class="act-how">${p.how ?? (hold ? '✊ Tieni premuto' : '👆 Tocca')}</span> ` : ''}${esc(p.icon)} ${esc(p.label.replace(/^Tieni premuto:\s*/, ''))}`;
       }
       // l'azione è appena diventata disponibile: il telefono vibra un attimo
       if (appeared) {

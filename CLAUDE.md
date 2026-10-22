@@ -154,3 +154,5 @@
   (three.js MIT, Fredoka OFL, Kenney CC0) in `public/LICENSES.txt`, linkato dai Crediti: ogni libreria, font o asset
   nuovo va aggiunto lì e nei Crediti. Niente marchi, nomi o grafiche di aziende o giochi reali.
 - Attività: per ora **tutte automatiche** (`ALL_AUTO` / `isAutoType` in src/config/business.ts, `isAutoBiz` in sim/economy.ts): niente interni, niente ordini di persona, personale (un dipendente per reparto + manager) assunto all'apertura. Non cancellare il codice degli interni (food truck, panificio): è solo nascosto.
+
+- Punti "da passare col dito" nei lavoretti 3D: `Task.sweep(a, b)` con `aim` (jobs.ts). Riceve il tratto percorso dal dito sulla zona `aim` e restituisce quanto è fatto (0–1); col dito fermo non avanza. Esempio: i mucchietti di sporco dell'aspirapolvere (`dustPile` in manual3d.ts). Niente riquadro: si fa nella scena.

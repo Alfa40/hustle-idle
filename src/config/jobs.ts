@@ -35,8 +35,8 @@ export const JOBS: Record<JobType, JobDef> = {
   },
   pulizie: {
     name: 'Pulizie di casa', icon: '🧽', skill: 'manualita', basePay: 28, xp: 13, fame: 1, where: 'house',
-    intro: "Pulisci l'appartamento del cliente: togli la polvere col panno, passa l'aspirapolvere sulle briciole, rimetti ogni cosa al suo posto e rifai il letto.",
-    steps: [['🧽', 'Strofina la polvere col panno', 'hold'], ['🧹', "Aspira le briciole", 'hold'], ['🧺', 'Ogni cosa al suo posto', 'tap'], ['🛏️', 'Rifai il letto', 'hold']],
+    intro: "Pulisci l'appartamento del cliente: togli la polvere col panno, passa l'aspirapolvere su ogni granello di sporco, rimetti ogni cosa al suo posto e rifai il letto.",
+    steps: [['🧽', 'Strofina la polvere col panno', 'hold'], ['🧹', 'Aspira: passa il dito su ogni granello', 'hold'], ['🧺', 'Ogni cosa al suo posto', 'tap'], ['🛏️', 'Rifai il letto', 'hold']],
   },
   idraulico: {
     name: 'Aiuto idraulico', icon: '💧', skill: 'manualita', basePay: 31, xp: 14, fame: 1.1, where: 'house',

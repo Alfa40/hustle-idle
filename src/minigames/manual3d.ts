@@ -116,13 +116,56 @@ function vacuumMesh() {
 }
 
 /** Briciole e terra sul pavimento. */
-function crumbs() {
-  const g = new THREE.Group();
-  for (let i = 0; i < 14; i++) {
-    const s = 0.03 + Math.random() * 0.04;
-    part(g, new THREE.BoxGeometry(s, 0.015, s), i % 3 ? 0x6b4a2a : 0xa1887f, (Math.random() - 0.5) * 0.7, 0.012, (Math.random() - 0.5) * 0.7);
+/** Mucchietto di sporco sul pavimento: tanti granelli veri, ognuno sparisce solo se il dito ci passa sopra. */
+type DustPile = { at: THREE.Vector3; obj: THREE.Object3D; aim: THREE.Mesh; suck: (a: THREE.Vector3, b: THREE.Vector3) => number };
+/** mezza larghezza della bocchetta (m): stretta, così su un mucchietto grande una passata sola non basta */
+const NOZZLE = 0.07;
+function dustPile(run: PhasedRun, at: THREE.Vector3, n: number): DustPile {
+  const R = 0.32 + n * 0.004;
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mesh = new THREE.InstancedMesh(geo, lamb(0xffffff), n);
+  const cols = [0x6b4a2a, 0xa1887f, 0x5a4a3a, 0x8d7b68, 0x7b7069].map((c) => new THREE.Color(c));
+  const grains: { x: number; z: number; s: number; gone: boolean }[] = [];
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const d = Math.sqrt(Math.random()) * R;
+    const g = { x: Math.cos(a) * d, z: Math.sin(a) * d * 0.85, s: 0.025 + Math.random() * 0.03, gone: false };
+    grains.push(g);
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * 3);
+    m.compose(new THREE.Vector3(g.x, 0.012, g.z), q, new THREE.Vector3(g.s, 0.015, g.s));
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, cols[i % cols.length]);
   }
-  return g;
+  // i granelli non si accendono (diventerebbero bianchi come coriandoli): si vedono già bene sul pavimento
+  mesh.userData.noGlow = true;
+  const obj = new THREE.Group();
+  obj.add(mesh);
+  run.prop(obj, at, 0, 1);
+  // zona invisibile da toccare (un po' più larga del mucchietto)
+  const aim = new THREE.Mesh(new THREE.CylinderGeometry(R + 0.12, R + 0.12, 0.04, 20), new THREE.MeshBasicMaterial({ visible: false }));
+  aim.userData.noGlow = true;
+  run.prop(aim, at.clone().setY(0.02), 0, 1);
+  let left = n;
+  const suck = (a: THREE.Vector3, b: THREE.Vector3) => {
+    // il tratto del dito sul pavimento, attorno al mucchietto
+    const ax = a.x - at.x, az = a.z - at.z;
+    const dx = b.x - a.x, dz = b.z - a.z;
+    const len2 = dx * dx + dz * dz || 1e-9;
+    grains.forEach((g, i) => {
+      if (g.gone) return;
+      const k = Math.max(0, Math.min(1, ((g.x - ax) * dx + (g.z - az) * dz) / len2));
+      if (Math.hypot(ax + dx * k - g.x, az + dz * k - g.z) > NOZZLE + g.s * 0.5) return;
+      g.gone = true;
+      left--;
+      m.makeScale(0, 0, 0);
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    return 1 - left / n;
+  };
+  return { at, obj, aim, suck };
 }
 
 /** Rubinetto generale dell'acqua sul muro: tubo e volantino rosso (gira chiudendo). */
@@ -500,7 +543,7 @@ export function cleaningJob(game: Game, lineLevel: number, slot: Slot, placed: P
     const p = freeSpot(crumbSpots, 1.3);
     if (p) crumbSpots.push(p);
   }
-  const crumbObjs: THREE.Object3D[] = [];
+  const piles: DustPile[] = [];
   // le cose in giro e i loro posti
   const kinds: Thing[] = Array.from({ length: nThings }, (_, i) => (['libro', 'gioco', 'vestito'] as Thing[])[i % 3]);
   const thingSpots: THREE.Vector3[] = [];
@@ -532,18 +575,20 @@ export function cleaningJob(game: Game, lineLevel: number, slot: Slot, placed: P
       })),
     },
     {
-      name: "Passa l'aspirapolvere", icon: '🧹', count: () => [crumbObjs.filter((o) => !o.visible).length, crumbObjs.length],
-      tip: "Prendi l'<b>aspirapolvere</b> e passalo sulle <b>briciole</b> per terra: tieni premuto",
+      name: "Passa l'aspirapolvere", icon: '🧹', count: () => [piles.filter((x) => !x.obj.visible).length, piles.length],
+      tip: "Prendi l'<b>aspirapolvere</b>. Passa il dito su ogni <b>granello</b> di sporco",
       tasks: () => [{
         pos: vacuumAt, kind: 'tap', label: "Prendi l'aspirapolvere", icon: '🧹', own: true, obj: vacuum,
         onDone: () => { vacuum.visible = false; hold(game, vacuumMesh()); },
-        then: () => crumbSpots.map((pos, i): Task => ({
-          pos, kind: 'hold', sec: 0.8, label: 'Aspira le briciole', icon: '🧹', fx: 'dust', own: true, obj: crumbObjs[i],
-          onProgress: (p) => crumbObjs[i].scale.setScalar(Math.max(0.1, 1 - p)),
+        // ogni mucchietto si aspira passandoci sopra col dito: sparisce solo il granello dove passa il dito
+        then: () => piles.map((pl): Task => ({
+          pos: pl.at, kind: 'hold', label: 'Aspira lo sporco', icon: '🧹', fx: 'dust', aim: pl.aim, obj: pl.obj,
+          tip: 'Il dito fermo non aspira: passalo su ogni granello',
+          sweep: (a, b) => pl.suck(a, b),
           onDone: () => {
-            crumbObjs[i].visible = false;
+            pl.obj.visible = false;
             // finito: l'aspirapolvere torna al suo posto
-            if (crumbObjs.every((o) => !o.visible)) {
+            if (piles.every((x) => !x.obj.visible)) {
               hold(game);
               vacuum.visible = true;
             }
@@ -608,9 +653,9 @@ export function cleaningJob(game: Game, lineLevel: number, slot: Slot, placed: P
       tasks: () => [{ pos: bedAt, kind: 'hold', sec: 1.6, label: 'Rifai il letto', icon: '🛏️', own: true, obj: bed.obj }],
     },
   ];
-  run = new PhasedRun(game, 1, title, phases, { time: Math.min(290, 50 + wipes.length * 22 + crumbSpots.length * 7 + things.length * 14) });
+  run = new PhasedRun(game, 1, title, phases, { time: Math.min(290, 50 + wipes.length * 22 + crumbSpots.length * 14 + things.length * 14) });
   vacuum = run.prop(vacuumMesh(), vacuumAt, 0, 1);
-  for (const pos of crumbSpots) crumbObjs.push(run.prop(crumbs(), pos, Math.random() * 3, 1));
+  for (const pos of crumbSpots) piles.push(dustPile(run, pos, Math.round(26 + 34 * t)));
   for (const th of things) th.obj = run.prop(thingMesh(th.k), th.at, Math.random() * 3, 1);
   // i posti: la libreria (già lì), la cesta dei giochi e il cesto della biancheria
   const used = [...new Set(things.map((x) => x.k))];
