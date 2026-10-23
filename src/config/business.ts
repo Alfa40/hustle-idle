@@ -88,21 +88,31 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     cost: (l) => Math.round((700 * 1.9 ** l) / 10) * 10,
   },
   risparmio: {
-    name: 'Fornitori all\'ingrosso', icon: '📦', desc: 'Merce e bollette costano meno: −8% per livello.', max: 4,
+    name: 'Fornitori all\'ingrosso', icon: '📦', desc: 'Merce e bollette costano meno: −8% per livello (al massimo −60%).', max: 4,
     cost: (l) => Math.round((550 * 1.8 ** l) / 10) * 10,
   },
 };
 
 /** migliorie in più delle attività senza interno (tutte tranne food truck e panificio), col nome del loro settore */
 export const AUTO_UPGRADES = ['qualita', 'formazione', 'sicurezza', 'fedelta', 'risparmio'] as const;
+/** attività con l'interno (cucina): le loro migliorie restano quelle di sempre */
+const KITCHEN_TYPES = { foodtruck: 1, panificio: 1 } as const;
 const SECTOR_UPG: Record<string, Record<(typeof AUTO_UPGRADES)[number], [string, string]>> = {
   cucina: { qualita: ['Ingredienti di qualità', '🥩'], formazione: ['Corsi di cucina e servizio', '🎓'], sicurezza: ['Allarme e manutenzione', '🚨'], fedelta: ['Tessera fedeltà', '🎟️'], risparmio: ['Fornitori all\'ingrosso', '📦'] },
   logistica: { qualita: ['Servizio puntuale', '⏱️'], formazione: ['Corsi di guida sicura', '🎓'], sicurezza: ['Antifurto e tagliandi ai mezzi', '🔧'], fedelta: ['Clienti abbonati', '🤝'], risparmio: ['Percorsi e ricambi', '🗺️'] },
   manualita: { qualita: ['Lavori a regola d\'arte', '🛠️'], formazione: ['Corsi per gli operai', '🎓'], sicurezza: ['Manutenzione degli attrezzi', '🧰'], fedelta: ['Recensioni dei clienti', '💬'], risparmio: ['Materiali all\'ingrosso', '🧱'] },
   artigianato: { qualita: ['Materiali pregiati', '💎'], formazione: ['Corsi di bottega', '🎓'], sicurezza: ['Allarme del laboratorio', '🚨'], fedelta: ['Portfolio e recensioni', '🖼️'], risparmio: ['Fornitori di fiducia', '🤝'] },
 };
-/** livello massimo delle migliorie nuove, per gradino dell'attività */
-const AUTO_NEW_MAX = [2, 3, 3, 4];
+/**
+ * Livello massimo delle migliorie delle attività senza interno, per gradino (base → più grande): almeno 5 per le
+ * base, fino a 15 (e 20 per attrezzatura, look e qualità) per le più grandi. "Più prodotti" resta legato ai prodotti.
+ */
+const TIER_MAX = [5, 8, 12, 15];
+const TIER_MAX_TOP = [5, 9, 14, 20];
+const TOP_UPGRADES: UpgradeId[] = ['attrezzatura', 'look', 'qualita'];
+/** oltre il 5° livello il prezzo cresce più piano (+30% a livello), se no i livelli alti costerebbero miliardi */
+const SOFT_FROM = 5;
+const SOFT_GROWTH = 1.3;
 
 export const UPGRADE_IDS = Object.keys(UPGRADES) as UpgradeId[];
 
@@ -684,11 +694,16 @@ export function upgOf(t: BusinessType, id: UpgradeId): UpgradeDef {
   const def = BUSINESS_TYPES[t] as BusinessTypeDef;
   // migliorie in più: nome e icona del settore, livello massimo dal gradino (es. "Ingredienti di qualità")
   const sec = (AUTO_UPGRADES as readonly string[]).includes(id) ? SECTOR_UPG[def.sector ?? 'cucina']?.[id as (typeof AUTO_UPGRADES)[number]] : undefined;
-  const o = def.upgrades?.[id] ?? (sec ? { name: sec[0], icon: sec[1], max: AUTO_NEW_MAX[def.tier ?? 0] ?? 2 } : undefined);
+  const o = def.upgrades?.[id] ?? (sec ? { name: sec[0], icon: sec[1] } : undefined);
   const k = TIER_COST[def.tier ?? 0] ?? 1;
-  const max = id === 'menu' ? Math.min(base.max, def.products.length - 1) : o?.max ?? base.max;
-  if (!o && k === 1 && max === base.max) return base;
-  return { name: o?.name ?? base.name, icon: o?.icon ?? base.icon, desc: o?.desc ?? base.desc, max, cost: (l) => Math.round((base.cost(l) * k) / 10) * 10 };
+  // attività senza interno (tutte tranne food truck e panificio): livelli per gradino, prezzi più dolci in alto
+  const open = !(t in KITCHEN_TYPES);
+  const tier = def.tier ?? 0;
+  const max = id === 'menu' ? Math.min(base.max, def.products.length - 1)
+    : open ? (TOP_UPGRADES.includes(id) ? TIER_MAX_TOP : TIER_MAX)[tier] ?? 5 : o?.max ?? base.max;
+  if (!o && k === 1 && max === base.max && !open) return base;
+  const raw = (l: number) => (open && l > SOFT_FROM ? base.cost(SOFT_FROM) * SOFT_GROWTH ** (l - SOFT_FROM) : base.cost(l));
+  return { name: o?.name ?? base.name, icon: o?.icon ?? base.icon, desc: o?.desc ?? base.desc, max, cost: (l) => Math.round((raw(l) * k) / 10) * 10 };
 }
 export const BUSINESS_TYPE_IDS = Object.keys(BUSINESS_TYPES) as BusinessType[];
 export const bizType = (t: BusinessType): BusinessTypeDef => BUSINESS_TYPES[t];

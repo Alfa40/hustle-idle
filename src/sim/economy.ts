@@ -567,7 +567,7 @@ export function buyStock(s: GameState, b: Business, pid: ProductId, qty: number,
   const have = b.stock[pid] ?? 0;
   const room = stockCap(b) - have;
   // con i debiti (3 mesi di fila in perdita) i fornitori fanno pagare di più
-  const cost = PRODUCTS[pid].cost * ((b.redMonths ?? 0) >= 3 ? CRISIS.DEBT_STOCK_MULT : 1) * (1 - 0.08 * upg(b, 'risparmio'));
+  const cost = PRODUCTS[pid].cost * ((b.redMonths ?? 0) >= 3 ? CRISIS.DEBT_STOCK_MULT : 1) * saving(b);
   let n = Math.min(qty, room);
   if (!free) n = Math.min(n, Math.floor(Math.max(0, s.money) / cost));
   if (n <= 0) return 0;
@@ -856,8 +856,11 @@ export function monthlyCosts(s: GameState, b: Business) {
   const salaries = b.staff.reduce((a, e) => a + proratedSalary(s, e), 0);
   // l'assicurazione si paga con le bollette
   // fornitori all'ingrosso: bollette −8% a livello
-  return { rent: lot.rent, utilities: Math.round(BUSINESS.UTILITIES_MONTH * (1 - 0.08 * upg(b, 'risparmio'))) + (b.insured ? insuranceCost(b) : 0), salaries };
+  return { rent: lot.rent, utilities: Math.round(BUSINESS.UTILITIES_MONTH * saving(b)) + (b.insured ? insuranceCost(b) : 0), salaries };
 }
+
+/** fornitori all'ingrosso: −8% a livello su merce e bollette, al massimo −60% */
+export const saving = (b: Business) => Math.max(0.4, 1 - 0.08 * upg(b, 'risparmio'));
 
 /** assicurazione al mese di un'attività */
 export const insuranceCost = (b: Business) => Math.max(120, Math.round((b.boughtFor * TROUBLES.INSURANCE_SHARE) / 10) * 10);
