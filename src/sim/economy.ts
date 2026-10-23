@@ -900,7 +900,7 @@ export function payMonth(s: GameState) {
   }
   if (total > 0) {
     addMoney(s, -total);
-    addNews(s, { icon: '🧾', kind: 'info', text: `Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi${palacesMonthly(s) ? ', palazzi' : ''} e veicoli` });
+    addNews(s, { icon: '🧾', kind: 'info', text: `Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi${palacesMonthly(s) ? ', palazzi' : ''} e veicoli`, cat: 'soldi', go: 'agency:resoconti' });
     toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi, assicurazioni e palazzi`, s.money < 0 ? 'bad' : 'info');
   }
 }

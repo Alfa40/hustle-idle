@@ -46,7 +46,7 @@ function fail(s: GameState, b: Business) {
   hitFame(s, b, CRISIS.FAIL_FAME);
   s.businesses = s.businesses.filter((x) => x !== b);
   for (const g of s.chainGroups ?? []) g.bizIds = g.bizIds.filter((id) => id !== b.id);
-  addNews(s, { icon: '💥', kind: 'bad', text: `${bizName(b)} è fallita dopo ${CRISIS.FAIL_MONTHS} mesi in perdita: chiusa, posto perso` });
+  addNews(s, { icon: '💥', kind: 'bad', text: `${bizName(b)} è fallita dopo ${CRISIS.FAIL_MONTHS} mesi in perdita: chiusa, posto perso`, cat: 'attivita', go: 'agency:mie' });
   toast(`💥 ${bizType(b.type).name} è fallita: chiusa`, 'bad');
   bus.emit('lots', b.lotId);
 }
@@ -59,15 +59,15 @@ export function monthEnd(s: GameState) {
     if (!red) continue;
     const loss = euro(-(b.lastProfit ?? 0));
     if (red >= CRISIS.FAIL_MONTHS) fail(s, b);
-    else if (red === 1) addNews(s, { icon: '⚠️', kind: 'warn', text: `${bizName(b)}: mese in perdita (−${loss}). Altri 3 di fila e fallisce`, biz: b.id });
+    else if (red === 1) addNews(s, { icon: '⚠️', kind: 'warn', text: `${bizName(b)}: mese in perdita (−${loss}). Altri 3 di fila e fallisce`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' });
     else {
       // crisi e debiti: qualcuno se ne va, la fama cala
       const e = quit(b);
       hitFame(s, b, CRISIS.CRISIS_FAME);
       const who = e ? ` ${e.name.split(' ')[0]} ha lasciato il lavoro.` : '';
       addNews(s, red === 2
-        ? { icon: '🟠', kind: 'bad', text: `${bizName(b)} è in crisi (−${loss}).${who} Torna in guadagno o tra 2 mesi fallisce`, biz: b.id }
-        : { icon: '🔴', kind: 'bad', text: `${bizName(b)} ha debiti (−${loss}): merce più cara, nessuno rimpiazza chi se ne va.${who} Ultimo mese`, biz: b.id });
+        ? { icon: '🟠', kind: 'bad', text: `${bizName(b)} è in crisi (−${loss}).${who} Torna in guadagno o tra 2 mesi fallisce`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' }
+        : { icon: '🔴', kind: 'bad', text: `${bizName(b)} ha debiti (−${loss}): merce più cara, nessuno rimpiazza chi se ne va.${who} Ultimo mese`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' });
     }
   }
 }
@@ -85,7 +85,7 @@ export function checkDebt(s: GameState) {
   const warns = CRISIS.SEIZE_WARN_AT;
   if ((s.negWarn ?? 0) < warns.length && days >= warns[s.negWarn ?? 0]) {
     s.negWarn = (s.negWarn ?? 0) + 1;
-    addNews(s, { icon: '📮', kind: 'bad', text: `Conto sotto zero (${euro(s.money)}): tra ${left} giorni arriva il pignoramento` });
+    addNews(s, { icon: '📮', kind: 'bad', text: `Conto sotto zero (${euro(s.money)}): tra ${left} giorni arriva il pignoramento`, cat: 'soldi', go: 'agency:resoconti', todo: 'debt' });
     toast(`📮 Conto sotto zero: pignoramento tra ${left} giorni`, 'bad');
   }
   if (days >= CRISIS.SEIZE_DAYS) seize(s);
@@ -115,6 +115,6 @@ function seize(s: GameState) {
   for (const k of Object.keys(s.fame) as (keyof typeof s.fame)[]) s.fame[k] *= 1 - CRISIS.SEIZE_FAME;
   s.negSince = s.money < 0 ? s.minutes : undefined;
   s.negWarn = 0;
-  addNews(s, { icon: '⚖️', kind: 'bad', text: sold.length ? `Pignoramento: venduti ${sold.join(', ')}` : 'Pignoramento: non c\'era niente da vendere' });
+  addNews(s, { icon: '⚖️', kind: 'bad', text: sold.length ? `Pignoramento: venduti ${sold.join(', ')}` : 'Pignoramento: non c\'era niente da vendere', cat: 'soldi', go: 'agency:resoconti' });
   toast('⚖️ Pignoramento: venduti beni per coprire i debiti', 'bad');
 }

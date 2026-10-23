@@ -33,7 +33,7 @@ export function advance(s: GameState, minutes: number, efficiency = 1, online = 
     const hAfter = (s.minutes % 1440) / 60;
     if (day(s) === before && hBefore < BUSINESS.CLOSE_HOUR && hAfter >= BUSINESS.CLOSE_HOUR) {
       const made = weeklyReports(s);
-      if (made) addNews(s, { icon: '📊', kind: 'info', text: `Il manager ha preparato ${made === 1 ? 'il resoconto' : `${made} resoconti`} della settimana: guarda cosa sistemare in Attività` });
+      if (made) addNews(s, { icon: '📊', kind: 'info', text: `Il manager ha preparato ${made === 1 ? 'il resoconto' : `${made} resoconti`} della settimana: guarda cosa sistemare in Attività`, cat: 'attivita', go: 'agency:mie' });
       if (online && made) toast(`📊 Il manager ha preparato ${made === 1 ? 'il resoconto' : `${made} resoconti`} della settimana`, 'info');
     }
     if (day(s) !== before) newDay(s, online);
@@ -84,7 +84,7 @@ export function updateEvents(s: GameState, announce = true) {
   s.events = s.events.filter((e) => e.endDay >= d);
   ensureWeather(s);
   // eventi di oggi: anche nelle notizie (si leggono con calma, anche se è successo a gioco chiuso)
-  for (const { h, kind } of sureEvents(s, d)) if (kind !== 'weekly') addNews(s, { icon: h.icon, kind: 'info', text: `Oggi: ${h.name}. ${h.desc}` });
+  for (const { h, kind } of sureEvents(s, d)) if (kind !== 'weekly') addNews(s, { icon: h.icon, kind: 'info', text: `Oggi: ${h.name}. ${h.desc}`, cat: 'eventi', go: 'calendar' });
   if (announce) {
     for (const { h, kind } of sureEvents(s, d)) if (kind !== 'weekly') toast(`${h.icon} Oggi: ${h.name}`, 'info');
     const w = weatherOf(s, d);
@@ -99,7 +99,7 @@ export function updateEvents(s: GameState, announce = true) {
       const def = pick(pool);
       const len = randInt(def.minDays, def.maxDays);
       s.events.push({ id: 'ev' + s.eventSeq++, defId: def.id, startDay: start, endDay: start + len - 1 });
-      addNews(s, { icon: '📅', kind: 'info', text: `In arrivo tra ${start - d} giorni: ${def.icon} ${def.name}. ${def.desc}` });
+      addNews(s, { icon: '📅', kind: 'info', text: `In arrivo tra ${start - d} giorni: ${def.icon} ${def.name}. ${def.desc}`, cat: 'eventi', go: 'calendar' });
       if (announce) toast(`📅 In arrivo: ${def.icon} ${def.name}`, 'info');
     }
   }

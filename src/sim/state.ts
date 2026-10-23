@@ -196,6 +196,14 @@ export interface NewsItem {
   biz?: string;
   /** scelta da fare (es. "Ripara subito €X"): sparisce quando è fatta o il problema è finito */
   action?: { kind: 'repair' | 'strike'; cost: number };
+  /** filtro della finestra Notizie */
+  cat?: 'attivita' | 'eventi' | 'soldi' | 'palazzi';
+  /** dove porta toccandola: `biz:<id>|<scheda>`, `report:<id>`, `agency:<scheda>`, `calendar`, `plot:<id>` */
+  go?: string;
+  /** serve un'azione del player (filtro "Da fare") finché il problema c'è: vedi `newsTodo` in sim/news.ts */
+  todo?: 'trouble' | 'rival' | 'crisis' | 'debt' | 'build' | 'staff' | 'inspect';
+  /** toccata: le cose "da fare" senza un problema che si vede (dimissioni, multa) escono dal filtro */
+  done?: boolean;
 }
 
 export interface PlotState {

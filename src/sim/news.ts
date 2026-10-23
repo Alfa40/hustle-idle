@@ -23,3 +23,9 @@ export function markNewsRead(s: GameState) {
   s.newsSeen = s.newsSeq ?? 0;
   bus.emit('news');
 }
+
+/** filtri della finestra Notizie */
+export const NEWS_FILTERS: [string, string][] = [['tutte', 'Tutte'], ['dafare', '❗ Da fare'], ['attivita', '🏢 Attività'], ['eventi', '📅 Eventi'], ['soldi', '💰 Soldi'], ['palazzi', '🏗️ Palazzi']];
+
+/** categoria (le notizie di prima non l'avevano: attività se parlano di un'attività, se no eventi) */
+export const newsCat = (n: NewsItem) => n.cat ?? (n.biz ? 'attivita' : 'eventi');

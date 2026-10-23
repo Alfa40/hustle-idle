@@ -173,7 +173,8 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
     'panel:news': {
       steps: [
         { say: '📰 Qui arriva tutto: eventi, resoconti, conti e problemi' },
-        { at: `${M} .card.news-new, ${M} .card`, say: 'Le nuove sono segnate: leggile con calma' },
+        { at: g('news-filters'), say: '❗ Filtra: "Da fare" mostra cosa sistemare' },
+        { at: `${M} .card.news-new, ${M} .card`, say: 'Tocca una notizia: vai dove si sistema' },
         { at: btnStart('newsAct:'), say: '🔧 Alcune hanno un tasto per risolvere subito' },
       ],
     },

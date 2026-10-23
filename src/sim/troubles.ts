@@ -41,11 +41,11 @@ export function dailyTroubles(s: GameState) {
       if (truck) {
         const cost = Math.max(300, Math.round((b.boughtFor * T.TOW_SHARE) / 10) * 10);
         b.broken = { kind: 'panne', cost, until: s.minutes + 2 * 1440 };
-        addNews(s, { icon: '🚧', kind: 'bad', text: `${name(b)}: furgone in panne, fermo 2 giorni. Carro attrezzi per ripartire subito`, biz: b.id, action: { kind: 'repair', cost } });
+        addNews(s, { icon: '🚧', kind: 'bad', text: `${name(b)}: furgone in panne, fermo 2 giorni. Carro attrezzi per ripartire subito`, biz: b.id, action: { kind: 'repair', cost }, cat: 'attivita', go: `biz:${b.id}|panoramica`, todo: 'trouble' });
       } else {
         const cost = Math.max(500, Math.round((b.boughtFor * T.REPAIR_SHARE) / 10) * 10);
         b.broken = { kind: 'guasto', cost };
-        addNews(s, { icon: '🔧', kind: 'bad', text: `${name(b)}: macchinario guasto, lavora a metà finché non lo ripari`, biz: b.id, action: { kind: 'repair', cost } });
+        addNews(s, { icon: '🔧', kind: 'bad', text: `${name(b)}: macchinario guasto, lavora a metà finché non lo ripari`, biz: b.id, action: { kind: 'repair', cost }, cat: 'attivita', go: `biz:${b.id}|panoramica`, todo: 'trouble' });
       }
       toast(`🔧 Guasto: ${bizType(b.type).name}. Guarda le Notizie`, 'bad');
     }
@@ -54,7 +54,7 @@ export function dailyTroubles(s: GameState) {
       const stolen = Math.max(100, Math.round(b.yesterday.revenue * rnd(T.THEFT_MIN, T.THEFT_MAX)));
       const loss = youPay(b, stolen);
       s.money -= loss;
-      addNews(s, { icon: '🕵️', kind: 'bad', text: `${name(b)}: furto di ${euro(stolen)}${b.insured ? `, l'assicurazione ne copre ${euro(stolen - loss)}` : ''}`, biz: b.id });
+      addNews(s, { icon: '🕵️', kind: 'bad', text: `${name(b)}: furto di ${euro(stolen)}${b.insured ? `, l'assicurazione ne copre ${euro(stolen - loss)}` : ''}`, biz: b.id, cat: 'soldi', go: `biz:${b.id}|panoramica` });
       toast(`🕵️ Furto: −${euro(loss)}`, 'bad');
     }
     // ispezione: attività trascurata → multa e fama in meno, curata → fama in più
@@ -68,11 +68,11 @@ export function dailyTroubles(s: GameState) {
         s.money -= fine;
         fame(s, b, -T.FINE_FAME);
         const why = !roles ? 'manca personale' : (w.lostStock ?? 0) > 0 ? 'magazzino spesso vuoto' : 'troppi clienti persi';
-        addNews(s, { icon: '📋', kind: 'bad', text: `${name(b)}: ispezione, multa di ${euro(fine)} (${why}). Fama in calo`, biz: b.id });
+        addNews(s, { icon: '📋', kind: 'bad', text: `${name(b)}: ispezione, multa di ${euro(fine)} (${why}). Fama in calo`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'inspect' });
         toast(`📋 Multa: −${euro(fine)}`, 'bad');
       } else {
         fame(s, b, T.PASS_FAME);
-        addNews(s, { icon: '📋', kind: 'good', text: `${name(b)}: ispezione superata, tutto in regola. Fama in aumento`, biz: b.id });
+        addNews(s, { icon: '📋', kind: 'good', text: `${name(b)}: ispezione superata, tutto in regola. Fama in aumento`, biz: b.id, cat: 'attivita', go: `report:${b.id}` });
       }
     }
     // concorrenza: un rivale apre vicino
@@ -80,7 +80,7 @@ export function dailyTroubles(s: GameState) {
       const cut = rnd(T.RIVAL_CUT[0], T.RIVAL_CUT[1]);
       const days = Math.round(rnd(T.RIVAL_DAYS[0], T.RIVAL_DAYS[1]));
       b.rival = { until: s.minutes + days * 1440, cut };
-      addNews(s, { icon: '🏪', kind: 'warn', text: `${name(b)}: un rivale ha aperto vicino, −${Math.round(cut * 100)}% clienti per ${days} giorni. Pubblicità e look aiutano`, biz: b.id });
+      addNews(s, { icon: '🏪', kind: 'warn', text: `${name(b)}: un rivale ha aperto vicino, −${Math.round(cut * 100)}% clienti per ${days} giorni. Pubblicità e look aiutano`, biz: b.id, cat: 'attivita', go: `biz:${b.id}|migliorie`, todo: 'rival' });
     }
     const tired = busy(s, b);
     // dimissioni: più facili se lavorano troppo
@@ -89,14 +89,14 @@ export function dailyTroubles(s: GameState) {
       if (list.length > 1) {
         const e = list[Math.floor(Math.random() * list.length)];
         b.staff = b.staff.filter((x) => x !== e);
-        addNews(s, { icon: '👋', kind: 'bad', text: `${name(b)}: ${e.name.split(' ')[0]} ha lasciato il lavoro${tired ? ' (troppo lavoro)' : ''}. Assumi qualcuno`, biz: b.id });
+        addNews(s, { icon: '👋', kind: 'bad', text: `${name(b)}: ${e.name.split(' ')[0]} ha lasciato il lavoro${tired ? ' (troppo lavoro)' : ''}. Assumi qualcuno`, biz: b.id, cat: 'attivita', go: `biz:${b.id}|personale`, todo: 'staff' });
       }
     }
     // sciopero: raro, con l'attività in crisi o il personale sotto sforzo
     if (!b.strike && ((b.redMonths ?? 0) >= 2 || tired) && Math.random() < T.STRIKE * mgr * calm) {
       const cost = Math.max(200, Math.round(b.staff.reduce((a, e) => a + e.salary, 0) * 0.1 / 10) * 10);
       b.strike = { until: s.minutes + 1440, cost };
-      addNews(s, { icon: '✊', kind: 'bad', text: `${name(b)}: sciopero, chiusa per un giorno. Un premio ai dipendenti lo ferma subito`, biz: b.id, action: { kind: 'strike', cost } });
+      addNews(s, { icon: '✊', kind: 'bad', text: `${name(b)}: sciopero, chiusa per un giorno. Un premio ai dipendenti lo ferma subito`, biz: b.id, action: { kind: 'strike', cost }, cat: 'attivita', go: `biz:${b.id}|panoramica`, todo: 'trouble' });
       toast(`✊ Sciopero: ${bizType(b.type).name}`, 'bad');
     }
   }

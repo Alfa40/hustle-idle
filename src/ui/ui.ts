@@ -9,11 +9,12 @@ import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, ZONE_COST, type SizeId, type WorkId } from '../config/plots';
 import { bizHealth, HEALTH_TAG, monthEnd } from '../sim/crisis';
-import { markNewsRead, unreadNews } from '../sim/news';
+import { markNewsRead, NEWS_FILTERS, newsCat, unreadNews } from '../sim/news';
 import { dailyTroubles, insuranceCost, solveTrouble, troubleActive, troubleCost } from '../sim/troubles';
 import { buildCost, buyPlot, fameOk, plotFame, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
+import type { NewsItem } from '../sim/state';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
 import { settingsAction, settingsHtml } from './settingsview';
@@ -3272,18 +3273,34 @@ export class UI {
       title: '📰 Notizie',
       color: '#2d6cdf',
       render: () => {
-        const list = s.news ?? [];
+        const all = s.news ?? [];
+        const f = this.newsFilter;
+        const inCat = (n: NewsItem) => f === 'tutte' || (f === 'dafare' ? this.newsTodo(n) : newsCat(n) === f);
+        const list = all.filter(inCat);
+        const count = (k: string) => all.filter((n) => (k === 'tutte' ? true : k === 'dafare' ? this.newsTodo(n) : newsCat(n) === k)).length;
+        const chips = NEWS_FILTERS.filter(([k]) => k === 'tutte' || k === 'dafare' || count(k))
+          .map(([k, label]) => `<button class="chip ${f === k ? 'on' : ''}" data-a="nf:${k}">${label} <b>${count(k)}</b></button>`).join('');
         const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
-        const help = points('Qui arriva tutto: eventi, resoconti, conti e problemi', 'Tocca una notizia di un\'attività per aprirla', '4 mesi di fila in perdita: l\'attività fallisce', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`);
-        if (!list.length) return `${debt}${help}<div class="card center muted">Ancora nessuna notizia: qui arriveranno eventi, resoconti e problemi delle attività.</div>`;
-        return `${debt}${help}${list.map((n) => {
+        const help = points('Qui arriva tutto: eventi, resoconti, conti e problemi', 'Da fare: le notizie che chiedono una tua mossa', 'Tocca una notizia per andare dove si sistema', '4 mesi di fila in perdita: l\'attività fallisce');
+        const empty = f === 'dafare' ? '✅ Niente da fare: è tutto a posto' : all.length ? 'Nessuna notizia di questo tipo' : 'Ancora nessuna notizia: qui arriveranno eventi, resoconti e problemi delle attività.';
+        return `<div class="chips" data-g="news-filters">${chips}</div><!--tabs-->${debt}${help}${list.length ? list.map((n) => {
           const nb = n.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
           const act = n.action && nb && troubleActive(s, nb, n.action.kind) ? this.troubleBtn(nb, n.action.kind, `newsAct:${n.id}`) : '';
-          return `<div class="card news-${n.kind}${n.id > seen ? ' news-new' : ''}"${nb ? ` data-a="open:${nb.id}" style="cursor:pointer"` : ''}><div class="row"><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${n.id > seen ? '<b class="news-tag">Nuova</b> · ' : ''}${dayName(n.day)}</div></div></div>${act}</div>`;
-        }).join('')}`;
+          const go = this.newsCanGo(n);
+          const todo = this.newsTodo(n);
+          return `<div class="card news-${n.kind}${n.id > seen ? ' news-new' : ''}"${go ? ` data-a="ngo:${n.id}" style="cursor:pointer"` : ''}><div class="row"><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div>
+            <div class="muted small">${n.id > seen ? '<b class="news-tag">Nuova</b> · ' : ''}${todo ? '<b class="bad">Da fare</b> · ' : ''}${dayName(n.day)}</div></div>${go ? '<span class="grp-arrow">›</span>' : ''}</div>${act}</div>`;
+        }).join('') : `<div class="card center muted">${empty}</div>`}`;
       },
       actions: {
-        open: (id) => this.openBusiness(id),
+        nf: (k) => (this.newsFilter = k),
+        // va dove la notizia si sistema (gestione, personale, resoconto, calendario, terreno…)
+        ngo: (id) => {
+          const n = (s.news ?? []).find((x) => x.id === +id);
+          if (!n) return;
+          if (n.todo === 'staff' || n.todo === 'inspect') n.done = true;
+          this.newsGo(n);
+        },
         // imprevisto dalla notizia: ripara, carro attrezzi o premio ai dipendenti
         newsAct: (id) => {
           const n = (s.news ?? []).find((x) => x.id === +id);
@@ -3292,6 +3309,42 @@ export class UI {
         },
       },
     });
+  }
+
+  /** filtro scelto nella finestra Notizie (resta finché il gioco è aperto) */
+  private newsFilter = 'tutte';
+
+  /** la notizia chiede ancora una mossa del player? (filtro "Da fare") */
+  private newsTodo(n: NewsItem) {
+    const s = this.s;
+    if (!n.todo || n.done) return false;
+    const b = n.biz ? s.businesses.find((x) => x.id === n.biz) : undefined;
+    switch (n.todo) {
+      case 'trouble': return !!b && !!n.action && troubleActive(s, b, n.action.kind);
+      case 'rival': return !!b?.rival && s.minutes < b.rival.until;
+      case 'crisis': return !!b && (b.redMonths ?? 0) > 0;
+      case 'debt': return s.money < 0;
+      case 'build': return !!n.go && plotStage(s, n.go.slice(5)) === 'ready';
+      default: return !!b;
+    }
+  }
+
+  /** si può aprire la schermata della notizia? (l'attività esiste ancora) */
+  private newsCanGo(n: NewsItem) {
+    if (!n.go) return !!n.biz && this.s.businesses.some((b) => b.id === n.biz);
+    const id = n.go.startsWith('biz:') ? n.go.slice(4).split('|')[0] : n.go.startsWith('report:') ? n.go.slice(7) : '';
+    return !id || this.s.businesses.some((b) => b.id === id);
+  }
+
+  private newsGo(n: NewsItem) {
+    const go = n.go ?? (n.biz ? `biz:${n.biz}|panoramica` : '');
+    if (go.startsWith('biz:')) {
+      const [id, tab] = go.slice(4).split('|');
+      this.openBusiness(id, tab);
+    } else if (go.startsWith('report:')) this.openReport(go.slice(7));
+    else if (go.startsWith('agency:')) this.openAgency(go.slice(7));
+    else if (go === 'calendar') this.openCalendar();
+    else if (go.startsWith('plot:')) this.openPlot(go.slice(5));
   }
 
   openMissions() {
