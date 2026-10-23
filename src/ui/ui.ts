@@ -4330,7 +4330,7 @@ export class UI {
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
-      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da 29 giorni</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da quasi 2 mesi</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
@@ -4369,7 +4369,7 @@ export class UI {
       // pignoramento: il giorno dopo arriva
       devDebt: () => {
         s.money = Math.min(s.money, -5000);
-        s.negSince = s.minutes - 29 * 1440;
+        s.negSince = s.minutes - (CRISIS.SEIZE_DAYS - 1) * 1440;
         s.negWarn = CRISIS.SEIZE_WARN_AT.length;
         toast('📮 Domani il pignoramento (dormi o +1 giorno)', 'info');
       },

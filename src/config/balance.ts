@@ -26,9 +26,9 @@ export const CRISIS = {
   FAIL_FAME: 0.1,
   /** con i debiti la merce costa di più */
   DEBT_STOCK_MULT: 1.25,
-  /** giorni di gioco col conto sotto zero prima del pignoramento, e quando arrivano gli avvisi */
-  SEIZE_DAYS: 30,
-  SEIZE_WARN_AT: [10, 20, 27],
+  /** giorni di gioco col conto sotto zero prima del pignoramento (2 mesi), e quando arrivano gli avvisi */
+  SEIZE_DAYS: 60,
+  SEIZE_WARN_AT: [20, 40, 55],
   /** al pignoramento le cose si vendono a metà valore; fama totale persa */
   SEIZE_SHARE: 0.5,
   SEIZE_FAME: 0.05,
