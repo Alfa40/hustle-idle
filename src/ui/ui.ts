@@ -28,6 +28,7 @@ import { MapScreen } from './mapscreen';
 import { ACCESSORIES, accById, ACC_SLOT_NAME, STYLES, type AccSlot } from '../world/style';
 import { EdgePointers } from './pointers';
 import { bus, toast } from '../sim/bus';
+import { forgetJobTold } from './jobtutorial';
 import { bizReport, ensurePartials } from '../sim/report';
 import { inShift, shiftText, shortRanges } from '../sim/shifts';
 import { demandFactors, demandForecast, perDay } from '../sim/market';
@@ -4498,6 +4499,7 @@ export class UI {
       },
       devMorning: () => this.game.sleep(),
       devTut: () => {
+        forgetJobTold();
         s.jobTutorials = [];
         s.bizTutorials = [];
         this.guide.reset();
