@@ -642,7 +642,14 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
 /** Perché un cliente se n'è andato (per gli avvisi dei resoconti). */
 export type LostWhy = 'staff' | 'stock' | 'queue';
 
+/** la simulazione gira col gioco aperto? (a gioco chiuso fama persa attenuata: FAME.OFFLINE_FACTOR) */
+let simOnline = true;
+export const setSimOnline = (v: boolean) => (simOnline = v);
+export const isSimOnline = () => simOnline;
+
 export function lostCustomer(b: Business, why?: LostWhy, s?: GameState) {
+  // un cliente perso toglie fama ai settori dell'attività
+  if (s) for (const k of bizType(b.type).skills) addFame(s, k, -FAME.PER_LOST * (simOnline ? 1 : FAME.OFFLINE_FACTOR));
   b.today.lost++;
   b.month.lost++;
   const w = s ? weekOf(s, b) : b.week;
@@ -820,7 +827,7 @@ export function completeOrder(s: GameState, b: Business, orderId: number, stars:
   if (!o) return 0;
   b.orders = b.orders.filter((x) => x !== o);
   if (stars <= 0) {
-    lostCustomer(b);
+    lostCustomer(b, undefined, s);
     return 0;
   }
   return recordSale(s, b, o.pid, true, 0.75 + stars * 0.15);

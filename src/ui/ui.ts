@@ -1488,7 +1488,7 @@ export class UI {
     }
     // mercato
     const zones: ZoneId[] = ['periferia', 'residenziale', 'centro'];
-    return points("Numero = <b>clienti all'ora</b> (servizi: <b>ordini all'ora</b>) di oggi", 'Cambia con stagioni, meteo, eventi e fama', 'Apri dove i numeri sono più alti', 'Metti in vendita i più richiesti, togli quelli a zero', 'Se ne perdi troppi: assumi o migliora (vedi Resoconti)') +
+    return points("Numero = <b>clienti all'ora</b> (servizi: <b>ordini all'ora</b>) di oggi", 'Cambia con stagioni, meteo, eventi e fama', 'Apri dove i numeri sono più alti', 'Metti in vendita i più richiesti, togli quelli a zero', 'Se ne perdi troppi: assumi o migliora (vedi Resoconti)', 'Ogni cliente perso ti toglie fama') +
       BUSINESS_TYPE_IDS.filter((t) => bizType(t).products.length).map((t) => {
         const def = bizType(t);
         const fm = fameMultiplier(s, t);
@@ -3670,7 +3670,7 @@ export class UI {
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(x - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div>
             ${lines || biz ? `<div class="career-lines">${lines}${biz}</div>` : ''}</div>`;
         }).join('');
-        return `${points('Livello del settore = somma dei suoi lavori e attività', `Ogni ${EVOLVE_EVERY} livelli un lavoro si evolve`, 'La fama sale anche coi dipendenti, ma più piano', 'Più fama = più clienti e offerte migliori')}${skills}`;
+        return `${points('Livello del settore = somma dei suoi lavori e attività', `Ogni ${EVOLVE_EVERY} livelli un lavoro si evolve`, 'La fama sale coi clienti serviti, i lavoretti e le missioni', 'Ogni cliente perso toglie fama (5 volte un servito)', 'Lavoretti falliti tolgono fama; ogni giorno ne cala un po\'', 'Più fama = più clienti e offerte migliori')}${skills}`;
       },
       actions: {},
     });

@@ -3,7 +3,7 @@ import { cloudSave } from './sim/account';
 import { fetchFriendRequests, fetchFriends, ping as pingOnline, submit as submitScore, type FriendEntry, type FriendRequest } from './sim/leaderboard';
 import { logoPlate, logoSprite, type Logo } from './logo';
 import { model, preload } from './assets';
-import { BUSINESS, JOB, jobDifficulty, TIME } from './config/balance';
+import { BUSINESS, FAME, JOB, jobDifficulty, TIME } from './config/balance';
 import { jobInfo, JOBS, type JobType } from './config/jobs';
 import { LOTS, OLD_HALF, WS } from './config/map';
 import { PRODUCTS, type ProductId } from './config/products';
@@ -1448,7 +1448,7 @@ export class Game {
       missionProgress(s, 'jobType', { jobType: offer.type });
       if (stars === 3) missionProgress(s, 'stars3');
     } else {
-      fame = -1;
+      fame = -FAME.FAIL_PENALTY;
       addFame(s, def.skill, fame);
       playStats(s).jobsFailed++;
     }
@@ -1477,7 +1477,7 @@ export class Game {
       const job = PRODUCTS[order.pid].job;
       if (job) addJobXp(s, job.line, Math.round(xp / 2));
       missionProgress(s, 'served');
-    } else addFame(s, def.skills[0], -1);
+    } else addFame(s, def.skills[0], -FAME.FAIL_PENALTY);
     if (stars > 0) playStats(this.state).orders++;
     this.ui.openOrderResult(biz, order, stars, earned, xp);
     this.save();

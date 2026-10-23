@@ -48,8 +48,8 @@ export interface SizeDef {
 
 export const SIZES: Record<SizeId, SizeDef> = {
   piccolo: { name: 'Palazzina', icon: '🏪', shops: 3, cost: 450_000, days: 3, fame: 0, upkeep: 4000 },
-  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 1_100_000, days: 6, fame: 700, upkeep: 10_000 },
-  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 2_500_000, days: 10, fame: 1500, upkeep: 25_000 },
+  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 1_100_000, days: 6, fame: 7000, upkeep: 10_000 },
+  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 2_500_000, days: 10, fame: 20000, upkeep: 25_000 },
 };
 
 /** costruire e sistemare costa di più dove c'è più passaggio */
@@ -57,7 +57,7 @@ export const ZONE_COST: Record<ZoneId, number> = { periferia: 1, residenziale: 1
 /** spese del palazzo al mese per ogni negozio aperto dentro (al posto dell'affitto) */
 export const FLOOR_RENT: Record<ZoneId, number> = { periferia: 600, residenziale: 1200, centro: 2500 };
 /** fama totale per comprare un terreno in questa zona (in centro solo chi è già famoso) */
-export const ZONE_FAME: Record<ZoneId, number> = { periferia: 0, residenziale: 300, centro: 700 };
+export const ZONE_FAME: Record<ZoneId, number> = { periferia: 0, residenziale: 3500, centro: 7000 };
 /** con una tua impresa di costruzioni o ristrutturazioni i lavori del terreno costano la metà */
 export const OWN_CREW_DISCOUNT = 0.5;
 

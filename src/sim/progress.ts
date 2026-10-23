@@ -86,8 +86,9 @@ export const totalLevel = (s: GameState) => SKILL_IDS.reduce((a, k) => a + skill
 
 /** ranghi per fama totale (profilo; anche le cose che chiedono fama dicono il rango) */
 export const FAME_RANKS = [
-  [0, 'Squattrinato'], [15, 'Tuttofare'], [50, 'Lavoratore stimato'], [120, 'Piccolo imprenditore'],
-  [300, 'Imprenditore'], [700, 'Uomo d\'affari'], [1500, 'Magnate'],
+  [0, 'Squattrinato'], [50, 'Tuttofare'], [200, 'Lavoratore stimato'], [600, 'Piccolo imprenditore'],
+  [1500, 'Imprenditore'], [3500, 'Commerciante affermato'], [7000, 'Uomo d\'affari'], [12000, 'Dirigente'],
+  [20000, 'Magnate'], [35000, 'Tycoon'], [60000, 'Leggenda della città'], [100000, 'Mito'],
 ] as const;
 
 /** Rango complessivo del giocatore mostrato nel profilo. */

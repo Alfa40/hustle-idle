@@ -18,12 +18,29 @@ export const TIME = {
 export const START_MONEY = 50;
 
 export const FAME = {
-  /** moltiplicatore domanda: 1 + fama/(fama+K) → massimo ×2 */
-  K: 150,
-  /** fama per ogni vendita fatta dai dipendenti (lenta) */
-  PER_AUTO_SALE: 0.01,
-  PER_MANUAL_SALE: 0.12,
-  FAIL_PENALTY: 1,
+  /** moltiplicatore domanda: 1 + fama/(fama+K) → massimo ×2 (fama media dei settori dell'attività) */
+  K: 2000,
+  /** fama per ogni vendita fatta dai dipendenti (lenta: la scalata dura mesi) */
+  PER_AUTO_SALE: 0.002,
+  PER_MANUAL_SALE: 0.025,
+  /** fama tolta per ogni cliente perso (5 volte una vendita: perdere più di 1 cliente su 6 fa scendere) */
+  PER_LOST: 0.01,
+  /** lavoretto o ordine fallito */
+  FAIL_PENALTY: 2,
+  /** calo giornaliero della fama (parte della fama di ogni settore, per giorno di gioco) */
+  DECAY_DAY: 0.0005,
+  /** a gioco chiuso fama persa e calo valgono meno (attenuati) */
+  OFFLINE_FACTOR: 0.5,
+  /** missioni: la fama totale fa crescere obiettivi e premi in soldi (scala = 1 + fama / questo) */
+  MISSION_SCALE: 800,
+  /**
+   * fama data da una missione: fissa + fama/DIV (cresce piano). Stima con 3 missioni al giorno, 1 a settimana e
+   * qualche lavoretto: Magnate (20.000) dopo ~40 ore di gioco attivo, Mito (100.000) dopo ~140
+   */
+  DAILY_MISSION: 8,
+  DAILY_MISSION_DIV: 4000,
+  WEEKLY_MISSION: 30,
+  WEEKLY_MISSION_DIV: 1000,
 };
 
 export const JOB = {

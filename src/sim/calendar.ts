@@ -1,4 +1,4 @@
-import { BUSINESS, TIME } from '../config/balance';
+import { BUSINESS, FAME, TIME } from '../config/balance';
 import { ALL_AUTO } from '../config/business';
 import { EVENTS, WEATHER } from '../config/events';
 import { ensureWeather, sureEvents, weatherOf } from './effects';
@@ -7,7 +7,7 @@ import { readyJobTypes } from '../config/careers';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
-import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates } from './economy';
+import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates, setSimOnline } from './economy';
 import { weeklyReports } from './report';
 import { totalFame, totalLevel } from './progress';
 import {
@@ -17,6 +17,7 @@ import {
 
 /** Avanza il tempo di gioco gestendo i cambi di giorno. */
 export function advance(s: GameState, minutes: number, efficiency = 1, online = true) {
+  setSimOnline(online);
   // a passi di massimo 10 minuti così i cambi di ora/giorno sono precisi
   while (minutes > 0) {
     const step = Math.min(minutes, 10);
@@ -50,6 +51,9 @@ export function newDay(s: GameState, online = true) {
     b.today = emptyLedger();
   }
   s.todayEarned = 0;
+  // la fama cala piano ogni giorno (a gioco chiuso meno): chi smette di curare il gioco scende
+  const decay = FAME.DECAY_DAY * (online ? 1 : FAME.OFFLINE_FACTOR);
+  for (const k of Object.keys(s.fame) as (keyof typeof s.fame)[]) s.fame[k] *= 1 - decay;
   // domanda del giorno: cammino casuale morbido
   for (const p of PRODUCT_IDS) {
     s.demandRand[p] = Math.min(1.5, Math.max(0.6, s.demandRand[p] * 0.6 + randDemand() * 0.4));
@@ -90,8 +94,17 @@ export function updateEvents(s: GameState, announce = true) {
 
 // ---------------- missioni giornaliere ----------------
 
+/**
+ * Fama di una missione: fissa più una parte piccola della fama che hai (prima cresceva quanto la fama stessa:
+ * palla di neve, in poche ore si arrivava in cima). Vedi FAME in config/balance.ts.
+ */
+export function missionFame(s: GameState, weekly: boolean) {
+  const f = totalFame(s);
+  return Math.round((weekly ? FAME.WEEKLY_MISSION + f / FAME.WEEKLY_MISSION_DIV : FAME.DAILY_MISSION + f / FAME.DAILY_MISSION_DIV) * 10) / 10;
+}
+
 export function genMissions(s: GameState) {
-  const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
+  const scale = 1 + totalFame(s) / FAME.MISSION_SCALE + (totalLevel(s) - 4) * 0.12;
   // stesso giorno (es. partita salvata con meno missioni): si tengono quelle che ci sono e si aggiungono le altre
   const list: Mission[] = s.missionsDay === day(s) ? [...s.missions] : [];
   // "servi clienti di persona": solo se si può entrare in un'attività (con ALL_AUTO non si entra mai)
@@ -132,7 +145,7 @@ export function genMissions(s: GameState) {
         m = { kind: 'earn', text: `💶 Guadagna €${n} oggi`, target: n, reward: n * 0.4 };
       }
     }
-    list.push({ ...m, id: `m${day(s)}_${list.length}`, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: 2 + scale });
+    list.push({ ...m, id: `m${day(s)}_${list.length}`, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: missionFame(s, false) });
   }
   s.missions = list;
   s.missionsDay = day(s);
@@ -155,7 +168,7 @@ export function ensureWeekly(s: GameState) {
   s.weeklyWeek = w;
   s.weeklyVer = WEEKLY_VER;
   s.weekEarned = 0;
-  const scale = 1 + totalFame(s) / 60 + (totalLevel(s) - 4) * 0.12;
+  const scale = 1 + totalFame(s) / FAME.MISSION_SCALE + (totalLevel(s) - 4) * 0.12;
   // "servi clienti di persona": solo se si può entrare in un'attività (con ALL_AUTO non si entra mai)
   const owns = !ALL_AUTO && s.businesses.length > 0;
   const pool: Mission['kind'][] = ['jobs', 'stars3', 'variety', 'earn', ...(owns ? ['served' as const] : [])];
@@ -192,7 +205,7 @@ export function ensureWeekly(s: GameState) {
       }
     }
     const skill = kind === 'served' ? 'clientela' : pick(SKILL_IDS);
-    return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: 6 + 2 * scale, types: [] };
+    return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: missionFame(s, true), types: [] };
   });
 }
 
