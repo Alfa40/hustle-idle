@@ -101,6 +101,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 - **Attività sbloccate dai lavoretti** (`BIZ_LINES`, `bizUnlock`): un'attività base si apre quando un suo lavoretto arriva alla **prima evoluzione (Liv. 10)**; ogni evoluzione dell'attività vuole il lavoretto del ramo all'evoluzione dopo (1ª evoluzione Liv. 20, 2ª Liv. 30, 3ª Liv. 40). Es. 🚚 Food truck: Cucina, Bar o Sala al Liv. 10; Trattoria: Cucina al Liv. 20. All'agenzia le attività bloccate si vedono con "🔒 Porta … al Liv. 10 (ora 7)", nell'evoluzione sotto il tasto.
 - **Tutorial obbligatorio della prima attività** (`unlock:firstbiz`): quando il primo lavoretto arriva al Liv. 10. Se mancano i soldi per il posto più economico il comune dà un contributo (una volta). Si compra dall'Attività anche lontano dall'agenzia, poi giro della gestione (Panoramica, Prodotti, Migliorie, Evoluzione) e subito dopo la guida per assumere (`unlock:biz`).
 - Comandi developer (sezione 🧭 Campi): un lavoretto al Liv. 10, tutti al Liv. 10, +5 livelli, livello per il prossimo campo, apri Nuovi mercati, rifai la scelta del campo.
+- Comandi developer (sezione ⭐ Livello e fama): livello del giocatore −5/−1/+1/+5 (sale o scende il settore principale), fama ±100/±1000/+10.000 (divisa tra i campi aperti) e Azzera; le stesse righe per ogni settore. Scendendo di livello si toglie prima l'esperienza delle attività e poi, in proporzione, quella dei lavoretti del settore (scendono anche loro).
 
 ## 7. Attività
 

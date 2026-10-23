@@ -41,7 +41,7 @@ import {
   refreshCandidates, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly, palacesMonthly,
   isAutoBiz,
 } from '../sim/economy';
-import { addFame, addMoney, FAME_RANKS, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
+import { addFame, addMoney, FAME_RANKS, lineLevel, lineXp, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
 import { CAREER_LINES, careerLine, EVOLVE_EVERY, linesOf } from '../config/careers';
 import { bizLockText, bizUnlock, chooseMainField, FIELD_STEPS, FIELDS, fieldOpen, mainField, needsField, nextFieldStep, openField, openFields, readyJobs } from '../sim/fields';
 import { devApp, devGame } from '../dev';
@@ -4561,6 +4561,14 @@ export class UI {
         <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello della linea: ${[1, 10, 20, 30, 40].map((v) => `<button class="btn sm sec" data-a="devLvl:${l.id}|${v}">${v}</button>`).join('')}</div></div>`).join('');
     return `<div class="card hl"><h3>🛠️ Partita developer</h3><p class="small" style="margin:0">Non va in classifica e non risulta "sta giocando" agli amici. 💰 ${euro(s.money)}</p>
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
+      <h3 class="sec-title">⭐ Livello e fama</h3>
+      <div class="card"><div class="small">Livello del giocatore <b>${totalLevel(s)}</b> · fama totale <b>${Math.round(totalFame(s))}</b> · ${rank(s)}</div>
+        <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello: ${[-5, -1, 1, 5].map((d) => `<button class="btn sm sec" data-a="devPLvl:${d}">${d > 0 ? '+' : ''}${d}</button>`).join('')}</div>
+        <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Fama: ${[-1000, -100, 100, 1000, 10000].map((d) => `<button class="btn sm sec" data-a="devPFame:${d}">${d > 0 ? '+' : ''}${d}</button>`).join('')}<button class="btn sm sec" data-a="devPFame:0">Azzera</button></div>
+        <p class="muted small explain" style="margin:6px 0 0">Livello: sale o scende il tuo settore principale. Fama: divisa tra i campi aperti. Sotto, settore per settore.</p></div>
+      ${SKILL_IDS.filter((k) => FIELDS.includes(k)).map((k) => `<div class="card"><div class="row between"><b>${SKILLS[k].icon} ${SKILLS[k].name}</b><span class="tag">Liv. ${skillLevel(s, k)} · fama ${Math.round(s.fame[k])}</span></div>
+        <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello: ${[-5, -1, 1, 5].map((d) => `<button class="btn sm sec" data-a="devSLvl:${k}|${d}">${d > 0 ? '+' : ''}${d}</button>`).join('')}</div>
+        <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Fama: ${[-1000, -100, 100, 1000].map((d) => `<button class="btn sm sec" data-a="devSFame:${k}|${d}">${d > 0 ? '+' : ''}${d}</button>`).join('')}<button class="btn sm sec" data-a="devSFame:${k}|0">Azzera</button></div></div>`).join('')}
       ${s.fields ? `<h3 class="sec-title">🧭 Campi di carriera</h3>
       <div class="card"><div class="small">Campi: <b>${openFields(s).map((k) => SKILLS[k].icon + ' ' + SKILLS[k].name).join(' · ') || 'nessuno'}</b> · livello giocatore <b>${totalLevel(s)}</b></div>
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm blue" data-a="devFirst">🔟 Un lavoretto al Liv. 10 (prima attività)</button><button class="btn sm blue" data-a="devAll10">🔓 Tutti i lavoretti dei miei campi al Liv. 10</button><button class="btn sm blue" data-a="devPlus5">⏫ +5 livelli ai lavoretti dei miei campi</button><button class="btn sm blue" data-a="devNextField">🧭 Livello per il prossimo campo</button><button class="btn sm sec" data-a="devMarkets">🧭 Apri Nuovi mercati</button><button class="btn sm sec" data-a="devResetField">🔁 Rifai la scelta del campo</button></div>
@@ -4587,6 +4595,25 @@ export class UI {
   private devActions(): Actions {
     const s = this.s;
     const xpFor = (l: number) => LEVEL.xpForLevel(Math.max(1, l)) + 1;
+    /**
+     * Livello di un settore a piacere (+d livelli): salendo si aggiunge esperienza "nelle attività" del settore,
+     * scendendo si toglie prima quella e poi, in proporzione, quella dei suoi lavoretti (scendono anche loro).
+     */
+    const setLvl = (k: SkillId, d: number) => {
+      const target = d > 0 || skillLevel(s, k) + d > 1 ? xpFor(skillLevel(s, k) + d) : 0;
+      const cur = sectorXp(s, k);
+      if (target >= cur) s.xp[k] += target - cur;
+      else {
+        let cut = cur - target;
+        const fromBiz = Math.min(s.xp[k], cut);
+        s.xp[k] -= fromBiz;
+        cut -= fromBiz;
+        const lines = CAREER_LINES.filter((l) => l.sector === k);
+        const tot = lines.reduce((a, l) => a + lineXp(s, l.id), 0);
+        if (cut > 0 && tot > 0) for (const l of lines) s.jobXp![l.id] = lineXp(s, l.id) * Math.max(0, 1 - cut / tot);
+      }
+      bus.emit('stats');
+    };
     return {
       devMoney: () => addMoney(s, 1_000_000_000),
       devHour: () => advance(s, 60),
@@ -4624,6 +4651,23 @@ export class UI {
         s.bizTutorials = [];
         this.guide.reset();
         toast('🎓 I tutorial ripartono', 'info');
+      },
+      // livello e fama a piacere
+      devPLvl: (d) => setLvl(mainField(s) ?? 'cucina', +d),
+      devSLvl: (arg) => {
+        const [k, d] = arg.split('|');
+        setLvl(k as SkillId, +d);
+      },
+      devPFame: (d) => {
+        const ks = openFields(s);
+        if (+d === 0) for (const k of SKILL_IDS) s.fame[k] = 0;
+        else for (const k of ks) s.fame[k] = Math.max(0, s.fame[k] + +d / ks.length);
+        bus.emit('stats');
+      },
+      devSFame: (arg) => {
+        const [k, d] = arg.split('|');
+        s.fame[k as SkillId] = +d === 0 ? 0 : Math.max(0, s.fame[k as SkillId] + +d);
+        bus.emit('stats');
       },
       // campi di carriera (sim/fields.ts)
       devFirst: () => {
