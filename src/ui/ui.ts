@@ -1464,6 +1464,9 @@ export class UI {
       const veh = vehiclesMonthly(s);
       const pal = palacesMonthly(s);
       const fixed = sal + rent + bills + veh + pal;
+      // utile stimato di un mese intero: la stima di ogni attività (come nella sua panoramica), meno veicoli e palazzi
+      const est = s.businesses.reduce((a, b) => a + estimateMonthlyProfit(s, b), 0) - veh - pal;
+      const notAuto = s.businesses.filter((b) => !isAutonomous(b)).length;
       const pToday = tRev - tGoods - fixed / D;
       const pMonth = mRev - mGoods - (fixed * dom) / D;
       const neg = (x: number) => (x ? `−${euro(x)}` : euro(0));
@@ -1480,7 +1483,9 @@ export class UI {
         ${veh ? row('🚗 Veicoli', neg(veh / D), neg((veh * dom) / D)) : ''}
         ${pal ? row('🏢 Manutenzione palazzi', neg(pal / D), neg((pal * dom) / D)) : ''}
         ${row('📊 Utile', `<span class="${pToday >= 0 ? 'good' : 'bad'}">${euro(pToday)}</span>`, `<span class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</span>`, 'lv-tot')}
-        ${points('Stipendi, affitto, bollette e veicoli si pagano a fine mese', 'Qui sono divisi per giorno: vedi se guadagni davvero', 'Merce = scorte comprate per i magazzini', "Resoconto di un'attività: toccala in 🏢 Le mie")}</div>`;
+        <div class="row between" style="margin-top:10px" data-g="est-profit"><b>📈 Utile stimato al mese</b><b class="${est >= 0 ? 'good' : 'bad'}">${euro(est)}</b></div>
+        ${notAuto ? `<div class="small muted">${notAuto} ${notAuto === 1 ? 'attività non lavora' : 'attività non lavorano'} da sola: conta solo quello che costa</div>` : ''}
+        ${points('Utile stimato: un mese intero coi turni e la domanda di adesso, meno tutte le spese', 'Stipendi, affitto, bollette e veicoli si pagano a fine mese', 'Qui sono divisi per giorno: vedi se guadagni davvero', 'Merce = scorte comprate per i magazzini', "Resoconto di un'attività: toccala in 🏢 Le mie")}</div>`;
       // dove vanno i soldi nel mese: le spese una per una rispetto agli incassi
       const spend: [string, number][] = [['📦 Merce', mGoods], ['👔 Stipendi', (sal * dom) / D], ['🏠 Affitto', (rent * dom) / D], ['💡 Bollette', (bills * dom) / D], ...(veh ? [['🚗 Veicoli', (veh * dom) / D] as [string, number]] : [])];
       const top = Math.max(1, mRev, ...spend.map((x) => x[1]));
