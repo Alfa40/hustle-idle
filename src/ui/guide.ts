@@ -317,7 +317,11 @@ export class Guide {
     if (t?.el && !this.scrolled) {
       this.scrolled = true;
       const r = t.r;
-      if (r.top < 60 || r.bottom > H - 20 || r.left < 0 || r.right > W) {
+      // coperto da qualcosa che resta fisso (es. il pulsante in fondo alla finestra): si porta al centro anche lui
+      // (si salta lo strato della guida, che copre tutto il resto dello schermo)
+      const top = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2).find((x) => !x.closest('.gd, .gd-bubble, .gd-ring') && x !== this.hand);
+      const covered = !!top && !t.el.contains(top) && !!top.closest('.modal');
+      if (r.top < 60 || r.bottom > H - 20 || r.left < 0 || r.right > W || covered) {
         // anche di lato (schede che scorrono)
         t.el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'auto' });
         t = this.target(st);

@@ -1,6 +1,8 @@
 import { LOTS } from '../config/map';
 import type { Game } from '../game';
+import { bizType } from '../config/business';
 import { chainTypes } from '../sim/chains';
+import type { Business } from '../sim/state';
 import { lotPrice, typesForLot } from '../sim/economy';
 import { moveSide } from '../settings';
 import type { GuideDef, GuideStep } from './guide';
@@ -46,6 +48,20 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
   };
   const cheapest = () => Math.min(...LOTS.map((l) => Math.min(...typesForLot(l.id).map((t) => lotPrice(l.id, t)))));
   const hasBiz = () => s().businesses.length > 0;
+  /** un'attività con una sola persona per reparto: nelle ore di punta perde clienti */
+  const understaffed = (b: Business) => bizType(b.type).roles.every((r) => b.staff.filter((e) => e.role === r).length <= 1);
+  // la prima attività parte con 1 persona per reparto: rischia già di perdere clienti, la guida fa assumere
+  const hireSteps = (): GuideStep[] => [
+    { say: '⚠️ Ha solo 1 persona per reparto' },
+    { say: '😠 Nelle ore di punta perderà clienti: meno soldi e meno fama' },
+    ...hud('biz', '🏢 Rimediamo: tocca Attività'),
+    { at: tab('mie'), say: '🏢 Tocca Le mie', tap: true, if: () => !exists(`${tab('mie')}.on`) },
+    { at: `${btnStart('report:')} .report-more`, say: 'Tocca la tua attività per il resoconto', tap: true },
+    { at: btn('go:personale'), say: '👥 Tocca Personale', tap: true },
+    { at: g('cands'), say: '📝 Questi sono i candidati di oggi' },
+    { at: g('hire-role'), say: '➕ Assumi una persona in più', tap: true },
+    { say: '✅ Ora regge di più. Il resoconto ti dice se serve altra gente' },
+  ];
 
   return {
     // ---------------- la prima volta ----------------
@@ -76,12 +92,14 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
     },
     'unlock:biz': {
       auto: hasBiz,
-      steps: [
-        { say: '🎉 Hai la tua prima attività!' },
-        ...hud('biz', '🏢 La gestisci da qui: tocca Attività'),
-        { at: tab('mie'), say: '🏢 Tocca Le mie', tap: true, if: () => !exists(`${tab('mie')}.on`) },
-        { at: `${btnStart('report:')} .report-more`, say: 'Tocca la tua attività per il resoconto', tap: true },
-      ],
+      covers: ['unlock:hire', 'biz/tab:personale'],
+      steps: [{ say: '🎉 Hai la tua prima attività!' }, ...hireSteps()],
+    },
+    // partite di prima: le attività aprono con 1 persona per reparto, e ora i clienti persi tolgono fama
+    'unlock:hire': {
+      auto: () => (s().guides ?? []).includes('unlock:biz') && s().businesses.some(understaffed),
+      covers: ['biz/tab:personale'],
+      steps: hireSteps(),
     },
     'unlock:chain': {
       auto: () => chainTypes(s()).length > 0,

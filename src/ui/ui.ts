@@ -2619,7 +2619,7 @@ export class UI {
       );
       const cands = group(
         s.candidates.filter((e) => order.includes(e.role)),
-        (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && !isAutoBiz(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}" ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
+        (e) => this.empCard(e, b.type, `<div class="row emp-btns">${hasInterior(b.type) && !isAutoBiz(b.type) && e.role !== 'manager' ? `<button class="btn sm purple" data-a="previewHire:${e.id}">👁️ Prova</button>` : ''}<button class="btn sm good" data-a="hire:${e.id}"${(type.roles as Role[]).includes(e.role) ? ' data-g="hire-role"' : ''} ${e.role === 'manager' && hasManager(b) ? 'disabled' : ''}>Assumi</button></div>`),
         () => '',
       ) || '<p class="muted small">Nessun candidato per questa attività oggi.</p>';
       return `${points(`Per lavorare da sola: ${type.roles.map((r) => roleName(b.type, r).toLowerCase()).join(', ')} + manager`, `Più persone nello stesso reparto = più ${unit} serviti`)}
