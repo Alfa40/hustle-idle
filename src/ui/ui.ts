@@ -36,7 +36,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  allLots, bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  allLots, bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonth, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly, palacesMonthly,
   isAutoBiz,
@@ -1493,15 +1493,19 @@ export class UI {
       const where = `<div class="card"><h3>📊 Entrate e spese del mese</h3>${bar('💰 Incassi', mRev, 'var(--green)')}${spend.map(([n, v]) => bar(n, v, '#eb5757')).join('')}
         <div class="row between" style="margin-top:6px"><b>Spese fisse al mese</b><b>${euro(fixed)}</b></div>
         <div class="small muted">stipendi ${euro(sal)} + affitto ${euro(rent)} + bollette ${euro(bills)}${veh ? ` + veicoli ${euro(veh)}` : ''}</div></div>`;
-      // in alto, grande: quanto incassano e quanto spendono tutte le attività insieme, e cosa resta
+      // in alto, grande: un mese intero stimato (incassi, spese, utile); sotto, piccolo, com'è andato finora
       const sOut = mGoods + (fixed * dom) / D;
-      const totals = `<div class="card tint" data-g="totals"><div class="row between"><h3 style="margin:0">💶 Tutte le attività</h3><span class="muted small">mese ${dom}/${D}</span></div>
+      const ests = s.businesses.map((b) => estimateMonth(s, b));
+      const eRev = ests.reduce((a, e) => a + e.revenue, 0);
+      const eOut = ests.reduce((a, e) => a + e.goods + e.fixed, 0) + veh + pal;
+      const nb = (v: string, cls = '') => `<b class="${cls}" style="white-space:nowrap">${v}</b>`;
+      const totals = `<div class="card tint" data-g="totals"><div class="row between"><h3 style="margin:0">💶 Tutte le attività</h3><span class="muted small">stima di un mese intero</span></div>
         <div class="grid3" style="margin-top:8px">
-          <div class="stat s-green"><b class="money-t">${euro(mRev)}</b><span>💰 guadagni</span></div>
-          <div class="stat s-red"><b class="bad">−${euro(sOut)}</b><span>💸 spese</span></div>
-          <div class="stat ${pMonth >= 0 ? 's-yellow' : 's-red'}"><b class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</b><span>📊 utile</span></div>
+          <div class="stat s-green"><b class="money-t">${euro(eRev)}</b><span>💰 guadagni</span></div>
+          <div class="stat s-red"><b class="bad">−${euro(eOut)}</b><span>💸 spese</span></div>
+          <div class="stat ${est >= 0 ? 's-yellow' : 's-red'}"><b class="${est >= 0 ? 'good' : 'bad'}">${euro(est)}</b><span>📈 utile</span></div>
         </div>
-        <div class="small muted center" style="margin-top:6px">📈 Utile stimato al mese: <b class="${est >= 0 ? 'good' : 'bad'}" style="white-space:nowrap">${euro(est)}</b><br>🧾 Spese al mese: <b class="bad" style="white-space:nowrap">−${euro(fixed)}</b></div></div>`;
+        <div class="small muted center" style="margin-top:6px">Finora (giorno ${dom}/${D}):<br>${nb(euro(mRev), 'money-t')} guadagni · ${nb(`−${euro(sOut)}`, 'bad')} spese · ${nb(euro(pMonth), pMonth >= 0 ? 'good' : 'bad')} utile</div></div>`;
       return totals + money + where;
     }
     // mercato

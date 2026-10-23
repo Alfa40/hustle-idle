@@ -903,20 +903,28 @@ export function payMonth(s: GameState) {
   }
 }
 
-export function estimateMonthlyProfit(s: GameState, b: Business) {
-  if (isCraft(b) || !b.products.length) return -monthlyCosts(s, b).rent - monthlyCosts(s, b).utilities;
+/** Stima di un mese intero coi turni e la domanda di adesso: incassi, merce e spese fisse (affitto, bollette, stipendi). */
+export function estimateMonth(s: GameState, b: Business) {
+  const c = monthlyCosts(s, b);
+  const fullSalaries = b.staff.reduce((a, e) => a + e.salary, 0);
+  const fixed = c.rent + c.utilities + fullSalaries;
+  if (isCraft(b) || !b.products.length) return { revenue: 0, goods: 0, fixed: c.rent + c.utilities };
   // clienti serviti in un giorno con i turni: ora per ora, quanti ne regge chi è di turno
   let perDay = 0;
   if (isAutonomous(b)) {
     const { plan, curve } = shiftsFor(s, b);
     for (let h = BUSINESS.OPEN_HOUR; h < BUSINESS.CLOSE_HOUR; h++) perDay += Math.min(curve[h], plan.capAt(h));
   }
-  const perHour = perDay / (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR);
-  const avgMargin = b.products.reduce((a, p) => a + PRODUCTS[p].price - PRODUCTS[p].cost, 0) / b.products.length;
-  const hours = (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;
-  const c = monthlyCosts(s, b);
-  const fullSalaries = b.staff.reduce((a, e) => a + e.salary, 0);
-  return perHour * hours * avgMargin - c.rent - c.utilities - fullSalaries;
+  const served = (perDay / (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR)) * (BUSINESS.CLOSE_HOUR - BUSINESS.OPEN_HOUR) * 30;
+  const n = b.products.length;
+  const price = b.products.reduce((a, p) => a + PRODUCTS[p].price, 0) / n;
+  const cost = b.products.reduce((a, p) => a + PRODUCTS[p].cost, 0) / n;
+  return { revenue: served * price, goods: served * cost, fixed };
+}
+
+export function estimateMonthlyProfit(s: GameState, b: Business) {
+  const e = estimateMonth(s, b);
+  return e.revenue - e.goods - e.fixed;
 }
 
 /** Stima per l'agenzia: clienti/ora del prodotto migliore e incasso al mese con lo staff base. */
