@@ -57,6 +57,7 @@ Il gioco si usa in verticale e in orizzontale, su telefono e tablet. Le regole c
 - **Una sola città** all'inizio, divisa in **zone** (per esempio periferia, residenziale, centro, zona commerciale).
 - **La posizione conta:** ogni lotto ha un moltiplicatore di **passaggio/domanda** e un **costo** (affitto o acquisto). In centro ci sono più clienti ma costa di più.
 - Le attività si aprono in **lotti disponibili**, distribuiti nelle varie zone.
+- **46 posti in vendita** (15 posteggi per furgoni, 31 negozi), sparsi anche nei quartieri attorno alla città originale: centro 9 (1 posteggio, 8 negozi, da €5500 a €22.000), residenziale 19 (5 posteggi, 14 negozi), periferia 18 (9 posteggi, 9 negozi, da €900). I nuovi stanno in `SPECIAL`/`LOTS` di src/config/map.ts (id `lot10`…`lot38`); 3 parchi sono diventati parchi con piazzola per i posteggi nuovi.
 - Il player **entra nei propri edifici dalla porta d'ingresso**. Dentro c'è la scena interna dell'attività (cucina, cassa, magazzino…).
 - **Traffico senza ingorghi infiniti**: un'auto ferma dietro altre auto da più di 2,5 s, se non è inquadrata dalla camera (o appena esce dalla visuale), riparte da un tratto di strada libero e fuori vista, lontano dal giocatore. Gli ingorghi davanti al giocatore restano finché si vedono; le auto ferme per il giocatore non spariscono
 
