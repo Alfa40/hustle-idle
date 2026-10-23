@@ -1988,6 +1988,39 @@ export class UI {
     return `<button class="btn sm blue" data-a="upg:${id}" ${this.s.money < cost ? 'disabled' : ''}>${upgOf(t[0].type, id).icon} ${upgOf(t[0].type, id).name} → Liv. ${to} (${t.length === bizs.length ? 'tutti' : t.length}) · ${euro(cost)}</button>`;
   }
 
+  /**
+   * Come va la catena, sempre visibile (anche prima dei resoconti dei manager): oggi, mese, spese fisse,
+   * negozi in crisi e imprevisti in corso, e l'assicurazione di tutti i negozi in un tocco.
+   */
+  private chainOverview(bizs: Business[]) {
+    const s = this.s;
+    const D = TIME.DAYS_PER_MONTH;
+    const dom = dayOfMonth(day(s));
+    const tot = (f: (b: Business) => number) => bizs.reduce((a, b) => a + f(b), 0);
+    const tRev = tot((b) => b.today.revenue), tServed = tot((b) => b.today.served), tLost = tot((b) => b.today.lost);
+    const mRev = tot((b) => b.month.revenue), mGoods = tot((b) => b.month.costs);
+    const fixed = tot((b) => { const c = monthlyCosts(s, b); return c.rent + c.utilities + c.salaries; });
+    const profit = mRev - mGoods - (fixed * dom) / D;
+    const lostPct = tServed + tLost ? Math.round((tLost / (tServed + tLost)) * 100) : 0;
+    const crisis = bizs.filter((b) => bizHealth(b) !== 'ok').length;
+    const troubles = bizs.filter((b) => (b.broken && troubleActive(s, b, 'repair')) || (b.strike && troubleActive(s, b, 'strike')) || (b.rival && s.minutes < b.rival.until)).length;
+    const insured = bizs.filter((b) => b.insured).length;
+    const missing = bizs.filter((b) => !b.insured);
+    const insCost = tot((b) => insuranceCost(b));
+    const addCost = missing.reduce((a, b) => a + insuranceCost(b), 0);
+    return `<div class="card" data-g="chain-overview"><h3 style="margin-top:0">📊 Come va la catena</h3>
+      <div class="lv-row lv-head"><span></span><b>Oggi</b><b>Mese (${dom}/${D})</b></div>
+      <div class="lv-row"><span>💰 Incassi</span><b class="money-t">${euro(tRev)}</b><b class="money-t">${euro(mRev)}</b></div>
+      <div class="lv-row"><span>👥 Serviti / persi</span><b>${tServed} / ${tLost}${tLost ? ` <small>(${lostPct}%)</small>` : ''}</b><b></b></div>
+      <div class="lv-row"><span>🧾 Spese fisse</span><b>−${euro(fixed / D)}</b><b>−${euro((fixed * dom) / D)}</b></div>
+      <div class="lv-row lv-tot"><span>📊 Utile del mese</span><b></b><b class="${profit >= 0 ? 'good' : 'bad'}">${euro(profit)}</b></div>
+      ${crisis ? `<div class="small bad" style="margin-top:6px">🟠 ${crisis} ${crisis === 1 ? 'negozio in perdita' : 'negozi in perdita'}: guarda qui sotto</div>` : ''}
+      ${troubles ? `<div class="small bad" style="margin-top:4px">⚡ Imprevisti in corso in ${troubles} ${troubles === 1 ? 'negozio' : 'negozi'}</div>` : ''}
+      <div class="row between" style="margin-top:10px"><div><b>🛡️ Assicurazione</b><div class="muted small">${insured}/${bizs.length} negozi · ${euro(insCost)}/mese per tutti</div></div>
+        ${missing.length ? `<button class="btn sm good" data-a="insureAll:1">Assicura tutti · +${euro(addCost)}/mese</button>` : '<button class="btn sm sec" data-a="insureAll:0">✅ Tutti · Disdici</button>'}</div>
+      ${points('Spese fisse = affitti, bollette e stipendi di tutti i negozi', 'L\'assicurazione copre il 70% di guasti e furti')}</div>`;
+  }
+
   private chainReport(bizs: Business[]) {
     const s = this.s;
     ensurePartials(s);
@@ -2008,8 +2041,9 @@ export class UI {
         ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
         <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="manage:${b.id}">⚙️ Gestione</button></div></div>`;
     }).join('');
-    // anche senza dati dei manager i negozi si vedono (resoconto con conti e turni, tasto Personale)
-    if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager raccolgono i dati: primo resoconto dal 3° giorno</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
+    const overview = this.chainOverview(bizs);
+    // anche senza dati dei manager: i numeri principali, l'assicurazione e i negozi (resoconto con conti e turni)
+    if (!got.length) return status + overview + `<div class="card center muted">🧑‍💼 I manager raccolgono i dati: primo resoconto dal 3° giorno</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
     const sum = (f: (r: (typeof got)[number]) => number) => got.reduce((a, r) => a + f(r), 0);
     const arrived = sum((r) => r.snap!.data.avg.arrived);
     const served = sum((r) => r.snap!.data.avg.served);
@@ -2109,7 +2143,7 @@ export class UI {
       return `${upgOf(type, id).icon} ${upgOf(type, id).name}: Liv. ${Math.min(...lv)}–${Math.max(...lv)}`;
     }), uneven.map((id) => this.chainUpgBtn(bizs, id)).join('')));
     const advice = `<div class="card"><h3>💡 Cosa fare nella catena</h3>${explain('Problemi di tutti i negozi insieme: un tasto li sistema in tutto il gruppo')}${blocks.length ? blocks.join('') : '<div class="report-alert ok"><span>✅ Tutto in ordine: personale, magazzini e migliorie</span></div>'}</div>`;
-    return status + advice + day + peakCard + `<h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
+    return status + overview + advice + day + peakCard + `<h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
   }
 
   openChain(type: BusinessType, startGroup = 'all') {
@@ -2185,6 +2219,13 @@ export class UI {
         },
         // gestione di un negozio dal resoconto della catena ("‹ Indietro" torna qui)
         manage: (id) => this.openBusiness(id),
+        // assicura (o disdici) tutti i negozi del gruppo in un tocco
+        insureAll: (on) => {
+          const list = sel().bizs;
+          for (const b of list) b.insured = on === '1';
+          toast(on === '1' ? `🛡️ Assicurati ${list.length} negozi` : '🛡️ Assicurazione disdetta in tutti i negozi', 'info');
+          this.game.save();
+        },
         // dal resoconto della catena: resoconto di un negozio ("‹ Indietro" torna qui) o una sua scheda
         rep: (id) => this.openReport(id),
         prodInfo: (p) => this.openProduct(p as ProductId, sel().bizs.map((b) => b.id)),

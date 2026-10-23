@@ -330,6 +330,8 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
     },
     'chain/tab:resoconto': {
       steps: [
+        { at: g('chain-overview'), say: '📊 Come va la catena, sempre aggiornato' },
+        { at: btnStart('insureAll:'), say: '🛡️ Assicura tutti i negozi in un tocco' },
         { at: g('shops'), say: '🏪 Negozio per negozio' },
         { at: btnStart('manage:'), say: '⚙️ Gestione di quel negozio' },
       ],
