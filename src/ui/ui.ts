@@ -2353,31 +2353,6 @@ export class UI {
       });
       return `<div class="shg-wrap"><div class="shg" style="grid-template-columns:22px 42px 48px repeat(${Math.max(1, members.length)}, minmax(16px, 1fr));grid-template-rows:auto repeat(${hours.length}, 19px)">${cells.join('')}</div></div>`;
     };
-    const legendOf = (members: Employee[]) => members.map((e) => {
-      const sh = shiftFor(e);
-      const serves = need.includes(e.role);
-      return `<div class="sh-leg ${off?.id === e.id ? 'off' : ''}" data-a="shx:${e.id}"><i style="background-color:${color.get(e.id)}">${esc(initials(e.name))}</i><span><b>${esc(e.name)}</b> <span class="muted">${roleName(biz.type, e.role)}</span></span><span class="sh-time">${sh ? shiftText(sh) : 'riposo'}</span><span class="sh-rate">${serves ? `${fmtRate(employeeRate(e, biz))} ${unit}/ora` : '+10% a tutti'}</span></div>`;
-    }).join('');
-    const bands: [string, number, number][] = [['🌅 Mattina', O, 12], ['🍝 Pranzo', 12, 15], ['☀️ Pomeriggio', 15, 18], ['🌙 Sera', 18, C]];
-    // fasce orarie: previsti, quanti ne reggono (il reparto o tutta l'attività), quanti di turno, quanti persi
-    const bandsOf = (members: Employee[], cap: (h: number) => number) => `<div class="lv-row lv-head lv-5"><span></span><b>previsti</b><b>reggono</b><b>di turno</b><b>persi</b></div>` + bands.map(([name, a, b]) => {
-      let want = 0;
-      let got = 0;
-      let lost = 0;
-      let maxOn = 0;
-      for (let h = a; h < b; h++) {
-        want += curve[h];
-        got += cap(h);
-        lost += Math.max(0, curve[h] - cap(h));
-        maxOn = Math.max(maxOn, members.filter((e) => {
-          const sh = shiftFor(e);
-          return sh && inShift(sh, h);
-        }).length);
-      }
-      // senza dipendenti i clienti li servi tu: niente "persi" per i turni
-      const bad = team.length > 0 && want > 0.05 && lost > want * (1 - tol);
-      return `<div class="lv-row lv-5 ${bad ? 'lv-bad' : ''}"><span>${name}<small class="muted">${a}–${b}</small></span><b>${fmtRate(want)}</b><b>${team.length ? fmtRate(got) : '—'}</b><b>${maxOn}</b><b>${!team.length ? 'tu' : bad ? `⚠️ ${fmtRate(lost)}` : '✅ 0'}</b></div>`;
-    }).join('');
     const inTraining = biz.staff.length - team.length;
     const training = inTraining ? `<div class="small muted">🎓 ${inTraining} al corso di formazione (non sono nei turni)</div>` : '';
     const note = (key: string, cap = capOf(null)) => `<div class="small muted sh-note"><b>previsti</b>: ${unit} in arrivo · <b>reggono</b>: quanti ne serve il turno · <b>colonne</b>: ore di ogni dipendente${key}${hours.some(shortWith(cap)) ? ' · <b class="bad">rosso</b>: non bastano' : ''}</div>`;
@@ -2387,7 +2362,7 @@ export class UI {
     if (!team.length) {
       shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>
         <div class="small muted">Nessun dipendente: ${isAutoBiz(biz.type) ? 'senza personale resta ferma' : def.kind === 'service' ? 'gli ordini li fai tu' : 'al bancone ci sei solo tu'}. Assumi dalla scheda 👥 Personale.</div>${training}
-        <h3 style="margin:12px 0 4px">⏰ Fasce orarie</h3>${bandsOf([], capOf(null))}${explainTxt}</div>`;
+        ${explainTxt}</div>`;
     } else {
       // più reparti (es. cuochi e cassieri): stessa griglia e stesse fasce, con i dati del reparto scelto sopra
       // ("Tutti": tutta l'attività, dove conta il reparto più lento)
@@ -2402,7 +2377,6 @@ export class UI {
             return `<button class="seg ${r === view ? 'on' : ''} ${slow ? 'slow' : ''}" data-a="shv:${r ?? 'all'}">${r ? esc(rolePlural(roleName(biz.type, r))) : 'Tutti'}${r ? ` <small>${team.filter((e) => e.role === r).length}</small>` : ''}${slow ? ' ⚠️' : ''}</button>`;
           }).join('')}</div>`
         : '';
-      const label = view ? rolePlural(roleName(biz.type, view)) : multi ? "tutta l'attività" : '';
       const empty = view && !members.length ? `<div class="small bad">Nessun ${esc(roleName(biz.type, view).toLowerCase())}: l'attività non serve nessuno. Assumi dalla scheda 👥 Personale.</div>` : '';
       const cap2 = off ? capOf2(view) : undefined;
       // riquadro "se lo licenzi": clienti persi in più (tutta l'attività), incassi e stipendio risparmiato
@@ -2424,8 +2398,8 @@ export class UI {
       }
       shifts = `<div class="card"><h3 class="row between">🗓️ Turni di oggi ${staffBtn}</h3>${segs}<div class="small muted sh-tap explain">👆 Tocca un turno: vedi cosa succede senza quella persona</div>${what}${gridOf(members, cap, cap2)}${empty}
         ${view ? '' : `<div class="sh-key">${roles.map((r) => `<span><i class="${pat(r)}"></i>${roleName(biz.type, r)}</span>`).join('')}</div>`}${note(view ? '' : ' e la trama il lavoro', cap)}
-        <div class="sh-legend">${legendOf(members)}</div>${training}
-        <h3 style="margin:12px 0 4px">⏰ Fasce orarie${label ? ` <span class="muted small">${esc(label)}</span>` : ''}${off ? ` <span class="small bad">senza ${esc(off.name.split(' ')[0])}</span>` : ''}</h3>${bandsOf(members.filter((e) => need.includes(e.role) && e.id !== off?.id), cap2 ?? cap)}${explainTxt}</div>`;
+        ${training}
+        ${explainTxt}</div>`;
     }
     return shifts + money;
   }
