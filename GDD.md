@@ -90,6 +90,8 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 - **Si può fallire** (tempo scaduto, cliente insoddisfatto): nessuna paga o paga ridotta e una piccola **penalità di fama** nella categoria.
 - **Difficoltà crescente:** più il lavoro o l'attività è complessa, più i mini-giochi diventano difficili.
 
+- **Comandi dei lavoretti una volta sola** (src/ui/jobtutorial.ts): la prima parte del tutorial (🕹️ camminare, 👀 guardarsi attorno, 📋 riquadro del lavoretto, ⏸️ pausa) e i pedali della guida si spiegano solo al primo lavoretto in assoluto su quel telefono, anche tra partite diverse (`hustle.jobTold` in localStorage); il riquadro non si rispiega coi pedali se è già stato spiegato. Dopo, il tutorial di ogni lavoretto nuovo spiega solo come si fa. "🎓 Rifai i tutorial" (partita developer) li fa ripartire.
+
 ### 6b. Campi di carriera (versione di prova, ramo `beta`)
 
 > Per ora solo nella versione di prova (https://beta.hustle-anteprime.pages.dev). Se piace va nel gioco vero e le partite si azzerano.

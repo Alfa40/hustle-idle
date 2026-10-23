@@ -66,6 +66,35 @@ const AIM_WHAT: Record<string, Record<number, string>> = {
   pulizie: { 1: 'sullo sporco e passalo su ogni granello' },
 };
 
+/**
+ * Spiegazioni dei comandi dei lavoretti già viste su questo telefono (in qualsiasi partita): camminare e guardarsi
+ * attorno, pedali, riquadro del lavoretto. Si dicono una volta sola; dopo il tutorial spiega solo il lavoretto.
+ */
+const TOLD_KEY = 'hustle.jobTold';
+function toldList(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(TOLD_KEY) ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+}
+const told = (k: string) => toldList().includes(k);
+function tell(...ks: string[]) {
+  try {
+    localStorage.setItem(TOLD_KEY, JSON.stringify([...new Set([...toldList(), ...ks])]));
+  } catch {
+    /* modalità privata: si rispiega la prossima volta */
+  }
+}
+/** "Rifai i tutorial" (partita developer): anche i comandi si rispiegano */
+export const forgetJobTold = () => {
+  try {
+    localStorage.removeItem(TOLD_KEY);
+  } catch {
+    /* niente */
+  }
+};
+
 export class JobTutorial {
   /** chiave del lavoretto (tipo o tipo:versione) */
   private type: string | null = null;
@@ -236,22 +265,26 @@ export class JobTutorial {
       const z = inp.fpZones()[k];
       return new DOMRect(z.x, z.y, z.w, z.h);
     };
-    if (body.contains('fp-controls') && !gd.isSeen('job:controls')) {
+    // comandi e riquadro del lavoretto: solo al primo lavoretto in assoluto (anche tra partite diverse: `told`)
+    // partite di prima: chi li ha già visti in una partita non li rivede nelle altre
+    if (gd.isSeen('job:controls') && !told('controls')) tell('controls', 'jobbar');
+    if (gd.isSeen('job:pedals') && !told('pedals')) tell('pedals', 'jobbar');
+    if (body.contains('fp-controls') && !gd.isSeen('job:controls') && !told('controls')) {
       gd.show({ steps: [
         { rect: zone('move'), say: '🕹️ Trascina qui per camminare' },
         { rect: zone('look'), say: '👀 Trascina qui per guardarti attorno' },
-        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo' },
-        { at: '#j-pause', say: '⏸️ Pausa, o per rinunciare' },
-      ] }, 'job:controls');
+        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo', if: () => !told('jobbar') },
+        { at: '#j-pause', say: '⏸️ Pausa, o per rinunciare', if: () => !told('jobbar') },
+      ], done: () => tell('controls', 'jobbar') }, 'job:controls');
       return true;
     }
-    if (body.contains('pedal-drive') && !gd.isSeen('job:pedals')) {
+    if (body.contains('pedal-drive') && !gd.isSeen('job:pedals') && !told('pedals')) {
       gd.show({ steps: [
         { at: '.pd-gas', say: '⚡ Tieni premuto per accelerare' },
         { at: '.pd-brake', say: '🛑 Freno: tienilo per fermarti' },
         { at: '.pd-right', say: '↔️ Le frecce per girare' },
-        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo' },
-      ] }, 'job:pedals');
+        { at: '.jobbar', say: '📋 Qui vedi cosa fare e il tempo', if: () => !told('jobbar') },
+      ], done: () => tell('pedals', 'jobbar') }, 'job:pedals');
       return true;
     }
     // minigioco col dito aperto (impastatrice, forma…): i suoi passi, una volta per tipo
