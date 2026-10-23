@@ -1,7 +1,9 @@
 import type { ZoneId } from './map';
 
 /**
- * Terreni edificabili: quando i posti in vendita finiscono, si compra un terreno, si fanno i lavori per
+ * Terreni edificabili: l'ultima spiaggia per allargarsi. Si comprano solo quando hai già TUTTI i negozi della
+ * città (`plotsOpen` in sim/plots.ts) e costano molto: servono a chi ha attività tutte redditizie e non vuole
+ * venderne. Quando i posti in vendita finiscono, si compra un terreno, si fanno i lavori per
  * sistemarlo (dipendono da com'è: rudere, rifiuti, alberi, acqua…) e ci si costruisce un palazzo.
  * Ogni piano del palazzo è un negozio tuo (lotto `shop` con id `<terreno>-p<n>`): più grande il palazzo,
  * più negozi. Lo stato di ogni terreno è in `GameState.plots` (sim/plots.ts).
@@ -20,13 +22,13 @@ export interface WorkDef {
 }
 
 export const WORKS: Record<WorkId, WorkDef> = {
-  rifiuti: { name: 'Sgombera i rifiuti', icon: '🗑️', issue: 'Rifiuti abbandonati', cost: 900, hours: 6 },
-  alberi: { name: 'Taglia alberi e radici', icon: '🌳', issue: 'Alberi e radici', cost: 1600, hours: 10 },
-  dislivello: { name: 'Livella il terreno', icon: '📐', issue: 'Terreno in pendenza', cost: 2600, hours: 14 },
-  acqua: { name: "Drena l'acqua", icon: '💧', issue: 'Terreno fangoso', cost: 3200, hours: 18 },
-  rocce: { name: 'Scava le rocce', icon: '🚜', issue: 'Rocce nel terreno', cost: 3800, hours: 20 },
-  rudere: { name: 'Demolisci il rudere', icon: '🧱', issue: 'Vecchio rudere', cost: 4500, hours: 24 },
-  bonifica: { name: 'Bonifica il terreno', icon: '🧪', issue: 'Terreno inquinato', cost: 7000, hours: 36 },
+  rifiuti: { name: 'Sgombera i rifiuti', icon: '🗑️', issue: 'Rifiuti abbandonati', cost: 9000, hours: 6 },
+  alberi: { name: 'Taglia alberi e radici', icon: '🌳', issue: 'Alberi e radici', cost: 16000, hours: 10 },
+  dislivello: { name: 'Livella il terreno', icon: '📐', issue: 'Terreno in pendenza', cost: 26000, hours: 14 },
+  acqua: { name: "Drena l'acqua", icon: '💧', issue: 'Terreno fangoso', cost: 32000, hours: 18 },
+  rocce: { name: 'Scava le rocce', icon: '🚜', issue: 'Rocce nel terreno', cost: 38000, hours: 20 },
+  rudere: { name: 'Demolisci il rudere', icon: '🧱', issue: 'Vecchio rudere', cost: 45000, hours: 24 },
+  bonifica: { name: 'Bonifica il terreno', icon: '🧪', issue: 'Terreno inquinato', cost: 70000, hours: 36 },
 };
 
 export type SizeId = 'piccolo' | 'medio' | 'grande';
@@ -42,15 +44,15 @@ export interface SizeDef {
 }
 
 export const SIZES: Record<SizeId, SizeDef> = {
-  piccolo: { name: 'Palazzina', icon: '🏪', shops: 3, cost: 24000, days: 2 },
-  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 60000, days: 4 },
-  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 125000, days: 7 },
+  piccolo: { name: 'Palazzina', icon: '🏪', shops: 3, cost: 450_000, days: 3 },
+  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 1_100_000, days: 6 },
+  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 2_500_000, days: 10 },
 };
 
 /** costruire e sistemare costa di più dove c'è più passaggio */
 export const ZONE_COST: Record<ZoneId, number> = { periferia: 1, residenziale: 1.5, centro: 2.4 };
 /** spese del palazzo al mese per ogni negozio aperto dentro (al posto dell'affitto) */
-export const FLOOR_RENT: Record<ZoneId, number> = { periferia: 110, residenziale: 210, centro: 480 };
+export const FLOOR_RENT: Record<ZoneId, number> = { periferia: 250, residenziale: 500, centro: 1000 };
 /** con una tua impresa di costruzioni o ristrutturazioni i lavori del terreno costano la metà */
 export const OWN_CREW_DISCOUNT = 0.5;
 
@@ -64,15 +66,15 @@ export interface PlotDef {
 }
 
 export const PLOTS: PlotDef[] = [
-  { id: 'terreno1', char: '!', name: 'Terreno in via dei Gelsi', price: 6000, works: ['rifiuti', 'alberi'] },
-  { id: 'terreno2', char: '@', name: 'Terreno vicino al fiume', price: 5500, works: ['acqua', 'alberi'] },
-  { id: 'terreno3', char: '$', name: 'Terreno della vecchia fabbrica', price: 7000, works: ['rudere', 'bonifica'] },
-  { id: 'terreno4', char: '%', name: 'Terreno in collina', price: 6500, works: ['dislivello', 'rocce'] },
-  { id: 'terreno5', char: '&', name: 'Terreno in via Garibaldi', price: 14000, works: ['rudere', 'rifiuti'] },
-  { id: 'terreno6', char: '*', name: 'Terreno dietro al teatro', price: 15000, works: ['alberi', 'dislivello'] },
-  { id: 'terreno7', char: '+', name: 'Terreno in piazza Cavour', price: 16000, works: ['acqua', 'rocce', 'rifiuti'] },
-  { id: 'terreno8', char: '=', name: 'Terreno in corso Italia', price: 38000, works: ['rudere'] },
-  { id: 'terreno9', char: '~', name: 'Terreno vicino al municipio', price: 42000, works: ['rifiuti', 'dislivello'] },
+  { id: 'terreno1', char: '!', name: 'Terreno in via dei Gelsi', price: 150_000, works: ['rifiuti', 'alberi'] },
+  { id: 'terreno2', char: '@', name: 'Terreno vicino al fiume', price: 140_000, works: ['acqua', 'alberi'] },
+  { id: 'terreno3', char: '$', name: 'Terreno della vecchia fabbrica', price: 170_000, works: ['rudere', 'bonifica'] },
+  { id: 'terreno4', char: '%', name: 'Terreno in collina', price: 160_000, works: ['dislivello', 'rocce'] },
+  { id: 'terreno5', char: '&', name: 'Terreno in via Garibaldi', price: 320_000, works: ['rudere', 'rifiuti'] },
+  { id: 'terreno6', char: '*', name: 'Terreno dietro al teatro', price: 340_000, works: ['alberi', 'dislivello'] },
+  { id: 'terreno7', char: '+', name: 'Terreno in piazza Cavour', price: 360_000, works: ['acqua', 'rocce', 'rifiuti'] },
+  { id: 'terreno8', char: '=', name: 'Terreno in corso Italia', price: 750_000, works: ['rudere'] },
+  { id: 'terreno9', char: '~', name: 'Terreno vicino al municipio', price: 800_000, works: ['rifiuti', 'dislivello'] },
 ];
 
 export const plotDef = (id: string) => PLOTS.find((p) => p.id === id);

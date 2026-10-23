@@ -1,6 +1,7 @@
 import { OWN_CREW_DISCOUNT, plotDef, SIZES, WORKS, ZONE_COST, type SizeId, type WorkId } from '../config/plots';
 import { bizType } from '../config/business';
-import { lotZone } from './economy';
+import { LOTS } from '../config/map';
+import { bizAtLot, lotZone } from './economy';
 import type { GameState, PlotState } from './state';
 
 /**
@@ -43,9 +44,13 @@ export const workCost = (s: GameState, id: string, w: WorkId) =>
 
 export const buildCost = (id: string, size: SizeId) => Math.round((SIZES[size].cost * ZONE_COST[plotZone(id)]) / 100) * 100;
 
+/** negozi della città ancora liberi: i terreni si comprano solo quando sono tutti tuoi (ultima spiaggia) */
+export const shopsLeft = (s: GameState) => LOTS.filter((l) => l.kind === 'shop' && !bizAtLot(s, l.id)).length;
+export const plotsOpen = (s: GameState) => shopsLeft(s) === 0;
+
 export function buyPlot(s: GameState, id: string) {
   const def = plotDef(id);
-  if (!def || plotState(s, id) || s.money < def.price) return false;
+  if (!def || plotState(s, id) || s.money < def.price || !plotsOpen(s)) return false;
   s.money -= def.price;
   (s.plots ??= {})[id] = { works: {} };
   return true;

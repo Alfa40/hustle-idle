@@ -8,7 +8,7 @@ import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf
 import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, type SizeId, type WorkId } from '../config/plots';
-import { buildCost, buyPlot, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
+import { buildCost, buyPlot, plotsOpen, shopsLeft, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
@@ -1207,11 +1207,13 @@ export class UI {
     if (stage === 'sale') {
       const tot = def.works.reduce((a, w) => a + workCost(s, id, w), 0);
       return `${head}
-        ${points('Compra il terreno', 'Paga i lavori per sistemarlo', 'Poi costruisci il palazzo: più è grande, più negozi', 'Ogni piano è un negozio tuo: niente affitto, solo le spese')}
+        ${points('Si compra solo quando hai tutti i negozi della città', 'Paga i lavori per sistemarlo', 'Poi costruisci il palazzo: più è grande, più negozi', 'Ogni piano è un negozio tuo: niente affitto, solo le spese')}
         <h3 class="sec-title">🚧 Da sistemare</h3>${works}
         <div class="muted small center">Lavori in tutto: ${euro(tot)}${crew ? ' (metà prezzo con la tua impresa)' : ''}</div>
-        <button class="btn good full" style="margin-top:10px" data-a="buyPlot" ${!canBuy || s.money < def.price ? 'disabled' : ''}>🛒 Compra il terreno · ${euro(def.price)}</button>
-        ${canBuy ? '' : '<div class="muted small center">Per comprare vai davanti al terreno o all\'agenzia affari</div>'}`;
+        ${plotsOpen(s) ? `<button class="btn good full" style="margin-top:10px" data-a="buyPlot" ${!canBuy || s.money < def.price ? 'disabled' : ''}>🛒 Compra il terreno · ${euro(def.price)}</button>
+        ${canBuy ? '' : '<div class="muted small center">Per comprare vai davanti al terreno o all\'agenzia affari</div>'}`
+        : `<button class="btn sec full" style="margin-top:10px" disabled>🔒 Prima compra tutti i negozi della città</button>
+        <div class="muted small center">Ne mancano ${shopsLeft(s)}: i palazzi sono l'ultima spiaggia</div>`}`;
     }
     if (stage === 'works') {
       return `${head}${points('Un lavoro alla volta', 'Il tempo passa anche a gioco chiuso', 'Finiti tutti: puoi costruire')}${crewTag}
@@ -1415,7 +1417,7 @@ export class UI {
         ${floors ? `<h3 class="sec-title">🏢 Piani liberi nei tuoi palazzi</h3>${floors}` : ''}
         ${trucks ? `<h3 class="sec-title">🅿️ Posteggi per food truck</h3>${trucks}` : ''}
         ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}
-        ${plots ? `<h3 class="sec-title">🏞️ Terreni: costruisci un palazzo</h3>${points('Finiti i locali? Compra un terreno', 'Sistemalo e costruisci: ogni piano è un negozio')}${plots}` : ''}`;
+        ${plots ? `<h3 class="sec-title">🏞️ Terreni: costruisci un palazzo</h3>${points('Ultima spiaggia: quando hai tutti i negozi della città', 'Costano molto: sistemi il terreno e costruisci', 'Ogni piano è un negozio')}${plotsOpen(s) ? '' : `<div class="card tint small">🔒 Prima compra tutti i negozi della città: ne mancano ${shopsLeft(s)}</div>`}${plots}` : ''}`;
     }
     if (tab === 'resoconti') {
       // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
