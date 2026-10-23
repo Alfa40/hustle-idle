@@ -353,7 +353,11 @@ export class Game {
     // attività automatiche (per ora tutte): una volta sola, anche quelle delle partite vecchie ricevono un dipendente per
     // reparto e il manager (poi, se il giocatore ne licenzia uno, resta licenziato)
     if (!this.state.allAuto) {
-      for (const b of this.state.businesses) ensureAutoStaff(this.state, b);
+      for (const b of this.state.businesses) {
+        ensureAutoStaff(this.state, b);
+        // la merce si ordina sempre da sola (non c'è più il tasto per spegnerlo)
+        b.autoRestock = true;
+      }
       this.state.allAuto = true;
     }
     // niente più "servi clienti di persona" (non si entra nelle attività): quelle non finite si tolgono e si rifanno

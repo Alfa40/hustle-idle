@@ -960,7 +960,7 @@ export interface StaffWarning {
   kind: 'short' | 'stock' | 'excess' | 'info';
   text: string;
   /** dove si sistema: scheda dell'attività (personale, magazzino, migliorie) */
-  tab?: 'personale' | 'magazzino' | 'migliorie';
+  tab?: 'personale' | 'migliorie';
 }
 
 /** Clienti all'ora scritti sempre allo stesso modo in resoconti e consigli (es. "5,1" o "17"). */
@@ -1071,10 +1071,10 @@ export function staffWarnings(s: GameState, b: Business): StaffWarning[] {
   // prodotti finiti
   const stockLost = m.lostStock ?? 0;
   if (stockLost >= 3) {
-    const tip = !b.autoRestock ? 'attiva il riordino automatico nel Magazzino'
-      : !hasManager(b) && !b.staff.some((e) => e.role === 'magazzino') ? 'assumi un manager o un magazziniere'
-        : 'compra la miglioria del frigo per tenere più scorte';
-    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti: prodotti finiti. Soluzione: ${tip}`, tab: tip.includes('frigo') ? 'migliorie' : tip.includes('assumi') ? 'personale' : 'magazzino' });
+    // la merce si riordina da sola: serve chi riordina (manager) o più scorte (magazzino più grande)
+    const tip = !hasManager(b) && !b.staff.some((e) => e.role === 'magazzino') ? 'assumi un manager o un magazziniere'
+      : 'compra la miglioria del magazzino per tenere più scorte';
+    out.push({ kind: 'stock', text: `Persi ${stockLost} clienti: prodotti finiti. Soluzione: ${tip}`, tab: tip.includes('assumi') ? 'personale' : 'migliorie' });
   }
   // fila troppo lunga mentre lavoravi tu
   const queueLost = m.lostQueue ?? 0;

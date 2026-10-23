@@ -132,7 +132,7 @@ export function bizReport(s: GameState, b: Business, ms: GameState = s) {
       advice.push({ kind: 'grow', icon: '🏗️', text: `Il più richiesto qui è ${PRODUCTS[lockedTop.pid].icon} ${PRODUCTS[lockedTop.pid].name} (${fmtRate(lockedTop.demand)}/h): serve l'ampliamento`, tab: 'migliorie', label: '⬆️ Migliorie' });
     }
     const hot = products.find((x) => x.event > 1.15 && !x.locked);
-    if (hot) advice.push({ kind: 'grow', icon: '🎉', text: `Evento: ${PRODUCTS[hot.pid].icon} ${PRODUCTS[hot.pid].name} +${Math.round((hot.event - 1) * 100)}% oggi.${hot.selling ? ' Tieni pieno il magazzino' : ' Mettilo nel menù'}`, tab: hot.selling ? 'magazzino' : 'prodotti', label: hot.selling ? '🧊 Magazzino' : '🍔 Prodotti' });
+    if (hot) advice.push({ kind: 'grow', icon: '🎉', text: `Evento: ${PRODUCTS[hot.pid].icon} ${PRODUCTS[hot.pid].name} +${Math.round((hot.event - 1) * 100)}% oggi.${hot.selling ? ' Il manager riordina da solo' : ' Mettilo nel menù'}`, tab: hot.selling ? undefined : 'prodotti', label: hot.selling ? undefined : '🍔 Prodotti' });
   }
   if (b.staff.length && !hasManager(b) && !advice.some((a) => a.text.includes('manager'))) {
     advice.push({ kind: 'short', icon: '👔', text: 'Senza manager l\'attività lavora solo quando ci sei tu', tab: 'personale', label: '👥 Personale' });

@@ -36,7 +36,7 @@ import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } 
 import {
   allLots, bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
-  refreshCandidates, stockCap, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly, palacesMonthly,
+  refreshCandidates, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly, palacesMonthly,
   isAutoBiz,
 } from '../sim/economy';
 import { addFame, addMoney, FAME_RANKS, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
@@ -1567,6 +1567,8 @@ export class UI {
     const service = bizType(b().type).kind === 'service';
     const orders = service && !auto;
     if (auto && tab === 'ordini') tab = undefined;
+    // il magazzino non c'è più (chi ci arrivava da un consiglio va alle migliorie: magazzino più grande)
+    if (tab === 'magazzino') tab = 'migliorie';
     let cur = tab ?? (orders ? 'ordini' : craft ? 'lavori' : 'panoramica');
     // laboratorio dell'artigiano: solo lavori su richiesta (niente prodotti, magazzino né personale)
     const tabs = craft ? [['lavori', '🛠️ Lavori su richiesta'], ['panoramica', '📊 Panoramica'], ['migliorie', '⬆️ Migliorie']] : [
@@ -1574,7 +1576,8 @@ export class UI {
       ['panoramica', '📊 Panoramica'],
       ['prodotti', service ? '🧰 Servizi' : '🍔 Prodotti'],
       // il personale si apre dal resoconto (tasto 👥 Personale accanto ai turni) o dalla catena: la scheda c'è solo arrivando da lì
-      ['magazzino', service ? '🧴 Materiali' : '🧊 Magazzino'], ...(tab === 'personale' ? [['personale', '👥 Personale']] : []), ['migliorie', '⬆️ Migliorie'],
+      // niente scheda Magazzino: la merce si riordina da sola (riordino automatico sempre acceso)
+      ...(tab === 'personale' ? [['personale', '👥 Personale']] : []), ['migliorie', '⬆️ Migliorie'],
       // si può evolvere in un'attività più grande (albero delle evoluzioni)
       ...(evolvesOf(b().type).length ? [['evoluzione', '🌱 Evoluzione']] : []),
     ];
@@ -2111,9 +2114,9 @@ export class UI {
     // 3) prodotti finiti: si sistema per tutto il gruppo in un tocco
     const stock = got.filter((r) => r.snap!.data.advice.some((a) => a.kind === 'stock'));
     if (stock.length) {
-      const noAuto = bizs.filter((b) => !b.autoRestock).length;
+      // la merce si riordina da sola: il rimedio è tenere più scorte (magazzino più grande)
       blocks.push(block('stock', '📦', `Prodotti finiti in ${stock.length} ${stock.length === 1 ? 'negozio' : 'negozi'} (${stock.map((r) => name(r.b)).join(', ')})`, [],
-        `${noAuto ? `<button class="btn sm" data-a="autoOn">🔁 Riordino automatico in tutti (spento in ${noAuto})</button>` : ''}<button class="btn sm" data-a="fill">🧊 Riempi tutti i magazzini</button>${this.chainUpgBtn(bizs, 'frigo')}`));
+        this.chainUpgBtn(bizs, 'frigo')));
     }
     // 4) dipendenti di troppo (solo dai resoconti completi): per reparto e negozio, con i nomi
     const excess = got.filter((r) => r.full).map((r) => ({ r, a: r.snap!.data.advice.find((a) => a.kind === 'excess') })).filter((x) => x.a);
@@ -2167,7 +2170,7 @@ export class UI {
         const today = g.bizs.reduce((a, b) => a + b.today.revenue, 0);
         const month = g.bizs.reduce((a, b) => a + b.month.revenue, 0);
         const auto = g.bizs.filter((b) => isAutonomous(b)).length;
-        const tabs = [['resoconto', '📊 Resoconto'], ...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : [])];
+        const tabs = [['resoconto', '📊 Resoconto'], ...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie']];
         let body = '';
         if (tab === 'resoconto') {
           body = this.chainReport(g.bizs);
@@ -2195,12 +2198,6 @@ export class UI {
               return `<div class="card"><div class="row between"><div><b>${u.icon} ${u.name}</b><div class="muted small">Liv. ${lo === hi ? lo : `${lo}–${hi}`} / ${u.max}${can && !even ? ` · prima si pareggiano i negozi più indietro` : ''}</div></div></div>
                 <button class="btn sm full ${can ? 'blue' : 'sec'}" style="margin-top:6px" data-a="upg:${id}" ${!can || s.money < cost ? 'disabled' : ''}>${label}</button></div>`;
             }).join('');
-        } else if (tab === 'magazzino') {
-          const allAuto = g.bizs.every((b) => b.autoRestock);
-          body = `<div class="card"><b>🧊 Riempi i magazzini</b><div class="muted small explain">Ogni prodotto al massimo, in tutti i negozi</div>
-              <button class="btn full" style="margin-top:8px" data-a="fill">Riempi tutto</button></div>
-            <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small explain">Il manager riordina da solo in tutti i negozi</div></div>
-              <span class="switch ${allAuto ? 'on' : ''}"><i></i></span></button>`;
         }
         const head = `<div class="chips">${chips}</div><!--tabs-->`;
         const sum = `<div class="grid3"><div class="stat s-green"><b class="money-t">${euro(today)}</b><span>💰 oggi</span></div>
@@ -2606,23 +2603,6 @@ export class UI {
               <div class="row between small"><span>Domanda oggi ${demandBars(d, service ? 1 : 4)} ${f2(d)}/h</span><span class="muted">stagione ${trend}</span></div>
               <div class="row between small muted"><span>Prezzo ${euro(pr.price)} · costo ${f2(pr.cost)}€</span><span>margine <b class="good">${f2(pr.price - pr.cost)}€</b></span></div>
               <div class="report-more">Tocca per domanda, mercato e previsioni ›</div></div></div>`;
-          })
-          .join('');
-    }
-    if (tab === 'magazzino') {
-      const cap = stockCap(b);
-      return `<div class="card"><label class="toggle"><input type="checkbox" ${b.autoRestock ? 'checked' : ''} data-c="autoRestock"> Riordino automatico</label>
-        <p class="muted small explain" style="margin-bottom:0">${hasManager(b) ? 'Il manager riordina da solo quando le scorte scendono.' : 'Il riordino automatico funziona solo con un manager.'}
-        ${service ? ' Ogni servizio consuma 1 unità di materiali.' : ''}</p></div>` +
-        b.products
-          .map((p) => {
-            const pr = PRODUCTS[p];
-            const n = b.stock[p] ?? 0;
-            const fill = Math.max(0, cap - n);
-            return `<div class="card"><div class="row between"><h3>${pr.icon} ${pr.name}</h3><b>${n}/${cap}</b></div>
-              <div class="bar green"><i style="width:${(n / cap) * 100}%"></i></div>
-              <div class="btnrow"><button class="btn sm sec" data-a="stock:${p}|10">+10 (${euro(10 * pr.cost)})</button>
-              <button class="btn sm" data-a="stock:${p}|max" ${fill ? '' : 'disabled'}>Riempi (${euro(fill * pr.cost)})</button></div></div>`;
           })
           .join('');
     }

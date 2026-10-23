@@ -174,7 +174,7 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btnStart('chain:'), say: '🔗 Le tue catene: attività uguali insieme' },
         { at: btnStart('grp:'), say: 'Tocca un gruppo per aprirlo o chiuderlo' },
         { at: btnStart('report:'), say: 'Questa è una tua attività: incasso di oggi' },
-        { at: btnStart('open:'), say: 'Gestisci: prodotti, magazzino e migliorie' },
+        { at: btnStart('open:'), say: 'Gestisci: prodotti e migliorie' },
         { at: `${btnStart('report:')} .report-more`, say: 'Tocca l\'attività per il resoconto', tap: true },
       ],
     },
@@ -251,7 +251,6 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         tabStep('lavori', '🛠️ Lavori su richiesta, fatti da te'),
         tabStep('panoramica', '📊 Panoramica: stato e costi'),
         tabStep('prodotti', '🍔 Prodotti: cosa vendi'),
-        tabStep('magazzino', '📦 Magazzino: la merce'),
         tabStep('personale', '👥 Personale: chi lavora qui'),
         tabStep('migliorie', '⬆️ Migliorie: rendila più forte'),
         tabStep('evoluzione', '🌱 Evoluzione: falla diventare più grande'),
@@ -269,13 +268,6 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
       steps: [
         { at: `${M} label.toggle`, say: '✔️ Spunta per metterlo in vendita' },
         { at: `${M} h3[data-a^="prodInfo:"]`, say: '🔎 Tocca il nome: domanda e prossimi giorni' },
-      ],
-    },
-    'biz/tab:magazzino': {
-      steps: [
-        { at: `${M} label.toggle`, say: '🔁 Riordino automatico: compra la merce da solo' },
-        { at: `${M} [data-a$="|10"]`, say: '➕ Compra 10 pezzi' },
-        { at: `${M} [data-a$="|max"]`, say: '📦 Riempi il magazzino' },
       ],
     },
     'biz/tab:personale': {
@@ -325,7 +317,6 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         tabStep('resoconto', '📊 Resoconto di tutti insieme'),
         tabStep('prodotti', '🍔 Prodotti per tutti i negozi'),
         tabStep('migliorie', '⬆️ Migliorie per tutti'),
-        tabStep('magazzino', '📦 Merce per tutti'),
       ],
     },
     'chain/tab:resoconto': {
@@ -343,12 +334,6 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
       ],
     },
     'chain/tab:migliorie': { steps: [{ at: btnStart('upg:'), say: '⬆️ Migliora tutti insieme' }] },
-    'chain/tab:magazzino': {
-      steps: [
-        { at: btn('fill'), say: '📦 Riempi tutti i magazzini' },
-        { at: btn('auto'), say: '🔁 Riordino automatico per tutti' },
-      ],
-    },
 
     // ---------------- altre finestre ----------------
     'panel:missions': {
