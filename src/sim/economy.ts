@@ -9,6 +9,7 @@ import { bizSectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { ALL_AUTO, BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type LotDef, type ZoneId } from '../config/map';
+import { addNews } from './news';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, SIZES, ZONE_COST } from '../config/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
@@ -899,6 +900,7 @@ export function payMonth(s: GameState) {
   }
   if (total > 0) {
     addMoney(s, -total);
+    addNews(s, { icon: '🧾', kind: 'info', text: `Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi${palacesMonthly(s) ? ', palazzi' : ''} e veicoli` });
     toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi, assicurazioni e palazzi`, s.money < 0 ? 'bad' : 'info');
   }
 }

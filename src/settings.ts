@@ -22,10 +22,10 @@ export interface Settings {
 export const actSide = () => (settings.swapControls ? 'sinistra' : 'destra');
 export const moveSide = () => (settings.swapControls ? 'destra' : 'sinistra');
 
-export const HUD_KEYS = ['biz', 'missions', 'profile', 'home', 'shop', 'multi', 'settings', 'camera'] as const;
+export const HUD_KEYS = ['biz', 'missions', 'news', 'profile', 'home', 'shop', 'multi', 'settings', 'camera'] as const;
 export type HudKey = (typeof HUD_KEYS)[number];
 export const HUD_NAMES: Record<HudKey, string> = {
-  biz: '🏢 Attività', missions: '📋 Missioni', profile: '👤 Profilo', home: '🏠 Casa', shop: '🛍️ Negozio', multi: '🎮 Multigiocatore', settings: '⚙️ Opzioni', camera: '🎥 Camera',
+  biz: '🏢 Attività', missions: '📋 Missioni', news: '📰 Notizie', profile: '👤 Profilo', home: '🏠 Casa', shop: '🛍️ Negozio', multi: '🎮 Multigiocatore', settings: '⚙️ Opzioni', camera: '🎥 Camera',
 };
 
 const KEY = 'hustleidle.settings';

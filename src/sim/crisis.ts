@@ -3,7 +3,8 @@ import { bizType } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { bus, toast } from './bus';
 import { lotDef, sellValue } from './economy';
-import { day, euro, type Business, type GameState, type NewsItem } from './state';
+import { addNews } from './news';
+import { euro, type Business, type GameState } from './state';
 
 /**
  * Attività in crisi e fallimento, pignoramento (GDD §"Crisi"). A fine mese ogni attività chiude in guadagno o in
@@ -22,14 +23,7 @@ export const bizHealth = (b: Business): BizHealth => {
 
 export const HEALTH_TAG: Record<BizHealth, string> = { ok: '', perdita: '⚠️ In perdita', crisi: '🟠 In crisi', debiti: '🔴 Debiti' };
 
-/** nel registro "📰 Notizie" (ultime 40) */
-export function addNews(s: GameState, n: Omit<NewsItem, 'day' | 'id'>) {
-  s.news ??= [];
-  s.newsSeq = (s.newsSeq ?? 0) + 1;
-  s.news.unshift({ ...n, id: s.newsSeq, day: day(s) });
-  s.news.length = Math.min(s.news.length, 40);
-  bus.emit('news');
-}
+export { addNews };
 
 const bizName = (b: Business) => `${bizType(b.type).icon} ${bizType(b.type).name} in ${lotDef(b.lotId).name}`;
 

@@ -9,6 +9,7 @@ import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, ZONE_COST, type SizeId, type WorkId } from '../config/plots';
 import { bizHealth, HEALTH_TAG, monthEnd } from '../sim/crisis';
+import { markNewsRead, unreadNews } from '../sim/news';
 import { dailyTroubles, insuranceCost, solveTrouble, troubleActive, troubleCost } from '../sim/troubles';
 import { buildCost, buyPlot, fameOk, plotFame, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
@@ -227,6 +228,7 @@ export class UI {
     this.buildHud();
     bus.on('toast', ({ text, kind }) => this.toast(text, kind));
     bus.on('missions', () => this.updateDot());
+    bus.on('news', () => this.updateDot());
   }
 
   private get s() {
@@ -251,6 +253,7 @@ export class UI {
       <div class="hud-btns">
         <button class="hbtn c-orange" data-h="biz"><span class="i">🏢</span><span class="l">Attività</span></button>
         <button class="hbtn c-purple" data-h="missions"><span class="i">📋</span><span class="l">Missioni</span><span class="dot" id="h-dot" style="display:none">!</span></button>
+        <button class="hbtn c-news" data-h="news"><span class="i">📰</span><span class="l">Notizie</span><span class="dot" id="h-dot-n" style="display:none"></span></button>
         <button class="hbtn" data-h="profile"><span class="i">👤</span><span class="l">Profilo</span><span class="dot" id="h-dot-p" style="display:none">!</span></button>
         <button class="hbtn c-green" data-h="home"><span class="i">🏠</span><span class="l">Casa</span></button>
         <button class="hbtn c-pink" data-h="shop"><span class="i">🛍️</span><span class="l">Negozio</span></button>
@@ -275,6 +278,7 @@ export class UI {
         const k = b.dataset.h;
         if (k === 'biz') this.openAgency();
         if (k === 'missions') this.openMissions();
+        if (k === 'news') this.openNews();
         if (k === 'profile') this.openProfile();
         if (k === 'home') {
           this.game.goHome();
@@ -727,7 +731,14 @@ export class UI {
     const req = this.game.friendRequests.length > 0;
     const dotP = this.root.querySelector('#h-dot-p') as HTMLElement | null;
     if (dotP) dotP.style.display = req ? '' : 'none';
-    if (dot2) dot2.style.display = (claimable && !this.hudShown.includes('missions')) || (req && !this.hudShown.includes('profile')) ? '' : 'none';
+    // notizie da leggere: quante sul tasto 📰 (e il pallino sul ☰ se il tasto è nel menu)
+    const unread = unreadNews(this.s);
+    const dotN = this.root.querySelector('#h-dot-n') as HTMLElement | null;
+    if (dotN) {
+      dotN.style.display = unread ? '' : 'none';
+      dotN.textContent = unread > 9 ? '9+' : String(unread);
+    }
+    if (dot2) dot2.style.display = (claimable && !this.hudShown.includes('missions')) || (req && !this.hudShown.includes('profile')) || (unread && !this.hudShown.includes('news')) ? '' : 'none';
   }
 
   /**
@@ -1291,7 +1302,7 @@ export class UI {
   openAgency(tab?: string, atAgency = false) {
     let cur = tab ?? (this.s.businesses.length ? 'mie' : 'compra');
     let sel: string | null = null;
-    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['notizie', '📰 Notizie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
+    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
     this.open({
       guide: 'agency',
       money: true,
@@ -1308,12 +1319,6 @@ export class UI {
           sel = null;
         },
         lot: (id) => (sel = id),
-        // imprevisto dalla notizia: ripara, carro attrezzi o premio ai dipendenti
-        newsAct: (id) => {
-          const n = (this.s.news ?? []).find((x) => x.id === +id);
-          const nb = n?.biz ? this.s.businesses.find((b) => b.id === n.biz) : undefined;
-          if (n?.action && nb && solveTrouble(this.s, nb, n.action.kind)) this.game.save();
-        },
         // terreno: la sua finestra in avanti (si compra solo all'agenzia o davanti al terreno)
         plot: (id) => this.openPlot(id, atAgency),
         grp: (id) => {
@@ -1433,18 +1438,6 @@ export class UI {
         ${trucks ? `<h3 class="sec-title">🅿️ Posteggi per food truck</h3>${trucks}` : ''}
         ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}
         ${plots ? `<h3 class="sec-title">🏞️ Terreni: costruisci un palazzo</h3>${points('Costano molto: sistemi il terreno e costruisci', 'Ogni piano è un negozio', 'Residenziale, centro e palazzi grandi chiedono fama')}${plots}` : ''}`;
-    }
-    if (tab === 'notizie') {
-      // crisi, fallimenti, pignoramenti e imprevisti: le più nuove in alto
-      const list = s.news ?? [];
-      const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
-      if (!list.length) return `${debt}<div class="card center muted">Qui arrivano le notizie delle tue attività: mesi in perdita, crisi, imprevisti.</div>${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}`;
-      return `${debt}${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}
-        ${list.map((n) => {
-          const nb = n.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
-          const act = n.action && nb && troubleActive(s, nb, n.action.kind) ? this.troubleBtn(nb, n.action.kind, `newsAct:${n.id}`) : '';
-          return `<div class="card news-${n.kind}"${nb ? ` data-a="open:${nb.id}" style="cursor:pointer"` : ''}><div class="row"><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${dayName(n.day)}</div></div></div>${act}</div>`;
-        }).join('')}`;
     }
     if (tab === 'resoconti') {
       // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
@@ -3264,6 +3257,42 @@ export class UI {
   }
 
   // ---------------- missioni e calendario ----------------
+
+  /**
+   * 📰 Notizie: tutto quello che succede (eventi, resoconti pronti, conti di fine mese, crisi, imprevisti, palazzi),
+   * le più nuove in alto, da leggere con calma. Aprendola le notizie diventano lette (si spegne il pallino).
+   */
+  openNews() {
+    const s = this.s;
+    const seen = s.newsSeen ?? 0;
+    markNewsRead(s);
+    this.open({
+      guide: 'news',
+      live: true,
+      title: '📰 Notizie',
+      color: '#2d6cdf',
+      render: () => {
+        const list = s.news ?? [];
+        const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
+        const help = points('Qui arriva tutto: eventi, resoconti, conti e problemi', 'Tocca una notizia di un\'attività per aprirla', '4 mesi di fila in perdita: l\'attività fallisce', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`);
+        if (!list.length) return `${debt}${help}<div class="card center muted">Ancora nessuna notizia: qui arriveranno eventi, resoconti e problemi delle attività.</div>`;
+        return `${debt}${help}${list.map((n) => {
+          const nb = n.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
+          const act = n.action && nb && troubleActive(s, nb, n.action.kind) ? this.troubleBtn(nb, n.action.kind, `newsAct:${n.id}`) : '';
+          return `<div class="card news-${n.kind}${n.id > seen ? ' news-new' : ''}"${nb ? ` data-a="open:${nb.id}" style="cursor:pointer"` : ''}><div class="row"><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${n.id > seen ? '<b class="news-tag">Nuova</b> · ' : ''}${dayName(n.day)}</div></div></div>${act}</div>`;
+        }).join('')}`;
+      },
+      actions: {
+        open: (id) => this.openBusiness(id),
+        // imprevisto dalla notizia: ripara, carro attrezzi o premio ai dipendenti
+        newsAct: (id) => {
+          const n = (s.news ?? []).find((x) => x.id === +id);
+          const nb = n?.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
+          if (n?.action && nb && solveTrouble(s, nb, n.action.kind)) this.game.save();
+        },
+      },
+    });
+  }
 
   openMissions() {
     const s = this.s;

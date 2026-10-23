@@ -110,6 +110,11 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btnStart('chain:'), say: '🔗 Tocca la catena: le gestisci tutte insieme', tap: true },
       ],
     },
+    // la prima notizia: si fa vedere il tasto 📰 Notizie
+    'unlock:news': {
+      auto: () => (s().news ?? []).length > 0 && hasBiz(),
+      steps: hud('news', '📰 È arrivata una notizia: tocca Notizie'),
+    },
     'unlock:vehicle': {
       auto: () => s().vehicles.length > 0 && exists('.ride-btn'),
       steps: [{ at: '.ride-btn', say: '🛵 Tocca qui per salire e scendere dal veicolo' }],
@@ -165,8 +170,12 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btn('back'), say: '◀ Torna alla lista', tap: true },
       ],
     },
-    'agency/tab:notizie': {
-      steps: [{ at: `${M} .sec-title, ${M} .card`, say: '📰 Qui arrivano crisi, fallimenti e imprevisti' }],
+    'panel:news': {
+      steps: [
+        { say: '📰 Qui arriva tutto: eventi, resoconti, conti e problemi' },
+        { at: `${M} .card.news-new, ${M} .card`, say: 'Le nuove sono segnate: leggile con calma' },
+        { at: btnStart('newsAct:'), say: '🔧 Alcune hanno un tasto per risolvere subito' },
+      ],
     },
     'agency/tab:mie': {
       when: hasBiz,

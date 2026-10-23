@@ -270,9 +270,10 @@ export interface GameState {
    * finiscono) e palazzo (misura e minuto in cui è finito). C'è la chiave = il terreno è tuo.
    */
   plots?: Record<string, PlotState>;
-  /** registro delle notizie (ultime 40) e numeratore */
+  /** registro delle notizie (ultime 60, sim/news.ts), numeratore e ultima letta */
   news?: NewsItem[];
   newsSeq?: number;
+  newsSeen?: number;
   /** minuto in cui il conto è andato sotto zero (pignoramento dopo CRISIS.SEIZE_DAYS) e avvisi già dati */
   negSince?: number;
   negWarn?: number;

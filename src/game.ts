@@ -13,6 +13,7 @@ import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
 import { floorLotId, parseFloorLot, plotDef, SIZES, WORKS, type WorkId } from './config/plots';
+import { addNews } from './sim/news';
 import { plotLeft, plotsSignature, plotStage, workDoing, workStatus } from './sim/plots';
 import { buildPlotView, plotSign, PLOT_HALF, TOWER_HALF } from './world/plotview';
 import { bizAtLot, CHAR_MODELS, ensureAutoStaff, isAutoBiz, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
@@ -820,8 +821,14 @@ export class Game {
       if (before.get(id) === now) continue;
       const was = before.get(id)?.split(':') ?? [];
       const stage = plotStage(this.state, id);
-      if (was[2] && !workDoing(this.state, id) && stage !== 'building') toast(`🚧 Lavoro finito: ${WORKS[was[2] as WorkId]?.name ?? ''}`, 'good');
-      if (stage === 'built' && was[1] === 'building') toast(`🏢 ${plotDef(id)?.name.replace(/^Terreno/, 'Palazzo')} è pronto: apri i tuoi negozi!`, 'good');
+      if (was[2] && !workDoing(this.state, id) && stage !== 'building') {
+        toast(`🚧 Lavoro finito: ${WORKS[was[2] as WorkId]?.name ?? ''}`, 'good');
+        addNews(this.state, { icon: '🚧', kind: 'good', text: `${plotDef(id)?.name}: lavoro finito (${WORKS[was[2] as WorkId]?.name.toLowerCase() ?? ''})${stage === 'ready' ? '. Ora puoi costruire il palazzo' : ''}` });
+      }
+      if (stage === 'built' && was[1] === 'building') {
+        toast(`🏢 ${plotDef(id)?.name.replace(/^Terreno/, 'Palazzo')} è pronto: apri i tuoi negozi!`, 'good');
+        addNews(this.state, { icon: '🏢', kind: 'good', text: `${plotDef(id)?.name.replace(/^Terreno/, 'Palazzo')} è pronto: ogni piano è un negozio da aprire` });
+      }
       this.setupPlot(id);
     }
   }

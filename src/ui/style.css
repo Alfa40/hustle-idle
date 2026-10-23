@@ -1640,3 +1640,8 @@ body.is-landscape .upd-pill { left: 50% !important; top: calc(var(--sat) + 8px) 
 
 /* separatore leggero dentro una carta (es. imprevisti in corso) */
 hr.soft { border: none; border-top: 1px solid rgba(0, 0, 0, 0.08); margin: 10px 0; }
+
+/* tasto 📰 Notizie e notizie nuove */
+.hbtn.c-news { --b: #2d6cdf; --bd: #1f4fa8; }
+.card.news-new { box-shadow: inset 4px 0 0 #2d6cdf; }
+.news-tag { color: #2d6cdf; }
