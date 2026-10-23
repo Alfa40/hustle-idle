@@ -1,4 +1,5 @@
 import { CITY_MAP, LOTS, TILE } from '../config/map';
+import { PLOTS } from '../config/plots';
 import type { Game, MapMarker } from '../game';
 import { bizType } from '../config/business';
 import { fillTextIco, measureIco } from './icons';
@@ -37,7 +38,9 @@ function baseMap() {
       const x = col * PX;
       const y = r * PX;
       const lot = LOTS.some((l) => l.char === ch);
-      g.fillStyle = lot ? '#eef0fb' : TILE_COLORS[ch] ?? '#9be07a';
+      // terreno edificabile: terra marrone (il palazzo si vede col suo segnaposto)
+      const plot = PLOTS.some((l) => l.char === ch);
+      g.fillStyle = plot ? '#c9a77c' : lot ? '#eef0fb' : TILE_COLORS[ch] ?? '#9be07a';
       g.fillRect(x, y, PX, PX);
       if (ch === '#') {
         // linea di mezzeria

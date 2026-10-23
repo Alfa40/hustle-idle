@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { gltf, Instancer, placeMatrix, setInstanceVisible, type InstanceHandle } from '../assets';
+import { PLOTS } from '../config/plots';
 import { CITY_MAP, LOTS, TILE, WS, zoneAt, type ZoneId } from '../config/map';
 
 export type Dir = 'N' | 'E' | 'S' | 'W';
@@ -24,6 +25,11 @@ export interface Slot {
 export interface LotSlot extends Slot {
   id: string;
   kind: 'truck' | 'shop';
+}
+
+/** terreno edificabile (config/plots.ts): si disegna in game.ts (`setupPlot`) secondo lo stato */
+export interface PlotSlot extends Slot {
+  id: string;
 }
 
 const ROAD_PIECES: { path: string; conn: Dir[] }[] = [
@@ -64,6 +70,7 @@ export class City {
   restaurants: Slot[] = [];
   homes: Slot[] = [];
   lots: LotSlot[] = [];
+  plots: PlotSlot[] = [];
   board!: Slot;
   dealer!: Slot;
   agency!: Slot;
@@ -277,6 +284,12 @@ export class City {
             break;
           }
           default: {
+            const plot = PLOTS.find((l) => l.char === ch);
+            if (plot) {
+              // il terreno è vuoto: terra, rifiuti, palazzo… li disegna il gioco secondo lo stato
+              this.plots.push({ id: plot.id, pos: front(2.6), dir, center: p.clone(), zone });
+              break;
+            }
             const lot = LOTS.find((l) => l.char === ch);
             if (!lot) break;
             if (lot.kind === 'shop') {

@@ -1,3 +1,4 @@
+import type { SizeId, WorkId } from '../config/plots';
 import { randomLogo, safeLogo, type Logo } from '../logo';
 import { START_MONEY, TIME } from '../config/balance';
 import type { BusinessType, Role, UpgradeId } from '../config/business';
@@ -171,6 +172,12 @@ export interface CalEvent {
   endDay: number;
 }
 
+export interface PlotState {
+  works: Partial<Record<WorkId, number>>;
+  size?: SizeId;
+  buildEnd?: number;
+}
+
 export interface GameState {
   version: 1;
   /** partita developer (src/dev.ts): mai in classifica */
@@ -232,6 +239,11 @@ export interface GameState {
   guides?: string[];
   /** guide spente (anteprima di una proposta con "Gioca subito") */
   guidesOff?: boolean;
+  /**
+   * terreni comprati (src/config/plots.ts, sim/plots.ts): lavori fatti o in corso (minuto di gioco in cui
+   * finiscono) e palazzo (misura e minuto in cui è finito). C'è la chiave = il terreno è tuo.
+   */
+  plots?: Record<string, PlotState>;
   /** le attività di prima sono già diventate automatiche (personale assunto una volta, src/game.ts) */
   allAuto?: boolean;
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */

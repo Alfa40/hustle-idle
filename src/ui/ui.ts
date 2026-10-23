@@ -7,6 +7,8 @@ import { extraRoom, hasInterior, LAYOUTS, productLevel } from '../config/recipes
 import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf, weekday, type DayHappening } from '../sim/effects';
 import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
+import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, type SizeId, type WorkId } from '../config/plots';
+import { buildCost, buyPlot, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
 import type { ActionPrompt, Game, MapMarker } from '../game';
@@ -30,7 +32,7 @@ import { CRAFT_JOBS, SPECIALS_PER_DAY, specialOrders, specialTime } from '../sim
 import { GLAZES, VASES, vaseSvg } from '../world/ceramics';
 import { advance, canRent, RENT_MAX_HOURS, weeklyDaysLeft, type OfflineReport } from '../sim/calendar';
 import {
-  bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
+  allLots, bizAtLot, capacityAt, makeCandidate, shiftOf, buyLot, sellBusiness, sellValue, evolveBusiness, evolveLots, evolveMissing, evolvePrice, buyStock, buyUpgrade, estimateLot, estimateMonthlyProfit, canMove, canTrain, hasCashUpgrade, empStat, moveEmployee, moveTargets, fmtRate, MAX_LEVEL, MAX_STARS, PARTIAL_DAYS, partialIn, REPORT_DAYS, startTraining, trainingCost, trainingDays, xpForEmpLevel, resetBizStats, weekDays, fameMultiplier, fire, hasManager,
   hire, isAutonomous, isOpenHour, shiftsFor, employeeRate, lotDef, lotPrice, lotZone, marketDemand, MAX_ORDERS, menuSlots, monthlyCosts, productDemand,
   refreshCandidates, stockCap, totalDemand, typesForLot, upg, upgradeMultiplier, vehiclesMonthly,
   isAutoBiz,
@@ -1075,20 +1077,20 @@ export class UI {
               <div class="stat s-green"><b class="money-t">${euro(150)}–${euro(400)}+</b><span>a lavoro, fatto da te</span></div>
             </div>
             <button class="btn good full" style="margin-top:10px" data-a="buy:${lotId}|${t}" ${!canBuy || s.money < price ? 'disabled' : ''}>🛒 Apri per ${euro(price)}</button>
-            ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">Lotto ${euro(lot.price)} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
+            ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">${lot.price ? `Lotto ${euro(lot.price)}` : 'Piano del tuo palazzo'} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
           </div>`;
         }
         return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
             <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small explain">${def.desc}</div></div></div>
           ${this.estStats(lotId, t)}
           <button class="btn good full" style="margin-top:10px" data-a="buy:${lotId}|${t}" ${!canBuy || s.money < price ? 'disabled' : ''}>🛒 Apri per ${euro(price)}</button>
-          ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">Lotto ${euro(lot.price)} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
+          ${def.setupCost ? `<div class="muted small center" style="margin-top:4px">${lot.price ? `Lotto ${euro(lot.price)}` : 'Piano del tuo palazzo'} + attrezzatura ${euro(def.setupCost)}</div>` : ''}
         </div>`;
       })
       .join('');
     return `<div class="grid2">
         <div class="stat s-purple"><b>📍 ${ZONES[zone].name}</b><span>zona · clienti ×${ZONES[zone].demand}</span></div>
-        <div class="stat s-orange"><b>${euro(lot.rent)}</b><span>${lot.kind === 'truck' ? '🅿️ posteggio' : '🏠 affitto'} al mese</span></div>
+        <div class="stat s-orange"><b>${euro(lot.rent)}</b><span>${lot.kind === 'truck' ? '🅿️ posteggio' : parseFloorLot(lotId) ? '🏢 spese del palazzo' : '🏠 affitto'} al mese</span></div>
       </div>
       ${canBuy ? '' : `<div class="card tint small" style="margin-top:10px">🏢 Si compra all'<b>agenzia affari</b> o davanti al cartello rosso</div>
         <button class="btn blue full" data-a="target:${lotId}" style="margin-top:8px">📍 Imposta come obiettivo sulla mappa</button>`}
@@ -1130,6 +1132,126 @@ export class UI {
         this.openBusiness(b.id, k === 'service' ? 'ordini' : k === 'craft' ? 'lavori' : 'prodotti');
       },
     };
+  }
+
+  /**
+   * Terreno edificabile (config/plots.ts): comprarlo, pagare i lavori per sistemarlo, scegliere il palazzo da
+   * costruire e, finito, aprire un negozio a ogni piano. `canBuy`: da davanti al terreno o all'agenzia.
+   */
+  openPlot(id: string, canBuy = true) {
+    const def = plotDef(id)!;
+    let shown = '';
+    const refresh = () => {
+      this.game.setupPlot(id);
+      this.game.save();
+    };
+    this.open({
+      guide: 'plot',
+      money: true,
+      live: true,
+      title: plotStage(this.s, id) === 'built' ? `🏢 ${def.name.replace(/^Terreno/, 'Palazzo')}` : `🏞️ ${def.name}`,
+      color: 'var(--orange)',
+      render: () => this.plotCard(id, canBuy),
+      // la guida di ogni momento (comprare, lavori, costruire, piani), la prima volta che arriva
+      after: () => {
+        const st = plotStage(this.s, id);
+        const key = st === 'sale' ? (canBuy ? 'buy' : '') : st === 'works' ? 'works' : st === 'ready' ? 'build' : st === 'built' ? 'floors' : '';
+        if (key && key !== shown) {
+          shown = key;
+          this.guideLater(`plot/${key}`);
+        }
+      },
+      actions: {
+        buyPlot: () => {
+          if (buyPlot(this.s, id)) refresh();
+        },
+        work: (w: string) => {
+          if (startWork(this.s, id, w as WorkId)) refresh();
+        },
+        build: (size: string) => {
+          if (startBuild(this.s, id, size as SizeId)) refresh();
+        },
+        floor: (lotId: string) => {
+          const b = bizAtLot(this.s, lotId);
+          if (b) this.openBusiness(b.id);
+          else this.openLot(lotId);
+        },
+      },
+    });
+  }
+
+  private plotCard(id: string, canBuy: boolean) {
+    const s = this.s;
+    const def = plotDef(id)!;
+    const zone = plotZone(id);
+    const stage = plotStage(s, id);
+    const crew = ownCrew(s);
+    const head = `<div class="grid2">
+        <div class="stat s-purple"><b>📍 ${ZONES[zone].name}</b><span>zona · clienti ×${ZONES[zone].demand}</span></div>
+        <div class="stat s-orange"><b>${stage === 'sale' ? euro(def.price) : stage === 'built' ? `${SIZES[s.plots![id].size!].shops} negozi` : '✅ Tuo'}</b><span>${stage === 'sale' ? '🏞️ prezzo del terreno' : stage === 'built' ? `🏢 ${SIZES[s.plots![id].size!].name}` : '🏞️ terreno'}</span></div>
+      </div>`;
+    const works = def.works.map((w) => {
+      const st = workStatus(s, id, w);
+      const W = WORKS[w];
+      const cost = workCost(s, id, w);
+      const left = st === 'doing' ? plotLeft(s, id) : 0;
+      const right = st === 'done' ? '<span class="tag g">✅ Fatto</span>'
+        : st === 'doing' ? `<span class="tag">⏳ ${leftText(left)}</span>`
+        : stage === 'sale' ? `<b>${euro(cost)}</b>` : '';
+      const btn = stage === 'works' && st === 'todo'
+        ? `<button class="btn sm full ${s.money >= cost && !workDoing(s, id) ? 'blue' : 'sec'}" data-a="work:${w}" ${s.money < cost || workDoing(s, id) ? 'disabled' : ''}>${workDoing(s, id) ? '⏳ Prima finisce l\'altro lavoro' : `${W.icon} ${W.name} · ${euro(cost)} · ${W.hours} h`}</button>` : '';
+      const bar = st === 'doing' ? `<div class="bar green"><i style="width:${(1 - left / (W.hours * 60)) * 100}%"></i></div>` : '';
+      return `<div class="card"><div class="row between"><b>${W.icon} ${W.issue}</b>${right}</div>${bar}${btn}</div>`;
+    }).join('');
+    const crewTag = crew ? '<div class="card tint small">🛠️ Hai un\'impresa di costruzioni o ristrutturazioni: lavori a <b>metà prezzo</b></div>' : '';
+    if (stage === 'sale') {
+      const tot = def.works.reduce((a, w) => a + workCost(s, id, w), 0);
+      return `${head}
+        ${points('Compra il terreno', 'Paga i lavori per sistemarlo', 'Poi costruisci il palazzo: più è grande, più negozi', 'Ogni piano è un negozio tuo: niente affitto, solo le spese')}
+        <h3 class="sec-title">🚧 Da sistemare</h3>${works}
+        <div class="muted small center">Lavori in tutto: ${euro(tot)}${crew ? ' (metà prezzo con la tua impresa)' : ''}</div>
+        <button class="btn good full" style="margin-top:10px" data-a="buyPlot" ${!canBuy || s.money < def.price ? 'disabled' : ''}>🛒 Compra il terreno · ${euro(def.price)}</button>
+        ${canBuy ? '' : '<div class="muted small center">Per comprare vai davanti al terreno o all\'agenzia affari</div>'}`;
+    }
+    if (stage === 'works') {
+      return `${head}${points('Un lavoro alla volta', 'Il tempo passa anche a gioco chiuso', 'Finiti tutti: puoi costruire')}${crewTag}
+        <h3 class="sec-title">🚧 Lavori per sistemare il terreno</h3>${works}`;
+    }
+    if (stage === 'ready') {
+      const cards = (Object.keys(SIZES) as SizeId[]).map((k) => {
+        const z = SIZES[k];
+        const cost = buildCost(id, k);
+        return `<div class="card"><div class="row"><div class="icon-bubble">${z.icon}</div><div style="flex:1"><h3 style="margin:0">${z.name}</h3><div class="muted small">${z.shops} piani · ${z.shops} negozi</div></div></div>
+          <div class="grid2" style="margin-top:8px">
+            <div class="stat s-purple"><b>${z.shops}</b><span>🏬 negozi</span></div>
+            <div class="stat s-orange"><b>${z.days} giorni</b><span>⏳ di cantiere</span></div>
+          </div>
+          <div class="muted small" style="margin-top:6px">Spese del palazzo: ${euro(FLOOR_RENT[zone])}/mese per negozio aperto</div>
+          <button class="btn good full" style="margin-top:8px" data-a="build:${k}" ${s.money < cost ? 'disabled' : ''}>🏗️ Costruisci · ${euro(cost)}</button></div>`;
+      }).join('');
+      return `${head}<div class="card tint small">✅ Terreno sistemato: scegli il palazzo</div>${points('Più grande = più negozi', 'Più grande = più caro e più giorni di cantiere', 'Il cantiere va avanti anche a gioco chiuso')}
+        <h3 class="sec-title">🏗️ Cosa costruisci</h3>${cards}`;
+    }
+    const ps = s.plots![id];
+    const z = SIZES[ps.size!];
+    if (stage === 'building') {
+      const left = plotLeft(s, id);
+      return `${head}<div class="card"><div class="row between"><b>🏗️ Cantiere: ${z.name}</b><span class="tag">⏳ ${leftText(left)}</span></div>
+        <div class="bar green"><i style="width:${(1 - left / (z.days * 1440)) * 100}%"></i></div>
+        <div class="muted small" style="margin-top:6px">${z.shops} negozi pronti alla fine dei lavori</div></div>
+        ${points('Va avanti anche a gioco chiuso', 'Finito: ogni piano è un negozio da aprire')}`;
+    }
+    const floors = Array.from({ length: z.shops }, (_, i) => {
+      const lotId = floorLotId(id, i + 1);
+      const b = bizAtLot(s, lotId);
+      const d = b ? bizType(b.type) : null;
+      return `<button class="card row" style="width:100%;border:none;text-align:left;cursor:pointer" data-a="floor:${lotId}">
+        <div class="icon-bubble" ${d ? `style="background:${d.color};color:#fff"` : ''}>${d ? d.icon : '🏬'}</div>
+        <div style="flex:1"><b>Piano ${i + 1}</b><div class="muted small">${d ? `${d.name} · oggi <b class="money-t">${euro(b!.today.revenue)}</b>` : 'Libero: apri un\'attività'}</div></div><span class="grp-arrow">›</span></button>`;
+    }).reverse().join('');
+    const free = Array.from({ length: z.shops }, (_, i) => floorLotId(id, i + 1)).filter((l) => !bizAtLot(s, l)).length;
+    return `${head}${points('Ogni piano è un negozio tuo', 'Niente prezzo del posto: paghi solo l\'attrezzatura', `Spese: ${euro(FLOOR_RENT[zone])}/mese per negozio aperto`)}
+      <h3 class="sec-title">🏢 Piani${free ? ` · ${free} liberi` : ''}</h3>${floors}`;
   }
 
   openLot(lotId: string) {
@@ -1175,6 +1297,8 @@ export class UI {
           sel = null;
         },
         lot: (id) => (sel = id),
+        // terreno: la sua finestra in avanti (si compra solo all'agenzia o davanti al terreno)
+        plot: (id) => this.openPlot(id, atAgency),
         grp: (id) => {
           if (!this.bizGroupsOpen.delete(id)) this.bizGroupsOpen.add(id);
         },
@@ -1257,8 +1381,7 @@ export class UI {
         return `<button class="btn sm sec" data-a="back" style="margin-bottom:10px">◀ Tutti i lotti</button>
           <h3 class="sec-title" style="margin-top:0">🏷️ ${lotDef(sel).name}</h3>${this.lotCard(sel, atAgency)}`;
       }
-      const free = LOTS.filter((l) => !bizAtLot(s, l.id)).sort((a, b) => a.price - b.price);
-      if (!free.length) return '<div class="card center">Hai comprato tutti i lotti della città! 🏆</div>';
+      const free = allLots(s).filter((l) => !bizAtLot(s, l.id)).sort((a, b) => a.price - b.price);
       const row = (l: (typeof LOTS)[number]) => {
         const types = typesForLot(l.id).map((t) => bizType(t).icon).join(' ');
         const from = Math.min(...typesForLot(l.id).map((t) => lotPrice(l.id, t)));
@@ -1268,10 +1391,31 @@ export class UI {
           <div style="text-align:right"><div class="muted small">da</div><b class="${s.money >= from ? 'money-t' : ''}">${euro(from)}</b></div></button>`;
       };
       const trucks = free.filter((l) => l.kind === 'truck').map(row).join('');
-      const shops = free.filter((l) => l.kind === 'shop').map(row).join('');
+      // piani liberi: una riga per palazzo (si apre il palazzo coi suoi piani)
+      const freeIn = new Map<string, number>();
+      for (const l of free) {
+        const fl = parseFloorLot(l.id);
+        if (fl) freeIn.set(fl.plot, (freeIn.get(fl.plot) ?? 0) + 1);
+      }
+      const floors = [...freeIn].map(([pid, n]) => `<button class="card row" style="width:100%;border:none;text-align:left;cursor:pointer" data-a="plot:${pid}">
+          <div class="icon-bubble">🏢</div>
+          <div style="flex:1"><b>${plotDef(pid)!.name.replace(/^Terreno/, 'Palazzo')}</b><div class="muted small">📍 ${ZONES[plotZone(pid)].name} · ${n} ${n === 1 ? 'piano libero' : 'piani liberi'}</div></div>
+          <div style="text-align:right"><div class="muted small">posto</div><b class="money-t">gratis</b></div></button>`).join('');
+      const shops = free.filter((l) => l.kind === 'shop' && !parseFloorLot(l.id)).map(row).join('');
+      // terreni: quelli in vendita e i tuoi non ancora finiti (lavori, cantiere)
+      const plots = PLOTS.filter((p) => plotStage(s, p.id) !== 'built').sort((a, b) => a.price - b.price).map((p) => {
+        const st = plotStage(s, p.id);
+        const what = st === 'sale' ? p.works.map((w) => WORKS[w].icon).join(' ') : st === 'works' ? '🚧 lavori' : st === 'ready' ? '✅ pronto per costruire' : `🏗️ cantiere · ${leftText(plotLeft(s, p.id))}`;
+        return `<button class="card row" style="width:100%;border:none;text-align:left;cursor:pointer" data-a="plot:${p.id}">
+          <div class="icon-bubble">🏞️</div>
+          <div style="flex:1"><b>${p.name}</b><div class="muted small">📍 ${ZONES[plotZone(p.id)].name} · ${what}</div></div>
+          <div style="text-align:right">${st === 'sale' ? `<div class="muted small">terreno</div><b class="${s.money >= p.price ? 'money-t' : ''}">${euro(p.price)}</b>` : '<span class="tag g">Tuo</span>'}</div></button>`;
+      }).join('');
       return `${atAgency ? '' : '<div class="card tint small">🏢 Qui puoi guardare. Per comprare vai all\'<b>agenzia affari</b> o davanti al lotto.</div>'}
+        ${floors ? `<h3 class="sec-title">🏢 Piani liberi nei tuoi palazzi</h3>${floors}` : ''}
         ${trucks ? `<h3 class="sec-title">🅿️ Posteggi per food truck</h3>${trucks}` : ''}
-        ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}`;
+        ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}
+        ${plots ? `<h3 class="sec-title">🏞️ Terreni: costruisci un palazzo</h3>${points('Finiti i locali? Compra un terreno', 'Sistemalo e costruisci: ogni piano è un negozio')}${plots}` : ''}`;
     }
     if (tab === 'resoconti') {
       // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
@@ -3207,7 +3351,9 @@ export class UI {
 
   /** "Dettagli" dalla mappa: apre la scheda giusta senza poter comprare a distanza. */
   private openFromMap(m: MapMarker) {
-    if (m.kind === 'lot' || m.kind === 'biz') {
+    // terreno o palazzo: la sua finestra, senza comprare a distanza
+    if (m.id.startsWith('plot:')) this.openPlot(m.id.slice(5), false);
+    else if (m.kind === 'lot' || m.kind === 'biz') {
       const lotId = m.id.slice(4);
       const biz = bizAtLot(this.s, lotId);
       if (biz) this.openBusiness(biz.id);
@@ -4117,7 +4263,7 @@ export class UI {
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
-      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button></div>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button></div>
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
@@ -4140,6 +4286,14 @@ export class UI {
     return {
       devMoney: () => addMoney(s, 1_000_000_000),
       devHour: () => advance(s, 60),
+      // terreni: lavori in corso e cantieri finiti subito
+      devPlots: () => {
+        for (const ps of Object.values(s.plots ?? {})) {
+          for (const w of Object.keys(ps.works) as WorkId[]) ps.works[w] = Math.min(ps.works[w]!, s.minutes);
+          if (ps.buildEnd !== undefined) ps.buildEnd = Math.min(ps.buildEnd, s.minutes);
+        }
+        toast('🏗️ Lavori e cantieri finiti', 'info');
+      },
       devMorning: () => this.game.sleep(),
       devTut: () => {
         s.jobTutorials = [];

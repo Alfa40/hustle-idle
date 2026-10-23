@@ -85,6 +85,17 @@ const SPECIAL: [number, number, number, number, string][] = [
   [3, 3, 2, 0, '7'],
   [3, 5, 2, 0, 'j'],
   [5, 3, 2, 0, '6'],
+  // terreni edificabili (config/plots.ts): si compra il terreno e ci si costruisce un palazzo di negozi.
+  // Mai al posto delle case della città originale (sono le case dell'agenzia immobiliare: cambierebbero quelle comprate)
+  [-2, -1, 2, 1, '!'],
+  [10, 6, 2, 1, '@'],
+  [10, 2, 2, 1, '$'],
+  [-1, 7, 2, 1, '%'],
+  [2, 4, 2, 0, '&'],
+  [6, 4, 2, 2, '*'],
+  [3, 2, 2, 2, '+'],
+  [3, 5, 2, 1, '='],
+  [5, 3, 2, 1, '~'],
   // posti nuovi (anche nei quartieri attorno: righe e colonne da −2 a 10)
   [-2, 5, 2, 1, 'a'],
   [4, -2, 2, 1, 'd'],

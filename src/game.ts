@@ -12,6 +12,9 @@ import { CAMERA_MULT, onSettings, QUALITY_PIXEL_RATIO, settings } from './settin
 import { ensureWeather } from './sim/effects';
 import { bus, toast } from './sim/bus';
 import { advance, applyOffline, ensureWeekly, genMissions, missionProgress, RENT_PER_HOUR, updateEvents, type OfflineReport } from './sim/calendar';
+import { floorLotId, parseFloorLot, plotDef, SIZES, WORKS, type WorkId } from './config/plots';
+import { plotLeft, plotsSignature, plotStage, workDoing, workStatus } from './sim/plots';
+import { buildPlotView, plotSign, PLOT_HALF, TOWER_HALF } from './world/plotview';
 import { bizAtLot, CHAR_MODELS, ensureAutoStaff, isAutoBiz, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
 import { effectiveJobLevel, EVOLVE_EVERY, readyJobTypes } from './config/careers';
@@ -325,6 +328,8 @@ export class Game {
     this.traffic = new Traffic(this.city, 44, 26, CHAR_MODELS);
     this.scene.add(this.traffic.group);
     for (const l of this.city.lots) lotZone[l.id] = l.zone;
+    // i piani dei palazzi sono nella zona del loro terreno
+    for (const pl of this.city.plots) for (let n = 1; n <= 12; n++) lotZone[floorLotId(pl.id, n)] = pl.zone;
 
     // bacheca, casa, concessionaria e agenzia non dipendono dalla partita
     this.setupPlaces();
@@ -363,6 +368,8 @@ export class Game {
     if (this.state.candidatesDay !== day(this.state)) refreshCandidates(this.state);
 
     for (const lot of this.city.lots) this.setupLot(lot.id);
+    for (const pl of this.city.plots) this.setupPlot(pl.id);
+    this.plotsSig = plotsSignature(this.state);
     this.refreshHomes();
     void this.refreshFriends();
     // le attività degli amici (e chi sta giocando) si aggiornano ogni 2 minuti;
@@ -735,7 +742,89 @@ export class Game {
 
   // ---------------- lotti e food truck ----------------
 
+  /** terreni: cosa c'è adesso in città (per ridisegnarli) */
+  private plotSites = new Map<string, { group: THREE.Group; inter: Interactable }>();
+  private plotsSig = '';
+  private plotTimer = 0;
+
+  /**
+   * Terreno edificabile (config/plots.ts): terra con i problemi da sistemare, cantiere o palazzo coi negozi.
+   * Toccandolo si apre la sua finestra (comprare, lavori, costruire, piani).
+   */
+  setupPlot(id: string) {
+    const old = this.plotSites.get(id);
+    if (old) {
+      this.scene.remove(old.group);
+      this.removeInteractable(old.inter);
+    }
+    const slot = this.city.plots.find((p) => p.id === id);
+    const def = plotDef(id);
+    if (!slot || !def) return;
+    const s = this.state;
+    const stage = plotStage(s, id);
+    const ps = s.plots?.[id];
+    const size = ps?.size ? SIZES[ps.size] : null;
+    const shops = size ? Array.from({ length: size.shops }, (_, i) => {
+      const b = bizAtLot(s, floorLotId(id, i + 1));
+      return b ? { color: bizType(b.type).color, icon: bizType(b.type).icon, name: bizType(b.type).name } : {};
+    }) : [];
+    const g = buildPlotView({
+      seed: id, stage,
+      todo: def.works.filter((w) => workStatus(s, id, w) !== 'done'),
+      doing: workDoing(s, id),
+      floors: size?.shops, progress: ps?.buildEnd !== undefined && size ? 1 - plotLeft(s, id) / (size.days * 1440) : 0,
+      shops, logo: s.logo,
+    });
+    g.position.copy(slot.center);
+    g.rotation.y = DIR_ROT[slot.dir];
+    // cartello davanti, verso la strada (non sul palazzo finito: lì ci sono le insegne dei piani)
+    if (stage !== 'built') {
+      const sign = stage === 'sale' ? plotSign('🏞️ TERRENO', '€' + def.price.toLocaleString('it-IT'), '#e53935')
+        : stage === 'building' ? plotSign('🏗️ CANTIERE', `${size?.name ?? ''}`, '#f08c00')
+        : stage === 'ready' ? plotSign('✅ PRONTO', 'si può costruire', '#2f9e44')
+        : plotSign('🚧 LAVORI', workDoing(s, id) ? 'in corso' : 'da fare', '#e8590c');
+      sign.position.set(PLOT_HALF * 0.55, 0, PLOT_HALF - 0.3);
+      g.add(sign);
+    }
+    this.scene.add(g);
+    // il palazzo non si attraversa
+    this.city.colliders = this.city.colliders.filter((c) => (c as { plot?: string }).plot !== id);
+    if (stage === 'built' || stage === 'building') {
+      const h = TOWER_HALF + (stage === 'building' ? 0.3 : 0);
+      this.city.colliders.push(Object.assign({ minX: slot.center.x - h, maxX: slot.center.x + h, minZ: slot.center.z - h, maxZ: slot.center.z + h }, { plot: id }));
+    }
+    const label = stage === 'sale' ? 'Terreno in vendita' : stage === 'built' ? `${size?.name ?? 'Palazzo'}: i tuoi negozi` : stage === 'building' ? 'Cantiere del palazzo' : 'Il tuo terreno';
+    const inter = this.addInteractable({
+      pos: slot.pos.clone(), radius: 2.6, label, icon: stage === 'built' ? '🏢' : stage === 'building' ? '🏗️' : '🏞️',
+      action: () => this.ui.openPlot(id),
+    });
+    this.plotSites.set(id, { group: g, inter });
+  }
+
+  /** lavori finiti, cantiere avanti o palazzo pronto: si ridisegna il terreno e si avvisa */
+  private updatePlots() {
+    const sig = plotsSignature(this.state);
+    if (sig === this.plotsSig) return;
+    const before = new Map(this.plotsSig.split('|').filter(Boolean).map((x) => [x.split(':')[0], x]));
+    this.plotsSig = sig;
+    for (const id of Object.keys(this.state.plots ?? {})) {
+      const now = sig.split('|').find((x) => x.startsWith(id + ':'));
+      if (before.get(id) === now) continue;
+      const was = before.get(id)?.split(':') ?? [];
+      const stage = plotStage(this.state, id);
+      if (was[2] && !workDoing(this.state, id) && stage !== 'building') toast(`🚧 Lavoro finito: ${WORKS[was[2] as WorkId]?.name ?? ''}`, 'good');
+      if (stage === 'built' && was[1] === 'building') toast(`🏢 ${plotDef(id)?.name.replace(/^Terreno/, 'Palazzo')} è pronto: apri i tuoi negozi!`, 'good');
+      this.setupPlot(id);
+    }
+  }
+
   setupLot(lotId: string) {
+    // negozio al piano di un tuo palazzo: si ridisegna il palazzo (insegne dei piani)
+    const fl = parseFloorLot(lotId);
+    if (fl) {
+      this.setupPlot(fl.plot);
+      return;
+    }
     const old = this.trucks.get(lotId);
     if (old) {
       this.scene.remove(old.group);
@@ -1405,6 +1494,15 @@ export class Game {
 
   /** Obiettivo sulla mappa: un lotto in vendita (dalla lista delle attività), per andarci a comprarlo. */
   setLotTarget(lotId: string) {
+    // piano di un palazzo o terreno: si va al terreno
+    const pid = parseFloorLot(lotId)?.plot ?? (plotDef(lotId) ? lotId : null);
+    const pl = pid ? this.city.plots.find((p) => p.id === pid) : null;
+    if (pl) {
+      const name = plotDef(pl.id)!.name;
+      this.waypoint = { id: 'plot:' + pl.id, x: pl.center.x, z: pl.center.z, icon: '🏞️', label: name };
+      toast(`📍 Obiettivo: ${name}. Segui la linea sulla strada e le frecce`, 'info');
+      return;
+    }
     const lot = this.city.lots.find((l) => l.id === lotId);
     if (!lot) return;
     const name = LOTS.find((l) => l.id === lotId)?.name ?? 'Lotto';
@@ -1446,6 +1544,24 @@ export class Game {
           id: 'lot:' + lot.id, icon: '🏷️', color: '#ff5d73', label: `${def.kind === 'truck' ? 'Posteggio' : 'Locale'} in vendita · ${def.name}`,
           sub: `${zone} · da €${Math.min(...typesForLot(lot.id).map((t) => lotPrice(lot.id, t))).toLocaleString('it-IT')}`,
           kind: 'lot', cat: 'forsale', keywords: `${types} vendita comprare lotto`,
+        });
+      }
+    }
+    // terreni e palazzi
+    for (const pl of this.city.plots) {
+      const def = plotDef(pl.id)!;
+      const st = plotStage(this.state, pl.id);
+      const zone = ZONES[pl.zone].name;
+      if (st === 'sale') {
+        add(pl.center, { id: 'plot:' + pl.id, icon: '🏞️', color: '#e8590c', label: `Terreno in vendita · ${def.name}`, sub: `${zone} · €${def.price.toLocaleString('it-IT')} · costruisci un palazzo`, kind: 'lot', cat: 'forsale', keywords: 'terreno palazzo costruire negozi vendita' });
+      } else {
+        const size = this.state.plots![pl.id].size;
+        const bizs = size ? Array.from({ length: SIZES[size].shops }, (_, i) => bizAtLot(this.state, floorLotId(pl.id, i + 1))).filter((b) => !!b) : [];
+        add(pl.center, {
+          id: 'plot:' + pl.id, icon: st === 'built' ? '🏢' : '🏗️', color: '#e8590c',
+          label: st === 'built' ? `${SIZES[size!].name} · ${def.name.replace(/^Terreno/, '').trim()}` : `Il tuo terreno · ${def.name}`,
+          sub: st === 'built' ? `${bizs.length}/${SIZES[size!].shops} negozi aperti · ${zone}` : st === 'building' ? `Cantiere · ${zone}` : `Lavori · ${zone}`,
+          kind: 'biz', cat: 'mine', keywords: `palazzo terreno mia mie ${bizs.map((b) => bizType(b.type).name).join(' ')}`,
         });
       }
     }
@@ -1699,6 +1815,11 @@ export class Game {
     this.player.update(dt);
     this.updateLighting();
     this.updateLotsOpen();
+    this.plotTimer += dt;
+    if (this.plotTimer > 1) {
+      this.plotTimer = 0;
+      this.updatePlots();
+    }
 
     this.saveTimer += dt;
     if (this.saveTimer > 10) this.save();

@@ -8,7 +8,8 @@ import { VEHICLES } from '../config/vehicles';
 import { bizSectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { ALL_AUTO, BUSINESS_TYPES } from '../config/business';
-import { LOTS, ZONES, type ZoneId } from '../config/map';
+import { LOTS, ZONES, type LotDef, type ZoneId } from '../config/map';
+import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, SIZES } from '../config/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
 import { demandCurve, inShift, planRole, planShifts, shortRanges, SHIFT_HOURS, type Shift } from './shifts';
@@ -29,7 +30,27 @@ export const CHAR_MODELS = [
 /** Zona di ogni lotto, calcolata dalla mappa all'avvio. */
 export const lotZone: Record<string, ZoneId> = {};
 
-export const lotDef = (id: string) => LOTS.find((l) => l.id === id)!;
+/** Un posto: quelli della città (LOTS) o un piano di un tuo palazzo (config/plots.ts, id `terrenoN-pK`). */
+export const lotDef = (id: string): LotDef => {
+  const fl = parseFloorLot(id);
+  if (!fl) return LOTS.find((l) => l.id === id)!;
+  const plot = plotDef(fl.plot);
+  // il palazzo è tuo: niente prezzo del posto, solo le spese del palazzo
+  return { id, char: '', kind: 'shop', name: `${plot?.name.replace(/^Terreno/, 'Palazzo') ?? 'Palazzo'} · piano ${fl.floor}`, price: 0, rent: FLOOR_RENT[lotZone[id] ?? 'periferia'] };
+};
+
+/** piani dei tuoi palazzi finiti: ognuno è un posto per un negozio */
+export function floorLots(s: GameState): LotDef[] {
+  const out: LotDef[] = [];
+  for (const [id, ps] of Object.entries(s.plots ?? {})) {
+    if (!ps.size || ps.buildEnd === undefined || s.minutes < ps.buildEnd) continue;
+    for (let n = 1; n <= SIZES[ps.size].shops; n++) out.push(lotDef(floorLotId(id, n)));
+  }
+  return out;
+}
+
+/** tutti i posti dove si può aprire un'attività: quelli della città e i piani dei tuoi palazzi */
+export const allLots = (s: GameState) => [...LOTS, ...floorLots(s)];
 export const bizAtLot = (s: GameState, lotId: string) => s.businesses.find((b) => b.lotId === lotId);
 
 // ---------------- domanda ----------------
@@ -432,7 +453,7 @@ export const evolvePrice = (lotId: string, target: BusinessType, own?: string) =
  * il suo stesso locale (`own`), così si evolve anche quando tutti i locali sono già tuoi.
  */
 export const evolveLots = (s: GameState, target: BusinessType, own?: string) =>
-  LOTS.filter((l) => l.kind === bizType(target).lot && (l.id === own || !bizAtLot(s, l.id))).map((l) => l.id);
+  allLots(s).filter((l) => l.kind === bizType(target).lot && (l.id === own || !bizAtLot(s, l.id))).map((l) => l.id);
 
 /**
  * Evolve un'attività: quella vecchia si trasforma (il suo posto torna libero) e la nuova apre nel locale

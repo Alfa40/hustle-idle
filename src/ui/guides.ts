@@ -174,6 +174,28 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { say: '💡 Apri dove i numeri sono alti' },
       ],
     },
+    // terreno edificabile: ogni momento ha la sua guida la prima volta che compare
+    'panel:plot': {
+      steps: [
+        { at: `${M} .stat.s-purple`, say: '📍 La zona: in centro più clienti, lavori più cari' },
+        { at: `${M} .help-q:not([hidden])`, say: '❓ Il ? spiega come si costruisce' },
+      ],
+    },
+    'plot/buy': {
+      steps: [
+        { at: `${M} .sec-title`, say: '🚧 Questi lavori servono per sistemare il terreno' },
+        { at: btnStart('buyPlot'), say: '🛒 Prima compri il terreno' },
+      ],
+    },
+    'plot/works': {
+      steps: [{ at: btnStart('work:'), say: '🚧 Paga un lavoro: dura qualche ora di gioco' }],
+    },
+    'plot/build': {
+      steps: [{ at: btnStart('build:'), say: '🏗️ Scegli il palazzo: più grande, più negozi' }],
+    },
+    'plot/floors': {
+      steps: [{ at: btnStart('floor:'), say: '🏬 Ogni piano è un negozio: tocca per aprirlo' }],
+    },
     'panel:lot': {
       steps: [
         { at: `${M} .stat.s-purple`, say: '📍 La zona: in centro ci sono più clienti' },
