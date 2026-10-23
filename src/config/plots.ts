@@ -1,9 +1,8 @@
 import type { ZoneId } from './map';
 
 /**
- * Terreni edificabili: l'ultima spiaggia per allargarsi. Si comprano solo quando hai già TUTTI i negozi della
- * città (`plotsOpen` in sim/plots.ts) e costano molto: servono a chi ha attività tutte redditizie e non vuole
- * venderne. Quando i posti in vendita finiscono, si compra un terreno, si fanno i lavori per
+ * Terreni edificabili: l'ultima spiaggia per allargarsi, per chi ha attività tutte redditizie e non vuole
+ * venderne. Costano molto e le opzioni più grandi chiedono fama (`ZONE_FAME`, `SizeDef.fame`). Quando i posti in vendita finiscono, si compra un terreno, si fanno i lavori per
  * sistemarlo (dipendono da com'è: rudere, rifiuti, alberi, acqua…) e ci si costruisce un palazzo.
  * Ogni piano del palazzo è un negozio tuo (lotto `shop` con id `<terreno>-p<n>`): più grande il palazzo,
  * più negozi. Lo stato di ogni terreno è in `GameState.plots` (sim/plots.ts).
@@ -41,18 +40,24 @@ export interface SizeDef {
   cost: number;
   /** giorni di cantiere */
   days: number;
+  /** fama totale che serve per costruirlo (0 = nessuna) */
+  fame: number;
+  /** manutenzione del palazzo al mese (× zona), anche con i piani vuoti */
+  upkeep: number;
 }
 
 export const SIZES: Record<SizeId, SizeDef> = {
-  piccolo: { name: 'Palazzina', icon: '🏪', shops: 3, cost: 450_000, days: 3 },
-  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 1_100_000, days: 6 },
-  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 2_500_000, days: 10 },
+  piccolo: { name: 'Palazzina', icon: '🏪', shops: 3, cost: 450_000, days: 3, fame: 0, upkeep: 4000 },
+  medio: { name: 'Palazzo', icon: '🏢', shops: 6, cost: 1_100_000, days: 6, fame: 700, upkeep: 10_000 },
+  grande: { name: 'Grattacielo', icon: '🏙️', shops: 10, cost: 2_500_000, days: 10, fame: 1500, upkeep: 25_000 },
 };
 
 /** costruire e sistemare costa di più dove c'è più passaggio */
 export const ZONE_COST: Record<ZoneId, number> = { periferia: 1, residenziale: 1.5, centro: 2.4 };
 /** spese del palazzo al mese per ogni negozio aperto dentro (al posto dell'affitto) */
-export const FLOOR_RENT: Record<ZoneId, number> = { periferia: 250, residenziale: 500, centro: 1000 };
+export const FLOOR_RENT: Record<ZoneId, number> = { periferia: 600, residenziale: 1200, centro: 2500 };
+/** fama totale per comprare un terreno in questa zona (in centro solo chi è già famoso) */
+export const ZONE_FAME: Record<ZoneId, number> = { periferia: 0, residenziale: 300, centro: 700 };
 /** con una tua impresa di costruzioni o ristrutturazioni i lavori del terreno costano la metà */
 export const OWN_CREW_DISCOUNT = 0.5;
 

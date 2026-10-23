@@ -9,7 +9,7 @@ import { bizSectorOn } from '../config/careers';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { ALL_AUTO, BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type LotDef, type ZoneId } from '../config/map';
-import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, SIZES } from '../config/plots';
+import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, SIZES, ZONE_COST } from '../config/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { toast } from './bus';
 import { demandCurve, inShift, planRole, planShifts, shortRanges, SHIFT_HOURS, type Shift } from './shifts';
@@ -845,8 +845,12 @@ export function monthlyCosts(s: GameState, b: Business) {
 
 export const vehiclesMonthly = (s: GameState) => s.vehicles.reduce((a, v) => a + VEHICLES[v].monthly, 0);
 
+/** manutenzione dei tuoi palazzi finiti (config/plots.ts), al mese: si paga anche con i piani vuoti */
+export const palacesMonthly = (s: GameState) => Object.entries(s.plots ?? {}).reduce((a, [id, ps]) =>
+  a + (ps.size && ps.buildEnd !== undefined && s.minutes >= ps.buildEnd ? Math.round(SIZES[ps.size].upkeep * ZONE_COST[lotZone[floorLotId(id, 1)] ?? 'periferia']) : 0), 0);
+
 export function payMonth(s: GameState) {
-  let total = vehiclesMonthly(s);
+  let total = vehiclesMonthly(s) + palacesMonthly(s);
   for (const b of s.businesses) {
     const c = monthlyCosts(s, b);
     const sum = c.rent + c.utilities + c.salaries;
@@ -856,7 +860,7 @@ export function payMonth(s: GameState) {
   }
   if (total > 0) {
     addMoney(s, -total);
-    toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi e assicurazioni`, s.money < 0 ? 'bad' : 'info');
+    toast(`Fine mese: pagati ${euro(total)} tra affitti, bollette, stipendi, assicurazioni e palazzi`, s.money < 0 ? 'bad' : 'info');
   }
 }
 

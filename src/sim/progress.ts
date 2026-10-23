@@ -84,14 +84,16 @@ export function addFame(s: GameState, skill: SkillId, amount: number) {
 export const totalFame = (s: GameState) => SKILL_IDS.reduce((a, k) => a + s.fame[k], 0);
 export const totalLevel = (s: GameState) => SKILL_IDS.reduce((a, k) => a + skillLevel(s, k), 0);
 
+/** ranghi per fama totale (profilo; anche le cose che chiedono fama dicono il rango) */
+export const FAME_RANKS = [
+  [0, 'Squattrinato'], [15, 'Tuttofare'], [50, 'Lavoratore stimato'], [120, 'Piccolo imprenditore'],
+  [300, 'Imprenditore'], [700, 'Uomo d\'affari'], [1500, 'Magnate'],
+] as const;
+
 /** Rango complessivo del giocatore mostrato nel profilo. */
 export function rank(s: GameState) {
   const f = totalFame(s);
-  const ranks = [
-    [0, 'Squattrinato'], [15, 'Tuttofare'], [50, 'Lavoratore stimato'], [120, 'Piccolo imprenditore'],
-    [300, 'Imprenditore'], [700, 'Uomo d\'affari'], [1500, 'Magnate'],
-  ] as const;
-  let r: string = ranks[0][1];
-  for (const [min, name] of ranks) if (f >= min) r = name;
+  let r: string = FAME_RANKS[0][1];
+  for (const [min, name] of FAME_RANKS) if (f >= min) r = name;
   return r;
 }
