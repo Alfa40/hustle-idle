@@ -7,7 +7,7 @@ import { readyJobTypes } from '../config/careers';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
-import { checkDebt, monthEnd } from './crisis';
+import { afterPayments, checkDebt, monthEnd, monthStart } from './crisis';
 import { addNews } from './news';
 import { dailyTroubles } from './troubles';
 import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates, setSimOnline } from './economy';
@@ -68,10 +68,12 @@ export function newDay(s: GameState, online = true) {
   ensureWeekly(s);
   refreshCandidates(s);
   if (dayOfMonth(d) === 1) {
+    // chi aveva iniziato il mese in debito e non è rientrato: bancarotta, partita persa
+    if (monthStart(s)) return;
     payMonth(s);
     monthEnd(s);
-  }
-  checkDebt(s);
+    afterPayments(s);
+  } else checkDebt(s);
   // imprevisti solo col gioco aperto: così si può reagire
   if (online) dailyTroubles(s);
   bus.emit('newday');

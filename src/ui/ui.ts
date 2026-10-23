@@ -3263,6 +3263,38 @@ export class UI {
    * 📰 Notizie: tutto quello che succede (eventi, resoconti pronti, conti di fine mese, crisi, imprevisti, palazzi),
    * le più nuove in alto, da leggere con calma. Aprendola le notizie diventano lette (si spegne il pallino).
    */
+  /**
+   * Bancarotta: la partita è persa (mese iniziato in debito e non saldato, sim/crisis.ts). Riepilogo e
+   * "Ricomincia da capo" (cancella la partita di questo slot). Non si chiude in altro modo.
+   */
+  openBankrupt() {
+    const b = this.s.bankrupt;
+    if (!b || this.panel?.title === '💀 Bancarotta') return;
+    while (this.isOpen) this.close();
+    this.open({
+      title: '💀 Bancarotta',
+      color: '#5a2a2a',
+      locked: true,
+      render: () => `<div class="card center"><h3 style="margin-top:0">Hai finito il mese ancora in debito</h3>
+          <p class="small">La banca ha chiuso tutto: la partita è persa.</p></div>
+        <div class="grid2">
+          <div class="stat s-red"><b>${euro(b.money)}</b><span>💸 debito finale</span></div>
+          <div class="stat s-purple"><b>${dayName(b.day)}</b><span>📅 giorno della bancarotta</span></div>
+          <div class="stat s-green"><b class="money-t">${euro(b.earned)}</b><span>💰 guadagnato in tutto</span></div>
+          <div class="stat s-orange"><b>⭐ ${b.fame}</b><span>fama · ${b.businesses} attività</span></div>
+        </div>
+        ${bullets('Inizi il mese in debito? Hai tempo fino a fine mese', 'Vendi un\'attività o fai lavoretti per rientrare', 'Le attività in perdita per 2 mesi falliscono')}
+        <button class="btn good full" style="margin-top:12px" data-a="restart">🔄 Ricomincia da capo</button>`,
+      actions: {
+        restart: () => {
+          this.game.resetting = true;
+          wipeSave();
+          location.reload();
+        },
+      },
+    });
+  }
+
   openNews() {
     const s = this.s;
     const seen = s.newsSeen ?? 0;
@@ -3280,8 +3312,8 @@ export class UI {
         const count = (k: string) => all.filter((n) => (k === 'tutte' ? true : k === 'dafare' ? this.newsTodo(n) : newsCat(n) === k)).length;
         const chips = NEWS_FILTERS.filter(([k]) => k === 'tutte' || k === 'dafare' || count(k))
           .map(([k, label]) => `<button class="chip ${f === k ? 'on' : ''}" data-a="nf:${k}">${label} <b>${count(k)}</b></button>`).join('');
-        const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
-        const help = points('Qui arriva tutto: eventi, resoconti, conti e problemi', 'Da fare: le notizie che chiedono una tua mossa', 'Tocca una notizia per andare dove si sistema', '4 mesi di fila in perdita: l\'attività fallisce');
+        const debt = s.debtFrom !== undefined ? `<div class="card tint small bad">📮 Sei in debito (${euro(s.money)}): torna sopra zero entro fine mese (${TIME.DAYS_PER_MONTH - dayOfMonth(day(s)) + 1} giorni) o è bancarotta</div>` : '';
+        const help = points('Qui arriva tutto: eventi, resoconti, conti e problemi', 'Da fare: le notizie che chiedono una tua mossa', 'Tocca una notizia per andare dove si sistema', '2 mesi di fila in perdita: l\'attività fallisce', 'Mese iniziato in debito e non saldato: bancarotta');
         const empty = f === 'dafare' ? '✅ Niente da fare: è tutto a posto' : all.length ? 'Nessuna notizia di questo tipo' : 'Ancora nessuna notizia: qui arriveranno eventi, resoconti e problemi delle attività.';
         return `<div class="chips" data-g="news-filters">${chips}</div><!--tabs-->${debt}${help}${list.length ? list.map((n) => {
           const nb = n.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
@@ -4389,7 +4421,7 @@ export class UI {
           <div class="card"><h3>🕹️ Comandi</h3>${bullets(`Muoviti: trascina nella metà ${moveSide()}`, `Azione: sul cerchio a terra tocca la <b>metà ${actSide()}</b>`, '"Tieni premuto": dito giù finché il cerchio è pieno', 'I lati si invertono in ⚙️ Opzioni')}
             <h4 style="margin:8px 0 2px">Nei lavoretti</h4>${bullets(`🕹️ in basso a ${moveSide()} per camminare`, 'Trascina altrove per guardarti attorno', "Tocca l'oggetto che pulsa")}
             <h4 style="margin:8px 0 2px">Su PC</h4>${bullets('WASD o frecce', 'E o spazio per l\'azione')}</div>
-          <div class="card"><h3>⏰ Tempo</h3>${bullets('1 mese di gioco = 2 ore reali', '1 giornata = 4 minuti', `A gioco chiuso il tempo va ${TIME.OFFLINE_SLOWDOWN} volte più piano`, 'Offline le attività guadagnano: 80% (primo giorno), 50% (2 giorni dopo), poi 20%')}</div>`;
+          <div class="card"><h3>⏰ Tempo</h3>${bullets('1 mese di gioco = 4 ore reali', '1 giornata = 8 minuti', `A gioco chiuso il tempo va ${TIME.OFFLINE_SLOWDOWN} volte più piano`, 'Offline le attività guadagnano: 80% (primo giorno), 50% (2 giorni dopo), poi 20%')}</div>`;
       },
       actions: {
         ...this.devActions(),
@@ -4431,7 +4463,7 @@ export class UI {
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
-      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da quasi 2 mesi</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Debito all'ultimo giorno del mese</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
@@ -4467,12 +4499,12 @@ export class UI {
         dailyTroubles(s);
         Object.assign(TROUBLES, keep);
       },
-      // pignoramento: il giorno dopo arriva
+      // bancarotta: in debito dall'inizio del mese, domani si chiude il mese
       devDebt: () => {
         s.money = Math.min(s.money, -5000);
-        s.negSince = s.minutes - (CRISIS.SEIZE_DAYS - 1) * 1440;
-        s.negWarn = CRISIS.SEIZE_WARN_AT.length;
-        toast('📮 Domani il pignoramento (dormi o +1 giorno)', 'info');
+        s.debtFrom = day(s);
+        s.minutes = (Math.floor(day(s) / TIME.DAYS_PER_MONTH) * TIME.DAYS_PER_MONTH + TIME.DAYS_PER_MONTH - 1) * 1440 + 20 * 60;
+        toast('📮 In debito e ultimo giorno del mese: a mezzanotte la bancarotta', 'info');
       },
       // terreni: lavori in corso e cantieri finiti subito
       devPlots: () => {

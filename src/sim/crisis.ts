@@ -1,27 +1,26 @@
 import { CRISIS } from '../config/balance';
 import { bizType } from '../config/business';
-import { VEHICLES } from '../config/vehicles';
 import { bus, toast } from './bus';
-import { lotDef, sellValue } from './economy';
+import { lotDef } from './economy';
 import { addNews } from './news';
-import { euro, type Business, type GameState } from './state';
+import { day, dayOfMonth, euro, type Business, type GameState } from './state';
+import { TIME } from '../config/balance';
+import { totalFame } from './progress';
 
 /**
- * Attività in crisi e fallimento, pignoramento (GDD §"Crisi"). A fine mese ogni attività chiude in guadagno o in
- * perdita (`Business.lastProfit`, lo calcola payMonth): mesi di fila in perdita → avviso, crisi (dimissioni,
- * fama), debiti (merce più cara, nessuno rimpiazza chi se ne va), fallimento (chiude da sola). Un mese in
- * guadagno riporta tutto a zero. Conto sotto zero per troppo tempo → pignoramento.
+ * Attività in crisi e fallimento, bancarotta del giocatore (GDD §"Crisi"). A fine mese ogni attività chiude in
+ * guadagno o in perdita (`Business.lastProfit`, lo calcola payMonth): 1 mese in perdita → in crisi (avviso, fama),
+ * 2 di fila → fallisce e chiude da sola. Un mese in guadagno riporta tutto a zero.
+ * Giocatore: chi **inizia un mese col conto sotto zero** (dopo i pagamenti di fine mese) e non torna sopra zero
+ * prima della fine di quel mese va in **bancarotta**: la partita è persa (`GameState.bankrupt`).
  */
 
-/** stato di un'attività per i mesi di fila in perdita */
-export type BizHealth = 'ok' | 'perdita' | 'crisi' | 'debiti';
+/** stato di un'attività per i mesi di fila in perdita (al secondo fallisce) */
+export type BizHealth = 'ok' | 'crisi';
 
-export const bizHealth = (b: Business): BizHealth => {
-  const r = b.redMonths ?? 0;
-  return r >= 3 ? 'debiti' : r === 2 ? 'crisi' : r === 1 ? 'perdita' : 'ok';
-};
+export const bizHealth = (b: Business): BizHealth => ((b.redMonths ?? 0) >= 1 ? 'crisi' : 'ok');
 
-export const HEALTH_TAG: Record<BizHealth, string> = { ok: '', perdita: '⚠️ In perdita', crisi: '🟠 In crisi', debiti: '🔴 Debiti' };
+export const HEALTH_TAG: Record<BizHealth, string> = { ok: '', crisi: '🟠 In crisi' };
 
 export { addNews };
 
@@ -30,15 +29,6 @@ const bizName = (b: Business) => `${bizType(b.type).icon} ${bizType(b.type).name
 /** fama tolta ai settori dell'attività (una parte, es. 0.1 = 10%) */
 function hitFame(s: GameState, b: Business, share: number) {
   for (const k of bizType(b.type).skills) s.fame[k] *= 1 - share;
-}
-
-/** un dipendente se ne va (mai il manager) */
-function quit(b: Business) {
-  const list = b.staff.filter((e) => e.role !== 'manager');
-  if (!list.length) return null;
-  const e = list[Math.floor(Math.random() * list.length)];
-  b.staff = b.staff.filter((x) => x !== e);
-  return e;
 }
 
 /** chiude l'attività fallita: il posto torna libero, attrezzatura e merce perse */
@@ -51,7 +41,7 @@ function fail(s: GameState, b: Business) {
   bus.emit('lots', b.lotId);
 }
 
-/** Fine mese (dopo payMonth): mesi in perdita, crisi, debiti, fallimenti. */
+/** Fine mese (dopo payMonth): mesi in perdita, crisi e fallimenti. */
 export function monthEnd(s: GameState) {
   for (const b of [...s.businesses]) {
     const red = (b.lastProfit ?? 0) < 0 ? (b.redMonths ?? 0) + 1 : 0;
@@ -59,62 +49,59 @@ export function monthEnd(s: GameState) {
     if (!red) continue;
     const loss = euro(-(b.lastProfit ?? 0));
     if (red >= CRISIS.FAIL_MONTHS) fail(s, b);
-    else if (red === 1) addNews(s, { icon: '⚠️', kind: 'warn', text: `${bizName(b)}: mese in perdita (−${loss}). Altri 3 di fila e fallisce`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' });
     else {
-      // crisi e debiti: qualcuno se ne va, la fama cala
-      const e = quit(b);
       hitFame(s, b, CRISIS.CRISIS_FAME);
-      const who = e ? ` ${e.name.split(' ')[0]} ha lasciato il lavoro.` : '';
-      addNews(s, red === 2
-        ? { icon: '🟠', kind: 'bad', text: `${bizName(b)} è in crisi (−${loss}).${who} Torna in guadagno o tra 2 mesi fallisce`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' }
-        : { icon: '🔴', kind: 'bad', text: `${bizName(b)} ha debiti (−${loss}): merce più cara, nessuno rimpiazza chi se ne va.${who} Ultimo mese`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' });
+      addNews(s, { icon: '🟠', kind: 'bad', text: `${bizName(b)} è in crisi: mese in perdita (−${loss}). Se anche questo mese chiude in perdita, fallisce`, biz: b.id, cat: 'attivita', go: `report:${b.id}`, todo: 'crisis' });
     }
   }
 }
 
-/** Ogni giorno: conto sotto zero da troppo → avvisi, poi pignoramento. */
-export function checkDebt(s: GameState) {
-  if (s.money >= 0) {
-    s.negSince = undefined;
-    s.negWarn = 0;
-    return;
+/** giorni che mancano alla fine del mese (il mese si chiude all'inizio del giorno 1 del mese dopo) */
+const daysToMonthEnd = (s: GameState) => TIME.DAYS_PER_MONTH - dayOfMonth(day(s)) + 1;
+
+/**
+ * Inizio del mese, prima dei pagamenti: chi aveva iniziato il mese scorso in debito e non è rientrato va in
+ * bancarotta. Restituisce true se la partita è persa.
+ */
+export function monthStart(s: GameState) {
+  if (s.debtFrom !== undefined && s.money < 0) {
+    goBankrupt(s);
+    return true;
   }
-  s.negSince ??= s.minutes;
-  const days = (s.minutes - s.negSince) / 1440;
-  const left = Math.ceil(CRISIS.SEIZE_DAYS - days);
-  const warns = CRISIS.SEIZE_WARN_AT;
-  if ((s.negWarn ?? 0) < warns.length && days >= warns[s.negWarn ?? 0]) {
-    s.negWarn = (s.negWarn ?? 0) + 1;
-    addNews(s, { icon: '📮', kind: 'bad', text: `Conto sotto zero (${euro(s.money)}): tra ${left} giorni arriva il pignoramento`, cat: 'soldi', go: 'agency:resoconti', todo: 'debt' });
-    toast(`📮 Conto sotto zero: pignoramento tra ${left} giorni`, 'bad');
-  }
-  if (days >= CRISIS.SEIZE_DAYS) seize(s);
+  return false;
 }
 
-/** Pignoramento: si vendono veicoli e attività che guadagnano meno, a metà valore, finché il conto torna pari. */
-function seize(s: GameState) {
-  const sold: string[] = [];
-  for (const v of [...s.vehicles]) {
-    if (s.money >= 0) break;
-    const val = Math.round(VEHICLES[v].price * CRISIS.SEIZE_SHARE);
-    s.money += val;
-    s.vehicles = s.vehicles.filter((x) => x !== v);
-    if (s.riding === v) s.riding = null;
-    sold.push(`${VEHICLES[v].icon} ${VEHICLES[v].name} (${euro(val)})`);
-  }
-  const byProfit = [...s.businesses].sort((a, b) => (a.lastProfit ?? 0) - (b.lastProfit ?? 0));
-  for (const b of byProfit) {
-    if (s.money >= 0) break;
-    const val = Math.round(sellValue(b).total * CRISIS.SEIZE_SHARE);
-    s.money += val;
-    s.businesses = s.businesses.filter((x) => x !== b);
-    for (const g of s.chainGroups ?? []) g.bizIds = g.bizIds.filter((id) => id !== b.id);
-    sold.push(`${bizType(b.type).icon} ${bizType(b.type).name} (${euro(val)})`);
-    bus.emit('lots', b.lotId);
-  }
-  for (const k of Object.keys(s.fame) as (keyof typeof s.fame)[]) s.fame[k] *= 1 - CRISIS.SEIZE_FAME;
-  s.negSince = s.money < 0 ? s.minutes : undefined;
+/** Dopo i pagamenti di fine mese: se il conto è sotto zero, il mese inizia in debito (va ripagato entro fine mese). */
+export function afterPayments(s: GameState) {
+  if (s.money >= 0) return;
+  s.debtFrom = day(s);
   s.negWarn = 0;
-  addNews(s, { icon: '⚖️', kind: 'bad', text: sold.length ? `Pignoramento: venduti ${sold.join(', ')}` : 'Pignoramento: non c\'era niente da vendere', cat: 'soldi', go: 'agency:resoconti' });
-  toast('⚖️ Pignoramento: venduti beni per coprire i debiti', 'bad');
+  addNews(s, { icon: '📮', kind: 'bad', text: `Inizi il mese in debito (${euro(s.money)}): torna sopra zero entro fine mese o è bancarotta e perdi la partita`, cat: 'soldi', go: 'agency:resoconti', todo: 'debt' });
+  toast(`📮 Sei in debito: rientra entro fine mese o perdi la partita`, 'bad');
+}
+
+/** Ogni giorno: rientrato dal debito? avvisi quando mancano 10, 5 e 1 giorni. */
+export function checkDebt(s: GameState) {
+  if (s.debtFrom === undefined) return;
+  if (s.money >= 0) {
+    s.debtFrom = undefined;
+    s.negWarn = 0;
+    addNews(s, { icon: '✅', kind: 'good', text: 'Debito saldato: niente più rischio di bancarotta', cat: 'soldi' });
+    return;
+  }
+  const left = daysToMonthEnd(s);
+  const warns = CRISIS.DEBT_WARN_LEFT;
+  const i = s.negWarn ?? 0;
+  if (i < warns.length && left <= warns[i]) {
+    s.negWarn = i + 1;
+    addNews(s, { icon: '📮', kind: 'bad', text: `Ancora in debito (${euro(s.money)}): ${left === 1 ? 'ultimo giorno' : `${left} giorni`} per tornare sopra zero, poi è bancarotta`, cat: 'soldi', go: 'agency:resoconti', todo: 'debt' });
+    toast(`📮 Debito: ${left === 1 ? 'ultimo giorno' : `${left} giorni`} per rientrare`, 'bad');
+  }
+}
+
+/** Bancarotta: la partita è persa (resta il riepilogo; si ricomincia da capo). */
+function goBankrupt(s: GameState) {
+  s.bankrupt = { day: day(s), money: Math.round(s.money), businesses: s.businesses.length, fame: Math.round(totalFame(s)), earned: Math.round(s.totalEarned) };
+  addNews(s, { icon: '💀', kind: 'bad', text: `Bancarotta: hai finito il mese ancora in debito (${euro(s.money)}). La partita è persa`, cat: 'soldi' });
+  bus.emit('bankrupt');
 }

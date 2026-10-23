@@ -93,7 +93,7 @@ export function dailyTroubles(s: GameState) {
       }
     }
     // sciopero: raro, con l'attività in crisi o il personale sotto sforzo
-    if (!b.strike && ((b.redMonths ?? 0) >= 2 || tired) && Math.random() < T.STRIKE * mgr * calm) {
+    if (!b.strike && ((b.redMonths ?? 0) >= 1 || tired) && Math.random() < T.STRIKE * mgr * calm) {
       const cost = Math.max(200, Math.round(b.staff.reduce((a, e) => a + e.salary, 0) * 0.1 / 10) * 10);
       b.strike = { until: s.minutes + 1440, cost };
       addNews(s, { icon: '✊', kind: 'bad', text: `${name(b)}: sciopero, chiusa per un giorno. Un premio ai dipendenti lo ferma subito`, biz: b.id, action: { kind: 'strike', cost }, cat: 'attivita', go: `biz:${b.id}|panoramica`, todo: 'trouble' });

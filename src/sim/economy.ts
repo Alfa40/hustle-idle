@@ -1,4 +1,4 @@
-import { BUSINESS, CRISIS, FAME, TROUBLES } from '../config/balance';
+import { BUSINESS, FAME, TROUBLES } from '../config/balance';
 import {
   bizType, evolvesOf, FIRST_NAMES, isAutoType, LAST_NAMES, roleName, upgOf, upgradeIdsFor,
   type BusinessType, type Role, type UpgradeId,
@@ -308,8 +308,7 @@ export const isAutoBiz = (t: BusinessType) => isAutoType(t);
  * evoluzione), così lavora da subito.
  */
 export function ensureAutoStaff(s: GameState, b: Business) {
-  // con i debiti nessuno rimpiazza chi se ne va
-  if (!isAutoBiz(b.type) || (b.redMonths ?? 0) >= 3) return;
+  if (!isAutoBiz(b.type)) return;
   // niente ordini da fare di persona (partite vecchie)
   b.orders = [];
   for (const r of [...bizType(b.type).roles, 'manager'] as Role[]) {
@@ -567,8 +566,7 @@ export function sellBusiness(s: GameState, b: Business) {
 export function buyStock(s: GameState, b: Business, pid: ProductId, qty: number, free = false) {
   const have = b.stock[pid] ?? 0;
   const room = stockCap(b) - have;
-  // con i debiti (3 mesi di fila in perdita) i fornitori fanno pagare di più
-  const cost = PRODUCTS[pid].cost * ((b.redMonths ?? 0) >= 3 ? CRISIS.DEBT_STOCK_MULT : 1) * saving(b);
+  const cost = PRODUCTS[pid].cost * saving(b);
   let n = Math.min(qty, room);
   if (!free) n = Math.min(n, Math.floor(Math.max(0, s.money) / cost));
   if (n <= 0) return 0;

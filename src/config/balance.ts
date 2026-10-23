@@ -1,8 +1,8 @@
 // Tutti i numeri "tarabili" del gioco in un unico posto (vedi GDD).
 
 export const TIME = {
-  /** minuti di gioco per secondo reale mentre si gioca: 1 mese (30 gg) = 2 ore reali */
-  GAME_MIN_PER_SEC: (30 * 24 * 60) / 7200,
+  /** minuti di gioco per secondo reale mentre si gioca: 1 mese (30 gg) = 4 ore reali (un giorno = 8 minuti) */
+  GAME_MIN_PER_SEC: (30 * 24 * 60) / 14400,
   /** offline il tempo scorre 100 volte più lento */
   OFFLINE_SLOWDOWN: 100,
   DAYS_PER_MONTH: 30,
@@ -17,21 +17,15 @@ export const TIME = {
 
 export const START_MONEY = 50;
 
-/** Crisi delle attività e pignoramento (src/sim/crisis.ts). */
+/** Crisi delle attività e bancarotta (src/sim/crisis.ts). */
 export const CRISIS = {
-  /** mesi di fila in perdita che fanno fallire un'attività */
-  FAIL_MONTHS: 4,
-  /** fama dei settori dell'attività persa: a ogni mese in crisi/debiti e al fallimento */
+  /** mesi di fila in perdita che fanno fallire un'attività (al primo è in crisi) */
+  FAIL_MONTHS: 2,
+  /** fama dei settori dell'attività persa: al mese in crisi e al fallimento */
   CRISIS_FAME: 0.02,
   FAIL_FAME: 0.1,
-  /** con i debiti la merce costa di più */
-  DEBT_STOCK_MULT: 1.25,
-  /** giorni di gioco col conto sotto zero prima del pignoramento (2 mesi), e quando arrivano gli avvisi */
-  SEIZE_DAYS: 60,
-  SEIZE_WARN_AT: [20, 40, 55],
-  /** al pignoramento le cose si vendono a metà valore; fama totale persa */
-  SEIZE_SHARE: 0.5,
-  SEIZE_FAME: 0.05,
+  /** in debito a inizio mese: avvisi quando mancano questi giorni alla fine del mese (poi bancarotta) */
+  DEBT_WARN_LEFT: [10, 5, 1],
 };
 
 /** Imprevisti delle attività (src/sim/troubles.ts): probabilità al giorno di gioco, solo col gioco aperto. */

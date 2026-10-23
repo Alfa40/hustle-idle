@@ -282,9 +282,11 @@ export interface GameState {
   news?: NewsItem[];
   newsSeq?: number;
   newsSeen?: number;
-  /** minuto in cui il conto è andato sotto zero (pignoramento dopo CRISIS.SEIZE_DAYS) e avvisi già dati */
-  negSince?: number;
+  /** giorno in cui il mese è iniziato in debito (va ripagato entro fine mese, se no bancarotta) e avvisi già dati */
+  debtFrom?: number;
   negWarn?: number;
+  /** partita persa per bancarotta: riepilogo (si vede all'apertura, poi si ricomincia da capo) */
+  bankrupt?: { day: number; money: number; businesses: number; fame: number; earned: number };
   /** le attività di prima sono già diventate automatiche (personale assunto una volta, src/game.ts) */
   allAuto?: boolean;
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */

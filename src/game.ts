@@ -386,7 +386,10 @@ export class Game {
     this.mode = 'play';
     this.snapCamera();
     bus.on('newday', () => this.ui?.refresh());
-    // attività fallita o pignorata (sim/crisis.ts): il posto in città torna libero
+    // bancarotta (sim/crisis.ts): partita persa, si vede il riepilogo (anche riaprendo il gioco)
+    bus.on('bankrupt', () => this.ui?.openBankrupt());
+    if (this.state.bankrupt) setTimeout(() => this.ui?.openBankrupt(), 300);
+    // attività fallita (sim/crisis.ts): il posto in città torna libero
     bus.on('lots', (lotId: string) => {
       if (this.trucks.has(lotId) || parseFloorLot(lotId)) this.setupLot(lotId);
     });
