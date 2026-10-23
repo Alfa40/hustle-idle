@@ -2006,7 +2006,7 @@ export class UI {
       return `<div class="card report-card" data-a="rep:${b.id}"><div class="row between"><b>${name(b)}</b>${this.autoTag(b)}</div>
         <div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name}${d ? ` · ${full ? 'settimana' : '📋 provvisorio'} · ${fmtRate(d.avg.served)} serviti al giorno · ${fmtRate(d.avg.lost)} persi (${lp}%) · ${euro(d.avg.revenue)} al giorno` : ' · 🧑‍💼 il manager sta raccogliendo i dati'}</div>
         ${staff ? `<div class="row" style="gap:4px;flex-wrap:wrap;margin-top:4px">${staff}</div>` : ''}
-        <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="bizTab:${b.id}|personale">👥 Personale</button></div></div>`;
+        <div class="row between" style="margin-top:6px"><span class="report-more" style="margin:0">Tocca per il resoconto del negozio ›</span><button class="btn sm" data-a="manage:${b.id}">⚙️ Gestione</button></div></div>`;
     }).join('');
     // anche senza dati dei manager i negozi si vedono (resoconto con conti e turni, tasto Personale)
     if (!got.length) return status + `<div class="card center muted">🧑‍💼 I manager raccolgono i dati: primo resoconto dal 3° giorno</div><h3 class="sec-title" data-g="shops">🏪 Negozio per negozio</h3>` + rows();
@@ -2133,9 +2133,7 @@ export class UI {
         const today = g.bizs.reduce((a, b) => a + b.today.revenue, 0);
         const month = g.bizs.reduce((a, b) => a + b.month.revenue, 0);
         const auto = g.bizs.filter((b) => isAutonomous(b)).length;
-        const shops = g.bizs.map((b) => `<div class="card chain-shop"><div class="row between"><div><b>${esc(lotDef(b.lotId).name)}</b><div class="muted small">📍 ${ZONES[lotZone[b.lotId]].name} · oggi ${euro(b.today.revenue)} · ${b.products.map((p) => PRODUCTS[p].icon).join('') || '—'}</div></div>
-            <div class="row" style="gap:6px">${this.autoTag(b)}<button class="btn sm" data-a="shop:${b.id}">Gestisci</button></div></div></div>`).join('');
-        const tabs = [['resoconto', '📊 Resoconto'], ...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : []), ['negozi', `🏪 Negozi (${g.bizs.length})`]];
+        const tabs = [['resoconto', '📊 Resoconto'], ...(hasMenu(type) ? [['prodotti', '🍔 Prodotti']] : []), ['migliorie', '⬆️ Migliorie'], ...(hasMenu(type) ? [['magazzino', '🧊 Magazzino']] : [])];
         let body = '';
         if (tab === 'resoconto') {
           body = this.chainReport(g.bizs);
@@ -2169,8 +2167,6 @@ export class UI {
               <button class="btn full" style="margin-top:8px" data-a="fill">Riempi tutto</button></div>
             <button class="card set-toggle" data-a="auto"><div style="flex:1;text-align:left"><b>🔁 Riordino automatico</b><div class="muted small explain">Il manager riordina da solo in tutti i negozi</div></div>
               <span class="switch ${allAuto ? 'on' : ''}"><i></i></span></button>`;
-        } else {
-          body = shops;
         }
         const head = `<div class="chips">${chips}</div><!--tabs-->`;
         const sum = `<div class="grid3"><div class="stat s-green"><b class="money-t">${euro(today)}</b><span>💰 oggi</span></div>
@@ -2187,6 +2183,8 @@ export class UI {
           this.close();
           this.openBusiness(id);
         },
+        // gestione di un negozio dal resoconto della catena ("‹ Indietro" torna qui)
+        manage: (id) => this.openBusiness(id),
         // dal resoconto della catena: resoconto di un negozio ("‹ Indietro" torna qui) o una sua scheda
         rep: (id) => this.openReport(id),
         prodInfo: (p) => this.openProduct(p as ProductId, sel().bizs.map((b) => b.id)),

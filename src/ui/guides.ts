@@ -326,13 +326,12 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         tabStep('prodotti', '🍔 Prodotti per tutti i negozi'),
         tabStep('migliorie', '⬆️ Migliorie per tutti'),
         tabStep('magazzino', '📦 Merce per tutti'),
-        tabStep('negozi', '🏪 I negozi uno per uno'),
       ],
     },
     'chain/tab:resoconto': {
       steps: [
         { at: g('shops'), say: '🏪 Negozio per negozio' },
-        { at: btnStart('bizTab:'), say: '👥 Il personale di quel negozio' },
+        { at: btnStart('manage:'), say: '⚙️ Gestione di quel negozio' },
       ],
     },
     'chain/tab:prodotti': {
@@ -348,7 +347,6 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btn('auto'), say: '🔁 Riordino automatico per tutti' },
       ],
     },
-    'chain/tab:negozi': { steps: [{ at: btnStart('shop:'), say: 'Tocca un negozio per gestirlo' }] },
 
     // ---------------- altre finestre ----------------
     'panel:missions': {
