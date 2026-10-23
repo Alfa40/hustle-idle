@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUSINESS, CRISIS, LEVEL, TIME } from '../config/balance';
+import { BUSINESS, CRISIS, LEVEL, TIME, TROUBLES } from '../config/balance';
 import { BIZ_GROUPS, BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizGroup, bizType, evolvesOf, hourFactor, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
@@ -9,6 +9,7 @@ import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, ZONE_COST, type SizeId, type WorkId } from '../config/plots';
 import { bizHealth, HEALTH_TAG, monthEnd } from '../sim/crisis';
+import { dailyTroubles, insuranceCost, solveTrouble, troubleActive, troubleCost } from '../sim/troubles';
 import { buildCost, buyPlot, fameOk, plotFame, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
@@ -1307,6 +1308,12 @@ export class UI {
           sel = null;
         },
         lot: (id) => (sel = id),
+        // imprevisto dalla notizia: ripara, carro attrezzi o premio ai dipendenti
+        newsAct: (id) => {
+          const n = (this.s.news ?? []).find((x) => x.id === +id);
+          const nb = n?.biz ? this.s.businesses.find((b) => b.id === n.biz) : undefined;
+          if (n?.action && nb && solveTrouble(this.s, nb, n.action.kind)) this.game.save();
+        },
         // terreno: la sua finestra in avanti (si compra solo all'agenzia o davanti al terreno)
         plot: (id) => this.openPlot(id, atAgency),
         grp: (id) => {
@@ -1433,7 +1440,11 @@ export class UI {
       const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
       if (!list.length) return `${debt}<div class="card center muted">Qui arrivano le notizie delle tue attività: mesi in perdita, crisi, imprevisti.</div>${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}`;
       return `${debt}${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}
-        ${list.map((n) => `<div class="card row news-${n.kind}"${n.biz && s.businesses.some((b) => b.id === n.biz) ? ` data-a="open:${n.biz}" style="cursor:pointer"` : ''}><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${dayName(n.day)}</div></div></div>`).join('')}`;
+        ${list.map((n) => {
+          const nb = n.biz ? s.businesses.find((b) => b.id === n.biz) : undefined;
+          const act = n.action && nb && troubleActive(s, nb, n.action.kind) ? this.troubleBtn(nb, n.action.kind, `newsAct:${n.id}`) : '';
+          return `<div class="card news-${n.kind}"${nb ? ` data-a="open:${nb.id}" style="cursor:pointer"` : ''}><div class="row"><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${dayName(n.day)}</div></div></div>${act}</div>`;
+        }).join('')}`;
     }
     if (tab === 'resoconti') {
       // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
@@ -1528,6 +1539,25 @@ export class UI {
     return `<div class="small bad" style="margin-top:4px">${HEALTH_TAG[h]} · ${b.redMonths} ${b.redMonths === 1 ? 'mese' : 'mesi'} in perdita: ${left === 1 ? 'un altro e fallisce' : `altri ${left} e fallisce`}</div>`;
   }
 
+  /** pulsante dell'imprevisto: ripara / carro attrezzi / premio, col costo (già con l'assicurazione) */
+  private troubleBtn(b: Business, kind: 'repair' | 'strike', action: string) {
+    const cost = troubleCost(b, kind);
+    const label = kind === 'strike' ? '✊ Premio ai dipendenti' : b.broken?.kind === 'panne' ? '🚛 Carro attrezzi' : '🔧 Ripara subito';
+    return `<button class="btn sm full ${this.s.money >= cost ? 'blue' : 'sec'}" style="margin-top:8px" data-a="${action}" ${this.s.money < cost ? 'disabled' : ''}>${label} · ${euro(cost)}${b.insured && kind === 'repair' ? ' (assicurata)' : ''}</button>`;
+  }
+
+  /** imprevisti in corso e assicurazione (panoramica dell'attività) */
+  private troubleHtml(b: Business) {
+    const s = this.s;
+    const rows: string[] = [];
+    if (b.broken && troubleActive(s, b, 'repair')) rows.push(`<div class="small bad">${b.broken.kind === 'panne' ? `🚧 Furgone in panne: fermo ancora ${Math.ceil((b.broken.until! - s.minutes) / 1440)} giorni` : '🔧 Macchinario guasto: lavora a metà'}</div>${this.troubleBtn(b, 'repair', 'trouble:repair')}`);
+    if (b.strike && troubleActive(s, b, 'strike')) rows.push(`<div class="small bad">✊ Sciopero: chiusa fino a domani</div>${this.troubleBtn(b, 'strike', 'trouble:strike')}`);
+    if (b.rival && s.minutes < b.rival.until) rows.push(`<div class="small bad">🏪 Rivale vicino: −${Math.round(b.rival.cut * 100)}% clienti ancora ${Math.ceil((b.rival.until - s.minutes) / 1440)} giorni</div>`);
+    const ins = `<div class="row between" style="margin-top:${rows.length ? 10 : 0}px"><div><b>🛡️ Assicurazione</b><div class="muted small">${euro(insuranceCost(b))}/mese · copre il 70% di guasti e furti</div></div>
+      <button class="btn sm ${b.insured ? 'good' : 'sec'}" data-a="insure">${b.insured ? '✅ Attiva' : 'Attiva'}</button></div>`;
+    return `<div class="card">${rows.join('<hr class="soft">')}${ins}</div>`;
+  }
+
   openBusiness(bizId: string, tab?: string) {
     const s = this.s;
     const b = () => s.businesses.find((x) => x.id === bizId)!;
@@ -1563,11 +1593,20 @@ export class UI {
         const chain = cur === 'panoramica' && n >= 2
           ? `<button class="card chain-card" data-a="chain" style="--sc:${bizType(b().type).color}"><div class="icon-bubble" style="background:${bizType(b().type).color};color:#fff">🔗</div><div style="flex:1;text-align:left"><b>Catena: ${n} attività</b><div class="muted small">Modifiche a tutti i negozi insieme o a gruppi</div></div><span class="shop-go">›</span></button>`
           : '';
-        return head + chain + this.bizTab(b(), cur) + (cur === 'panoramica' ? this.sellHtml(b(), confirmSell) : '');
+        return head + chain + (cur === 'panoramica' ? this.troubleHtml(b()) : '') + this.bizTab(b(), cur) + (cur === 'panoramica' ? this.sellHtml(b(), confirmSell) : '');
       },
       actions: {
         // in avanti: con "‹ Indietro" si torna ai prodotti
         prodInfo: (p) => this.openProduct(p as ProductId, [bizId]),
+        // imprevisti e assicurazione
+        trouble: (k) => {
+          if (solveTrouble(s, b(), k as 'repair' | 'strike')) this.game.save();
+        },
+        insure: () => {
+          b().insured = !b().insured;
+          toast(b().insured ? `🛡️ Assicurazione attiva: ${euro(insuranceCost(b()))}/mese` : '🛡️ Assicurazione disdetta', 'info');
+          this.game.save();
+        },
         sell: () => {
           const biz = b();
           const why = this.sellBlock(biz);
@@ -2497,7 +2536,7 @@ export class UI {
         </div>
         <div class="card" data-g="costs" style="margin-top:10px"><h3>🧾 Costi mensili</h3>
           <div class="row between small"><span>${lot.kind === 'truck' ? 'Posteggio' : 'Affitto'}</span><span>${euro(c.rent)}</span></div>
-          <div class="row between small"><span>Bollette</span><span>${euro(c.utilities)}</span></div>
+          <div class="row between small"><span>${b.insured ? "Bollette e assicurazione" : "Bollette"}</span><span>${euro(c.utilities)}</span></div>
           <div class="row between small"><span>Stipendi (${b.staff.length})</span><span>${euro(fullSal)}</span></div>
           <hr><div class="row between"><b>Utile stimato al mese</b><b class="${estimateMonthlyProfit(s, b) >= 0 ? 'good' : 'bad'}">${isAutonomous(b) ? euro(estimateMonthlyProfit(s, b)) : '—'}</b></div>
           <p class="muted small explain" style="margin-bottom:0">Aperto ${BUSINESS.OPEN_HOUR}:00–${BUSINESS.CLOSE_HOUR}:00 · i costi si pagano il 1° del mese</p>
@@ -4291,7 +4330,7 @@ export class UI {
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
-      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da 29 giorni</button></div>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da 29 giorni</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
@@ -4318,6 +4357,14 @@ export class UI {
       devRed: () => {
         for (const b of s.businesses) b.lastProfit = -1000;
         monthEnd(s);
+      },
+      // imprevisti: tutti quelli possibili, subito (per provarli)
+      devTrouble: () => {
+        const keep = { ...TROUBLES };
+        Object.assign(TROUBLES, { BREAK: 1, THEFT: 1, INSPECTION: 1, RIVAL: 1, QUIT_BUSY: 1, QUIT_CALM: 1, STRIKE: 1, MANAGER_CUT: 0 });
+        for (const b of s.businesses) b.redMonths = Math.max(2, b.redMonths ?? 0);
+        dailyTroubles(s);
+        Object.assign(TROUBLES, keep);
       },
       // pignoramento: il giorno dopo arriva
       devDebt: () => {

@@ -67,6 +67,15 @@ export interface Business {
   redMonths?: number;
   /** utile dell'ultimo mese chiuso (incassi − merce − affitto, bollette, stipendi) */
   lastProfit?: number;
+  /**
+   * imprevisti in corso (sim/troubles.ts): macchinario guasto (lavora a metà finché non lo ripari) o furgone in
+   * panne (fermo fino a `until` o al carro attrezzi), rivale vicino (meno clienti fino a `until`), sciopero
+   */
+  broken?: { kind: 'guasto' | 'panne'; cost: number; until?: number };
+  rival?: { until: number; cut: number };
+  strike?: { until: number; cost: number };
+  /** assicurazione: costa ogni mese, copre gran parte di guasti e furti */
+  insured?: boolean;
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
   /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
@@ -185,6 +194,8 @@ export interface NewsItem {
   kind: 'bad' | 'warn' | 'good' | 'info';
   /** attività di cui parla (per aprirla) */
   biz?: string;
+  /** scelta da fare (es. "Ripara subito €X"): sparisce quando è fatta o il problema è finito */
+  action?: { kind: 'repair' | 'strike'; cost: number };
 }
 
 export interface PlotState {

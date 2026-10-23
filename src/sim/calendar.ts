@@ -8,6 +8,7 @@ import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
 import { checkDebt, monthEnd } from './crisis';
+import { dailyTroubles } from './troubles';
 import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates, setSimOnline } from './economy';
 import { weeklyReports } from './report';
 import { totalFame, totalLevel } from './progress';
@@ -69,6 +70,8 @@ export function newDay(s: GameState, online = true) {
     monthEnd(s);
   }
   checkDebt(s);
+  // imprevisti solo col gioco aperto: così si può reagire
+  if (online) dailyTroubles(s);
   bus.emit('newday');
 }
 

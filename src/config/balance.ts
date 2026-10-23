@@ -34,6 +34,38 @@ export const CRISIS = {
   SEIZE_FAME: 0.05,
 };
 
+/** Imprevisti delle attività (src/sim/troubles.ts): probabilità al giorno di gioco, solo col gioco aperto. */
+export const TROUBLES = {
+  BREAK: 0.008,
+  THEFT: 0.005,
+  INSPECTION: 0.005,
+  RIVAL: 0.003,
+  /** dimissioni: personale sotto sforzo (più del 15% di clienti persi per mancanza di personale) o normale */
+  QUIT_BUSY: 0.03,
+  QUIT_CALM: 0.003,
+  STRIKE: 0.005,
+  /** un manager riduce tutto di questa parte */
+  MANAGER_CUT: 0.3,
+  /** ogni livello di attrezzatura toglie questa parte ai guasti, ogni livello della cassa ai furti */
+  EQUIP_CUT: 0.08,
+  CASH_CUT: 0.1,
+  /** riparazione (parte di quanto è costata l'attività), carro attrezzi, furto (parte dell'incasso di ieri) */
+  REPAIR_SHARE: 0.25,
+  TOW_SHARE: 0.1,
+  THEFT_MIN: 0.3,
+  THEFT_MAX: 0.6,
+  /** ispezione andata male: multa (parte dell'incasso del mese, minimo 500) e fama persa; andata bene: fama */
+  FINE_SHARE: 0.08,
+  FINE_FAME: 0.03,
+  PASS_FAME: 0.01,
+  /** concorrenza: clienti in meno e durata (giorni); pubblicità e look attenuano */
+  RIVAL_CUT: [0.2, 0.35],
+  RIVAL_DAYS: [15, 30],
+  /** assicurazione al mese (parte di quanto è costata l'attività, minimo 120) e parte coperta */
+  INSURANCE_SHARE: 0.04,
+  INSURANCE_COVER: 0.7,
+};
+
 export const FAME = {
   /** moltiplicatore domanda: 1 + fama/(fama+K) → massimo ×2 (fama media dei settori dell'attività) */
   K: 2000,

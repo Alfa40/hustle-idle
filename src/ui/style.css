@@ -1637,3 +1637,6 @@ body.is-landscape .prof-bar { grid-template-columns: repeat(6, 1fr); }
 }
 .upd-pill.in-stack { transform: none; white-space: normal; text-align: left; max-width: calc(100vw - var(--sal) - var(--sar) - max(var(--hud-w), var(--mm)) - 28px); }
 body.is-landscape .upd-pill { left: 50% !important; top: calc(var(--sat) + 8px) !important; }
+
+/* separatore leggero dentro una carta (es. imprevisti in corso) */
+hr.soft { border: none; border-top: 1px solid rgba(0, 0, 0, 0.08); margin: 10px 0; }

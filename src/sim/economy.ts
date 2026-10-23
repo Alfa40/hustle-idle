@@ -1,4 +1,4 @@
-import { BUSINESS, CRISIS, FAME } from '../config/balance';
+import { BUSINESS, CRISIS, FAME, TROUBLES } from '../config/balance';
 import {
   bizType, evolvesOf, FIRST_NAMES, isAutoType, LAST_NAMES, roleName, upgOf, upgradeIdsFor,
   type BusinessType, type Role, type UpgradeId,
@@ -768,10 +768,10 @@ export function autoSim(s: GameState, b: Business, minutes: number, efficiency =
     return;
   }
   if (!isAutonomous(b) || !isOpenHour(s)) return;
-  const now = demandNow(s, b);
+  const now = demandNow(s, b) * rivalMult(s, b);
   notePeak(b, now, s);
-  // serve solo chi è di turno in quest'ora
-  const rate = Math.min(now, capacityAt(s, b, hourOf(s)));
+  // serve solo chi è di turno in quest'ora (guasti e scioperi tolgono capacità)
+  const rate = Math.min(now, capacityAt(s, b, hourOf(s)) * troubleCap(s, b));
   const lostRate = Math.max(0, now - rate);
   let a = (acc.get(b.id) ?? 0) + (rate * minutes) / 60;
   let lostAcc = (acc.get(b.id + 'l') ?? 0) + (lostRate * minutes) / 60;
@@ -849,7 +849,26 @@ export function restock(s: GameState, b: Business, threshold = 0) {
 export function monthlyCosts(s: GameState, b: Business) {
   const lot = lotDef(b.lotId);
   const salaries = b.staff.reduce((a, e) => a + proratedSalary(s, e), 0);
-  return { rent: lot.rent, utilities: BUSINESS.UTILITIES_MONTH, salaries };
+  // l'assicurazione si paga con le bollette
+  return { rent: lot.rent, utilities: BUSINESS.UTILITIES_MONTH + (b.insured ? insuranceCost(b) : 0), salaries };
+}
+
+/** assicurazione al mese di un'attività */
+export const insuranceCost = (b: Business) => Math.max(120, Math.round((b.boughtFor * TROUBLES.INSURANCE_SHARE) / 10) * 10);
+
+/** capacità con gli imprevisti: sciopero e furgone in panne fermano tutto, un guasto la dimezza */
+export function troubleCap(s: GameState, b: Business) {
+  if (b.strike && s.minutes >= b.strike.until) b.strike = undefined;
+  if (b.broken?.until !== undefined && s.minutes >= b.broken.until) b.broken = undefined;
+  if (b.strike) return 0;
+  return b.broken ? (b.broken.kind === 'panne' ? 0 : 0.5) : 1;
+}
+
+/** clienti con un rivale vicino: in meno, attenuati da pubblicità e look */
+export function rivalMult(s: GameState, b: Business) {
+  if (b.rival && s.minutes >= b.rival.until) b.rival = undefined;
+  if (!b.rival) return 1;
+  return 1 - b.rival.cut * Math.max(0.3, 1 - 0.06 * upg(b, 'marketing') - 0.04 * upg(b, 'look'));
 }
 
 export const vehiclesMonthly = (s: GameState) => s.vehicles.reduce((a, v) => a + VEHICLES[v].monthly, 0);
