@@ -1495,14 +1495,13 @@ export class UI {
         <div class="small muted">stipendi ${euro(sal)} + affitto ${euro(rent)} + bollette ${euro(bills)}${veh ? ` + veicoli ${euro(veh)}` : ''}</div></div>`;
       // in alto, grande: quanto incassano e quanto spendono tutte le attività insieme, e cosa resta
       const sOut = mGoods + (fixed * dom) / D;
-      const tOut = tGoods + fixed / D;
       const totals = `<div class="card tint" data-g="totals"><div class="row between"><h3 style="margin:0">💶 Tutte le attività</h3><span class="muted small">mese ${dom}/${D}</span></div>
         <div class="grid3" style="margin-top:8px">
           <div class="stat s-green"><b class="money-t">${euro(mRev)}</b><span>💰 guadagni</span></div>
           <div class="stat s-red"><b class="bad">−${euro(sOut)}</b><span>💸 spese</span></div>
           <div class="stat ${pMonth >= 0 ? 's-yellow' : 's-red'}"><b class="${pMonth >= 0 ? 'good' : 'bad'}">${euro(pMonth)}</b><span>📊 utile</span></div>
         </div>
-        <div class="small muted center" style="margin-top:6px">Oggi: <b class="money-t">${euro(tRev)}</b> guadagni · <b class="bad">−${euro(tOut)}</b> spese · <b class="${pToday >= 0 ? 'good' : 'bad'}">${euro(pToday)}</b> utile</div></div>`;
+        <div class="small muted center" style="margin-top:6px">📈 Utile stimato al mese: <b class="${est >= 0 ? 'good' : 'bad'}" style="white-space:nowrap">${euro(est)}</b><br>🧾 Spese al mese: <b class="bad" style="white-space:nowrap">−${euro(fixed)}</b></div></div>`;
       return totals + money + where;
     }
     // mercato
