@@ -17,7 +17,9 @@ export const EXTRA_ROLES: { role: Role; level: number; desc: string }[] = [
   { role: 'sala', level: 2, desc: 'Porta il cibo ai tavoli della sala: clienti più contenti e mance più alte.' },
 ];
 
-export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'cassa' | 'look' | 'menu' | 'frigo' | 'marketing';
+export type UpgradeId = 'ampliamento' | 'fuochi' | 'banco' | 'ripiano' | 'attrezzatura' | 'cassa' | 'look' | 'menu' | 'frigo' | 'marketing'
+  // solo per le attività automatiche (`autoBiz`): nomi e icone dati dal settore (SECTOR_UPG)
+  | 'qualita' | 'formazione' | 'sicurezza' | 'fedelta' | 'risparmio';
 
 export interface UpgradeDef {
   name: string;
@@ -68,7 +70,39 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     name: 'Pubblicità', icon: '📣', desc: '+10% di domanda per livello. Manifesti alle pareti e insegna.', max: 6,
     cost: (l) => Math.round(650 * 2 ** l),
   },
+  // migliorie delle attività automatiche (effetti in sim/economy.ts e sim/troubles.ts)
+  qualita: {
+    name: 'Qualità', icon: '💎', desc: 'Ogni cliente paga di più: +8% per livello.', max: 5,
+    cost: (l) => Math.round((600 * 1.9 ** l) / 10) * 10,
+  },
+  formazione: {
+    name: 'Corsi per il personale', icon: '🎓', desc: 'Personale più svelto (+8% per livello) e meno dimissioni e scioperi (−15% per livello).', max: 5,
+    cost: (l) => Math.round((500 * 1.8 ** l) / 10) * 10,
+  },
+  sicurezza: {
+    name: 'Allarme e manutenzione', icon: '🚨', desc: 'Meno guasti e furti: −15% per livello.', max: 4,
+    cost: (l) => Math.round((450 * 1.8 ** l) / 10) * 10,
+  },
+  fedelta: {
+    name: 'Clienti fedeli', icon: '🎟️', desc: 'Più fama da ogni cliente servito: +25% per livello.', max: 4,
+    cost: (l) => Math.round((700 * 1.9 ** l) / 10) * 10,
+  },
+  risparmio: {
+    name: 'Fornitori all\'ingrosso', icon: '📦', desc: 'Merce e bollette costano meno: −8% per livello.', max: 4,
+    cost: (l) => Math.round((550 * 1.8 ** l) / 10) * 10,
+  },
 };
+
+/** migliorie in più delle attività senza interno (tutte tranne food truck e panificio), col nome del loro settore */
+export const AUTO_UPGRADES = ['qualita', 'formazione', 'sicurezza', 'fedelta', 'risparmio'] as const;
+const SECTOR_UPG: Record<string, Record<(typeof AUTO_UPGRADES)[number], [string, string]>> = {
+  cucina: { qualita: ['Ingredienti di qualità', '🥩'], formazione: ['Corsi di cucina e servizio', '🎓'], sicurezza: ['Allarme e manutenzione', '🚨'], fedelta: ['Tessera fedeltà', '🎟️'], risparmio: ['Fornitori all\'ingrosso', '📦'] },
+  logistica: { qualita: ['Servizio puntuale', '⏱️'], formazione: ['Corsi di guida sicura', '🎓'], sicurezza: ['Antifurto e tagliandi ai mezzi', '🔧'], fedelta: ['Clienti abbonati', '🤝'], risparmio: ['Percorsi e ricambi', '🗺️'] },
+  manualita: { qualita: ['Lavori a regola d\'arte', '🛠️'], formazione: ['Corsi per gli operai', '🎓'], sicurezza: ['Manutenzione degli attrezzi', '🧰'], fedelta: ['Recensioni dei clienti', '💬'], risparmio: ['Materiali all\'ingrosso', '🧱'] },
+  artigianato: { qualita: ['Materiali pregiati', '💎'], formazione: ['Corsi di bottega', '🎓'], sicurezza: ['Allarme del laboratorio', '🚨'], fedelta: ['Portfolio e recensioni', '🖼️'], risparmio: ['Fornitori di fiducia', '🤝'] },
+};
+/** livello massimo delle migliorie nuove, per gradino dell'attività */
+const AUTO_NEW_MAX = [2, 3, 3, 4];
 
 export const UPGRADE_IDS = Object.keys(UPGRADES) as UpgradeId[];
 
@@ -623,6 +657,8 @@ export function upgradeIdsFor(t: BusinessType, hasInterior: boolean, cash: boole
     if (id === 'cassa' && !cash) return false;
     // "più prodotti" solo se c'è più di un prodotto da mettere
     if (id === 'menu' && def.products.length < 2) return false;
+    // le migliorie in più (qualità, corsi, sicurezza, fedeltà, risparmio): tutte le attività senza interno
+    if ((AUTO_UPGRADES as readonly string[]).includes(id) && hasInterior) return false;
     return true;
   });
 }
@@ -646,7 +682,9 @@ const TIER_COST = [1, 3, 8, 20];
 export function upgOf(t: BusinessType, id: UpgradeId): UpgradeDef {
   const base = UPGRADES[id];
   const def = BUSINESS_TYPES[t] as BusinessTypeDef;
-  const o = def.upgrades?.[id];
+  // migliorie in più: nome e icona del settore, livello massimo dal gradino (es. "Ingredienti di qualità")
+  const sec = (AUTO_UPGRADES as readonly string[]).includes(id) ? SECTOR_UPG[def.sector ?? 'cucina']?.[id as (typeof AUTO_UPGRADES)[number]] : undefined;
+  const o = def.upgrades?.[id] ?? (sec ? { name: sec[0], icon: sec[1], max: AUTO_NEW_MAX[def.tier ?? 0] ?? 2 } : undefined);
   const k = TIER_COST[def.tier ?? 0] ?? 1;
   const max = id === 'menu' ? Math.min(base.max, def.products.length - 1) : o?.max ?? base.max;
   if (!o && k === 1 && max === base.max) return base;

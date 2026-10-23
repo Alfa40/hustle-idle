@@ -34,7 +34,10 @@ export function dailyTroubles(s: GameState) {
     const mgr = hasManager(b) ? 1 - T.MANAGER_CUT : 1;
     const truck = lotDef(b.lotId).kind === 'truck';
     // guasto (o furgone in panne sui posteggi)
-    if (!b.broken && Math.random() < T.BREAK * mgr * Math.max(0.2, 1 - T.EQUIP_CUT * upg(b, 'attrezzatura'))) {
+    // allarme e manutenzione: −15% a guasti e furti per livello; corsi: −15% a dimissioni e scioperi
+    const safe = Math.max(0.2, 1 - 0.15 * upg(b, 'sicurezza'));
+    const calm = Math.max(0.2, 1 - 0.15 * upg(b, 'formazione'));
+    if (!b.broken && Math.random() < T.BREAK * mgr * safe * Math.max(0.2, 1 - T.EQUIP_CUT * upg(b, 'attrezzatura'))) {
       if (truck) {
         const cost = Math.max(300, Math.round((b.boughtFor * T.TOW_SHARE) / 10) * 10);
         b.broken = { kind: 'panne', cost, until: s.minutes + 2 * 1440 };
@@ -47,7 +50,7 @@ export function dailyTroubles(s: GameState) {
       toast(`🔧 Guasto: ${bizType(b.type).name}. Guarda le Notizie`, 'bad');
     }
     // furto: parte dell'incasso di ieri
-    if (Math.random() < T.THEFT * mgr * Math.max(0.2, 1 - T.CASH_CUT * upg(b, 'cassa'))) {
+    if (Math.random() < T.THEFT * mgr * safe * Math.max(0.2, 1 - T.CASH_CUT * upg(b, 'cassa'))) {
       const stolen = Math.max(100, Math.round(b.yesterday.revenue * rnd(T.THEFT_MIN, T.THEFT_MAX)));
       const loss = youPay(b, stolen);
       s.money -= loss;
@@ -81,7 +84,7 @@ export function dailyTroubles(s: GameState) {
     }
     const tired = busy(s, b);
     // dimissioni: più facili se lavorano troppo
-    if (Math.random() < (tired ? T.QUIT_BUSY : T.QUIT_CALM) * mgr) {
+    if (Math.random() < (tired ? T.QUIT_BUSY : T.QUIT_CALM) * mgr * calm) {
       const list = b.staff.filter((e) => e.role !== 'manager');
       if (list.length > 1) {
         const e = list[Math.floor(Math.random() * list.length)];
@@ -90,7 +93,7 @@ export function dailyTroubles(s: GameState) {
       }
     }
     // sciopero: raro, con l'attività in crisi o il personale sotto sforzo
-    if (!b.strike && ((b.redMonths ?? 0) >= 2 || tired) && Math.random() < T.STRIKE * mgr) {
+    if (!b.strike && ((b.redMonths ?? 0) >= 2 || tired) && Math.random() < T.STRIKE * mgr * calm) {
       const cost = Math.max(200, Math.round(b.staff.reduce((a, e) => a + e.salary, 0) * 0.1 / 10) * 10);
       b.strike = { until: s.minutes + 1440, cost };
       addNews(s, { icon: '✊', kind: 'bad', text: `${name(b)}: sciopero, chiusa per un giorno. Un premio ai dipendenti lo ferma subito`, biz: b.id, action: { kind: 'strike', cost } });

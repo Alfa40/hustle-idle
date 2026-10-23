@@ -240,6 +240,8 @@ export function employeeRate(e: Employee, b: Business) {
     else if (e.role === 'cassa' || e.role === 'sala') r *= 1 + 0.15 * upg(b, 'cassa');
   } else if (e.role !== 'manager') r *= 1 + 0.15 * upg(b, 'attrezzatura');
   if (hasManager(b)) r *= 1.1;
+  // corsi per il personale: +8% a livello
+  r *= 1 + 0.08 * upg(b, 'formazione');
   return r * bizType(b.type).rateMul;
 }
 
@@ -565,7 +567,7 @@ export function buyStock(s: GameState, b: Business, pid: ProductId, qty: number,
   const have = b.stock[pid] ?? 0;
   const room = stockCap(b) - have;
   // con i debiti (3 mesi di fila in perdita) i fornitori fanno pagare di più
-  const cost = PRODUCTS[pid].cost * ((b.redMonths ?? 0) >= 3 ? CRISIS.DEBT_STOCK_MULT : 1);
+  const cost = PRODUCTS[pid].cost * ((b.redMonths ?? 0) >= 3 ? CRISIS.DEBT_STOCK_MULT : 1) * (1 - 0.08 * upg(b, 'risparmio'));
   let n = Math.min(qty, room);
   if (!free) n = Math.min(n, Math.floor(Math.max(0, s.money) / cost));
   if (n <= 0) return 0;
@@ -625,7 +627,8 @@ export function resetBizStats(s: GameState, b: Business, why: string) {
 
 /** Registra una vendita (sia manuale sia automatica). */
 export function recordSale(s: GameState, b: Business, pid: ProductId, manual: boolean, tipMult = 1, efficiency = 1) {
-  const amount = PRODUCTS[pid].price * tipMult * efficiency;
+  // qualità: ogni cliente paga di più (+8% a livello)
+  const amount = PRODUCTS[pid].price * tipMult * efficiency * (1 + 0.08 * upg(b, 'qualita'));
   b.stock[pid] = Math.max(0, (b.stock[pid] ?? 0) - 1);
   b.today.revenue += amount;
   b.today.served++;
@@ -637,7 +640,9 @@ export function recordSale(s: GameState, b: Business, pid: ProductId, manual: bo
   b.month.served++;
   b.totalRevenue += amount;
   addMoney(s, amount);
-  for (const k of bizType(b.type).skills) addFame(s, k, manual ? FAME.PER_MANUAL_SALE : FAME.PER_AUTO_SALE);
+  // clienti fedeli: più fama da ogni cliente servito (+25% a livello)
+  const fame = (manual ? FAME.PER_MANUAL_SALE : FAME.PER_AUTO_SALE) * (1 + 0.25 * upg(b, 'fedelta'));
+  for (const k of bizType(b.type).skills) addFame(s, k, fame);
   return amount;
 }
 
@@ -850,7 +855,8 @@ export function monthlyCosts(s: GameState, b: Business) {
   const lot = lotDef(b.lotId);
   const salaries = b.staff.reduce((a, e) => a + proratedSalary(s, e), 0);
   // l'assicurazione si paga con le bollette
-  return { rent: lot.rent, utilities: BUSINESS.UTILITIES_MONTH + (b.insured ? insuranceCost(b) : 0), salaries };
+  // fornitori all'ingrosso: bollette −8% a livello
+  return { rent: lot.rent, utilities: Math.round(BUSINESS.UTILITIES_MONTH * (1 - 0.08 * upg(b, 'risparmio'))) + (b.insured ? insuranceCost(b) : 0), salaries };
 }
 
 /** assicurazione al mese di un'attività */
