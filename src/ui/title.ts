@@ -4,12 +4,14 @@ import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
 import { DEV_SLOT, tryDevKey } from '../dev';
 import { tryTesterKey } from '../tester';
-import { previewPr } from '../preview';
+import { betaSite, previewPr, sandbox } from '../preview';
 import { loadState } from '../sim/state';
-import { loggedIn, login } from '../sim/account';
-import { nickname } from '../sim/leaderboard';
+import { chooseName, loggedIn, login, MIN_PASSWORD, register } from '../sim/account';
+import { MAX_NICK, nickname } from '../sim/leaderboard';
+import { draftLogo, onboarded, setOnboarded, setProfileLogo } from '../identity';
+import { LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoUrl, randomLogo, SHAPE_ICON, type Logo } from '../logo';
 
-type View = 'main' | 'slots' | 'new' | 'settings' | 'credits' | 'login';
+type View = 'main' | 'slots' | 'new' | 'settings' | 'credits' | 'login' | 'welcome' | 'ident';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -40,6 +42,11 @@ export class TitleScreen {
   private accPw = '';
   private accMsg = '';
   private accBusy = false;
+  /** prima apertura: nome e logo che si stanno scegliendo, e se si crea anche l'account */
+  private idName = nickname();
+  private idLogo: Logo = draftLogo();
+  private idAccount = false;
+  private idMsg = '';
 
   constructor(private onStart: (slot: number, newName?: string, quick?: boolean) => void) {
     this.el = document.createElement('div');
@@ -51,7 +58,11 @@ export class TitleScreen {
       if (t.name === 'savename') this.newName = t.value;
       if (t.name === 'accname') this.accName = t.value;
       if (t.name === 'accpw') this.accPw = t.value;
+      if (t.name === 'idname') this.idName = t.value;
+      if (t.name === 'idtext') this.idLogo.text = t.value.slice(0, 3);
     });
+    // prima apertura del gioco: chi sei (ospite o account), nome e logo. Nei siti di prova l'account non c'è
+    if (!onboarded()) this.view = 'welcome';
     this.render();
   }
 
@@ -69,17 +80,47 @@ export class TitleScreen {
     const slots = listSlots();
     const last = lastSlot();
     let html = '';
+    if (this.view === 'welcome') {
+      html = `<div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">Benvenuto! Prima di tutto: chi sei?</div></div>
+        <div class="t-menu">
+          <button class="t-btn t-main" data-t="guest"><span class="t-ico">👤</span><span><b>Gioca come ospite</b><small>Le partite restano su questo telefono</small></span></button>
+          <button class="t-btn" data-t="newacc" ${sandbox ? 'disabled' : ''}><span class="t-ico">🆕</span><span><b>Crea un account</b><small>${sandbox ? 'Non c\'è nella versione di prova' : 'Le partite si salvano anche sul server'}</small></span></button>
+          <button class="t-btn" data-t="view:login" ${sandbox ? 'disabled' : ''}><span class="t-ico">🔑</span><span><b>Ho già un account</b><small>${sandbox ? 'Non c\'è nella versione di prova' : 'Ritrova partite, nome e logo'}</small></span></button>
+        </div>`;
+      this.el.innerHTML = html;
+      return;
+    }
+    if (this.view === 'ident') {
+      const l = this.idLogo;
+      const sw = (k: string, cur: string) => `<div class="lg-row">${LOGO_COLORS.map((c) => `<button class="lg-sw ${c === cur ? 'on' : ''}" style="background:${c}" data-t="${k}:${c}"></button>`).join('')}</div>`;
+      html = this.panel(this.idAccount ? '🆕 Crea il tuo account' : '👤 Il tuo nome e il tuo logo', `
+        <div class="card tint small">Vanno su insegne e classifiche, in tutte le tue partite. Si cambiano dal 👤 Profilo.</div>
+        <div class="lg-preview"><img src="${logoUrl(l, 200)}" width="96" height="96" alt=""><div><b>${esc(this.idName || 'Senza nome')}</b><small>🎨 Il tuo logo</small></div></div>
+        <label class="t-label">Il tuo nome</label>
+        <input class="t-input" name="idname" maxlength="${MAX_NICK}" placeholder="Il tuo nome" value="${esc(this.idName)}" />
+        ${this.idAccount ? `<label class="t-label">Password (almeno ${MIN_PASSWORD} caratteri)</label><input class="t-input" name="accpw" type="password" autocomplete="new-password" value="${esc(this.accPw)}" />` : ''}
+        <label class="t-label">Forma</label><div class="lg-row">${LOGO_SHAPES.map((k) => `<button class="lg-opt ${l.shape === k ? 'on' : ''}" data-t="idshape:${k}">${SHAPE_ICON[k]}<small>${k}</small></button>`).join('')}</div>
+        <label class="t-label">Colore di sfondo</label>${sw('idbg', l.bg)}
+        <label class="t-label">Simbolo</label><div class="lg-row lg-syms">${LOGO_SYMBOLS.map((e) => `<button class="lg-sym ${l.symbol === e ? 'on' : ''}" data-t="idsym:${e}">${e}</button>`).join('')}</div>
+        <label class="t-label">Iniziali (facoltative, max 3)</label><input class="t-input" name="idtext" maxlength="3" placeholder="es. LB" value="${esc(l.text)}" />
+        <label class="t-label">Colore delle iniziali</label>${sw('idfg', l.fg)}
+        <div class="btnrow" style="margin-top:12px"><button class="btn sec" data-t="idrnd">🎲 A caso</button><button class="btn good" data-t="idsave" ${this.accBusy ? 'disabled' : ''}>${this.accBusy ? '⏳ Un attimo…' : this.idAccount ? '✅ Crea e continua' : '✅ Continua'}</button></div>
+        ${this.idMsg ? `<p class="small bad center" style="margin:8px 0 0">${this.idMsg}</p>` : ''}
+        <p class="muted small center" style="margin:8px 0 0">📷 Una tua foto come logo la puoi mettere dopo, dal Profilo</p>`).replace('data-t="view:main"', 'data-t="view:welcome"');
+      this.el.innerHTML = html;
+      return;
+    }
     if (this.view === 'main') {
       const ls = last ? slots[last - 1] : null;
       html = `
-        <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">Da squattrinato a magnate 💼</div></div>
+        <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">${betaSite ? 'Versione di prova 🧪 · salvataggi a parte' : 'Da squattrinato a magnate 💼'}</div></div>
         <div class="t-menu">
           ${ls ? `<button class="t-btn ${previewPr !== null ? '' : 't-main'}" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
           ${previewPr !== null ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}
           <button class="t-btn ${ls || previewPr !== null ? '' : 't-main'}" data-t="view:new"><span class="t-ico">🆕</span><span><b>Nuova partita</b></span></button>
           <button class="t-btn" data-t="view:slots" ${slots.some(Boolean) ? '' : 'disabled'}><span class="t-ico">📂</span><span><b>Carica partita</b></span></button>
-          ${previewPr !== null ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
-          ${previewPr !== null ? '' : loggedIn() ? `<div class="t-acc">💾 Account: <b>${esc(nickname())}</b> · partite salvate</div>` : '<button class="t-btn" data-t="view:login"><span class="t-ico">🔑</span><span><b>Entra con il tuo account</b><small>Ritrova le tue partite con nome e password</small></span></button>'}
+          ${sandbox ? `<button class="t-btn" data-t="dev"><span class="t-ico">🛠️</span><span><b>Partita developer</b><small>${loadState(DEV_SLOT) ? `${euro(loadState(DEV_SLOT)!.money)} · non va in classifica` : 'Un miliardo, comandi rapidi, niente classifica'}</small></span></button>` : ''}
+          ${sandbox ? '' : loggedIn() ? `<div class="t-acc">💾 Account: <b>${esc(nickname())}</b> · partite salvate</div>` : '<button class="t-btn" data-t="view:login"><span class="t-ico">🔑</span><span><b>Entra con il tuo account</b><small>Ritrova le tue partite con nome e password</small></span></button>'}
           <div class="t-row">
             <button class="t-btn t-small" data-t="view:settings"><span class="t-ico">⚙️</span><b>Impostazioni</b></button>
             <button class="t-btn t-small" data-t="view:credits"><span class="t-ico">ℹ️</span><b>Crediti</b></button>
@@ -138,7 +179,8 @@ export class TitleScreen {
   }
 
   private panel(title: string, body: string) {
-    return `<div class="t-panel"><div class="t-head"><button class="t-back" data-t="view:main">◀</button><h2>${title}</h2></div><div class="t-body">${body}</div></div>`;
+    // prima apertura non finita: si torna al benvenuto
+    return `<div class="t-panel"><div class="t-head"><button class="t-back" data-t="view:${onboarded() ? 'main' : 'welcome'}">◀</button><h2>${title}</h2></div><div class="t-body">${body}</div></div>`;
   }
 
   private onClick(e: Event) {
@@ -213,8 +255,61 @@ export class TitleScreen {
             return;
           }
           // si riparte con le partite dell'account
+          setOnboarded();
           location.reload();
         });
+        break;
+      }
+      // prima apertura: ospite o account, poi nome e logo
+      case 'guest':
+      case 'newacc':
+        this.idAccount = cmd === 'newacc';
+        this.idMsg = '';
+        this.view = 'ident';
+        break;
+      case 'idshape':
+        this.idLogo.shape = arg as Logo['shape'];
+        break;
+      case 'idbg':
+        this.idLogo.bg = arg;
+        break;
+      case 'idfg':
+        this.idLogo.fg = arg;
+        break;
+      case 'idsym':
+        this.idLogo.symbol = arg;
+        break;
+      case 'idrnd':
+        this.idLogo = { ...randomLogo(), text: this.idLogo.text };
+        break;
+      case 'idsave': {
+        const name = this.idName.trim();
+        if (!name) {
+          this.idMsg = '✏️ Scrivi il tuo nome';
+          break;
+        }
+        if (this.idAccount && this.accPw.length < MIN_PASSWORD) {
+          this.idMsg = `La password deve avere almeno ${MIN_PASSWORD} caratteri`;
+          break;
+        }
+        this.accBusy = true;
+        this.idMsg = '';
+        void (async () => {
+          // il nome è unico: si controlla sul server (senza rete si tiene e si controlla dopo)
+          const r = await chooseName(name);
+          let err = r === 'taken' ? `<b>${esc(name)}</b> è già di un altro giocatore: scegline un altro` : r === 'bad' ? 'Questo nome non va bene: provane un altro' : '';
+          if (!err && this.idAccount) err = esc((await register(this.accPw)) ?? '');
+          this.accBusy = false;
+          if (err) {
+            this.idMsg = err;
+            this.render();
+            return;
+          }
+          setProfileLogo({ ...this.idLogo });
+          setOnboarded();
+          this.view = 'main';
+          this.render();
+        })();
         break;
       }
       case 'newin':

@@ -3,9 +3,8 @@ import { ALL_AUTO } from '../config/business';
 import { EVENTS, WEATHER } from '../config/events';
 import { ensureWeather, sureEvents, weatherOf } from './effects';
 import { JOBS } from '../config/jobs';
-import { readyJobTypes } from '../config/careers';
+import { openFields, readyJobs } from './fields';
 import { PRODUCT_IDS } from '../config/products';
-import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
 import { afterPayments, checkDebt, monthEnd, monthStart } from './crisis';
 import { addNews } from './news';
@@ -119,6 +118,8 @@ export function missionFame(s: GameState, weekly: boolean) {
 }
 
 export function genMissions(s: GameState) {
+  // partita nuova che non ha ancora scelto il campo: niente lavoretti, le missioni arrivano dopo la scelta
+  if (!readyJobs(s).length) return;
   const scale = 1 + totalFame(s) / FAME.MISSION_SCALE + (totalLevel(s) - 4) * 0.12;
   // stesso giorno (es. partita salvata con meno missioni): si tengono quelle che ci sono e si aggiungono le altre
   const list: Mission[] = s.missionsDay === day(s) ? [...s.missions] : [];
@@ -128,11 +129,12 @@ export function genMissions(s: GameState) {
   const chosen = new Set<string>(list.map((m) => (m.kind === 'jobType' ? m.kind + m.jobType : m.kind)));
   while (list.length < DAILY_MISSIONS) {
     const kind = pick(kinds);
-    const jt = pick(readyJobTypes());
+    const jt = pick(readyJobs(s));
     const key = kind === 'jobType' ? kind + jt : kind;
     if (chosen.has(key)) continue;
     chosen.add(key);
-    const skill = kind === 'jobType' ? JOBS[jt].skill : kind === 'served' ? 'clientela' : pick(SKILL_IDS);
+    // la fama della missione va a un campo aperto (sim/fields.ts)
+    const skill = kind === 'jobType' ? JOBS[jt].skill : kind === 'served' ? 'clientela' : pick(openFields(s));
     let m: Omit<Mission, 'id' | 'progress' | 'claimed' | 'fameSkill' | 'fame'>;
     switch (kind) {
       case 'jobs': {
@@ -180,6 +182,8 @@ export function ensureWeekly(s: GameState) {
   const w = weekOf(day(s));
   // WEEKLY_VER: le missioni create con le regole vecchie si rifanno
   if (s.weeklyWeek === w && s.weekly?.length && s.weeklyVer === WEEKLY_VER) return;
+  // campo non ancora scelto: si aspetta (poi le missioni della settimana contano i suoi lavoretti)
+  if (!readyJobs(s).length) return;
   s.weeklyWeek = w;
   s.weeklyVer = WEEKLY_VER;
   s.weekEarned = 0;
@@ -207,7 +211,7 @@ export function ensureWeekly(s: GameState) {
         break;
       }
       case 'variety':
-        m = { kind, text: `🗓️ Fai almeno 3 lavoretti di ogni tipo (tutti e ${readyJobTypes().length})`, target: readyJobTypes().length * 3, reward: 30 * readyJobTypes().length * 3 * scale };
+        m = { kind, text: `🗓️ Fai almeno 3 lavoretti di ogni tipo (tutti e ${readyJobs(s).length})`, target: readyJobs(s).length * 3, reward: 30 * readyJobs(s).length * 3 * scale };
         break;
       case 'served': {
         const n = randInt(120, 180);
@@ -219,7 +223,7 @@ export function ensureWeekly(s: GameState) {
         m = { kind: 'earn', text: `🗓️ 💶 Guadagna €${n} questa settimana`, target: n, reward: n * 0.2 };
       }
     }
-    const skill = kind === 'served' ? 'clientela' : pick(SKILL_IDS);
+    const skill = kind === 'served' ? 'clientela' : pick(openFields(s));
     return { ...m, id: `w${w}_${i}`, weekly: true, reward: Math.round(m.reward), progress: 0, claimed: false, fameSkill: skill, fame: missionFame(s, true), types: [] };
   });
 }

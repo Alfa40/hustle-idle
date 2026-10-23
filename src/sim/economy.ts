@@ -6,6 +6,7 @@ import {
 import { EXTRA_ROLES, hourFactor, ROLES } from '../config/business';
 import { VEHICLES } from '../config/vehicles';
 import { bizSectorOn } from '../config/careers';
+import { bizUnlock, fieldOpen } from './fields';
 import { extraRoom, hasInterior, productLevel } from '../config/recipes';
 import { ALL_AUTO, BUSINESS_TYPES } from '../config/business';
 import { LOTS, ZONES, type LotDef, type ZoneId } from '../config/map';
@@ -425,11 +426,13 @@ export const lotPrice = (lotId: string, type: BusinessType) => lotDef(lotId).pri
  * Tipi di attività che si possono comprare in un lotto: solo quelle base (le altre si ottengono evolvendo)
  * e solo dei settori accesi (config/careers.ts: FOCUS_SECTORS).
  */
-export const typesForLot = (lotId: string) =>
+export const typesForLot = (lotId: string, s?: GameState) =>
   (Object.keys(BUSINESS_TYPES) as BusinessType[]).filter((t) => {
     const d = bizType(t);
     // il laboratorio dell'artigiano (lavoro solo a mano, dentro) non si compra più: ora le attività lavorano da sole
-    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || bizSectorOn(d.sector)) && !(ALL_AUTO && d.kind === 'craft');
+    // con la partita (`s`): solo i campi aperti (sim/fields.ts); se sono sbloccate dai lavoretti lo dice bizUnlock
+    return d.lot === lotDef(lotId).kind && !d.tier && (!d.sector || bizSectorOn(d.sector)) && !(ALL_AUTO && d.kind === 'craft')
+      && (!s || fieldOpen(s, d.sector ?? 'cucina'));
   });
 
 // ---------------- evoluzione delle attività ----------------
@@ -465,7 +468,7 @@ export const evolveLots = (s: GameState, target: BusinessType, own?: string) =>
  */
 export function evolveBusiness(s: GameState, b: Business, target: BusinessType, lotId: string) {
   const price = evolvePrice(lotId, target, b.lotId);
-  if (!evolvesOf(b.type).includes(target) || evolveMissing(b).length || (lotId !== b.lotId && bizAtLot(s, lotId)) || s.money < price) return null;
+  if (!evolvesOf(b.type).includes(target) || evolveMissing(b).length || !bizUnlock(s, target).ok || (lotId !== b.lotId && bizAtLot(s, lotId)) || s.money < price) return null;
   if (bizType(target).lot !== lotDef(lotId).kind) return null;
   addMoney(s, -price);
   const nb: Business = {
@@ -502,7 +505,7 @@ export function evolveBusiness(s: GameState, b: Business, target: BusinessType, 
 export function buyLot(s: GameState, lotId: string, type: BusinessType) {
   const lot = lotDef(lotId);
   const price = lotPrice(lotId, type);
-  if (bizAtLot(s, lotId) || s.money < price || bizType(type).lot !== lot.kind) return null;
+  if (bizAtLot(s, lotId) || s.money < price || bizType(type).lot !== lot.kind || !bizUnlock(s, type).ok) return null;
   const b: Business = {
     id: 'biz' + lotId,
     type, lotId,

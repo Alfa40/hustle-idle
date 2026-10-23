@@ -14,7 +14,7 @@ import type { Game } from '../game';
 import { bizType } from '../config/business';
 import { devApp, devKey, isDevDevice } from '../dev';
 import { testerKey } from '../tester';
-import { previewPr } from '../preview';
+import { previewPr, sandbox } from '../preview';
 import { previewStart } from '../previewStart';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, day } from '../sim/state';
@@ -45,7 +45,7 @@ interface Proposal {
 }
 
 /** si vede la scheda "Proponi" su questo telefono */
-export const canPropose = () => (previewPr === null && !devApp && (testerKey() !== '' || isDevDevice())) || !!previewStart?.tester;
+export const canPropose = () => (!sandbox && !devApp && (testerKey() !== '' || isDevDevice())) || !!previewStart?.tester;
 /** si vede la scheda "Proposte" (lettura e approvazione); nelle anteprime no */
 export const canReview = () => previewPr === null && !devApp && isDevDevice();
 

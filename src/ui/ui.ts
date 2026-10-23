@@ -13,7 +13,7 @@ import { markNewsRead, NEWS_FILTERS, newsCat, unreadNews } from '../sim/news';
 import { dailyTroubles, insuranceCost, solveTrouble, troubleActive, troubleCost } from '../sim/troubles';
 import { buildCost, buyPlot, fameOk, plotFame, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
-import { SKILLS, SKILL_IDS } from '../config/skills';
+import { SKILLS, SKILL_IDS, type SkillId } from '../config/skills';
 import type { NewsItem } from '../sim/state';
 import type { ActionPrompt, Game, MapMarker } from '../game';
 import { Minimap } from './map';
@@ -42,10 +42,12 @@ import {
   isAutoBiz,
 } from '../sim/economy';
 import { addFame, addMoney, FAME_RANKS, lineLevel, rank, sectorXp, skillLevel, totalFame, totalLevel } from '../sim/progress';
-import { careerLine, EVOLVE_EVERY, linesOf, readyJobTypes } from '../config/careers';
+import { CAREER_LINES, careerLine, EVOLVE_EVERY, linesOf } from '../config/careers';
+import { bizLockText, bizUnlock, chooseMainField, FIELD_STEPS, FIELDS, fieldOpen, mainField, needsField, nextFieldStep, openField, openFields, readyJobs } from '../sim/fields';
 import { devApp, devGame } from '../dev';
 import { canPropose, canReview, Proposals } from './proposals';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
+import { setProfileLogo } from '../identity';
 import { drawLogo, photoPicker, shrinkImage, LOGO_COLORS, LOGO_SHAPES, LOGO_SYMBOLS, logoImg, logoUrl, newPhotoEdit, photoData, preloadLogo, randomLogo, renderPhoto, SHAPE_ICON, type Logo, type PhotoEdit } from '../logo';
 import {
   currentSlot, day, dayOfMonth, euro, hourOf, monthIndex, playStats, wipeSave, yearOf,
@@ -473,7 +475,8 @@ export class UI {
       if (free && nameTaken() && !this.takenAsked && !this.guide.active) {
         this.takenAsked = true;
         this.openNameEditor(true);
-      } else if (free) this.guide.checkUnlocks();
+      } else if (free && needsField(this.s) && !this.guide.active) this.openFieldChoice();
+      else if (free) this.guide.checkUnlocks();
     }
     const s = this.s;
     const m = euro(s.money);
@@ -1078,10 +1081,18 @@ export class UI {
     const s = this.s;
     const lot = lotDef(lotId);
     const zone = lotZone[lotId];
-    const opts = typesForLot(lotId)
+    const opts = typesForLot(lotId, s)
+      .sort((a, b) => Number(!bizUnlock(s, a).ok) - Number(!bizUnlock(s, b).ok))
       .map((t) => {
         const def = bizType(t);
         const price = lotPrice(lotId, t);
+        // non ancora sbloccata dai lavoretti (sim/fields.ts): si vede cosa serve
+        const lock = bizLockText(s, t);
+        if (lock) {
+          return `<div class="card biz-locked"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff;opacity:.5">${def.icon}</div>
+              <div style="flex:1"><h3 style="margin:0">${def.name}</h3><div class="muted small explain">${def.desc}</div></div></div>
+            <div class="card tint small" style="margin-top:8px" data-g="biz-lock">${lock}</div></div>`;
+        }
         if (def.kind === 'craft') {
           // laboratorio: niente clienti, si guadagna coi lavori fatti a mano
           return `<div class="card"><div class="row"><div class="icon-bubble" style="background:${def.color};color:#fff">${def.icon}</div>
@@ -1402,13 +1413,15 @@ export class UI {
     if (tab === 'compra') {
       if (sel) {
         return `<button class="btn sm sec" data-a="back" style="margin-bottom:10px">◀ Tutti i lotti</button>
-          <h3 class="sec-title" style="margin-top:0">🏷️ ${lotDef(sel).name}</h3>${this.lotCard(sel, atAgency)}`;
+          <h3 class="sec-title" style="margin-top:0">🏷️ ${lotDef(sel).name}</h3>${this.lotCard(sel, atAgency || this.guide.current === 'unlock:firstbiz')}`;
       }
-      const free = allLots(s).filter((l) => !bizAtLot(s, l.id)).sort((a, b) => a.price - b.price);
+      const free = allLots(s).filter((l) => !bizAtLot(s, l.id) && typesForLot(l.id, s).length).sort((a, b) => a.price - b.price);
       const row = (l: (typeof LOTS)[number]) => {
-        const types = typesForLot(l.id).map((t) => bizType(t).icon).join(' ');
-        const from = Math.min(...typesForLot(l.id).map((t) => lotPrice(l.id, t)));
-        return `<button class="card row" style="width:100%;border:none;text-align:left;cursor:pointer" data-a="lot:${l.id}">
+        const all = typesForLot(l.id, s);
+        const open = all.filter((t) => bizUnlock(s, t).ok);
+        const types = all.map((t) => `<span style="opacity:${open.includes(t) ? 1 : 0.35}">${bizType(t).icon}</span>`).join(' ');
+        const from = Math.min(...(open.length ? open : all).map((t) => lotPrice(l.id, t)));
+        return `<button class="card row" style="width:100%;border:none;text-align:left;cursor:pointer" data-a="lot:${l.id}" ${open.length ? 'data-g="lot-ok"' : ''}>
           <div class="icon-bubble">${l.kind === 'truck' ? '🅿️' : '🏬'}</div>
           <div style="flex:1"><b>${l.name}</b><div class="muted small">📍 ${ZONES[lotZone[l.id]].name} · ${types}</div></div>
           <div style="text-align:right"><div class="muted small">da</div><b class="${s.money >= from ? 'money-t' : ''}">${euro(from)}</b></div></button>`;
@@ -1739,17 +1752,21 @@ export class UI {
       // anteprima nel locale libero che rende di più (come all'acquisto)
       const bestLot = lots.map((l) => ({ l, p: estimateLot(s, l, t).profit })).sort((x, y) => y.p - x.p)[0]?.l;
       const next = evolvesOf(t).map((x) => `${bizType(x).icon} ${bizType(x).name}`).join(' o ');
+      // anche il lavoretto del ramo deve essere arrivato all'evoluzione giusta (sim/fields.ts)
+      const lock = bizLockText(s, t);
+      const go = ready && !lock;
       return `<div class="card evo-card" style="--sc:${d.color}"><div class="row"><div class="icon-bubble" style="background:${d.color};color:#fff">${d.icon}</div>
           <div style="flex:1"><h3 style="margin:0">${d.name}</h3><div class="small">${d.products.map((p) => PRODUCTS[p].icon).join(' ')} · ${(d.tier ?? 1)}ª evoluzione</div></div></div>
         <p class="muted small explain" style="margin:6px 0">${d.desc}${next ? ` Poi potrà diventare: ${next}.` : ' È l\'ultima del suo ramo.'}</p>
         ${bestLot ? `${this.estStats(bestLot, t)}<div class="muted small center" style="margin:4px 0 8px">nel locale libero migliore: ${esc(lotDef(bestLot).name)}</div>` : ''}
-        <button class="btn full ${ready ? 'good' : 'sec'}" data-a="evolve:${t}" ${ready && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : ready ? `🏗️ Scegli il locale · da ${euro(from)}` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button>
+        <button class="btn full ${go ? 'good' : 'sec'}" data-a="evolve:${t}" ${go && lots.length ? '' : 'disabled'}>${!lots.length ? 'Nessun locale libero' : go ? `🏗️ Scegli il locale · da ${euro(from)}` : lock && ready ? `🔒 Da ${euro(from)}: prima il lavoretto` : `🔒 Da ${euro(from)}: prima tutte le migliorie al massimo`}</button>
+        ${lock ? `<div class="small center" style="margin-top:6px;color:#e0a030" data-g="evo-lock">${lock}</div>` : ''}
         ${!ready ? `<div class="small center" style="margin-top:6px;color:#e0a030">${miss.length === 1 ? 'Manca 1 miglioria' : `Mancano ${miss.length} migliorie`} (elenco qui sopra)</div>`
           : !lots.length ? `<div class="small center" style="margin-top:6px;color:#e0a030">${d.name} vuole un altro tipo di locale e sono tutti tuoi.<br>Vendine uno per liberarlo.</div>`
           : s.money < from ? `<div class="small center" style="margin-top:6px;color:#e0a030">Ti mancano ${euro(from - s.money)} per il locale più economico.</div>` : ''}</div>`;
     }).join('');
     return `<div class="card ${ready ? 'hl' : ''}"><div class="row between"><h3>🌱 Evolvi ${def.icon} ${def.name}</h3><span class="tag ${ready ? 'g' : 'y'}">${all.length - miss.length}/${all.length}</span></div>
-        ${points('Servono <b>tutte le migliorie al massimo</b>', 'Paghi locale + ristrutturazione in un solo prezzo', 'Restando dove sei paghi solo la ristrutturazione', 'Se cambi locale, il vecchio torna libero', 'I dipendenti restano, migliorie e scorte ripartono da zero')}
+        ${points('Servono <b>tutte le migliorie al massimo</b>', ...(s.fields ? ['E il lavoretto del ramo all\'evoluzione giusta: 1ª evoluzione Liv. 20, 2ª Liv. 30, 3ª Liv. 40'] : []), 'Paghi locale + ristrutturazione in un solo prezzo', 'Restando dove sei paghi solo la ristrutturazione', 'Se cambi locale, il vecchio torna libero', 'I dipendenti restano, migliorie e scorte ripartono da zero')}
         ${reqs}</div>
       <h3 class="sec-title">${targets.length > 1 ? '🔀 Bivio: scegli un ramo' : '➡️ Diventa'}</h3>${cards}${this.estNote()}`;
   }
@@ -3375,7 +3392,7 @@ export class UI {
               m.claimed ? '<span class="tag g">Riscossa</span>' : done ? `<button class="btn sm good" data-a="claim:${m.id}">Riscuoti</button>` : ''
             }</div>
             <div class="bar green"><i style="width:${(m.progress / m.target) * 100}%"></i></div>
-            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${readyJobTypes().map((t) => { const n = m.types?.filter((x) => x === t).length ?? 0; return `<span style="opacity:${n ? 1 : 0.35}">${JOBS[t].icon} ${n}/3</span>`; }).join(' · ')}</div>` : ''}
+            ${m.kind === 'variety' ? `<div class="small muted" style="margin-top:4px">Fatti: ${readyJobs(this.s).map((t) => { const n = m.types?.filter((x) => x === t).length ?? 0; return `<span style="opacity:${n ? 1 : 0.35}">${JOBS[t].icon} ${n}/3</span>`; }).join(' · ')}</div>` : ''}
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(m.progress)}/${m.target}</span><span>Premio ${euro(m.reward)} · +${m.fame.toFixed(0)} fama ${SKILLS[m.fameSkill].icon}</span></div></div>`;
         };
         const ms = s.missions.map(card).join('');
@@ -3820,8 +3837,13 @@ export class UI {
       live: true,
       color: 'var(--purple)',
       render: () => {
-        const skills = SKILL_IDS.map((k) => {
+        const skills = SKILL_IDS.filter((k) => FIELDS.includes(k) || s.xp[k] > 0 || s.fame[k] > 0).map((k) => {
           const lvl = skillLevel(s, k);
+          // campo non ancora aperto (sim/fields.ts): solo il nome e dove si apre
+          if (!fieldOpen(s, k)) {
+            return `<button class="card row field-closed" data-a="markets" style="width:100%;border:none;text-align:left;cursor:pointer"><div class="icon-bubble" style="opacity:.5">${SKILLS[k].icon}</div>
+              <div style="flex:1"><b>${SKILLS[k].name}</b><div class="muted small">🔒 Campo chiuso · tocca per i nuovi mercati</div></div><span class="grp-arrow">›</span></button>`;
+          }
           const x = sectorXp(s, k);
           const a = LEVEL.xpForLevel(lvl);
           const b = LEVEL.xpForLevel(lvl + 1);
@@ -3841,9 +3863,103 @@ export class UI {
             <div class="row between small muted" style="margin-top:4px"><span>${Math.floor(x - a)}/${b - a} XP</span><span>Fama ${f.toFixed(1)} · +${bonus}% domanda</span></div>
             ${lines || biz ? `<div class="career-lines">${lines}${biz}</div>` : ''}</div>`;
         }).join('');
-        return `${points('Livello del settore = somma dei suoi lavori e attività', `Ogni ${EVOLVE_EVERY} livelli un lavoro si evolve`, 'La fama sale coi clienti serviti, i lavoretti e le missioni', 'Ogni cliente perso toglie fama (5 volte un servito)', 'Lavoretti falliti tolgono fama; ogni giorno ne cala un po\'', 'Più fama = più clienti e offerte migliori')}${skills}`;
+        return `${this.marketsCard()}${points('Livello del settore = somma dei suoi lavori e attività', `Ogni ${EVOLVE_EVERY} livelli un lavoro si evolve`, 'La fama sale coi clienti serviti, i lavoretti e le missioni', 'Ogni cliente perso toglie fama (5 volte un servito)', 'Lavoretti falliti tolgono fama; ogni giorno ne cala un po\'', 'Più fama = più clienti e offerte migliori')}${skills}`;
       },
-      actions: {},
+      actions: { markets: () => this.openMarkets() },
+    });
+  }
+
+  /** Riquadro dei nuovi mercati (profilo): il prossimo campo, cosa serve, e il tasto per aprirli. */
+  private marketsCard() {
+    const s = this.s;
+    if (!s.fields) return '';
+    const st = nextFieldStep(s);
+    if (!st) return '';
+    const lv = totalLevel(s);
+    const ok = lv >= st.level;
+    return `<button class="card row ${ok ? 'hl' : ''}" data-a="markets" data-g="markets" style="width:100%;border:none;text-align:left;cursor:pointer"><div class="icon-bubble">🧭</div>
+      <div style="flex:1"><b>Nuovi mercati</b><div class="muted small">${ok ? `✅ Puoi entrare in un campo nuovo · ${euro(st.cost)}` : `Prossimo campo dal Liv. ${st.level} (ora ${lv}) · ${euro(st.cost)}`}</div></div><span class="grp-arrow">›</span></button>`;
+  }
+
+  /** Cosa offre un campo: i suoi lavoretti e le attività da cui si parte. */
+  private fieldInfo(k: SkillId) {
+    const lines = CAREER_LINES.filter((l) => l.sector === k && l.ready);
+    const bases = BUSINESS_TYPE_IDS.filter((t) => bizType(t).sector === k && !bizType(t).tier && bizType(t).kind !== 'craft');
+    return `<div class="small" style="margin-top:6px"><b>Lavoretti:</b> ${lines.map((l) => `${l.icon} ${l.name}`).join(' · ')}</div>
+      <div class="small" style="margin-top:4px"><b>Attività:</b> ${bases.map((t) => `${bizType(t).icon} ${bizType(t).name}`).join(' · ')}</div>`;
+  }
+
+  /** Partita nuova: si sceglie il campo principale (obbligatorio, una volta sola). */
+  openFieldChoice() {
+    const s = this.s;
+    let sel: SkillId | null = null;
+    this.open({
+      title: '🧭 Scegli la tua strada',
+      color: 'var(--purple)',
+      locked: true,
+      guide: 'fields',
+      render: () => `${bullets('Parti da <b>un campo</b>: in città solo i suoi lavoretti', 'Porta un lavoretto al <b>Liv. 10</b> e apri la tua prima attività', `Dal <b>Liv. ${FIELD_STEPS[0].level}</b> potrai entrare in un altro campo`)}
+        <div class="field-grid">${FIELDS.map((k) => `<button class="card field-pick ${sel === k ? 'on' : ''}" data-a="pick:${k}" data-g="field-pick">
+          <div class="row"><div class="icon-bubble">${SKILLS[k].icon}</div><h3 style="margin:0;flex:1">${SKILLS[k].name}</h3>${sel === k ? '<span class="tag g">✔️</span>' : ''}</div>${this.fieldInfo(k)}</button>`).join('')}</div>
+        <div class="btnrow"><button class="btn ${sel ? 'good' : 'sec'}" data-a="go" data-g="field-go">${sel ? `▶ Inizia con ${SKILLS[sel].name}` : '👆 Tocca un campo qui sopra'}</button></div>`,
+      actions: {
+        pick: (k) => {
+          sel = k as SkillId;
+          this.renderPanel();
+        },
+        go: () => {
+          if (!sel || !chooseMainField(s, sel)) return;
+          this.game.refreshJobs();
+          this.game.save();
+          this.close();
+        },
+      },
+    });
+  }
+
+  /** Nuovi mercati: entrare in un altro campo (livello del giocatore + corso e licenza da pagare). */
+  openMarkets() {
+    const s = this.s;
+    let confirm: SkillId | null = null;
+    this.open({
+      title: '🧭 Nuovi mercati',
+      color: 'var(--purple)',
+      money: true,
+      live: true,
+      guide: 'markets',
+      render: () => {
+        const st = nextFieldStep(s);
+        const lv = totalLevel(s);
+        const mine = openFields(s).map((k) => `${SKILLS[k].icon} ${SKILLS[k].name}${k === mainField(s) ? ' (principale)' : ''}`).join(' · ');
+        const head = `<div class="card"><div class="small"><b>I tuoi campi:</b> ${mine}</div>
+          ${st ? `<div class="small" style="margin-top:4px">Prossimo campo: <b>Liv. ${st.level}</b> (ora ${lv}) · <b>${euro(st.cost)}</b></div><div class="bar purple" style="margin-top:6px"><i style="width:${Math.min(100, (lv / st.level) * 100)}%"></i></div>` : '<div class="small" style="margin-top:4px">✅ Sei in tutti i campi</div>'}</div>
+          ${points('Ogni campo nuovo apre i suoi lavoretti e le sue attività', 'Il livello è la somma dei livelli dei tuoi settori', 'Ogni campo costa più del precedente: corso e licenza', 'I lavoretti nuovi pagano quasi come i tuoi: la paga dipende da te, non dal lavoretto', 'Per qualche giorno in città vedi più lavoretti del campo nuovo')}`;
+        if (!st) return head;
+        const ok = lv >= st.level;
+        const cards = FIELDS.filter((k) => !fieldOpen(s, k)).map((k) => {
+          const c = confirm === k;
+          const can = ok && s.money >= st.cost;
+          return `<div class="card"><div class="row"><div class="icon-bubble">${SKILLS[k].icon}</div><h3 style="margin:0;flex:1">${SKILLS[k].name}</h3></div>${this.fieldInfo(k)}
+            <button class="btn full ${c ? 'danger' : can ? 'good' : 'sec'}" style="margin-top:10px" data-a="enter:${k}" data-g="field-enter" ${can ? '' : 'disabled'}>${!ok ? `🔒 Dal Liv. ${st.level}` : s.money < st.cost ? `Ti mancano ${euro(st.cost - s.money)}` : c ? `Sicuro? Paghi ${euro(st.cost)}` : `🎓 Entra · ${euro(st.cost)}`}</button></div>`;
+        }).join('');
+        return `${head}<h3 class="sec-title">Campi in cui puoi entrare</h3>${cards}`;
+      },
+      actions: {
+        enter: (k) => {
+          const f = k as SkillId;
+          if (confirm !== f) {
+            confirm = f;
+            this.renderPanel();
+            return;
+          }
+          confirm = null;
+          if (openField(s, f)) {
+            this.game.refreshJobs();
+            this.game.save();
+          }
+          this.renderPanel();
+        },
+      },
     });
   }
 
@@ -4187,6 +4303,8 @@ export class UI {
           }
           s.logo = { ...draft };
           s.logoChosen = true;
+          // vale per tutte le partite (src/identity.ts)
+          setProfileLogo(s.logo);
           void preloadLogo(s.logo).then(() => {
             for (const b of s.businesses) this.game.setupLot(b.lotId);
           });
@@ -4438,11 +4556,15 @@ export class UI {
   /** Comandi rapidi della partita developer: soldi, lavoretti a ogni gradino, attività, tempo. */
   private devHtml() {
     const s = this.s;
-    const lines = [...linesOf('logistica'), ...linesOf('cucina')].map((l) => `<div class="card"><h3>${l.icon} ${l.name} <span class="tag">Liv. ${lineLevel(s, l.id)}</span></h3>
+    const lines = openFields(s).flatMap((k) => linesOf(k)).map((l) => `<div class="card"><h3>${l.icon} ${l.name} <span class="tag">Liv. ${lineLevel(s, l.id)}</span></h3>
         <div class="dev-grid">${l.ladder.map((name, r) => `<button class="btn sm" data-a="devJob:${l.id}|${r}">▶ ${r + 1}. ${name}</button>`).join('')}</div>
         <div class="row small" style="gap:6px;margin-top:6px;flex-wrap:wrap">Livello della linea: ${[1, 10, 20, 30, 40].map((v) => `<button class="btn sm sec" data-a="devLvl:${l.id}|${v}">${v}</button>`).join('')}</div></div>`).join('');
     return `<div class="card hl"><h3>🛠️ Partita developer</h3><p class="small" style="margin:0">Non va in classifica e non risulta "sta giocando" agli amici. 💰 ${euro(s.money)}</p>
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
+      ${s.fields ? `<h3 class="sec-title">🧭 Campi di carriera</h3>
+      <div class="card"><div class="small">Campi: <b>${openFields(s).map((k) => SKILLS[k].icon + ' ' + SKILLS[k].name).join(' · ') || 'nessuno'}</b> · livello giocatore <b>${totalLevel(s)}</b></div>
+        <div class="dev-grid" style="margin-top:8px"><button class="btn sm blue" data-a="devFirst">🔟 Un lavoretto al Liv. 10 (prima attività)</button><button class="btn sm blue" data-a="devAll10">🔓 Tutti i lavoretti dei miei campi al Liv. 10</button><button class="btn sm blue" data-a="devPlus5">⏫ +5 livelli ai lavoretti dei miei campi</button><button class="btn sm blue" data-a="devNextField">🧭 Livello per il prossimo campo</button><button class="btn sm sec" data-a="devMarkets">🧭 Apri Nuovi mercati</button><button class="btn sm sec" data-a="devResetField">🔁 Rifai la scelta del campo</button></div>
+        <p class="muted small explain" style="margin:6px 0 0">Il livello del giocatore è la somma dei livelli dei settori. "Rifai la scelta" chiude tutti i campi (attività e livelli restano).</p></div>` : ''}
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
       <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Debito all'ultimo giorno del mese</button><button class="btn sm blue" data-a="devTrouble">⚡ Imprevisti subito in tutte</button></div>
@@ -4502,6 +4624,35 @@ export class UI {
         s.bizTutorials = [];
         this.guide.reset();
         toast('🎓 I tutorial ripartono', 'info');
+      },
+      // campi di carriera (sim/fields.ts)
+      devFirst: () => {
+        const l = openFields(s).flatMap((k) => linesOf(k))[0];
+        if (!l) return;
+        s.jobXp ??= {};
+        s.jobXp[l.id] = Math.max(s.jobXp[l.id] ?? 0, xpFor(10));
+      },
+      devAll10: () => {
+        s.jobXp ??= {};
+        for (const l of openFields(s).flatMap((k) => linesOf(k))) s.jobXp[l.id] = Math.max(s.jobXp[l.id] ?? 0, xpFor(10));
+      },
+      devPlus5: () => {
+        s.jobXp ??= {};
+        for (const l of openFields(s).flatMap((k) => linesOf(k))) s.jobXp[l.id] = xpFor(lineLevel(s, l.id) + 5);
+      },
+      devNextField: () => {
+        const st = nextFieldStep(s);
+        const l = openFields(s).flatMap((k) => linesOf(k));
+        if (!st || !l.length) return;
+        s.jobXp ??= {};
+        // un livello alla volta sul primo lavoretto finché il livello del giocatore basta
+        for (let i = 0; i < 200 && totalLevel(s) < st.level; i++) s.jobXp[l[i % l.length].id] = xpFor(lineLevel(s, l[i % l.length].id) + 1);
+      },
+      devMarkets: () => this.openMarkets(),
+      devResetField: () => {
+        s.fields = [];
+        s.newField = undefined;
+        this.close();
       },
       devLvl: (arg) => {
         const [line, v] = arg.split('|');

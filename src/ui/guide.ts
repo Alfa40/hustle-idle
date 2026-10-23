@@ -103,6 +103,11 @@ export class Guide {
     return !!this.id;
   }
 
+  /** la guida in corso (null se nessuna) */
+  get current() {
+    return this.id;
+  }
+
   private get seen(): string[] {
     return this.game.state.guides ?? (this.game.state.guides = []);
   }

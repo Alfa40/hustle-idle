@@ -18,12 +18,13 @@ import { plotLeft, plotsSignature, plotStage, workDoing, workStatus } from './si
 import { buildPlotView, plotSign, PLOT_HALF, TOWER_HALF } from './world/plotview';
 import { bizAtLot, CHAR_MODELS, ensureAutoStaff, isAutoBiz, isOpenHour, lotZone, refreshCandidates } from './sim/economy';
 import { addFame, addJobXp, addMoney, addXp, lineLevel, skillLevel } from './sim/progress';
-import { effectiveJobLevel, EVOLVE_EVERY, readyJobTypes } from './config/careers';
+import { effectiveJobLevel, EVOLVE_EVERY } from './config/careers';
+import { boostedLines, NEW_FIELD_BOOST_SHARE, payFame, payLevel, PAY_PER_LEVEL, readyJobs } from './sim/fields';
 import {
   currentSlot, day, hourOf, loadState, newState, pick, playStats, rand, saveState, setCurrentSlot, SLOT_COUNT,
   type GameState, type JobOffer,
 } from './sim/state';
-import { previewPr } from './preview';
+import { sandbox } from './preview';
 import { Character, charPath } from './world/character';
 import { BUILDING_MODELS, City, CITY_ASSETS, DIR_ROT, DIR_VEC, TREE_MODELS, type Slot } from './world/city';
 import { StreetLights, WindowLights } from './world/night';
@@ -459,8 +460,8 @@ export class Game {
     this.applyRide();
 
     // NPC dei lavori già offerti
-    // solo i lavoretti dei settori accesi (config/careers.ts: FOCUS_SECTORS)
-    const ready = readyJobTypes();
+    // solo i lavoretti dei campi aperti (sim/fields.ts)
+    const ready = readyJobs(this.state);
     this.state.jobs = this.state.jobs.filter((j) => ready.includes(j.type) && this.slotsFor(j.type)[j.slot]);
     for (const j of this.state.jobs) this.spawnNpc(j);
 
@@ -1138,10 +1139,28 @@ export class Game {
 
   // ---------------- lavori ----------------
 
+  /**
+   * Paga di un lavoretto (GDD §"Campi"): dipende da te, non dal lavoretto. Livello del tuo settore migliore e fama
+   * più alta tra i campi aperti, così un campo appena aperto paga quasi come quello vecchio; ogni evoluzione del
+   * lavoretto aggiunge il 10% (fino al +40%). Il livello del lavoretto decide solo la difficoltà.
+   */
   offerPay(type: JobType, level: number) {
     const def = JOBS[type];
-    const f = this.state.fame[def.skill];
-    return Math.round(def.basePay * (1 + 0.18 * (level - 1)) * (1 + f / (f + 60)));
+    const s = this.state;
+    if (!s.fields) {
+      const f = s.fame[def.skill];
+      return Math.round(def.basePay * (1 + 0.18 * (level - 1)) * (1 + f / (f + 60)));
+    }
+    const f = payFame(s);
+    const rung = Math.min(4, Math.floor(level / EVOLVE_EVERY));
+    return Math.round(def.basePay * (1 + PAY_PER_LEVEL * (payLevel(s) - 1)) * (1 + f / (f + 60)) * (1 + 0.1 * rung));
+  }
+
+  /** Campi cambiati (scelto il primo o aperto uno nuovo): via le offerte di campi chiusi, subito un paio di nuove. */
+  refreshJobs() {
+    const ready = readyJobs(this.state);
+    for (const j of [...this.state.jobs]) if (!ready.includes(j.type)) this.removeNpc(j.id);
+    for (let i = 0; i < 3 && this.state.jobs.length < JOB.MAX_ACTIVE; i++) this.spawnOffer();
   }
 
   private spawnOffer() {
@@ -1149,9 +1168,13 @@ export class Game {
     const key = (sl: Slot) => `${sl.pos.x},${sl.pos.z}`;
     const inUse = new Set(s.jobs.map((j) => key(this.slotsFor(j.type)[j.slot])));
     // solo i lavori pronti (config/careers.ts); prima quelli che non sono già offerti
-    const ready = readyJobTypes();
+    const ready = readyJobs(s);
+    if (!ready.length) return;
     const types = ready.filter((t) => !s.jobs.some((j) => j.type === t) || s.jobs.length >= ready.length);
-    const type = pick(types.length ? types : ready);
+    // campo appena aperto: metà delle offerte nuove sono sue finché i suoi lavoretti sono sotto il Liv. 5
+    const boost = boostedLines(s).filter((t) => ready.includes(t as JobType)) as JobType[];
+    const rest = (types.length ? types : ready).filter((t) => !boost.includes(t));
+    const type = boost.length && (Math.random() < NEW_FIELD_BOOST_SHARE || !rest.length) ? pick(boost) : pick(boost.length ? rest : types.length ? types : ready);
     const slots = this.slotsFor(type);
     const free = slots.map((_, i) => i).filter((i) => !inUse.has(key(slots[i])));
     if (!free.length) return;
@@ -1556,11 +1579,11 @@ export class Game {
           id: 'lot:' + lot.id, icon: '🤝', color: '#5b4bb7', label: fr.length > 1 ? `Attività di ${names}` : `${bt.name} di ${names}`, sub: `Amici · ${zone} · il posto è libero per te`,
           kind: 'lot', cat: 'forsale', keywords: `amico amici ${names} ${bt.name}`,
         });
-      } else {
-        const types = typesForLot(lot.id).map((t) => bizType(t).name).join(' ');
+      } else if (typesForLot(lot.id, this.state).length) {
+        const types = typesForLot(lot.id, this.state).map((t) => bizType(t).name).join(' ');
         add(lot.center, {
           id: 'lot:' + lot.id, icon: '🏷️', color: '#ff5d73', label: `${def.kind === 'truck' ? 'Posteggio' : 'Locale'} in vendita · ${def.name}`,
-          sub: `${zone} · da €${Math.min(...typesForLot(lot.id).map((t) => lotPrice(lot.id, t))).toLocaleString('it-IT')}`,
+          sub: `${zone} · da €${Math.min(...typesForLot(lot.id, this.state).map((t) => lotPrice(lot.id, t))).toLocaleString('it-IT')}`,
           kind: 'lot', cat: 'forsale', keywords: `${types} vendita comprare lotto`,
         });
       }
@@ -2465,7 +2488,7 @@ export class Game {
     saveState(this.state, undefined, this.awayAt || Date.now());
     void submitScore(this.state);
     // con l'account le partite vanno anche sul server (non la partita developer né le anteprime)
-    if (currentSlot <= SLOT_COUNT && !this.state.dev && previewPr === null) void cloudSave(document.hidden);
+    if (currentSlot <= SLOT_COUNT && !this.state.dev && !sandbox) void cloudSave(document.hidden);
   }
 
   /**

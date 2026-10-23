@@ -14,6 +14,7 @@ import { loadState } from './sim/state';
 import { checkTesterLink } from './tester';
 import { claimPoker } from './ui/poker';
 import { previewPr } from './preview';
+import { syncLogo } from './identity';
 import { applyPreviewStart, previewNow, previewStart } from './previewStart';
 import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
@@ -56,6 +57,8 @@ async function boot() {
 
   const start = (slot: number, newName?: string, quick = false) => {
     game.begin(slot, newName);
+    // il logo è del giocatore, uguale in tutte le partite (src/identity.ts)
+    syncLogo(game.state);
     // partita developer nuova: un miliardo, niente tutorial di benvenuto
     if (slot === DEV_SLOT && newName !== undefined) {
       game.state.money = 1_000_000_000;
@@ -73,6 +76,8 @@ async function boot() {
     if (previewPr !== null && quick) {
       game.state.tutorialDone = true;
       game.state.guidesOff = true;
+      // si prova la modifica con tutti i campi aperti (niente scelta del campo)
+      game.state.fields = undefined;
     }
     game.ui = new UI(game);
     // nome e logo prima di tutto (ogni volta finché non sono stati scelti); il resto aspetta in coda

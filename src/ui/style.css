@@ -1645,3 +1645,9 @@ hr.soft { border: none; border-top: 1px solid rgba(0, 0, 0, 0.08); margin: 10px 
 .hbtn.c-news { --b: #2d6cdf; --bd: #1f4fa8; }
 .card.news-new { box-shadow: inset 4px 0 0 #2d6cdf; }
 .news-tag { color: #2d6cdf; }
+
+/* ---------- scelta del campo di carriera (partita nuova) ---------- */
+.field-grid { display: grid; gap: 10px; }
+body.is-landscape .field-grid { grid-template-columns: 1fr 1fr; }
+.field-pick { width: 100%; border: 2px solid transparent; text-align: left; cursor: pointer; display: block; margin: 0; }
+.field-pick.on { border-color: var(--purple); background: #f3edff; }

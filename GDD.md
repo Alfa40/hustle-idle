@@ -90,6 +90,18 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 - **Si può fallire** (tempo scaduto, cliente insoddisfatto): nessuna paga o paga ridotta e una piccola **penalità di fama** nella categoria.
 - **Difficoltà crescente:** più il lavoro o l'attività è complessa, più i mini-giochi diventano difficili.
 
+### 6b. Campi di carriera (versione di prova, ramo `beta`)
+
+> Per ora solo nella versione di prova (https://beta.hustle-anteprime.pages.dev). Se piace va nel gioco vero e le partite si azzerano.
+
+- **Prima apertura del gioco** (non per partita): "Chi sei?" → 👤 Gioca come ospite, 🆕 Crea un account, 🔑 Ho già un account (nella versione di prova l'account non c'è). Poi **nome e logo** (disegnato; la foto si mette dopo dal Profilo). Valgono per **tutte le partite** (`src/identity.ts`: `hustle.logo`, `syncLogo` a ogni avvio di partita) e si cambiano dal 👤 Profilo.
+- **Ogni partita nuova sceglie il suo campo principale** ("🧭 Scegli la tua strada", obbligatorio): 🚚 Trasporti e logistica, 🍳 Ristorazione e ospitalità, 🔨 Costruzione e manualità, 🎨 Arte, design e ristrutturazione. Si possono avere partite con campi diversi. In città compaiono solo i lavoretti dei campi aperti, all'agenzia solo le attività dei campi aperti (`GameState.fields`, src/sim/fields.ts; partite di prima senza `fields` = tutti aperti).
+- **Nuovi mercati** (👤 Profilo → ⭐ Esperienza → 🧭 Nuovi mercati): per entrare in un altro campo servono il **livello del giocatore** (somma dei livelli dei settori) e un costo (corso e licenza): 2° campo Liv. 15 / €150.000, 3° Liv. 30 / €750.000, 4° Liv. 45 / €3.000.000, 5° (Commercio, quando si riaccende) Liv. 60 / €10.000.000 (`FIELD_STEPS`). Due tocchi per confermare. Guida `unlock:field` la prima volta che il livello basta. Il campo appena aperto ha **metà delle offerte** in città finché i suoi lavoretti sono sotto il Liv. 5.
+- **Paga dei lavoretti dal giocatore**: livello del settore migliore tra quelli aperti (+10% a livello) e fama più alta tra i campi aperti; ogni evoluzione del lavoretto +10% (fino a +40%). Il livello del lavoretto decide solo la difficoltà: un lavoretto nuovo è facile ma paga quasi come uno evoluto (es. 75 contro 77).
+- **Attività sbloccate dai lavoretti** (`BIZ_LINES`, `bizUnlock`): un'attività base si apre quando un suo lavoretto arriva alla **prima evoluzione (Liv. 10)**; ogni evoluzione dell'attività vuole il lavoretto del ramo all'evoluzione dopo (1ª evoluzione Liv. 20, 2ª Liv. 30, 3ª Liv. 40). Es. 🚚 Food truck: Cucina, Bar o Sala al Liv. 10; Trattoria: Cucina al Liv. 20. All'agenzia le attività bloccate si vedono con "🔒 Porta … al Liv. 10 (ora 7)", nell'evoluzione sotto il tasto.
+- **Tutorial obbligatorio della prima attività** (`unlock:firstbiz`): quando il primo lavoretto arriva al Liv. 10. Se mancano i soldi per il posto più economico il comune dà un contributo (una volta). Si compra dall'Attività anche lontano dall'agenzia, poi giro della gestione (Panoramica, Prodotti, Migliorie, Evoluzione) e subito dopo la guida per assumere (`unlock:biz`).
+- Comandi developer (sezione 🧭 Campi): un lavoretto al Liv. 10, tutti al Liv. 10, +5 livelli, livello per il prossimo campo, apri Nuovi mercati, rifai la scelta del campo.
+
 ## 7. Attività
 
 ### 7.1 Tipi iniziali

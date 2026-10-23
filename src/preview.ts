@@ -8,3 +8,14 @@ const m = /^proposta-(\d+)\.hustle-anteprime\.pages\.dev$/.exec(location.hostnam
 export const previewPr = m ? Number(m[1]) : null;
 
 if (previewPr !== null) document.title = `Anteprima #${previewPr} · ${document.title}`;
+
+/**
+ * Versione di prova (beta): sito a parte su Cloudflare Pages, https://beta.hustle-anteprime.pages.dev, costruito dal
+ * ramo `beta` (.github/workflows/beta.yml). Come le anteprime: salvataggi suoi (altro sito), niente classifica né
+ * account, e la partita developer c'è sempre (comandi rapidi per provare tutto in fretta).
+ */
+export const betaSite = location.hostname === 'beta.hustle-anteprime.pages.dev' || /[?&]beta\b/.test(location.search);
+/** sito a parte (anteprima o beta): niente classifica, niente account, niente soldi veri del poker */
+export const sandbox = previewPr !== null || betaSite;
+
+if (betaSite) document.title = `Prova · ${document.title}`;

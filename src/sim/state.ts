@@ -227,6 +227,13 @@ export interface GameState {
   xp: Record<SkillId, number>;
   /** esperienza di ogni linea di lavoro (config/careers.ts): il suo livello e la sua evoluzione */
   jobXp?: Record<string, number>;
+  /**
+   * campi di carriera aperti (sim/fields.ts), il primo è quello principale. Assente = partite di prima, tutti
+   * aperti; vuoto = partita nuova che deve ancora scegliere il campo
+   */
+  fields?: SkillId[];
+  /** l'ultimo campo aperto (ha più offerte finché i suoi lavoretti sono bassi) */
+  newField?: SkillId;
   fame: Record<SkillId, number>;
   businesses: Business[];
   /** versione dei resoconti: 2 = statistiche con motivi dei persi e ore di punta */
@@ -355,6 +362,7 @@ export function newState(): GameState {
     style: { model: 'character-male-a', owned: ['character-male-a'], accOwned: [], acc: [] },
     houses: [],
     homeIdx: -1,
+    fields: [],
   };
 }
 
@@ -378,6 +386,8 @@ function parse(raw: string | null): GameState | null {
     const s = JSON.parse(raw) as GameState;
     if (s.version !== 1) return null;
     const st = { ...newState(), ...s };
+    // partite di prima dei campi di carriera: restano con tutti i campi aperti (niente scelta)
+    if (!('fields' in s)) st.fields = undefined;
     // eventi di versioni vecchie che non esistono più
     st.events = st.events.filter((e) => EVENT_BY_ID[e.defId]);
     // nuove esperienze, prodotti e campi aggiunti dopo

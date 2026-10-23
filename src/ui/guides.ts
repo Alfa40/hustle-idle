@@ -1,9 +1,11 @@
 import { LOTS } from '../config/map';
 import type { Game } from '../game';
-import { bizType } from '../config/business';
+import { BUSINESS_TYPE_IDS, bizType } from '../config/business';
+import { bizUnlock, fieldLevelReached, fieldOpen } from '../sim/fields';
+import { addMoney, totalLevel } from '../sim/progress';
 import { chainTypes } from '../sim/chains';
 import type { Business } from '../sim/state';
-import { lotPrice, typesForLot } from '../sim/economy';
+import { allLots, bizAtLot, lotPrice, typesForLot } from '../sim/economy';
 import { moveSide } from '../settings';
 import type { GuideDef, GuideStep } from './guide';
 
@@ -48,6 +50,25 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
   };
   const cheapest = () => Math.min(...LOTS.map((l) => Math.min(...typesForLot(l.id).map((t) => lotPrice(l.id, t)))));
   const hasBiz = () => s().businesses.length > 0;
+  /** attività base già sbloccate dai lavoretti (campi di carriera) */
+  const firstTypes = () => BUSINESS_TYPE_IDS.filter((t) => !bizType(t).tier && fieldOpen(s(), bizType(t).sector ?? 'cucina') && bizType(t).kind !== 'craft' && bizUnlock(s(), t).ok);
+  /** il posto più economico per una delle attività sbloccate */
+  const firstPrice = () => {
+    const ok = new Set(firstTypes());
+    let min = Infinity;
+    for (const l of allLots(s())) if (!bizAtLot(s(), l.id)) for (const t of typesForLot(l.id, s())) if (ok.has(t)) min = Math.min(min, lotPrice(l.id, t));
+    return Number.isFinite(min) ? min : 0;
+  };
+  let grantAmount: number | null = null;
+  let granted = false;
+  /** il contributo che serve (si calcola una volta) */
+  const grant = () => (grantAmount ??= Math.max(0, Math.ceil(firstPrice() - s().money)));
+  const giveGrant = () => {
+    if (granted || grant() <= 0) return;
+    granted = true;
+    addMoney(s(), grant(), 'contributo del comune');
+  };
+  const euroTxt = (n: number) => `€${n.toLocaleString('it-IT')}`;
   /** un'attività con una sola persona per reparto: nelle ore di punta perde clienti */
   const understaffed = (b: Business) => bizType(b.type).roles.every((r) => b.staff.filter((e) => e.role === r).length <= 1);
   // la prima attività parte con 1 persona per reparto: rischia già di perdere clienti, la guida fa assumere
@@ -78,16 +99,61 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: '.pill.date', say: '📅 Giorno e ora: toccali per il calendario' },
         { at: '.minimap', say: '🗺️ La mappa: toccala per vedere tutta la città' },
         { at: '.hud-btns', say: 'I tasti del gioco: ti spiego ognuno la prima volta che lo tocchi' },
-        { say: '🚚 Fai lavoretti, metti da parte i soldi e apri un food truck!' },
+        { say: s().fields ? '🔓 Porta un lavoretto al Liv. 10: si apre la tua prima attività!' : '🚚 Fai lavoretti, metti da parte i soldi e apri un food truck!' },
       ],
     },
 
     // ---------------- sblocchi ----------------
+    // campi di carriera (sim/fields.ts): la prima attività la apre il tutorial obbligatorio qui sotto
     'unlock:lot': {
-      auto: () => !hasBiz() && s().money >= cheapest(),
+      auto: () => !s().fields && !hasBiz() && s().money >= cheapest(),
       steps: [
         { say: '💰 Hai abbastanza soldi per la tua prima attività!' },
         ...hud('biz', '🏢 Tocca Attività'),
+      ],
+    },
+    // il primo lavoretto arriva al Liv. 10: tutorial obbligatorio, si compra un'attività e si vede come si gestisce
+    'unlock:firstbiz': {
+      auto: () => !!s().fields && !hasBiz() && firstTypes().length > 0,
+      covers: ['unlock:lot', 'panel:agency', 'agency/tab:compra', 'panel:lot', 'panel:biz', 'biz/tab:panoramica', 'biz/tab:prodotti', 'biz/tab:migliorie', 'biz/tab:evoluzione', 'biz/tab:ordini'],
+      steps: [
+        { say: '🎉 Un tuo lavoretto è al Liv. 10: prima evoluzione!' },
+        { get say() { return `🔓 Ora puoi aprire: ${firstTypes().map((t) => `${bizType(t).icon} ${bizType(t).name}`).join(', ')}`; } },
+        { say: '📚 Ti mostro come si compra e come si gestisce' },
+        // non bastano i soldi per il posto più economico: il comune aiuta (una volta, solo qui). I soldi arrivano
+        // quando il passo si vede (gli `if` si leggono anche prima, per i pallini: niente effetti lì)
+        { if: () => grant() > 0, get say() { giveGrant(); return `🏛️ Il comune ti dà un contributo di ${euroTxt(grant())} per aprirla`; } },
+        ...hud('biz', '🏢 Tocca Attività'),
+        { at: tab('compra'), say: '🛒 Tocca In vendita', tap: true, if: () => !exists(`${tab('compra')}.on`) },
+        { at: g('lot-ok'), say: '🏷️ Tocca un posto dove puoi aprirla', tap: true },
+        { at: `${M} .stat.s-purple`, say: '📍 La zona: in centro ci sono più clienti' },
+        { at: `${M} .stat.s-orange`, say: '🏠 Quanto paghi ogni mese' },
+        { at: `${M} .grid3`, say: '📊 Clienti, incassi e utile previsti' },
+        { at: `${M} [data-a^="buy:"]:not([disabled])`, say: '🛒 Tocca per aprirla', tap: true },
+        { say: '🎉 È tua! Ora vediamo come si gestisce' },
+        { at: tab('panoramica'), say: '📊 Tocca Panoramica', tap: true, if: () => !exists(`${tab('panoramica')}.on`) },
+        { at: g('state'), say: '✅ Stato: lavora da sola o serve aiuto?' },
+        { at: g('costs'), say: '🧾 Quanto paghi ogni mese' },
+        { at: tab('prodotti'), say: '🧰 Tocca qui: cosa vendi', tap: true },
+        { at: `${M} label.toggle`, say: '✔️ Spunta per metterlo in vendita' },
+        { at: tab('migliorie'), say: '⬆️ Tocca Migliorie', tap: true },
+        { at: btnStart('upgrade:'), say: '⬆️ Le migliorie la fanno rendere di più' },
+        { at: tab('evoluzione'), say: '🌱 Tocca Evoluzione', tap: true },
+        { say: '🌱 Per evolverla: migliorie al massimo e il lavoretto al Liv. 20' },
+        { at: `${M} .x`, say: '✕ Chiudi la finestra', tap: true },
+      ],
+    },
+    // livello per un campo nuovo (sim/fields.ts): si mostra dove sono i nuovi mercati
+    'unlock:field': {
+      auto: () => !!s().fields && hasBiz() && fieldLevelReached(s()),
+      covers: ['panel:markets'],
+      steps: [
+        { get say() { return `🧭 Sei al Liv. ${totalLevel(s())}: puoi entrare in un nuovo mercato!`; } },
+        ...hud('profile', '👤 Tocca Profilo'),
+        { at: btn('skills'), say: '⭐ Tocca Esperienza', tap: true },
+        { at: g('markets'), say: '🧭 Tocca Nuovi mercati', tap: true },
+        { at: g('field-enter'), say: '🎓 Scegli un campo: paghi corso e licenza' },
+        { say: '💡 I lavoretti nuovi pagano quasi come i tuoi: la paga dipende da te' },
       ],
     },
     'unlock:biz': {

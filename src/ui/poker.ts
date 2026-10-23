@@ -11,7 +11,7 @@
  */
 import type { Game } from '../game';
 import { DEV_SLOT } from '../dev';
-import { previewPr } from '../preview';
+import { sandbox } from '../preview';
 import { toast } from '../sim/bus';
 import { API, nickname as lbNickname, playerId } from '../sim/leaderboard';
 import { currentSlot, euro } from '../sim/state';
@@ -92,7 +92,7 @@ export async function casino<T>(game: CasinoGame, path: string, body: object, ti
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     // blackjack: `ins` dice al server che questo gioco sa mostrare l'assicurazione; anteprime: tavoli di prova
-    const extra = { ...(game === 'bj' ? { ins: 1 } : {}), ...(previewPr !== null ? { practice: true } : {}) };
+    const extra = { ...(game === 'bj' ? { ins: 1 } : {}), ...(sandbox ? { practice: true } : {}) };
     const r = await fetch(`${API}/hustle/${game}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player_id: playerId(), ...extra, ...body }), signal: ctl.signal });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(j.error || `errore ${r.status}`), { data: j });
@@ -119,7 +119,7 @@ export const pokerName = (game: Game) => lbNickname() || game.state.saveName || 
  */
 export async function claimPoker(game: Game, quiet = false) {
   // anteprime: tavoli di prova, le fiches tornano subito uscendo (niente da ritirare)
-  if (pokerBlocked() || previewPr !== null) return 0;
+  if (pokerBlocked() || sandbox) return 0;
   try {
     const j = await pk<{ amount: number }>('claim', { slot: currentSlot }, 30000);
     if (j.amount > 0) {
@@ -519,11 +519,11 @@ export class PokerTable {
       }
     }
     // anteprime: tavolo di prova, le fiches rimaste tornano subito sul conto della partita di prova
-    if (previewPr !== null && left > 0) {
+    if (sandbox && left > 0) {
       this.game.state.money += left;
       this.game.save();
     }
-    const got = previewPr !== null ? left : await claimPoker(this.game, true);
+    const got = sandbox ? left : await claimPoker(this.game, true);
     clearInterval(this.timer);
     this.deal.stop();
     removeEventListener('resize', this.onResize);

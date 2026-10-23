@@ -1,4 +1,5 @@
 import { API, nickname, setNickname } from './leaderboard';
+import { sandbox } from '../preview';
 
 /**
  * Account del giocatore: il nome (unico, uno per giocatore) + una password. Con l'account le partite si salvano
@@ -14,7 +15,7 @@ const TAKEN_KEY = 'hustle.nickTaken';
 export const MIN_PASSWORD = 6;
 
 /** Cosa va nel salvataggio sul server: le partite (non quella developer), il nome, l'id, gli amici, le impostazioni. */
-const SAVE_KEYS = ['hustleidle.slot.1', 'hustleidle.slot.2', 'hustleidle.slot.3', 'hustleidle.lastSlot', 'hustleidle.settings', 'hustle.nickname', 'hustle.playerId', 'hustle.friends'];
+const SAVE_KEYS = ['hustleidle.slot.1', 'hustleidle.slot.2', 'hustleidle.slot.3', 'hustleidle.lastSlot', 'hustleidle.settings', 'hustle.nickname', 'hustle.playerId', 'hustle.friends', 'hustle.logo'];
 
 const get = (k: string) => {
   try {
@@ -54,6 +55,11 @@ export type NameResult = 'ok' | 'taken' | 'offline' | 'bad';
 export async function chooseName(raw: string): Promise<NameResult> {
   const clean = [...raw].filter((c) => c.charCodeAt(0) >= 32).join('').trim();
   if (!clean) return 'bad';
+  // sito di prova o anteprima: il nome resta sul telefono, non si prenota sul server
+  if (sandbox) {
+    setNickname(clean);
+    return 'ok';
+  }
   try {
     const { status } = await post('/hustle/name/claim', { player_id: pid(), name: clean });
     if (status === 409) return 'taken';
@@ -107,6 +113,7 @@ async function unpack(s: string): Promise<Record<string, string> | null> {
 
 /** Crea l'account col nome di adesso e una password, e salva subito le partite. */
 export async function register(password: string): Promise<string | null> {
+  if (sandbox) return 'Nella versione di prova l\'account non c\'è';
   if (password.length < MIN_PASSWORD) return `La password deve avere almeno ${MIN_PASSWORD} caratteri`;
   const name = nickname();
   if (!name) return 'Prima scegli il tuo nome';
@@ -128,6 +135,7 @@ export async function register(password: string): Promise<string | null> {
  * (anche l'id del giocatore, così amici e classifica restano gli stessi). Poi il gioco ripartirà.
  */
 export async function login(name: string, password: string): Promise<string | null> {
+  if (sandbox) return 'Nella versione di prova l\'account non c\'è';
   if (!name.trim() || !password) return 'Scrivi nome e password';
   try {
     const { status, data } = await post<{ token: string; player_id: string; name: string; save: string | null; savedAt: number }>('/hustle/account/login', { name: name.trim(), password });
@@ -159,6 +167,7 @@ let busy = false;
  * (quando si chiude l'app o col tasto "Salva adesso"). Ritorna true se è andato a buon fine.
  */
 export async function cloudSave(force = false): Promise<boolean> {
+  if (sandbox) return false;
   if (!loggedIn() || busy) return false;
   const now = Date.now();
   if (!force && now - lastUp < 90_000) return false;

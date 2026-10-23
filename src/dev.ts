@@ -7,7 +7,7 @@
  * iniziale compare "🛠️ Partita developer", salvata in uno slot a parte (non tocca le 3 partite normali).
  * `?dev=off` la spegne su quel telefono.
  */
-import { previewPr } from './preview';
+import { sandbox } from './preview';
 
 const DEV_HASH = 'c9973361080da099481708145340d318dc2f5bb1b66009b5207ed4b7a6ee41a5';
 const DEV_KEY = 'hustle.dev';
@@ -18,7 +18,7 @@ export const DEV_SLOT = 9;
 
 export function isDevDevice() {
   // nelle anteprime delle proposte (sito a parte) la partita developer c'è sempre: serve a provare in fretta
-  if (previewPr !== null) return true;
+  if (sandbox) return true;
   try {
     return localStorage.getItem(DEV_KEY) === '1';
   } catch {

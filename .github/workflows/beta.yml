@@ -1,0 +1,35 @@
+name: Versione di prova (beta)
+
+# Il ramo `beta` (le modifiche grosse da far provare prima di metterle nel gioco vero) si pubblica su un sito a parte:
+# https://beta.hustle-anteprime.pages.dev (stesso progetto Cloudflare Pages delle anteprime, indirizzo suo).
+# Essendo un altro sito i salvataggi sono separati da quelli del gioco vero; il gioco lo riconosce (src/preview.ts:
+# betaSite) e lo tiene fuori da classifica e account, con la partita developer sempre disponibile.
+
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+
+concurrency:
+  group: beta
+  cancel-in-progress: true
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm run build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=hustle-anteprime --branch=beta --commit-dirty=true

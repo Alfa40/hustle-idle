@@ -8,7 +8,7 @@
  * stessa lista sul server); al tavolo la partita è offline (`Game.enterAway`).
  */
 import type { Game } from '../game';
-import { previewPr } from '../preview';
+import { sandbox } from '../preview';
 import { toast } from '../sim/bus';
 import { euro } from '../sim/state';
 import { buyBox, cardHtml, casino, claimPoker, colorOfName, initialsOf, wireBuyBox } from './poker';
@@ -430,11 +430,11 @@ export class BlackjackTable {
       }
     }
     // anteprime: tavolo di prova, le fiches rimaste tornano subito sul conto della partita di prova
-    if (previewPr !== null && left > 0) {
+    if (sandbox && left > 0) {
       this.game.state.money += left;
       this.game.save();
     }
-    const got = previewPr !== null ? left : await claimPoker(this.game, true);
+    const got = sandbox ? left : await claimPoker(this.game, true);
     clearInterval(this.timer);
     this.deal.stop();
     removeEventListener('resize', this.onResize);
