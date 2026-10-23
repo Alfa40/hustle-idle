@@ -7,6 +7,7 @@ import { readyJobTypes } from '../config/careers';
 import { PRODUCT_IDS } from '../config/products';
 import { SKILL_IDS } from '../config/skills';
 import { bus, toast } from './bus';
+import { checkDebt, monthEnd } from './crisis';
 import { autoSim, finishTrainings, payMonth, randDemand, refreshCandidates, setSimOnline } from './economy';
 import { weeklyReports } from './report';
 import { totalFame, totalLevel } from './progress';
@@ -63,7 +64,11 @@ export function newDay(s: GameState, online = true) {
   genMissions(s);
   ensureWeekly(s);
   refreshCandidates(s);
-  if (dayOfMonth(d) === 1) payMonth(s);
+  if (dayOfMonth(d) === 1) {
+    payMonth(s);
+    monthEnd(s);
+  }
+  checkDebt(s);
   bus.emit('newday');
 }
 

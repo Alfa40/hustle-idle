@@ -147,6 +147,9 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         { at: btn('back'), say: '◀ Torna alla lista', tap: true },
       ],
     },
+    'agency/tab:notizie': {
+      steps: [{ at: `${M} .sec-title, ${M} .card`, say: '📰 Qui arrivano crisi, fallimenti e imprevisti' }],
+    },
     'agency/tab:mie': {
       when: hasBiz,
       steps: [

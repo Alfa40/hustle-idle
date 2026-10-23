@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUSINESS, LEVEL, TIME } from '../config/balance';
+import { BUSINESS, CRISIS, LEVEL, TIME } from '../config/balance';
 import { BIZ_GROUPS, BUSINESS_TYPE_IDS, BUSINESS_TYPES, bizGroup, bizType, evolvesOf, hourFactor, EXTRA_ROLES, roleName, ROLES, upgOf, upgradeIdsFor, type BusinessType, type Role, type UpgradeId } from '../config/business';
 import { VEHICLE_IDS, VEHICLES, WALK_SPEED, type VehicleId } from '../config/vehicles';
 import { MONTH_NAMES, WEATHER, WEEKDAYS } from '../config/events';
@@ -8,6 +8,7 @@ import { activeToday, effectText, FORECAST_DAYS, forecast, sureEvents, weatherOf
 import { jobInfo, JOBS, JOB_TYPES } from '../config/jobs';
 import { LOTS, ZONES, type ZoneId } from '../config/map';
 import { floorLotId, FLOOR_RENT, parseFloorLot, plotDef, PLOTS, SIZES, WORKS, ZONE_COST, type SizeId, type WorkId } from '../config/plots';
+import { bizHealth, HEALTH_TAG, monthEnd } from '../sim/crisis';
 import { buildCost, buyPlot, fameOk, plotFame, leftText, ownCrew, plotLeft, plotStage, plotZone, startBuild, startWork, workCost, workDoing, workStatus } from '../sim/plots';
 import { PRODUCTS, type ProductId } from '../config/products';
 import { SKILLS, SKILL_IDS } from '../config/skills';
@@ -1289,7 +1290,7 @@ export class UI {
   openAgency(tab?: string, atAgency = false) {
     let cur = tab ?? (this.s.businesses.length ? 'mie' : 'compra');
     let sel: string | null = null;
-    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
+    const tabs = [['compra', '🛒 In vendita'], ['mie', '🏢 Le mie'], ['notizie', '📰 Notizie'], ['resoconti', '📊 Resoconto'], ['mercato', '📈 Mercato']];
     this.open({
       guide: 'agency',
       money: true,
@@ -1363,7 +1364,7 @@ export class UI {
             <div><h3 style="margin:0">${def.name}</h3><div class="muted small">${lot.name}</div></div></div>${this.autoTag(b)}</div>
           <div class="row between small" style="margin-top:8px"><span>Oggi: <b class="money-t">${euro(b.today.revenue)}</b> · ${b.today.served} ${def.kind === 'service' ? 'ordini' : def.kind === 'craft' ? 'lavori' : 'clienti'}${extra}</span>
           <button class="btn sm" data-a="open:${b.id}">Gestisci</button></div>
-          ${warn ? '<div class="small bad" style="margin-top:4px">⚠️ Qualcosa da sistemare: guarda il resoconto</div>' : ''}<div class="report-more">Tocca per il resoconto: conti, turni e dipendenti ›</div></div>`;
+          ${this.healthLine(b)}${warn ? '<div class="small bad" style="margin-top:4px">⚠️ Qualcosa da sistemare: guarda il resoconto</div>' : ''}<div class="report-more">Tocca per il resoconto: conti, turni e dipendenti ›</div></div>`;
       };
       // un menu a tendina per gruppo (ristorazione, consegne, traslochi…), nell'ordine di BIZ_GROUPS
       const groups = new Map<string, { g: ReturnType<typeof bizGroup>; list: Business[] }>();
@@ -1425,6 +1426,14 @@ export class UI {
         ${trucks ? `<h3 class="sec-title">🅿️ Posteggi per food truck</h3>${trucks}` : ''}
         ${shops ? `<h3 class="sec-title">🏬 Locali per negozi e imprese</h3>${shops}` : ''}
         ${plots ? `<h3 class="sec-title">🏞️ Terreni: costruisci un palazzo</h3>${points('Costano molto: sistemi il terreno e costruisci', 'Ogni piano è un negozio', 'Residenziale, centro e palazzi grandi chiedono fama')}${plots}` : ''}`;
+    }
+    if (tab === 'notizie') {
+      // crisi, fallimenti, pignoramenti e imprevisti: le più nuove in alto
+      const list = s.news ?? [];
+      const debt = s.money < 0 && s.negSince !== undefined ? `<div class="card tint small bad">📮 Conto sotto zero: pignoramento tra ${Math.max(0, Math.ceil(CRISIS.SEIZE_DAYS - (s.minutes - s.negSince) / 1440))} giorni</div>` : '';
+      if (!list.length) return `${debt}<div class="card center muted">Qui arrivano le notizie delle tue attività: mesi in perdita, crisi, imprevisti.</div>${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}`;
+      return `${debt}${points('4 mesi di fila in perdita: l\'attività fallisce', 'Un mese in guadagno riporta tutto a posto', `Conto sotto zero per ${CRISIS.SEIZE_DAYS} giorni: pignoramento`)}
+        ${list.map((n) => `<div class="card row news-${n.kind}"${n.biz && s.businesses.some((b) => b.id === n.biz) ? ` data-a="open:${n.biz}" style="cursor:pointer"` : ''}><div class="icon-bubble">${n.icon}</div><div style="flex:1"><div class="small">${n.text}</div><div class="muted small">${dayName(n.day)}</div></div></div>`).join('')}`;
     }
     if (tab === 'resoconti') {
       // solo i conti di tutte le attività insieme: il resoconto di ognuna si apre toccandola in "Le mie"
@@ -1509,6 +1518,14 @@ export class UI {
     if (bizType(b.type).kind === 'craft') return '<span class="tag y">Lavori su richiesta</span>';
     if (isAutonomous(b)) return '<span class="tag g">Autonoma</span>';
     return isAutoBiz(b.type) ? '<span class="tag y">Manca personale</span>' : '<span class="tag y">Serve il titolare</span>';
+  }
+
+  /** mesi in perdita: avviso rosso con quanto manca al fallimento (sim/crisis.ts) */
+  private healthLine(b: Business) {
+    const h = bizHealth(b);
+    if (h === 'ok') return '';
+    const left = CRISIS.FAIL_MONTHS - (b.redMonths ?? 0);
+    return `<div class="small bad" style="margin-top:4px">${HEALTH_TAG[h]} · ${b.redMonths} ${b.redMonths === 1 ? 'mese' : 'mesi'} in perdita: ${left === 1 ? 'un altro e fallisce' : `altri ${left} e fallisce`}</div>`;
   }
 
   openBusiness(bizId: string, tab?: string) {
@@ -1805,7 +1822,7 @@ export class UI {
           <div class="row between small"><span>Stipendi (${biz.staff.length})</span><span>${euro(r.costs.salaries)}</span></div>
           <div class="row between" style="margin-top:6px"><b>Totale</b><b>${euro(tot)}</b></div>
           <div class="row between" style="margin-top:6px"><span>Utile stimato al mese</span><b class="${(r.profit ?? 0) >= 0 ? 'good' : 'bad'}">${r.profit === null ? 'serve lo staff completo' : euro(r.profit)}</b></div></div>`;
-        return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>
+        return `<div class="row between" style="margin-bottom:8px"><span class="muted small">${def.name} · 📍 ${ZONES[lotZone[biz.lotId]].name}</span>${this.autoTag(biz)}</div>${this.healthLine(biz)}
           ${full ? `<div class="report-date">📅 Resoconto della settimana · dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))}<br>${this.reportProgress(biz, true)}</div>`
             : `<div class="report-date partial">📋 <b>Resoconto provvisorio</b> · ${n1(Math.floor(biz.partial!.days * 10) / 10)} giornate su ${REPORT_DAYS} (dal ${esc(dayName(Math.floor(snap.from / 1440)))} al ${esc(dayName(snap.day))})<br><span class="small">Pochi giorni: i numeri possono cambiare. Si aggiorna ogni sera; completo a ${REPORT_DAYS} giornate.</span>${this.reportProgress(biz, false)}</div>`}` + liveCards + advice + day + peakCard + staffCard + prod + costs;
       },
@@ -4274,7 +4291,7 @@ export class UI {
         <div class="dev-grid" style="margin-top:8px"><button class="btn sm good" data-a="devMoney">+ €1 miliardo</button><button class="btn sm" data-a="devHour">⏩ +1 ora</button><button class="btn sm" data-a="devMorning">🌅 Domani alle 8</button><button class="btn sm sec" data-a="devTut">🎓 Rifai i tutorial</button></div></div>
       <h3 class="sec-title">🎮 Gioca subito un lavoretto</h3>${lines}
       <h3 class="sec-title">🏢 Attività</h3>
-      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button></div>
+      <div class="card"><div class="dev-grid"><button class="btn sm blue" data-a="devUpg">⬆️ Tutte le migliorie al massimo</button><button class="btn sm blue" data-a="devOrders">📋 Un ordine subito in ogni attività</button><button class="btn sm blue" data-a="devStaff">👥 Personale completo + manager</button><button class="btn sm blue" data-a="devPlots">🏗️ Finisci lavori e cantieri dei terreni</button><button class="btn sm blue" data-a="devRed">📉 Un mese in perdita per tutte</button><button class="btn sm blue" data-a="devDebt">📮 Conto sotto zero da 29 giorni</button></div>
       <p class="muted small explain" style="margin:6px 0 0">Con le migliorie al massimo si apre subito l'evoluzione (scheda 🌱 dell'attività). Il personale completo la fa lavorare da sola.</p></div>`;
   }
 
@@ -4297,6 +4314,18 @@ export class UI {
     return {
       devMoney: () => addMoney(s, 1_000_000_000),
       devHour: () => advance(s, 60),
+      // crisi: tutte le attività chiudono un mese in perdita (4 di fila = fallimento)
+      devRed: () => {
+        for (const b of s.businesses) b.lastProfit = -1000;
+        monthEnd(s);
+      },
+      // pignoramento: il giorno dopo arriva
+      devDebt: () => {
+        s.money = Math.min(s.money, -5000);
+        s.negSince = s.minutes - 29 * 1440;
+        s.negWarn = CRISIS.SEIZE_WARN_AT.length;
+        toast('📮 Domani il pignoramento (dormi o +1 giorno)', 'info');
+      },
       // terreni: lavori in corso e cantieri finiti subito
       devPlots: () => {
         for (const ps of Object.values(s.plots ?? {})) {

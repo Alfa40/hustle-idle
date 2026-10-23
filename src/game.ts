@@ -381,6 +381,10 @@ export class Game {
     this.mode = 'play';
     this.snapCamera();
     bus.on('newday', () => this.ui?.refresh());
+    // attività fallita o pignorata (sim/crisis.ts): il posto in città torna libero
+    bus.on('lots', (lotId: string) => {
+      if (this.trucks.has(lotId) || parseFloorLot(lotId)) this.setupLot(lotId);
+    });
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('pagehide', () => this.save());
     this.save();

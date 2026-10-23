@@ -63,6 +63,10 @@ export interface Business {
   month: Ledger;
   totalRevenue: number;
   boughtFor: number;
+  /** mesi di fila chiusi in perdita (sim/crisis.ts): 1 avviso, 2 crisi, 3 debiti, 4 fallimento */
+  redMonths?: number;
+  /** utile dell'ultimo mese chiuso (incassi − merce − affitto, bollette, stipendi) */
+  lastProfit?: number;
   /** solo per le attività di servizio: ordini in attesa */
   orders: ServiceOrder[];
   /** clienti serviti e persi ora per ora in questo mese (per l'orario di punta del resoconto) */
@@ -172,6 +176,17 @@ export interface CalEvent {
   endDay: number;
 }
 
+/** una riga del registro "📰 Notizie" (crisi, fallimenti, imprevisti) */
+export interface NewsItem {
+  id: number;
+  day: number;
+  icon: string;
+  text: string;
+  kind: 'bad' | 'warn' | 'good' | 'info';
+  /** attività di cui parla (per aprirla) */
+  biz?: string;
+}
+
 export interface PlotState {
   works: Partial<Record<WorkId, number>>;
   size?: SizeId;
@@ -244,6 +259,12 @@ export interface GameState {
    * finiscono) e palazzo (misura e minuto in cui è finito). C'è la chiave = il terreno è tuo.
    */
   plots?: Record<string, PlotState>;
+  /** registro delle notizie (ultime 40) e numeratore */
+  news?: NewsItem[];
+  newsSeq?: number;
+  /** minuto in cui il conto è andato sotto zero (pignoramento dopo CRISIS.SEIZE_DAYS) e avvisi già dati */
+  negSince?: number;
+  negWarn?: number;
   /** le attività di prima sono già diventate automatiche (personale assunto una volta, src/game.ts) */
   allAuto?: boolean;
   /** ultimo veicolo usato (il pulsante Sali fa salire su questo) */

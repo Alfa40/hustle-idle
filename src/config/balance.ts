@@ -17,6 +17,23 @@ export const TIME = {
 
 export const START_MONEY = 50;
 
+/** Crisi delle attività e pignoramento (src/sim/crisis.ts). */
+export const CRISIS = {
+  /** mesi di fila in perdita che fanno fallire un'attività */
+  FAIL_MONTHS: 4,
+  /** fama dei settori dell'attività persa: a ogni mese in crisi/debiti e al fallimento */
+  CRISIS_FAME: 0.02,
+  FAIL_FAME: 0.1,
+  /** con i debiti la merce costa di più */
+  DEBT_STOCK_MULT: 1.25,
+  /** giorni di gioco col conto sotto zero prima del pignoramento, e quando arrivano gli avvisi */
+  SEIZE_DAYS: 30,
+  SEIZE_WARN_AT: [10, 20, 27],
+  /** al pignoramento le cose si vendono a metà valore; fama totale persa */
+  SEIZE_SHARE: 0.5,
+  SEIZE_FAME: 0.05,
+};
+
 export const FAME = {
   /** moltiplicatore domanda: 1 + fama/(fama+K) → massimo ×2 (fama media dei settori dell'attività) */
   K: 2000,
