@@ -1651,3 +1651,6 @@ hr.soft { border: none; border-top: 1px solid rgba(0, 0, 0, 0.08); margin: 10px 
 body.is-landscape .field-grid { grid-template-columns: 1fr 1fr; }
 .field-pick { width: 100%; border: 2px solid transparent; text-align: left; cursor: pointer; display: block; margin: 0; }
 .field-pick.on { border-color: var(--purple); background: #f3edff; }
+
+/* avviso del reset delle partite (main.ts, una volta sola) */
+.season-note { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9000; width: min(92vw, 420px); background: #fff8ec; color: #3a2f55; border-radius: 22px; padding: 18px 18px 16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 16px; line-height: 1.35; text-align: center; border: 3px solid #ffc21a; }

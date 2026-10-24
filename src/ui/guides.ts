@@ -482,6 +482,11 @@ export function makeGuides(game: Game): Record<string, GuideDef> {
         tabStep('aiuto', '❓ Come si gioca'),
       ],
     },
+    'settings/tab:partita': {
+      steps: [
+        { at: `${M} input[name="gift"]`, say: '🎁 Hai un codice regalo? Scrivilo qui' },
+      ],
+    },
     // solo sul telefono dello sviluppatore ci sono le schede (per i tester la finestra è solo il modulo)
     'panel:propose': {
       steps: [

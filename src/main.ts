@@ -10,7 +10,7 @@ import { TitleScreen } from './ui/title';
 import { showInstallTip } from './ui/install';
 import { preloadLogo } from './logo';
 import { checkDevLink, DEV_SLOT, devApp } from './dev';
-import { loadState } from './sim/state';
+import { loadState, seasonReset } from './sim/state';
 import { checkTesterLink } from './tester';
 import { claimPoker } from './ui/poker';
 import { previewPr } from './preview';
@@ -23,6 +23,8 @@ import { startUpdateCheck } from './update';
 async function boot() {
   // niente emoji: ogni emoji nella pagina diventa un'icona disegnata del gioco
   watchIcons();
+  // reset di tutte le partite (una volta sola per telefono): si riparte scegliendo la carriera
+  const wasReset = seasonReset();
   // link segreto della modalità developer (solo sul telefono dello sviluppatore, vedi src/dev.ts)
   await checkDevLink();
   // link segreto dei tester: aggiunge solo la scheda "Proponi" nelle Opzioni (vedi src/tester.ts)
@@ -109,6 +111,14 @@ async function boot() {
     start(slot, newName, quick);
   });
   (window as unknown as { title: TitleScreen }).title = title;
+  // le partite di prima sono state azzerate: si dice perché (una volta sola)
+  if (wasReset) {
+    const n = document.createElement('div');
+    n.className = 'season-note';
+    n.innerHTML = '<b>🆕 Hustle Idle è cambiato!</b><br>Ora si sceglie una carriera e si cresce passo passo: tutte le partite ripartono da zero. Nome, logo e account restano.<br><button class="btn good" style="margin-top:10px">Ok, ricomincio</button>';
+    document.body.appendChild(n);
+    n.querySelector('button')!.addEventListener('click', () => n.remove());
+  }
 }
 
 boot().catch((e) => {

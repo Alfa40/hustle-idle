@@ -92,7 +92,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 
 - **Comandi dei lavoretti una volta sola** (src/ui/jobtutorial.ts): la prima parte del tutorial (🕹️ camminare, 👀 guardarsi attorno, 📋 riquadro del lavoretto, ⏸️ pausa) e i pedali della guida si spiegano solo al primo lavoretto in assoluto su quel telefono, anche tra partite diverse (`hustle.jobTold` in localStorage); il riquadro non si rispiega coi pedali se è già stato spiegato. Dopo, il tutorial di ogni lavoretto nuovo spiega solo come si fa. "🎓 Rifai i tutorial" (partita developer) li fa ripartire.
 
-### 6b. Campi di carriera (versione di prova, ramo `beta`)
+### 6b. Campi di carriera (dal 24/10/2026 nel gioco vero, prima solo nel ramo `beta`)
 
 > Per ora solo nella versione di prova (https://beta.hustle-anteprime.pages.dev). Se piace va nel gioco vero e le partite si azzerano.
 
@@ -104,6 +104,13 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 - **Tutorial obbligatorio della prima attività** (`unlock:firstbiz`): quando il primo lavoretto arriva al Liv. 10. Se mancano i soldi per il posto più economico il comune dà un contributo (una volta). Si compra dall'Attività anche lontano dall'agenzia, poi giro della gestione (Panoramica, Prodotti, Migliorie, Evoluzione) e subito dopo la guida per assumere (`unlock:biz`).
 - Comandi developer (sezione 🧭 Campi): un lavoretto al Liv. 10, tutti al Liv. 10, +5 livelli, livello per il prossimo campo, apri Nuovi mercati, rifai la scelta del campo.
 - Comandi developer (sezione ⭐ Livello e fama): livello del giocatore −5/−1/+1/+5 (sale o scende il settore principale), fama ±100/±1000/+10.000 (divisa tra i campi aperti) e Azzera; le stesse righe per ogni settore. Scendendo di livello si toglie prima l'esperienza delle attività e poi, in proporzione, quella dei lavoretti del settore (scendono anche loro).
+
+
+### 6c. Nuova stagione (24/10/2026) e codice regalo
+- Le regole della beta (campi di carriera) sono entrate nel gioco vero: ogni giocatore riparte da zero e sceglie la carriera.
+- `seasonReset()` (src/sim/state.ts, `SEASON = 2`): al primo avvio cancella le partite locali (slot 1–3, 9, salvataggio vecchio) e il record di classifica; nome, logo e account restano. Avviso `.season-note` sul menu, una volta sola.
+- Server (`resetHustleSeason2` in server.js, una volta sola con la chiave `hustle:reset:season2`): classifiche, giocatori, partite salvate sul server e vincite del casinò azzerate; account, nomi e codici amico restano.
+- Codice regalo (src/gift.ts, solo l'impronta nel codice): +€100.000, +2000 di fama nel campo principale e livello del giocatore almeno 10. Una volta per telefono (`hustle.giftStart`), in Opzioni → 💾 Partita, dopo aver scelto la carriera. Scrive una notizia.
 
 ## 7. Attività
 

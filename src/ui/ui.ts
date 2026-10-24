@@ -46,6 +46,7 @@ import { addFame, addMoney, FAME_RANKS, lineLevel, lineXp, rank, sectorXp, skill
 import { CAREER_LINES, careerLine, EVOLVE_EVERY, linesOf } from '../config/careers';
 import { bizLockText, bizUnlock, chooseMainField, FIELD_STEPS, FIELDS, fieldOpen, mainField, needsField, nextFieldStep, openField, openFields, readyJobs } from '../sim/fields';
 import { devApp, devGame } from '../dev';
+import { GIFT, giftUsed, redeemGift } from '../gift';
 import { canPropose, canReview, Proposals } from './proposals';
 import { addFriend, answerFriendRequest, fetchBoard, fetchFriends, friendCode, MAX_NICK, moneyPerSecond, nickname as lbNickname, removeFriend, sendFriendRequest, submit as submitScore, type BoardKind, type FriendEntry, type LbData, type LbEntry } from '../sim/leaderboard';
 import { setProfileLogo } from '../identity';
@@ -4513,6 +4514,9 @@ export class UI {
         if (tab === 'partita') {
           return tabs + `
             <div class="card"><h3>💾 ${esc(this.s.saveName)}</h3><p class="muted small" style="margin:0">Slot ${currentSlot}</p>${explain('Si salva da sola ogni pochi secondi')}</div>
+            ${devGame || giftUsed() ? '' : `<div class="card"><h3>🎁 Codice regalo</h3>
+              <div class="row" style="gap:8px"><input class="t-input" name="gift" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Scrivi il codice" style="flex:1;margin:0" /><button class="btn good" data-a="gift">Usa</button></div>
+              ${explain('Vale una volta sola su questo telefono')}</div>`}
             <button class="btn blue full" data-a="menu">🏠 Salva e torna al menu principale</button>
             ${explain('Dal menu cambi partita o ne inizi una nuova', 'center')}
             <hr>
@@ -4538,6 +4542,15 @@ export class UI {
           // anteprima aperta con ?subito: al menu dell'anteprima, senza ripartire subito
           else if (previewPr !== null && location.search) location.href = location.pathname;
           else location.reload();
+        },
+        gift: () => {
+          const v = (document.querySelector('.modal input[name="gift"]') as HTMLInputElement | null)?.value ?? '';
+          void redeemGift(this.s, v).then((r) => {
+            if (r === 'ok') {
+              toast(`🎁 Regalo: +${euro(GIFT.money)}, +${GIFT.fame} di fama e livello ${totalLevel(this.s)}!`, 'good');
+              this.close();
+            } else toast(r === 'used' ? '🎁 Il codice è già stato usato su questo telefono' : r === 'nofield' ? '🎁 Prima scegli la tua carriera' : '🎁 Codice sbagliato', 'bad');
+          });
         },
         reset: () => {
           if (!confirm) {

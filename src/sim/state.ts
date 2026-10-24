@@ -477,6 +477,29 @@ function parse(raw: string | null): GameState | null {
   }
 }
 
+/**
+ * Reset di tutte le partite (24/10/2026, arrivano le regole della beta: campi di carriera). La prima volta che il
+ * telefono apre il gioco nuovo, le partite vecchie (le 3 normali e la developer) si cancellano: tutti ripartono
+ * scegliendo la carriera. Nome, logo e account restano. Si fa una volta sola (`hustle.season`).
+ */
+export const SEASON = 2;
+export function seasonReset() {
+  try {
+    if (Number(localStorage.getItem('hustle.season') ?? '1') >= SEASON) return false;
+    const had = [1, 2, 3, 9].some((n) => localStorage.getItem(slotKey(n))) || !!localStorage.getItem(OLD_KEY);
+    for (const n of [1, 2, 3, 9]) localStorage.removeItem(slotKey(n));
+    localStorage.removeItem(OLD_KEY);
+    localStorage.removeItem(LAST_KEY);
+    // record della classifica e data dell'ultimo salvataggio sul server: si riparte da zero
+    localStorage.setItem('hustle.lbBest', '0');
+    localStorage.removeItem('hustle.acctSavedAt');
+    localStorage.setItem('hustle.season', String(SEASON));
+    return had;
+  } catch {
+    return false;
+  }
+}
+
 export function loadState(slot = currentSlot): GameState | null {
   migrateOldSave();
   try {
