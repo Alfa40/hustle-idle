@@ -303,6 +303,9 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - **Regole** (tutte sul server, che è l'unico a vedere mazzo e carte coperte): bottone che gira, bui (a due giocatori il bottone mette il piccolo buio e parla per primo prima del flop), rilancio minimo pari all'ultimo rilancio, all-in più corto che non riapre i rilanci, piatti laterali, carte bruciate, showdown con le combinazioni in italiano (Carta alta … Scala reale), fiche che avanza al primo vincitore dopo il bottone. Turno da 25 secondi: se scade si passa (o si lascia); due volte di fila e sei **in pausa** finché non tocchi "Torno a giocare". Con zero fiches si può **ricomprare** tra una mano e l'altra, scegliendo la cifra come all'ingresso.
 - **Tavolo**: tavolo verde ovale, tu sempre in basso e gli altri sparsi attorno; per ognuno iniziali, nome, fiches, ultima mossa, puntata davanti e carte coperte; bottone del mazziere "D"; barra del tempo sotto chi deve giocare. In mezzo piatto, 5 carte comuni e il risultato della mano (carte vincenti illuminate). Sotto: le tue carte grandi, la combinazione che hai, fiches e conto, e i tasti **Lascia / Passa o Chiama / Punta o Rilancia** (con minimo, ½ piatto, piatto, all-in e cursore). In orizzontale i tasti stanno in una colonna a destra.
 
+## 12d. Regola dei luoghi al chiuso
+- Tutti i lavoretti che si fanno **dentro un palazzo** (`Room`) hanno il **soffitto**: dal soffitto non si deve mai vedere il cielo. Muri alti fino al soffitto (2,8 m), architrave sopra la porta, plafoniere accese; soffitto di colore pieno (non fa ombra e non resta scuro).
+
 ## 13. Punti aperti
 
 - **Guadagno offline al 100× più lento (valore di prova):** 30 ore offline con un food truck autonomo in periferia ≈ 9 giorni di gioco ≈ €430 netti. Un'ora di gioco attivo con lo stesso furgone ≈ €2.600. Da ritarare dopo i primi test.

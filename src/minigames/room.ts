@@ -6,9 +6,10 @@ import { label } from '../world/props';
 import type { Box } from './arena';
 
 /**
- * Scena separata dei lavoretti al chiuso di Ristorazione e ospitalità (cucina, sala, hotel, bar, forno): un
- * locale senza tetto (si vede il cielo e, oltre i muri, il quartiere vero dove si è accettato il lavoro), con
- * muri bassi, pavimento e mobili Kenney. Grande quanto serve per le cose da fare.
+ * Scena separata dei lavoretti al chiuso (cucina, sala, hotel, bar, forno, pulizie…):
+ * un locale chiuso col **soffitto** (dentro un palazzo non si vede mai il cielo; regola dell'utente),
+ * muri alti fino al soffitto, pavimento e mobili Kenney; dalla porta si vede il quartiere vero dove si è accettato
+ * il lavoro. Grande quanto serve per le cose da fare.
  *
  * Le coordinate dei lavoretti (at, furn) sono quelle del progetto (`w` × `d`); il locale vero è più grande
  * (SPREAD) e le cose si allargano: in mezzo le distanze crescono, vicino ai muri resta la stessa distanza dal
@@ -53,6 +54,8 @@ export interface RoomOpts {
   tiles?: boolean;
   /** cartello sopra la porta */
   sign?: string;
+  /** colore del soffitto */
+  ceiling?: number;
   slot?: Slot;
   placed?: { path: string; m: THREE.Matrix4 }[];
 }
@@ -108,7 +111,7 @@ export class Room {
       tex.magFilter = THREE.NearestFilter;
       plane(W, D, new THREE.MeshLambertMaterial({ map: tex }), O.x, 0.01, O.z);
     } else plane(W, D, mat(opts.floor ?? 0xc9a77c), O.x, 0.01, O.z);
-    // muri bassi (niente tetto) con la porta davanti in mezzo
+    // muri alti fino al soffitto, con la porta davanti in mezzo
     const H = 2.8;
     const wallM = mat(opts.wall ?? 0xf1e6d2);
     const wall = (x: number, z: number, w: number, d: number) => {
@@ -125,6 +128,26 @@ export class Room {
     const side = (W - DOOR) / 2;
     wall(O.x - DOOR / 2 - side / 2, O.z + D / 2 + 0.15, side, 0.3);
     wall(O.x + DOOR / 2 + side / 2, O.z + D / 2 + 0.15, side, 0.3);
+    // il soffitto (dentro un palazzo non si vede mai il cielo) e l'architrave sopra la porta; non fa ombra,
+    // se no il sole lo stenderebbe su tutta la stanza. Qualche plafoniera accesa.
+    // (colore pieno, senza luce: dal basso il sole non lo illuminerebbe e verrebbe scuro)
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.6, D + 0.6), new THREE.MeshBasicMaterial({ color: opts.ceiling ?? 0xdcd5c6, side: THREE.DoubleSide }));
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.set(O.x, H, O.z);
+    ceil.userData.noGlow = true;
+    g.add(ceil);
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(DOOR, H - 2.2, 0.3), wallM);
+    lintel.position.set(O.x, 2.2 + (H - 2.2) / 2, O.z + D / 2 + 0.15);
+    g.add(lintel);
+    const lampM = new THREE.MeshBasicMaterial({ color: 0xfff6d8 });
+    for (let ix = 0; ix < Math.max(1, Math.round(W / 5)); ix++) for (let iz = 0; iz < Math.max(1, Math.round(D / 5)); iz++) {
+      const nx = Math.max(1, Math.round(W / 5));
+      const nz = Math.max(1, Math.round(D / 5));
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.9), lampM);
+      l.position.set(O.x - W / 2 + (W / nx) * (ix + 0.5), H - 0.03, O.z - D / 2 + (D / nz) * (iz + 0.5));
+      l.userData.noGlow = true;
+      g.add(l);
+    }
     // battiscopa colorato in cima ai muri
     for (const [x, z, w2, d2] of [[0, -D / 2 - 0.15, W + 0.6, 0.34], [0, D / 2 + 0.15, W + 0.6, 0.34], [-W / 2 - 0.15, 0, 0.34, D], [W / 2 + 0.15, 0, 0.34, D]] as const) {
       const b = new THREE.Mesh(new THREE.BoxGeometry(w2, 0.22, d2), mat(0x8e5bd6));
