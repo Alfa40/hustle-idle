@@ -144,7 +144,7 @@
 - Gioco: repo pubblico `github.com/Alfa40/hustle-idle`, online su https://alfa40.github.io/hustle-idle/
   (GitHub Actions `.github/workflows/deploy.yml` a ogni push su `main`). Pagina di prova layout:
   `…/hustle-idle/debug.html`.
-- **Versione di prova (beta): eliminata il 24/10/2026.** Le sue regole (campi di carriera, GDD §6b) sono nel gioco vero con l'azzeramento delle partite (GDD §6c, `seasonReset()`, codice regalo in src/gift.ts). Niente più ramo `beta` né `betaSite`; il vecchio indirizzo beta.hustle-anteprime.pages.dev rimanda al gioco vero.
+- **Versione di prova (beta): eliminata il 24/10/2026.** Le sue regole (campi di carriera, GDD §6b) sono nel gioco vero con l'azzeramento delle partite e degli account (GDD §6c, `seasonReset()`, codice regalo in src/gift.ts). Niente più ramo `beta` né `betaSite`; il vecchio indirizzo beta.hustle-anteprime.pages.dev rimanda al gioco vero.
 - Classifica, amici, logo e "sto giocando": server Node in `~/quartiere-ostile-3d-leaderboard/server.js`
   (repo `github.com/Alfa40/gioco-castello-antico-`, branch `main`), pubblicato su Render come
   `crazy-town.onrender.com` (si aggiorna da solo a ogni push) con database Upstash Redis.

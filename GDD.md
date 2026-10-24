@@ -109,7 +109,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 ### 6c. Nuova stagione (24/10/2026) e codice regalo
 - Le regole della beta (campi di carriera) sono entrate nel gioco vero: ogni giocatore riparte da zero e sceglie la carriera.
 - `seasonReset()` (src/sim/state.ts, `SEASON = 2`): al primo avvio cancella le partite locali (slot 1–3, 9, salvataggio vecchio) e il record di classifica; nome, logo e account restano. Avviso `.season-note` sul menu, una volta sola.
-- Server (`resetHustleSeason2` in server.js, una volta sola con la chiave `hustle:reset:season2`): classifiche, giocatori, partite salvate sul server e vincite del casinò azzerate; account, nomi e codici amico restano.
+- Server (`resetHustleSeason2` in server.js, una volta sola con la chiave `hustle:reset:season2`): classifiche, giocatori, partite salvate sul server e vincite del casinò azzerate; nomi e codici amico restano. Anche gli account (nome + password) sono stati cancellati (`resetHustleAccounts2`, chiave `hustle:reset:accounts2`; sul telefono si esce dall'account con `hustle.acctReset`).
 - Codice regalo (src/gift.ts, solo l'impronta nel codice): +€100.000, +2000 di fama nel campo principale e livello del giocatore almeno 10. Una volta per telefono (`hustle.giftStart`), in Opzioni → 💾 Partita, dopo aver scelto la carriera. Scrive una notizia.
 
 ## 7. Attività

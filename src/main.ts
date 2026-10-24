@@ -115,7 +115,7 @@ async function boot() {
   if (wasReset) {
     const n = document.createElement('div');
     n.className = 'season-note';
-    n.innerHTML = '<b>🆕 Hustle Idle è cambiato!</b><br>Ora si sceglie una carriera e si cresce passo passo: tutte le partite ripartono da zero. Nome, logo e account restano.<br><button class="btn good" style="margin-top:10px">Ok, ricomincio</button>';
+    n.innerHTML = '<b>🆕 Hustle Idle è cambiato!</b><br>Ora si sceglie una carriera e si cresce passo passo: tutte le partite e gli account ripartono da zero. Nome e logo restano.<br><button class="btn good" style="margin-top:10px">Ok, ricomincio</button>';
     document.body.appendChild(n);
     n.querySelector('button')!.addEventListener('click', () => n.remove());
   }

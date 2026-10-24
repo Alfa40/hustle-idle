@@ -485,6 +485,12 @@ function parse(raw: string | null): GameState | null {
 export const SEASON = 2;
 export function seasonReset() {
   try {
+    // anche gli account del server sono stati cancellati: si esce dall'account (anche chi aveva già visto il reset)
+    if (localStorage.getItem('hustle.acctReset') !== '2') {
+      localStorage.removeItem('hustle.acctToken');
+      localStorage.removeItem('hustle.acctSavedAt');
+      localStorage.setItem('hustle.acctReset', '2');
+    }
     if (Number(localStorage.getItem('hustle.season') ?? '1') >= SEASON) return false;
     const had = [1, 2, 3, 9].some((n) => localStorage.getItem(slotKey(n))) || !!localStorage.getItem(OLD_KEY);
     for (const n of [1, 2, 3, 9]) localStorage.removeItem(slotKey(n));
