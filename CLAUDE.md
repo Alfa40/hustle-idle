@@ -6,6 +6,7 @@
   centrale in `src/ui/layout.ts`): verticale e orizzontale, scala in base al lato corto,
   safe area, niente `resize` o pixel fissi sparsi, prova con `debug.html` alle misure
   360×640, 390×844, 430×932, 768×1024 in entrambi gli orientamenti.
+- **Al chiuso c'è il soffitto**: ogni lavoretto dentro un palazzo (`Room`, src/minigames/room.ts) ha soffitto, muri alti fino al soffitto e plafoniere: dal soffitto non si deve mai vedere il cielo (regola dell'utente, 24/10/2026).
 - **Riquadro dei lavoretti essenziale**: nel badge in alto solo quello che serve davvero al player in quel
   momento (es. i civici dove consegnare, la camera della valigia in mano); niente informazioni inutili o
   secondarie (numero della fase, cose già visibili in scena, ripetizioni).
