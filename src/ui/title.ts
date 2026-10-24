@@ -4,7 +4,7 @@ import { settingsAction, settingsHtml } from './settingsview';
 import { formatDate } from './ui';
 import { DEV_SLOT, tryDevKey } from '../dev';
 import { tryTesterKey } from '../tester';
-import { betaSite, previewPr, sandbox } from '../preview';
+import { previewPr, sandbox } from '../preview';
 import { loadState } from '../sim/state';
 import { chooseName, loggedIn, login, MIN_PASSWORD, register } from '../sim/account';
 import { MAX_NICK, nickname } from '../sim/leaderboard';
@@ -113,7 +113,7 @@ export class TitleScreen {
     if (this.view === 'main') {
       const ls = last ? slots[last - 1] : null;
       html = `
-        <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">${betaSite ? 'Versione di prova 🧪 · salvataggi a parte' : 'Da squattrinato a magnate 💼'}</div></div>
+        <div class="t-logo"><div class="t-name">HUSTLE IDLE</div><div class="t-sub">Da squattrinato a magnate 💼</div></div>
         <div class="t-menu">
           ${ls ? `<button class="t-btn ${previewPr !== null ? '' : 't-main'}" data-t="play:${last}"><span class="t-ico">▶</span><span><b>Continua</b><small>${esc(ls.saveName)} · ${euro(ls.money)} · ${rank(ls)}</small></span></button>` : ''}
           ${previewPr !== null ? `<button class="t-btn t-main" data-t="quick"><span class="t-ico">▶</span><span><b>Gioca subito</b><small>Anteprima della proposta #${previewPr}</small></span></button>` : ''}

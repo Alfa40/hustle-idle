@@ -94,7 +94,7 @@ Espandi all'infinito  OPPURE  vendi (offerte d'acquisto) e reinvesti
 
 ### 6b. Campi di carriera (dal 24/10/2026 nel gioco vero, prima solo nel ramo `beta`)
 
-> Per ora solo nella versione di prova (https://beta.hustle-anteprime.pages.dev). Se piace va nel gioco vero e le partite si azzerano.
+> Dal 24/10/2026 nel gioco vero (la versione di prova è stata eliminata, le partite azzerate: §6c).
 
 - **Prima apertura del gioco** (non per partita): "Chi sei?" → 👤 Gioca come ospite, 🆕 Crea un account, 🔑 Ho già un account (nella versione di prova l'account non c'è). Poi **nome e logo** (disegnato; la foto si mette dopo dal Profilo). Valgono per **tutte le partite** (`src/identity.ts`: `hustle.logo`, `syncLogo` a ogni avvio di partita) e si cambiano dal 👤 Profilo.
 - **Ogni partita nuova sceglie il suo campo principale** ("🧭 Scegli la tua strada", obbligatorio): 🚚 Trasporti e logistica, 🍳 Ristorazione e ospitalità, 🔨 Costruzione e manualità, 🎨 Arte, design e ristrutturazione. Si possono avere partite con campi diversi. In città compaiono solo i lavoretti dei campi aperti, all'agenzia solo le attività dei campi aperti (`GameState.fields`, src/sim/fields.ts; partite di prima senza `fields` = tutti aperti).

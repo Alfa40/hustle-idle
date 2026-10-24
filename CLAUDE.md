@@ -144,7 +144,7 @@
 - Gioco: repo pubblico `github.com/Alfa40/hustle-idle`, online su https://alfa40.github.io/hustle-idle/
   (GitHub Actions `.github/workflows/deploy.yml` a ogni push su `main`). Pagina di prova layout:
   `…/hustle-idle/debug.html`.
-- **Versione di prova (beta)**: ramo `beta`, pubblicato da `.github/workflows/beta.yml` su Cloudflare Pages (stesso progetto delle anteprime) a https://beta.hustle-anteprime.pages.dev. Sito a parte: salvataggi suoi; `betaSite`/`sandbox` in src/preview.ts lo tengono fuori da classifica, account e poker vero, con la partita developer sempre disponibile. Le modifiche grosse da far provare vanno lì (commit sul ramo `beta`, push solo con "Pusha"); `main` resta il gioco vero. In locale si prova con `?beta`. I campi di carriera (GDD §6b) sono passati nel gioco vero il 24/10/2026 con l'azzeramento di tutte le partite (GDD §6c, `seasonReset()`, codice regalo in src/gift.ts).
+- **Versione di prova (beta): eliminata il 24/10/2026.** Le sue regole (campi di carriera, GDD §6b) sono nel gioco vero con l'azzeramento delle partite (GDD §6c, `seasonReset()`, codice regalo in src/gift.ts). Niente più ramo `beta` né `betaSite`; il vecchio indirizzo beta.hustle-anteprime.pages.dev rimanda al gioco vero.
 - Classifica, amici, logo e "sto giocando": server Node in `~/quartiere-ostile-3d-leaderboard/server.js`
   (repo `github.com/Alfa40/gioco-castello-antico-`, branch `main`), pubblicato su Render come
   `crazy-town.onrender.com` (si aggiorna da solo a ogni push) con database Upstash Redis.
