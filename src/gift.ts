@@ -10,7 +10,7 @@ import { addNews } from './sim/news';
  * almeno a 10 (sul campo principale). Vale una volta sola per telefono (localStorage); nel codice c'è solo l'impronta
  * SHA-256 del codice. Si scrive nelle Opzioni → 💾 Partita, dopo aver scelto la carriera.
  */
-const GIFT_HASH = 'b1d3be5155d8d147a4187b28385398f5bbdb402935e7536acfe7ff3a25d64654';
+const GIFT_HASH = '1732ccfe72c759f0db26eb29f160c66ee27b3e961432ef210e2846fbd98d93dc';
 const USED_KEY = 'hustle.giftStart';
 
 export const GIFT = { money: 100_000, fame: 2000, level: 10 };
