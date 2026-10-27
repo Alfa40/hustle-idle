@@ -581,7 +581,7 @@ export class PhotoStation extends Station {
   }
 
   private frame() {
-    return { x0: 0.28, y0: 0.24, x1: 0.72, y1: 0.7 };
+    return { x0: 0.12, y0: 0.2, x1: 0.88, y1: 0.72 };
   }
 
   private shutter() {
