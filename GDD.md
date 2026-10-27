@@ -493,7 +493,7 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
 - Opzioni → **🔁 Inverti joystick e azioni**: ci si muove a destra e si agisce a sinistra
 - Restano: oggetto che pulsa, cerchio a terra dove stare, scritta in alto, cerchietto sopra la testa per "tieni premuto"
 - Benvenuto: una riga spiega le due metà; chiuso il benvenuto, per qualche secondo le due metà si illuminano ("🕹️ Trascina qui per muoverti" / "👆 Tocca qui per parlare, entrare e lavorare"). Nei tutorial la manina tocca la metà delle azioni
-- Imbianchino: le cose del giardino stanno in fila contro la casa (girate o un po' più piccole se serve), lungo il muretto resta sempre un corridoio libero di 1,5 m per dipingerlo dall'interno
+- Imbianchino: le cose del giardino stanno in fila contro la casa (girate o un po' più piccole se serve), lungo il muretto resta sempre un corridoio libero di 1,5 m per dipingerlo dall'interno. La vernice sta a 2,8 m dall'ingresso verso il fondo, lontana dal muretto: non copre né ostacola il tratto di recinzione davanti a lei (proposta 15)
 
 ### Visuale sempre libera
 - Regola: nessun riquadro fisso, avviso o fumetto copre il personaggio, il campo attorno e gli obiettivi (i messaggi a comparsa rapida stanno al centro, sopra il personaggio, e spariscono in fretta)

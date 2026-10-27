@@ -1193,7 +1193,8 @@ export function paintArenaJob(game: Game, level: number, arena: Arena, title: st
     m.color.set(col);
     f.body.material = m;
   }
-  const cans = arena.entry.clone().add(new THREE.Vector3(2.2, 0, -0.6));
+  // la vernice sta lontana dal muretto: non deve coprire né ostacolare il tratto davanti a lei
+  const cans = arena.entry.clone().add(new THREE.Vector3(2.2, 0, -2.8));
   // cose del giardino da coprire: lontane dal muretto (resta un corridoio libero per dipingere)
   const nItems = Math.min(10, 2 + Math.floor(level));
   const kinds = [roundShrub, flowerBed, slide, patioSet, bigPlanter];
