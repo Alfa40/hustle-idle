@@ -20,6 +20,10 @@ import { nickname, setNickname } from './sim/leaderboard';
 import { watchIcons } from './ui/icons';
 import { startUpdateCheck } from './update';
 
+/** Hustle Idle spento per il momento: al posto del menu c'è un avviso che manda a Hustler Town */
+const GAME_OFF = true;
+const HUSTLER_TOWN = 'https://hustler-town.pages.dev';
+
 async function boot() {
   // niente emoji: ogni emoji nella pagina diventa un'icona disegnata del gioco
   watchIcons();
@@ -111,6 +115,14 @@ async function boot() {
     start(slot, newName, quick);
   });
   (window as unknown as { title: TitleScreen }).title = title;
+  // Hustle Idle è spento per il momento: un avviso copre il menu e manda a Hustler Town (l'app developer resta aperta)
+  if (GAME_OFF) {
+    const n = document.createElement('div');
+    n.className = 'off-note';
+    n.innerHTML = `<div class="off-box"><div class="off-title">AVVISO</div><p>Per il momento <b>Hustle Idle è spento</b>.</p><p>Da adesso si gioca a <b>Hustler Town</b>: entra dal link qui sotto.</p><a class="btn good off-go" href="${HUSTLER_TOWN}">Gioca a Hustler Town</a><div class="off-link">${HUSTLER_TOWN.replace('https://', '')}</div></div>`;
+    document.body.appendChild(n);
+    return;
+  }
   // le partite di prima sono state azzerate: si dice perché (una volta sola)
   if (wasReset) {
     const n = document.createElement('div');

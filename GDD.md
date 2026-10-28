@@ -677,3 +677,6 @@ Dopo l'MVP: altre attività, veicoli, più case, offerte d'acquisto, missioni se
   - 📷 **Studio fotografico** (base, locale, €3.500) → Foto di matrimoni → Agenzia di grafica → Studio creativo · bivio → Sartoria → Atelier di moda → Casa di moda.
 - Lista "Le mie": gruppi 🖌️ Pittura e ristrutturazioni, 🪚 Falegnameria, 📷 Foto, grafica e moda. Icone nuove: rocchetto di filo, vasca da bagno, vestito.
 - Provati con tocchi veri (tutorial compreso) al Liv. 1 e al Liv. 9; le attività comprate dal gioco partono col personale.
+
+## Gioco spento (28/10/2026)
+Per il momento Hustle Idle è spento: al posto del menu iniziale c'è un avviso (AVVISO, link a https://hustler-town.pages.dev) che non si chiude. Interruttore `GAME_OFF` in src/main.ts (false = gioco di nuovo aperto). L'app developer e le anteprime restano aperte.
